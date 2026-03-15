@@ -7,27 +7,42 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 const { migrate } = require('./src/migrate');
 const trackingApi = require('./src/tracking-api');
 const leadsApi = require('./src/leads-api');
 const adminApi = require('./src/admin-api');
+const authApi = require('./src/auth-api');
 
 const app = express();
 const PORT = process.env.PORT || 3900;
 app.set('trust proxy', 1);
 
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // API routes
 app.use('/api', trackingApi);
 app.use('/api', leadsApi);
+app.use('/api/auth', authApi);
 app.use('/api/admin', adminApi);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'lovetta' });
+});
+
+// SPA fallback for /my/* — serve React app
+const spaIndex = path.join(__dirname, '..', 'public', 'my', 'index.html');
+app.get('/my/*', (req, res) => {
+  if (fs.existsSync(spaIndex)) {
+    res.sendFile(spaIndex);
+  } else {
+    res.status(404).send('App not built yet. Run: npm run build');
+  }
 });
 
 // Start

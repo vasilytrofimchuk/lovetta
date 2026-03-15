@@ -77,14 +77,19 @@ async function runSync(command, args) {
 async function main() {
   console.log('[dev] Cleaning up existing processes...')
   await runSync('node', [resolve(__dirname, 'kill-lovetta-runtime.js')])
-  await runSync('node', [resolve(__dirname, 'kill-ports.js'), '3900'])
+  await runSync('node', [resolve(__dirname, 'kill-ports.js'), '3900', '5173'])
 
   spawnChild('server', 'node', ['server/index.js'], {
     cwd: resolve(__dirname, '..'),
   })
 
-  console.log('\n[dev] Local:   http://localhost:3900')
-  console.log('[dev] Admin:   http://localhost:3900/admin.html\n')
+  spawnChild('web', 'npm', ['-w', 'web', 'run', 'dev'], {
+    cwd: resolve(__dirname, '..'),
+  })
+
+  console.log('\n[dev] Landing: http://localhost:3900')
+  console.log('[dev] Admin:   http://localhost:3900/admin.html')
+  console.log('[dev] App:     http://localhost:5173/my/\n')
 }
 
 process.on('SIGINT', () => shutdown(0))

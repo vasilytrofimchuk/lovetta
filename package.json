@@ -2,17 +2,24 @@
   "name": "lovetta",
   "version": "0.0.1",
   "private": true,
+  "workspaces": ["web"],
   "scripts": {
     "start": "node server/index.js",
     "dev": "node scripts/run-dev.js",
+    "build": "npm -w web run build",
+    "heroku-postbuild": "npm run build",
     "migrate": "node server/src/migrate.js",
-    "kill:dev": "node scripts/kill-lovetta-runtime.js && node scripts/kill-ports.js 3900",
+    "kill:dev": "node scripts/kill-lovetta-runtime.js && node scripts/kill-ports.js 3900 5173",
     "kill:ports": "node scripts/kill-ports.js",
     "kill:runtime": "node scripts/kill-lovetta-runtime.js",
     "test:e2e": "npx playwright test"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "express": "^4.21.0",
+    "express-rate-limit": "^7.5.0",
+    "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.0"
   },
   "devDependencies": {

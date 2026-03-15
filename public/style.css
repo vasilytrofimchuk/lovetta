@@ -39,21 +39,21 @@ body {
 /* Header */
 header {
   padding: 32px 0 16px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
 }
 
 .logo {
-  width: 80px;
-  height: 80px;
-  border-radius: 20px;
-  margin-bottom: 12px;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
 }
 
 .logo-text {
-  width: 160px;
+  width: 200px;
   height: auto;
-  display: block;
-  margin: 0 auto 16px;
 }
 
 /* Hero */
@@ -248,14 +248,12 @@ header {
 }
 
 .form-message.success {
-  display: block;
   background: rgba(77, 214, 122, 0.1);
   border: 1px solid rgba(77, 214, 122, 0.3);
   color: var(--success);
 }
 
 .form-message.error {
-  display: block;
   background: rgba(255, 77, 106, 0.1);
   border: 1px solid rgba(255, 77, 106, 0.3);
   color: var(--error);

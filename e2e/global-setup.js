@@ -53,6 +53,8 @@ module.exports = async function globalSetup() {
       PORT: String(port),
       NODE_ENV: 'test',
       ADMIN_TOKEN: 'test-admin-token',
+      JWT_SECRET: 'test-jwt-secret-000',
+      JWT_REFRESH_SECRET: 'test-refresh-secret-000',
     },
     stdio: 'pipe',
     cwd: process.cwd(),

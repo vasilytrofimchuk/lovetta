@@ -17,3 +17,6 @@ test-results/
 
 # Temp files
 tmp-*.png
+
+# Vite build output (served by Express)
+public/my/
