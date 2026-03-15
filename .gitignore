@@ -1,0 +1,19 @@
+.env
+node_modules/
+dist/
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# E2E test artifacts
+e2e/.test-port
+e2e/videos/
+e2e/results/
+e2e/report/
+e2e/screenshots/
+e2e/*.png
+test-results/
+
+# Temp files
+tmp-*.png

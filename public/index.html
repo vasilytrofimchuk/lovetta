@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lovetta — Your AI Companion</title>
+  <meta name="description" content="Meet your AI companion. Personalized conversations, unique personality, always there for you. Create your perfect companion today.">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Lovetta — Your AI Companion">
+  <meta property="og:description" content="Meet your AI companion. Personalized conversations, unique personality, always there for you.">
+  <meta property="og:image" content="https://lovetta.ai/assets/brand/og-image.png">
+  <meta property="og:url" content="https://lovetta.ai">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Lovetta">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Lovetta — Your AI Companion">
+  <meta name="twitter:description" content="Meet your AI companion. Personalized conversations, unique personality, always there for you.">
+  <meta name="twitter:image" content="https://lovetta.ai/assets/brand/og-image.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/icon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/icon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/icon-180.png">
+  <link rel="icon" href="/assets/brand/favicon.ico">
+
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="/assets/brand/logo.png" alt="Lovetta" class="logo">
+    </header>
+
+    <section class="hero">
+      <h1>Meet Your AI Companion</h1>
+      <p>She remembers everything, adapts to you, and is always there when you need her. Create up to 3 unique companions with their own personality and style.</p>
+    </section>
+
+    <section class="features">
+      <div class="feature">
+        <div class="feature-icon">💬</div>
+        <h3>Natural Conversations</h3>
+        <p>Deep, meaningful chats that feel real. She remembers your stories and preferences.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🎭</div>
+        <h3>Unique Personality</h3>
+        <p>Choose from 20+ personalities or create your own. Each companion is one of a kind.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📸</div>
+        <h3>Generated Images</h3>
+        <p>She can send you photos. AI-generated and consistent with her character.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔔</div>
+        <h3>Always Connected</h3>
+        <p>She reaches out to you. Get notifications across all your devices.</p>
+      </div>
+    </section>
+
+    <section class="signup-section">
+      <div class="signup-card">
+        <h2>Join the Waitlist</h2>
+        <p class="subtitle">Be the first to meet your companion. We'll reach out when your spot is ready.</p>
+
+        <form id="signup-form">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="your@email.com" required autocomplete="email">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="birth-month">Birth Month</label>
+              <select id="birth-month" name="birthMonth" required>
+                <option value="">Month</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="birth-year">Birth Year</label>
+              <select id="birth-year" name="birthYear" required>
+                <option value="">Year</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="agree-terms" required>
+            <label for="agree-terms">I agree to the <a href="/privacy.html" target="_blank">Privacy Policy</a> and <a href="/terms.html" target="_blank">Terms of Service</a></label>
+          </div>
+
+          <button type="submit" class="btn-primary" id="submit-btn">Join Waitlist</button>
+        </form>
+
+        <div id="form-success" class="form-message success">
+          Thanks for joining! We'll reach out when your spot is ready.
+        </div>
+        <div id="form-error" class="form-message error"></div>
+      </div>
+    </section>
+
+    <footer>
+      <p>&copy; 2026 Lovetta. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="/privacy.html">Privacy Policy</a>
+        <a href="/terms.html">Terms of Service</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="/tracking.js"></script>
+  <script>
+    // Populate birth year dropdown
+    (function() {
+      var yearSelect = document.getElementById('birth-year');
+      var currentYear = new Date().getFullYear();
+      for (var y = currentYear - 18; y >= currentYear - 100; y--) {
+        var opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        yearSelect.appendChild(opt);
+      }
+    })();
+
+    // Form submission
+    document.getElementById('signup-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      var btn = document.getElementById('submit-btn');
+      var successEl = document.getElementById('form-success');
+      var errorEl = document.getElementById('form-error');
+      successEl.style.display = 'none';
+      errorEl.style.display = 'none';
+
+      var email = document.getElementById('email').value.trim();
+      var birthMonth = document.getElementById('birth-month').value;
+      var birthYear = document.getElementById('birth-year').value;
+
+      if (!email || !birthMonth || !birthYear) {
+        errorEl.textContent = 'Please fill in all fields.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      if (!document.getElementById('agree-terms').checked) {
+        errorEl.textContent = 'Please agree to the Privacy Policy and Terms of Service.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Joining...';
+
+      fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email,
+          birthMonth: parseInt(birthMonth, 10),
+          birthYear: parseInt(birthYear, 10),
+          sessionId: window.LovettaTracking ? window.LovettaTracking.getSessionId() : null
+        })
+      }).then(function(r) {
+        return r.json().then(function(data) { return { status: r.status, data: data }; });
+      }).then(function(result) {
+        if (result.data.ok) {
+          document.getElementById('signup-form').style.display = 'none';
+          successEl.style.display = 'block';
+        } else if (result.data.error === 'age_restricted') {
+          errorEl.textContent = 'You must be 18 or older to join.';
+          errorEl.style.display = 'block';
+        } else if (result.data.error === 'invalid_email') {
+          errorEl.textContent = 'Please enter a valid email address.';
+          errorEl.style.display = 'block';
+        } else {
+          errorEl.textContent = 'Something went wrong. Please try again.';
+          errorEl.style.display = 'block';
+        }
+      }).catch(function() {
+        errorEl.textContent = 'Connection error. Please try again.';
+        errorEl.style.display = 'block';
+      }).finally(function() {
+        btn.disabled = false;
+        btn.textContent = 'Join Waitlist';
+      });
+    });
+  </script>
+</body>
+</html>

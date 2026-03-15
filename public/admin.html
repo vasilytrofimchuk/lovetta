@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lovetta Admin</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/icon-32.png">
+  <style>
+    :root {
+      --bg: #0f0a1a;
+      --bg2: #1a1128;
+      --bg3: #231838;
+      --text: #f0e6ff;
+      --text2: #b8a4d6;
+      --muted: #7c6a9a;
+      --accent: #e040a0;
+      --border: #2d1f45;
+      --success: #4dd67a;
+      --error: #ff4d6a;
+      --radius: 10px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+    /* Auth gate */
+    #auth-gate {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+    }
+    #auth-gate .auth-box {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px; width: 100%; max-width: 400px; text-align: center;
+    }
+    #auth-gate h2 { margin-bottom: 20px; }
+    #auth-gate input {
+      width: 100%; padding: 12px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 1rem; margin-bottom: 16px;
+    }
+    #auth-gate button {
+      width: 100%; padding: 12px; background: var(--accent); color: white;
+      border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600;
+    }
+    #auth-error { color: var(--error); margin-top: 12px; display: none; }
+
+    /* Dashboard */
+    #dashboard { display: none; max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .dash-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    }
+    .dash-header h1 { font-size: 1.5rem; }
+    .dash-header button {
+      padding: 8px 16px; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text2); cursor: pointer; font-size: 0.85rem;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex; gap: 4px; margin-bottom: 24px;
+      border-bottom: 1px solid var(--border); padding-bottom: 0;
+    }
+    .tab {
+      padding: 10px 20px; background: none; border: none; border-bottom: 2px solid transparent;
+      color: var(--muted); cursor: pointer; font-size: 0.95rem; font-weight: 500;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Cards */
+    .stat-cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 2rem; font-weight: 700; margin-top: 4px; }
+    .stat-card .sub { font-size: 0.8rem; color: var(--text2); margin-top: 4px; }
+
+    /* Tables */
+    .section { margin-bottom: 32px; }
+    .section h3 { font-size: 1rem; color: var(--text2); margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; background: var(--bg3); border-radius: var(--radius); overflow: hidden; }
+    th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    th { color: var(--muted); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { color: var(--text2); }
+
+    /* Search */
+    .search-bar {
+      display: flex; gap: 12px; margin-bottom: 20px; align-items: center;
+    }
+    .search-bar input {
+      flex: 1; padding: 10px 16px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.95rem;
+    }
+    .search-bar input:focus { outline: none; border-color: var(--accent); }
+
+    /* Pagination */
+    .pagination {
+      display: flex; gap: 8px; justify-content: center; margin-top: 16px;
+    }
+    .pagination button {
+      padding: 8px 16px; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text2); cursor: pointer;
+    }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination span { padding: 8px 12px; color: var(--muted); font-size: 0.9rem; }
+
+    /* Settings */
+    .setting-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 12px;
+    }
+    .setting-row .label { font-size: 0.95rem; color: var(--text); }
+    .setting-row .desc { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .setting-row select {
+      padding: 8px 12px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.9rem;
+    }
+    .save-msg { color: var(--success); font-size: 0.85rem; margin-left: 12px; opacity: 0; transition: opacity 0.3s; }
+    .save-msg.show { opacity: 1; }
+
+    .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 768px) { .breakdown-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <!-- Auth Gate -->
+  <div id="auth-gate">
+    <div class="auth-box">
+      <h2>Admin Access</h2>
+      <input type="password" id="token-input" placeholder="Admin token" autofocus>
+      <button onclick="tryAuth()">Login</button>
+      <p id="auth-error">Invalid token</p>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard">
+    <div class="dash-header">
+      <h1>Lovetta Admin</h1>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('visitors')">Visitors</button>
+      <button class="tab" onclick="switchTab('leads')">Leads</button>
+      <button class="tab" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <!-- Visitors Tab -->
+    <div id="tab-visitors" class="tab-content active">
+      <div class="stat-cards" id="visitor-cards"></div>
+      <div class="breakdown-grid" id="visitor-breakdowns"></div>
+    </div>
+
+    <!-- Leads Tab -->
+    <div id="tab-leads" class="tab-content">
+      <div class="stat-cards" id="lead-cards"></div>
+      <div class="search-bar">
+        <input type="text" id="lead-search" placeholder="Search by email..." oninput="debounceLeadSearch()">
+      </div>
+      <div id="leads-table-wrap"></div>
+      <div class="pagination" id="leads-pagination"></div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="tab-settings" class="tab-content">
+      <h3 style="margin-bottom: 16px; color: var(--text2);">Content Levels by Platform</h3>
+      <div id="settings-list"></div>
+    </div>
+  </div>
+
+  <script>
+    var TOKEN = localStorage.getItem('lovetta-admin-token') || '';
+    var currentLeadPage = 1;
+    var leadSearchTimeout;
+
+    // Auth
+    function headers() {
+      return { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' };
+    }
+
+    function tryAuth() {
+      TOKEN = document.getElementById('token-input').value.trim();
+      fetch('/api/admin/stats', { headers: headers() }).then(function(r) {
+        if (r.ok) {
+          localStorage.setItem('lovetta-admin-token', TOKEN);
+          showDashboard();
+        } else {
+          document.getElementById('auth-error').style.display = 'block';
+        }
+      }).catch(function() {
+        document.getElementById('auth-error').style.display = 'block';
+      });
+    }
+
+    document.getElementById('token-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') tryAuth();
+    });
+
+    function logout() {
+      TOKEN = '';
+      localStorage.removeItem('lovetta-admin-token');
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('auth-gate').style.display = 'flex';
+    }
+
+    function showDashboard() {
+      document.getElementById('auth-gate').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      loadStats();
+      loadLeads();
+      loadSettings();
+    }
+
+    // Tabs
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+      event.target.classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+    }
+
+    // Stats
+    function loadStats() {
+      fetch('/api/admin/stats', { headers: headers() }).then(function(r) { return r.json(); }).then(function(data) {
+        var v = data.visitors || {};
+        document.getElementById('visitor-cards').innerHTML =
+          card('Total Visitors', v.total || 0) +
+          card('Today', v.today || 0) +
+          card('Active Now', v.active || 0);
+
+        var l = data.leads || {};
+        document.getElementById('lead-cards').innerHTML =
+          card('Total Leads', l.total || 0) +
+          card('Today', l.today || 0) +
+          card('Unique Emails', l.unique_emails || 0);
+
+        var breakdowns = '';
+        breakdowns += breakdownTable('Countries', 'country', data.countries || []);
+        breakdowns += breakdownTable('Cities', 'city', data.cities || []);
+        breakdowns += breakdownTable('Devices', 'device_type', data.devices || []);
+        breakdowns += breakdownTable('UTM Sources', 'utm_source', data.sources || []);
+        breakdowns += breakdownTable('UTM Mediums', 'utm_medium', data.mediums || []);
+        breakdowns += breakdownTable('Campaigns', 'utm_campaign', data.campaigns || []);
+        breakdowns += breakdownTable('Referrers', 'referrer_domain', data.referrers || []);
+        document.getElementById('visitor-breakdowns').innerHTML = breakdowns;
+      });
+    }
+
+    function card(label, value, sub) {
+      return '<div class="stat-card"><div class="label">' + label + '</div><div class="value">' + value + '</div>' +
+        (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
+    }
+
+    function breakdownTable(title, key, rows) {
+      if (!rows.length) return '';
+      var html = '<div class="section"><h3>' + title + '</h3><table><tr><th>' + title.slice(0, -1) + '</th><th>Count</th></tr>';
+      rows.forEach(function(r) {
+        html += '<tr><td>' + esc(r[key] || 'Unknown') + '</td><td>' + r.count + '</td></tr>';
+      });
+      return html + '</table></div>';
+    }
+
+    // Leads
+    function loadLeads(page) {
+      currentLeadPage = page || 1;
+      var search = (document.getElementById('lead-search') || {}).value || '';
+      var url = '/api/admin/leads?page=' + currentLeadPage + '&limit=50';
+      if (search) url += '&search=' + encodeURIComponent(search);
+
+      fetch(url, { headers: headers() }).then(function(r) { return r.json(); }).then(function(data) {
+        var leads = data.leads || [];
+        var total = data.total || 0;
+        var totalPages = Math.ceil(total / (data.limit || 50));
+
+        var html = '<table><tr><th>Email</th><th>Birth</th><th>Source</th><th>Country</th><th>Date</th></tr>';
+        leads.forEach(function(l) {
+          html += '<tr><td>' + esc(l.email) + '</td>' +
+            '<td>' + (l.birth_month || '?') + '/' + (l.birth_year || '?') + '</td>' +
+            '<td>' + esc(l.utm_source || l.source || '-') + '</td>' +
+            '<td>' + esc(l.country || '-') + '</td>' +
+            '<td>' + new Date(l.created_at).toLocaleDateString() + '</td></tr>';
+        });
+        html += '</table>';
+        if (!leads.length) html = '<p style="color: var(--muted); text-align: center; padding: 40px;">No leads yet</p>';
+        document.getElementById('leads-table-wrap').innerHTML = html;
+
+        var pag = '';
+        pag += '<button ' + (currentLeadPage <= 1 ? 'disabled' : '') + ' onclick="loadLeads(' + (currentLeadPage - 1) + ')">Prev</button>';
+        pag += '<span>Page ' + currentLeadPage + ' of ' + Math.max(1, totalPages) + ' (' + total + ' total)</span>';
+        pag += '<button ' + (currentLeadPage >= totalPages ? 'disabled' : '') + ' onclick="loadLeads(' + (currentLeadPage + 1) + ')">Next</button>';
+        document.getElementById('leads-pagination').innerHTML = pag;
+      });
+    }
+
+    function debounceLeadSearch() {
+      clearTimeout(leadSearchTimeout);
+      leadSearchTimeout = setTimeout(function() { loadLeads(1); }, 300);
+    }
+
+    // Settings
+    var CONTENT_LEVELS = ['0 - Light flirt', '1 - Romantic', '2 - Intimate', '3 - Unrestricted'];
+    var SETTING_DEFS = [
+      { key: 'text_level_web', label: 'Text Level — Web', desc: 'Sexual content level for text on web platform' },
+      { key: 'text_level_appstore', label: 'Text Level — App Store', desc: 'Sexual content level for text on iOS' },
+      { key: 'text_level_telegram', label: 'Text Level — Telegram', desc: 'Sexual content level for text in Telegram' },
+      { key: 'image_level_web', label: 'Image Level — Web', desc: 'Image content level on web platform' },
+      { key: 'image_level_appstore', label: 'Image Level — App Store', desc: 'Image content level on iOS' },
+      { key: 'image_level_telegram', label: 'Image Level — Telegram', desc: 'Image content level in Telegram' },
+    ];
+
+    function loadSettings() {
+      fetch('/api/admin/settings', { headers: headers() }).then(function(r) { return r.json(); }).then(function(data) {
+        var settings = data.settings || {};
+        var html = '';
+        SETTING_DEFS.forEach(function(def) {
+          var current = parseInt(settings[def.key], 10) || 0;
+          var options = CONTENT_LEVELS.map(function(l, i) {
+            return '<option value="' + i + '"' + (i === current ? ' selected' : '') + '>' + l + '</option>';
+          }).join('');
+          html += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
+            '<div style="display:flex;align-items:center;"><select onchange="saveSetting(\'' + def.key + '\', this.value, this)">' + options + '</select>' +
+            '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
+        });
+        document.getElementById('settings-list').innerHTML = html;
+      });
+    }
+
+    function saveSetting(key, value, el) {
+      fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({ key: key, value: parseInt(value, 10) })
+      }).then(function(r) {
+        if (r.ok) {
+          var msg = document.getElementById('msg-' + key);
+          msg.classList.add('show');
+          setTimeout(function() { msg.classList.remove('show'); }, 2000);
+        }
+      });
+    }
+
+    // Helpers
+    function esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // Auto-login if token saved
+    if (TOKEN) {
+      fetch('/api/admin/stats', { headers: headers() }).then(function(r) {
+        if (r.ok) showDashboard();
+      }).catch(function() {});
+    }
+  </script>
+</body>
+</html>

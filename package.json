@@ -1,0 +1,25 @@
+{
+  "name": "lovetta",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node scripts/run-dev.js",
+    "migrate": "node server/src/migrate.js",
+    "kill:dev": "node scripts/kill-lovetta-runtime.js && node scripts/kill-ports.js 3900",
+    "kill:ports": "node scripts/kill-ports.js",
+    "kill:runtime": "node scripts/kill-lovetta-runtime.js",
+    "test:e2e": "npx playwright test"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "sharp": "^0.33.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
