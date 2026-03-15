@@ -307,7 +307,7 @@
 
     // Settings
     var CONTENT_LEVELS = ['0 - Light flirt', '1 - Romantic', '2 - Intimate', '3 - Unrestricted'];
-    var SETTING_DEFS = [
+    var CONTENT_SETTING_DEFS = [
       { key: 'text_level_web', label: 'Text Level — Web', desc: 'Sexual content level for text on web platform' },
       { key: 'text_level_appstore', label: 'Text Level — App Store', desc: 'Sexual content level for text on iOS' },
       { key: 'text_level_telegram', label: 'Text Level — Telegram', desc: 'Sexual content level for text in Telegram' },
@@ -315,12 +315,17 @@
       { key: 'image_level_appstore', label: 'Image Level — App Store', desc: 'Image content level on iOS' },
       { key: 'image_level_telegram', label: 'Image Level — Telegram', desc: 'Image content level in Telegram' },
     ];
+    var NUMBER_SETTING_DEFS = [
+      { key: 'max_companions', label: 'Max Companions per User', desc: 'Maximum number of companions a user can create', min: 1, max: 10 },
+    ];
 
     function loadSettings() {
       fetch('/api/admin/settings', { headers: headers() }).then(function(r) { return r.json(); }).then(function(data) {
         var settings = data.settings || {};
         var html = '';
-        SETTING_DEFS.forEach(function(def) {
+
+        // Content level dropdowns
+        CONTENT_SETTING_DEFS.forEach(function(def) {
           var current = parseInt(settings[def.key], 10) || 0;
           var options = CONTENT_LEVELS.map(function(l, i) {
             return '<option value="' + i + '"' + (i === current ? ' selected' : '') + '>' + l + '</option>';
@@ -329,6 +334,18 @@
             '<div style="display:flex;align-items:center;"><select onchange="saveSetting(\'' + def.key + '\', this.value, this)">' + options + '</select>' +
             '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
         });
+
+        // Number inputs
+        html += '<h3 style="margin: 24px 0 16px; color: var(--text2);">App Limits</h3>';
+        NUMBER_SETTING_DEFS.forEach(function(def) {
+          var current = parseInt(settings[def.key], 10) || def.min || 1;
+          html += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
+            '<div style="display:flex;align-items:center;"><input type="number" min="' + (def.min || 1) + '" max="' + (def.max || 100) + '" value="' + current + '" ' +
+            'style="width:70px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;text-align:center;" ' +
+            'onchange="saveSetting(\'' + def.key + '\', parseInt(this.value, 10), this)">' +
+            '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
+        });
+
         document.getElementById('settings-list').innerHTML = html;
       });
     }

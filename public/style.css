@@ -46,7 +46,14 @@ header {
   width: 80px;
   height: 80px;
   border-radius: 20px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+}
+
+.logo-text {
+  width: 160px;
+  height: auto;
+  display: block;
+  margin: 0 auto 16px;
 }
 
 /* Hero */

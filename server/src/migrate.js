@@ -70,7 +70,8 @@ const MIGRATIONS = [
         ('text_level_telegram', '1'),
         ('image_level_web', '2'),
         ('image_level_appstore', '0'),
-        ('image_level_telegram', '1')
+        ('image_level_telegram', '1'),
+        ('max_companions', '3')
       ON CONFLICT (key) DO NOTHING;
     `,
   },
