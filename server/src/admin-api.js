@@ -460,20 +460,18 @@ router.get('/emails', async (req, res) => {
     const offset = (page - 1) * limit;
     const direction = req.query.direction || 'all';
 
-    let dirClause = '';
-    const params = [limit, offset];
-    if (direction !== 'all') {
-      dirClause = `WHERE direction = $3`;
-      params.push(direction === 'sent' ? 'outbound' : 'inbound');
-    }
+    const dirValue = direction === 'all' ? null : (direction === 'sent' ? 'outbound' : 'inbound');
+    const dirClause = dirValue ? `WHERE direction = $1` : '';
 
     const { rows: countRows } = await pool.query(
       `SELECT COUNT(*) AS total FROM admin_emails ${dirClause}`,
-      dirClause ? [params[2]] : []
+      dirValue ? [dirValue] : []
     );
+    const listClause = dirValue ? `WHERE direction = $3` : '';
+    const params = dirValue ? [limit, offset, dirValue] : [limit, offset];
     const { rows } = await pool.query(
       `SELECT id, direction, from_address, to_address, subject, is_marketing, forwarded, read, created_at
-       FROM admin_emails ${dirClause}
+       FROM admin_emails ${listClause}
        ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
       params
     );
