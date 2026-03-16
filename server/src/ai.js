@@ -25,6 +25,7 @@ const MAX_REGENERATE_ATTEMPTS = 2;
 const FAL_PRICING = {
   'fal-ai/flux-dev': 0.025,
   'fal-ai/flux/dev': 0.025,
+  'fal-ai/flux/schnell': 0.003,
   'fal-ai/flux-schnell': 0.003,
   'fal-ai/wan-2.6': 0.25,
   'fal-ai/wan/v2.6/image-to-video': 0.25,
@@ -350,7 +351,7 @@ async function generateImage(prompt, opts = {}) {
   if (!FAL_KEY) throw new Error('FAL_KEY not configured');
 
   const settings = await getAISettings();
-  const model = opts.model || settings.fal_image_model || 'fal-ai/flux-dev';
+  const model = opts.model || settings.fal_image_model || 'fal-ai/flux/dev';
   const platform = opts.platform || 'web';
 
   // Append image level rules to the prompt

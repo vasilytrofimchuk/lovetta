@@ -160,3 +160,15 @@
 - [x] Reply flow: parse reply text → insert as user message → AI response → send back as companion email
 - [x] Email threading via Message-ID / In-Reply-To headers (conversations.last_email_message_id)
 - [x] Profile page: full subscription details (status, plan, trial end, renewal date)
+
+## Audio Messages: TTS Playback + Voice Input
+
+- [x] DB migration v7: voice_id column on companion_templates and user_companions (default 'nova')
+- [x] Server: generateSpeech() in ai.js — OpenAI TTS API (tts-1 model, raw HTTPS)
+- [x] Server: tts-api.js — POST /api/chat/tts endpoint (auth, R2 cache, consumption tracking)
+- [x] Server: mount tts-api in index.js
+- [x] Server: mp3 MIME type in r2.js
+- [x] Frontend: useTTS hook — Audio playback with idle/loading/playing/paused states
+- [x] Frontend: MessageBubble play button — speaker icon on assistant messages
+- [x] Frontend: ChatInput mic button — Web Speech API voice-to-text (Chrome/Edge/Safari)
+- [x] OPENAI_API_KEY added to .env

@@ -10,6 +10,7 @@ import CompanionCreate from './pages/CompanionCreate'
 import ChatPage from './pages/ChatPage'
 import Pricing from './pages/Pricing'
 import Profile from './pages/Profile'
+import DesktopShell from './components/DesktopShell'
 
 function Loading() {
   return (
@@ -58,7 +59,9 @@ export default function App() {
   return (
     <BrowserRouter basename="/my">
       <AuthProvider>
-        <AppRoutes />
+        <DesktopShell>
+          <AppRoutes />
+        </DesktopShell>
       </AuthProvider>
     </BrowserRouter>
   )

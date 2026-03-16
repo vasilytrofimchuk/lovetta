@@ -15,6 +15,24 @@ body {
   color: #f0e6ff;
 }
 
+/* Desktop background decorations */
+.desktop-glow-pink {
+  position: absolute;
+  top: -10%;
+  left: -5%;
+  width: 40%;
+  height: 50%;
+  background: radial-gradient(ellipse, rgba(214, 51, 108, 0.07) 0%, transparent 70%);
+}
+.desktop-glow-purple {
+  position: absolute;
+  bottom: -10%;
+  right: -5%;
+  width: 40%;
+  height: 50%;
+  background: radial-gradient(ellipse, rgba(26, 17, 40, 0.5) 0%, transparent 70%);
+}
+
 input:-webkit-autofill,
 input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 1000px #1a1128 inset;

@@ -186,12 +186,12 @@ Text and image levels are independent, configurable per platform in admin settin
 - Same API pipeline, 5-10 second clips based on character
 - Lower priority — implement after image generation is stable
 
-### Audio Messages
-- **User → Companion**: MediaRecorder API captures voice, uploads as audio file to server
-- **Companion → User**: Small play button on each companion message for TTS playback
-- **TTS options**: Browser SpeechSynthesis API (free) or ElevenLabs/similar (premium quality)
-- **Voice selection**: During companion creation, user picks from available voices
-- Voice ID stored in user_companions.voice_id
+### Audio Messages — DONE
+- **User → Companion**: Browser Web Speech API transcribes voice to text (mic button in ChatInput)
+- **Companion → User**: Small play button on each assistant message for TTS playback
+- **TTS**: OpenAI TTS API (tts-1 model, on-demand generation, R2 caching)
+- **Voice selection**: voice_id column in user_companions (default 'nova')
+- **Cost**: ~$0.003 per message play, tracked in api_consumption (callType 'tts')
 
 ### Push Notifications
 - **Web Push**: VAPID keys + service worker registration

@@ -57,6 +57,18 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
         {/* Handle */}
         <div className="w-10 h-1 bg-brand-border rounded-full mx-auto mb-5" />
 
+        {/* Report button — top left */}
+        <button
+          onClick={onReport}
+          className="absolute top-5 left-5 p-2 rounded-lg text-brand-muted hover:text-brand-text hover:bg-brand-surface transition-colors"
+          title="Report Content"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+            <line x1="4" y1="22" x2="4" y2="15" />
+          </svg>
+        </button>
+
         {/* Avatar + Name */}
         <div className="flex flex-col items-center mb-4">
           {companion.avatar_url ? (
@@ -81,16 +93,9 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
           )}
         </div>
 
-        {/* Personality excerpt */}
-        {companion.personality && (
-          <p className="text-sm text-brand-text-secondary text-center mb-5 line-clamp-3">
-            {companion.personality}
-          </p>
-        )}
-
         {/* Tips */}
-        <div className="mb-4">
-          <p className="text-sm text-brand-text-secondary text-center mb-3">
+        <div className="rounded-xl border border-brand-accent/20 bg-brand-accent/5 p-4">
+          <p className="text-sm font-medium text-brand-accent text-center mb-3">
             Send {companion.name} a tip
           </p>
           <div className="grid grid-cols-4 gap-2">
@@ -99,26 +104,12 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
                 key={amount}
                 onClick={() => handleTip(amount)}
                 disabled={tipLoading !== null}
-                className="py-2.5 rounded-lg border border-brand-border bg-brand-surface text-brand-text hover:bg-brand-accent/10 hover:border-brand-accent/40 transition-colors disabled:opacity-50 text-sm font-medium"
+                className="py-2.5 rounded-lg border border-brand-accent/30 bg-brand-card text-brand-text hover:bg-brand-accent/15 hover:border-brand-accent/50 transition-colors disabled:opacity-50 text-sm font-medium"
               >
                 {tipLoading === amount ? '...' : `$${amount}`}
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Actions */}
-        <div className="space-y-2">
-          <button
-            onClick={onReport}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-brand-surface border border-brand-border text-brand-text-secondary hover:text-brand-text hover:border-brand-accent/30 transition-colors"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-              <line x1="4" y1="22" x2="4" y2="15" />
-            </svg>
-            Report Content
-          </button>
         </div>
       </div>
     </div>

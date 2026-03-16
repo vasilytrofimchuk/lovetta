@@ -130,17 +130,27 @@ async function getConsumptionSummary(period = '30d') {
         SUM(calls) AS calls,
         SUM(CASE WHEN call_type = 'chat' THEN cost ELSE 0 END) AS chat_cost,
         SUM(CASE WHEN call_type = 'image' THEN cost ELSE 0 END) AS image_cost,
-        SUM(CASE WHEN call_type = 'video' THEN cost ELSE 0 END) AS video_cost
+        SUM(CASE WHEN call_type = 'video' THEN cost ELSE 0 END) AS video_cost,
+        SUM(CASE WHEN call_type = 'tts' THEN cost ELSE 0 END) AS tts_cost
       FROM consumption
       WHERE companion_id IS NOT NULL
       GROUP BY companion_id
+    ),
+    by_companion_named AS (
+      SELECT
+        bc.*,
+        uc.name AS companion_name,
+        u.email AS user_email
+      FROM by_companion bc
+      LEFT JOIN user_companions uc ON uc.id = bc.companion_id
+      LEFT JOIN users u ON u.id = uc.user_id
     )
     SELECT
       (SELECT COALESCE(SUM(cost), 0) FROM consumption) AS total_cost_usd,
       (SELECT total_tips FROM tip_totals) AS total_tips,
       (SELECT COALESCE(json_agg(json_build_object('provider', provider, 'cost', cost, 'calls', calls)), '[]') FROM by_provider) AS by_provider,
       (SELECT COALESCE(json_agg(json_build_object('model', model, 'provider', provider, 'cost', cost, 'calls', calls, 'tokens', tokens)), '[]') FROM by_model) AS by_model,
-      (SELECT COALESCE(json_agg(json_build_object('companion_id', companion_id, 'cost', cost, 'calls', calls, 'chat_cost', chat_cost, 'image_cost', image_cost, 'video_cost', video_cost)), '[]') FROM by_companion) AS by_companion
+      (SELECT COALESCE(json_agg(json_build_object('companion_name', companion_name, 'user_email', user_email, 'cost', cost, 'calls', calls, 'chat_cost', chat_cost, 'image_cost', image_cost, 'video_cost', video_cost, 'tts_cost', tts_cost) ORDER BY cost DESC), '[]') FROM by_companion_named) AS by_companion
   `);
 
   // Daily breakdown

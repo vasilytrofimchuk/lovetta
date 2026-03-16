@@ -180,6 +180,7 @@ async function sendCompanionEmail({ companionName, companionId, toEmail, message
     to: toEmail,
     subject: `${companionName}`,
     text: plainText,
+    html: `<p>${plainText.replace(/\n/g, '<br>')}</p>`,
     headers: emailHeaders,
   });
 

@@ -132,7 +132,7 @@
     .save-msg { color: var(--success); font-size: 0.85rem; margin-left: 12px; opacity: 0; transition: opacity 0.3s; }
     .save-msg.show { opacity: 1; }
 
-    .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .breakdown-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
     @media (max-width: 768px) { .breakdown-grid { grid-template-columns: 1fr; } }
 
     /* Mono & truncate */
@@ -984,13 +984,15 @@
         // Companion table
         var companions = data.byCompanion || [];
         if (companions.length) {
-          var html = '<table><tr><th>Companion</th><th>Chat</th><th>Image</th><th>Video</th><th>Total</th></tr>';
+          var html = '<table><tr><th>Girl</th><th>User</th><th>Chat</th><th>Image</th><th>Video</th><th>TTS</th><th>Total</th></tr>';
           companions.forEach(function(c) {
             var total = parseFloat(c.cost) || 0;
-            html += '<tr><td>' + esc(c.companion_id ? c.companion_id.slice(0, 8) + '...' : 'N/A') + '</td>' +
+            html += '<tr><td>' + esc(c.companion_name || 'N/A') + '</td>' +
+              '<td>' + esc(c.user_email || 'N/A') + '</td>' +
               '<td>$' + (parseFloat(c.chat_cost) || 0).toFixed(3) + '</td>' +
               '<td>$' + (parseFloat(c.image_cost) || 0).toFixed(3) + '</td>' +
               '<td>$' + (parseFloat(c.video_cost) || 0).toFixed(3) + '</td>' +
+              '<td>$' + (parseFloat(c.tts_cost) || 0).toFixed(3) + '</td>' +
               '<td>$' + total.toFixed(3) + '</td></tr>';
           });
           html += '</table>';

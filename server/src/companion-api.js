@@ -46,7 +46,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: `Maximum ${maxCompanions} companions allowed` });
     }
 
-    const { templateId, name, personality, backstory, traits, communicationStyle, age } = req.body || {};
+    const { templateId, name, personality, backstory, traits, communicationStyle, age, avatarUrl } = req.body || {};
     let companionData;
 
     if (templateId) {
@@ -76,7 +76,7 @@ router.post('/', authenticate, async (req, res) => {
         name,
         personality,
         backstory: backstory || '',
-        avatar_url: null,
+        avatar_url: avatarUrl || null,
         traits: traits || [],
         communication_style: communicationStyle || 'playful',
         age: Math.max(20, age || 22),
@@ -225,6 +225,36 @@ router.delete('/:id', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[companions] delete error:', err.message);
     res.status(500).json({ error: 'Failed to delete companion' });
+  }
+});
+
+// -- POST /api/companions/imagine-personality ----------------
+router.post('/imagine-personality', authenticate, async (req, res) => {
+  try {
+    const { text, filters } = req.body || {};
+    const hints = [];
+    if (filters?.style === 'anime') hints.push('anime-inspired character');
+    if (filters?.hair && filters.hair !== 'all') hints.push(`${filters.hair} hair`);
+    if (filters?.skin && filters.skin !== 'all') hints.push(`${filters.skin} skin tone`);
+    if (filters?.age && filters.age !== 'all') hints.push(`age ${filters.age}`);
+    const filterContext = hints.length ? `\nHer appearance: ${hints.join(', ')}.` : '';
+
+    const systemPrompt = `You are a creative writer for an AI girlfriend app. Generate a compelling, unique personality description for a virtual girlfriend character.${filterContext}
+Write 2-3 sentences in third person describing who she is — her personality, passions, quirks, and how she connects with people. Be vivid and specific. Make her feel real and interesting. Keep it under 300 characters.
+Return ONLY the personality text, nothing else.`;
+
+    const userMsg = text?.trim()
+      ? `Improve and expand this personality description, keeping the core idea but making it more vivid and detailed:\n"${text.trim()}"`
+      : 'Generate a completely random and unique personality for a girlfriend character.';
+
+    const result = await chatCompletion(systemPrompt, [{ role: 'user', content: userMsg }], {
+      userId: req.userId,
+      platform: 'web',
+    });
+    res.json({ personality: result.fullText.trim().replace(/^["']|["']$/g, '') });
+  } catch (err) {
+    console.error('[companions] imagine-personality error:', err.message);
+    res.status(500).json({ error: 'Failed to generate personality' });
   }
 });
 
