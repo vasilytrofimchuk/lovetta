@@ -12,6 +12,7 @@ export default function useChat(companionId) {
   const [error, setError] = useState(null);
   const [shouldRequestTip, setShouldRequestTip] = useState(false);
   const abortRef = useRef(null);
+  const typewriterRef = useRef(null);
 
   const loadChat = useCallback(async () => {
     try {
@@ -80,13 +81,31 @@ export default function useChat(companionId) {
           try {
             const event = JSON.parse(jsonStr);
 
-            if (event.type === 'chunk') {
+            if (event.type === 'typing') {
+              // Server is thinking — streaming indicator already shows
+            } else if (event.type === 'chunk') {
               accumulated += event.text;
-              setStreamingText(accumulated);
+              // Typewriter effect: reveal text word-by-word
+              const words = accumulated.split(/(\s+)/); // split keeping whitespace
+              let wi = 0;
+              if (typewriterRef.current) clearInterval(typewriterRef.current);
+              setStreamingText('');
+              typewriterRef.current = setInterval(() => {
+                wi += 2; // 2 tokens (word + space) per tick
+                if (wi >= words.length) {
+                  setStreamingText(accumulated);
+                  clearInterval(typewriterRef.current);
+                  typewriterRef.current = null;
+                } else {
+                  setStreamingText(words.slice(0, wi).join(''));
+                }
+              }, 20);
             } else if (event.type === 'regenerate') {
               accumulated = '';
+              if (typewriterRef.current) { clearInterval(typewriterRef.current); typewriterRef.current = null; }
               setStreamingText('');
             } else if (event.type === 'done') {
+              if (typewriterRef.current) { clearInterval(typewriterRef.current); typewriterRef.current = null; }
               // Parse context from accumulated text
               const contextMatch = accumulated.match(/^\*([^*]+)\*/);
               const contextText = contextMatch ? contextMatch[1].trim() : (event.contextText || null);

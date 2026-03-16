@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
@@ -13,6 +13,61 @@ function getGradient(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return GRADIENT_COLORS[Math.abs(hash) % GRADIENT_COLORS.length];
+}
+
+function TemplateCard({ t, onSelect }) {
+  const videoRef = useRef(null);
+  const cardRef = useRef(null);
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card || !t.video_url) return;
+
+    // Shrink the intersection zone to a narrow band in the center — only 1 row (2 cards) activates
+    const observer = new IntersectionObserver(
+      ([entry]) => setActive(entry.isIntersecting),
+      { rootMargin: '-40% 0px -40% 0px', threshold: 0.5 }
+    );
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [t.video_url]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (active) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+      video.currentTime = 0;
+    }
+  }, [active]);
+
+  return (
+    <button ref={cardRef} onClick={() => onSelect(t)}
+      className="relative rounded-2xl overflow-hidden aspect-[3/4] group">
+      {t.avatar_url && (
+        <img src={t.avatar_url} alt={t.name}
+          className="absolute inset-0 w-full h-full object-cover" />
+      )}
+      {t.video_url && active && (
+        <video ref={videoRef} src={t.video_url} muted loop playsInline autoPlay
+          className="absolute inset-0 w-full h-full object-cover" />
+      )}
+      {!t.avatar_url && !t.video_url && (
+        <div className="absolute inset-0 bg-brand-card" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-white font-bold text-lg leading-tight">{t.name}</span>
+          <span className="text-brand-accent font-semibold text-base">{t.age}</span>
+        </div>
+        <p className="text-white/70 text-xs mt-0.5 line-clamp-2 leading-snug">{t.tagline}</p>
+      </div>
+    </button>
+  );
 }
 
 export default function CompanionCreate() {
@@ -127,29 +182,7 @@ export default function CompanionCreate() {
         {step === 'templates' && (
           <div className="grid grid-cols-2 gap-3">
             {templates.map(t => (
-              <button key={t.id} onClick={() => selectTemplate(t)}
-                className="relative rounded-2xl overflow-hidden aspect-[3/4] group">
-                {t.video_url ? (
-                  <video src={t.video_url} autoPlay muted loop playsInline
-                    poster={t.avatar_url} preload="metadata"
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                ) : t.avatar_url ? (
-                  <img src={t.avatar_url} alt={t.name}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                ) : (
-                  <div className="absolute inset-0 bg-brand-card" />
-                )}
-                {/* Gradient overlay for text readability */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                {/* Name + age + tagline */}
-                <div className="absolute bottom-0 left-0 right-0 p-3">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-white font-bold text-lg leading-tight">{t.name}</span>
-                    <span className="text-brand-accent font-semibold text-base">{t.age}</span>
-                  </div>
-                  <p className="text-white/70 text-xs mt-0.5 line-clamp-2 leading-snug">{t.tagline}</p>
-                </div>
-              </button>
+              <TemplateCard key={t.id} t={t} onSelect={selectTemplate} />
             ))}
           </div>
         )}
@@ -192,7 +225,7 @@ export default function CompanionCreate() {
               <div className="relative rounded-2xl overflow-hidden aspect-[3/4]">
                 {selected.video_url ? (
                   <video src={selected.video_url} autoPlay muted loop playsInline
-                    poster={selected.avatar_url}
+                    preload="auto"
                     className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
                   <img src={selected.avatar_url} alt={selected.name}

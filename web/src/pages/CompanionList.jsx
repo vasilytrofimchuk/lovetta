@@ -117,6 +117,14 @@ export default function CompanionList() {
             {companions.map(c => (
               <CompanionCard key={c.id} companion={c} />
             ))}
+
+            <button
+              onClick={() => navigate('/create')}
+              className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-brand-accent/40 text-brand-accent hover:bg-brand-accent/10 transition-colors mt-4"
+            >
+              <span className="text-xl leading-none">+</span>
+              <span className="text-sm font-medium">Awaken a new girlfriend</span>
+            </button>
           </div>
         )}
       </div>
