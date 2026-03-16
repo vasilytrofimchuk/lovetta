@@ -42,6 +42,15 @@ When tests are needed:
 1. Run relevant Playwright tests (`npm run test:e2e`)
 2. All tests must pass before marking task complete
 
+**Demo Tests (Video Recording)**:
+- `npm run test:e2e:demo` — runs demo tests with video recording enabled
+- Demo test files: `e2e/demo-*.test.js` (separate Playwright project, excluded from regular tests)
+- Videos saved to `e2e/videos/` with timestamped filenames (`.webm`)
+- Use `saveNamedDemoVideo(page, 'name.webm')` from `e2e/helpers.js` to save named videos
+- Use `page.waitForTimeout()` between actions for pacing in videos
+- Block external scripts (Google GSI) with `page.route()` to avoid React DOM crashes
+- **Build React app first**: `npm run build` before running demo tests (SPA needs built assets)
+
 **Test Port Isolation**: Tests use a **random free port** per run — NOT port 3900.
 - `e2e/global-setup.js` picks a random port, writes it to `e2e/.test-port`
 - `e2e/helpers.js` reads `BASE` URL from that file (fallback: 3900)
@@ -122,6 +131,8 @@ lovetta/
 | `npm run dev` | Kill existing processes, free port 3900, start fresh server |
 | `npm run kill:dev` | Kill port 3900 + all lovetta runtime processes |
 | `npm run kill:ports -- 3900` | Free a specific port |
+| `npm run test:e2e` | Run E2E tests (no video) |
+| `npm run test:e2e:demo` | Run demo tests with video recording |
 
 ### Git Setup
 
@@ -130,7 +141,7 @@ lovetta/
 
 ### Deployment
 
-- **Heroku app**: `lovetta-ai` (TBD)
+- **Heroku app**: `lovetta-ai`
 - Auto-deploys from GitHub on push to main
 - Procfile: `web: node server/index.js`
 

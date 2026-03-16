@@ -18,6 +18,15 @@ module.exports = defineConfig({
     {
       name: 'default',
       testMatch: '**/*.test.js',
+      testIgnore: [/demo-.*\.test\.js$/],
+    },
+    {
+      name: 'demo',
+      testMatch: /demo-.*\.test\.js$/,
+      use: {
+        browserName: 'chromium',
+        video: 'on',
+      },
     },
   ],
 });
