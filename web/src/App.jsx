@@ -5,7 +5,10 @@ import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
-import Home from './pages/Home'
+import CompanionList from './pages/CompanionList'
+import CompanionCreate from './pages/CompanionCreate'
+import ChatPage from './pages/ChatPage'
+import Pricing from './pages/Pricing'
 
 function Loading() {
   return (
@@ -40,7 +43,10 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+      <Route path="/" element={<ProtectedRoute><CompanionList /></ProtectedRoute>} />
+      <Route path="/create" element={<ProtectedRoute><CompanionCreate /></ProtectedRoute>} />
+      <Route path="/chat/:companionId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+      <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

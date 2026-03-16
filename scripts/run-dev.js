@@ -79,6 +79,9 @@ async function main() {
   await runSync('node', [resolve(__dirname, 'kill-lovetta-runtime.js')])
   await runSync('node', [resolve(__dirname, 'kill-ports.js'), '3900', '5173'])
 
+  console.log('[dev] Building React app...')
+  await runSync('npm', ['-w', 'web', 'run', 'build'])
+
   spawnChild('server', 'node', ['server/index.js'], {
     cwd: resolve(__dirname, '..'),
   })

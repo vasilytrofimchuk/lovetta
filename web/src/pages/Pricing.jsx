@@ -1,10 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api, { getErrorMessage } from '../lib/api'
 
-export default function Pricing({ subscription, onBack }) {
+export default function Pricing() {
   const { user } = useAuth()
-  const [loading, setLoading] = useState(null) // 'monthly' | 'yearly' | null
+  const navigate = useNavigate()
+  const [subscription, setSubscription] = useState(null)
+  const [loading, setLoading] = useState(null)
+  const [subLoading, setSubLoading] = useState(true)
+
+  useEffect(() => {
+    api.get('/api/billing/status')
+      .then(({ data }) => setSubscription(data))
+      .catch(() => {})
+      .finally(() => setSubLoading(false))
+  }, [])
 
   const handleSubscribe = async (plan) => {
     setLoading(plan)
@@ -33,13 +44,15 @@ export default function Pricing({ subscription, onBack }) {
     <div className="min-h-screen bg-brand-bg p-4">
       <div className="max-w-md mx-auto pt-8">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-xl font-bold">Subscription</h1>
-          <button onClick={onBack} className="text-sm text-brand-muted hover:text-brand-text">
+          <h1 className="text-xl font-bold text-brand-text">Subscription</h1>
+          <button onClick={() => navigate('/')} className="text-sm text-brand-muted hover:text-brand-text transition-colors">
             Back
           </button>
         </div>
 
-        {isActive ? (
+        {subLoading ? (
+          <div className="text-center py-8 text-brand-muted">Loading...</div>
+        ) : isActive ? (
           <div className="bg-brand-card border border-brand-border rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-3">
               <span className="text-brand-success font-semibold">Active</span>
@@ -71,10 +84,10 @@ export default function Pricing({ subscription, onBack }) {
             <div className="space-y-4">
               <div className="bg-brand-card border border-brand-border rounded-xl p-5">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold">Monthly</h3>
+                  <h3 className="font-semibold text-brand-text">Monthly</h3>
                   <span className="text-brand-accent font-bold text-lg">$20/mo</span>
                 </div>
-                <p className="text-sm text-brand-muted mb-4">Unlimited conversations, images, companions</p>
+                <p className="text-sm text-brand-muted mb-4">Unlimited conversations, images, girlfriends</p>
                 <button
                   onClick={() => handleSubscribe('monthly')}
                   disabled={!!loading}
@@ -89,7 +102,7 @@ export default function Pricing({ subscription, onBack }) {
                   SAVE 58%
                 </span>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold">Yearly</h3>
+                  <h3 className="font-semibold text-brand-text">Yearly</h3>
                   <div className="text-right">
                     <span className="text-brand-accent font-bold text-lg">$100/yr</span>
                     <span className="text-brand-muted text-sm ml-2">~$8.33/mo</span>
@@ -110,7 +123,7 @@ export default function Pricing({ subscription, onBack }) {
 
         {/* Tips section */}
         <div className="mt-8">
-          <h2 className="text-lg font-semibold mb-4 text-center">Send a tip</h2>
+          <h2 className="text-lg font-semibold mb-4 text-center text-brand-text">Send a tip</h2>
           <div className="grid grid-cols-4 gap-3">
             {[10, 20, 50, 100].map((amount) => (
               <TipButton key={amount} amount={amount} />

@@ -29,6 +29,8 @@ const leadsApi = require('./src/leads-api');
 const adminApi = require('./src/admin-api');
 const authApi = require('./src/auth-api');
 const billingApi = require('./src/billing-api');
+const companionApi = require('./src/companion-api');
+const chatApi = require('./src/chat-api');
 
 const app = express();
 const PORT = process.env.PORT || 3900;
@@ -75,6 +77,8 @@ app.use('/api', leadsApi);
 app.use('/api/auth', authApi);
 app.use('/api/billing', billingApi);
 app.use('/api/admin', adminApi);
+app.use('/api/companions', companionApi);
+app.use('/api/chat', chatApi);
 
 // Health check
 app.get('/api/health', (req, res) => {

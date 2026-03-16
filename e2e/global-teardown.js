@@ -22,6 +22,10 @@ module.exports = async function globalTeardown() {
   try {
     const pool = new Pool({ connectionString: testDbUrl });
     await pool.query(`
+      DROP TABLE IF EXISTS messages CASCADE;
+      DROP TABLE IF EXISTS conversations CASCADE;
+      DROP TABLE IF EXISTS user_companions CASCADE;
+      DROP TABLE IF EXISTS companion_templates CASCADE;
       DROP TABLE IF EXISTS user_companion_cost_balance CASCADE;
       DROP TABLE IF EXISTS api_consumption CASCADE;
       DROP TABLE IF EXISTS telegram_users CASCADE;
