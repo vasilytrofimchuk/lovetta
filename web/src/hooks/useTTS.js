@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+import api from '../lib/api';
 
 /**
  * Hook for TTS playback on a message.
@@ -45,21 +44,7 @@ export default function useTTS(messageId) {
       // Reuse cached URL if available
       let url = urlRef.current;
       if (!url) {
-        const token = document.cookie.match(/accessToken=([^;]+)/)?.[1] || '';
-        const res = await fetch(`${API_BASE}/api/chat/tts`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ messageId }),
-        });
-
-        if (!res.ok) {
-          throw new Error('TTS failed');
-        }
-
-        const data = await res.json();
+        const { data } = await api.post('/api/chat/tts', { messageId });
         url = data.audioUrl;
         urlRef.current = url;
       }
