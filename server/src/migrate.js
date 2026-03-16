@@ -415,6 +415,23 @@ const MIGRATIONS = [
     `,
   },
   {
+    name: '019_companion_template_avatars',
+    sql: `
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/luna.jpg' WHERE name = 'Luna';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/sophia.jpg' WHERE name = 'Sophia';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/aria.jpg' WHERE name = 'Aria';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/emma.jpg' WHERE name = 'Emma';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/mia.jpg' WHERE name = 'Mia';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/isabella.jpg' WHERE name = 'Isabella';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/chloe.jpg' WHERE name = 'Chloe';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/lily.jpg' WHERE name = 'Lily';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/zara.jpg' WHERE name = 'Zara';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/ruby.jpg' WHERE name = 'Ruby';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/jade.jpg' WHERE name = 'Jade';
+      UPDATE companion_templates SET avatar_url = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/violet.jpg' WHERE name = 'Violet';
+    `,
+  },
+  {
     name: '018_ai_consent_and_content_reports',
     sql: `
       ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_consent_at TIMESTAMPTZ;

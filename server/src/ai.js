@@ -7,6 +7,7 @@ const { trackConsumption } = require('./consumption');
 const { buildContentPrompt, buildImagePrompt } = require('./content-levels');
 const { processResponse, scanUserMessage, STRICT_REGENERATE_PROMPT } = require('./age-guard');
 const { getPool } = require('./db');
+const { uploadFromUrl } = require('./r2');
 
 const OPENROUTER_API_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
 const FAL_KEY = (process.env.FAL_KEY || '').trim();
@@ -399,8 +400,20 @@ async function generateImage(prompt, opts = {}) {
   }
 
   const result = await response.json();
-  const imageUrl = result.images?.[0]?.url || result.image?.url || null;
+  const falUrl = result.images?.[0]?.url || result.image?.url || null;
   const costUsd = FAL_PRICING[model] || 0.025;
+
+  // Upload to R2 for permanent storage
+  let imageUrl = falUrl;
+  if (falUrl) {
+    try {
+      const folder = opts.companionId ? `images/${opts.companionId}` : 'images/misc';
+      const { url } = await uploadFromUrl(falUrl, folder);
+      imageUrl = url;
+    } catch (e) {
+      console.error('[r2] Image upload failed, using fal.ai URL:', e.message);
+    }
+  }
 
   let consumptionResult = { shouldRequestTip: false };
   if (opts.userId) {
@@ -450,8 +463,20 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
   }
 
   const result = await response.json();
-  const videoUrl = result.video?.url || result.url || null;
+  const falUrl = result.video?.url || result.url || null;
   const costUsd = FAL_PRICING[model] || 0.25;
+
+  // Upload to R2 for permanent storage
+  let videoUrl = falUrl;
+  if (falUrl) {
+    try {
+      const folder = opts.companionId ? `videos/${opts.companionId}` : 'videos/misc';
+      const { url } = await uploadFromUrl(falUrl, folder, { extension: '.mp4' });
+      videoUrl = url;
+    } catch (e) {
+      console.error('[r2] Video upload failed, using fal.ai URL:', e.message);
+    }
+  }
 
   let consumptionResult = { shouldRequestTip: false };
   if (opts.userId) {
