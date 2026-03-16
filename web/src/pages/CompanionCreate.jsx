@@ -153,8 +153,19 @@ const VOICES = [
   { id: 'FGY2WhTYpPnrIDTdsKH5', label: 'Laura', desc: 'Quirky & enthusiastic' },
   { id: 'Xb7hH8MSUJpSbSDYk0k2', label: 'Alice', desc: 'Clear & engaging' },
   { id: 'pFZP5JQG7iQjIQuC4Bku', label: 'Lily', desc: 'Velvety & expressive' },
-  { id: 'hpp4J3VqNfWAUOO0d1Us', label: 'Bella', desc: 'Bright & professional' },
+  { id: 'hpp4J3VqNfWAUOO0d1Us', label: 'Bella', desc: 'Bright & polished' },
   { id: 'XrExE9yKIg1WjnnlVkGX', label: 'Matilda', desc: 'Confident & commanding' },
+  { id: 'KF337ZXYjoHdNuYUrufC', label: 'Cadence', desc: 'Calm & sultry' },
+  { id: 'AyCt0WmAXUcPJR11zeeP', label: 'Sasha', desc: 'Vibrant British' },
+  { id: 'lhgliD0TncfFOY1Nc93M', label: 'Chloe', desc: 'Effortless & modern' },
+  { id: 'rBUHN6YO9PJUwGXk13Jt', label: 'Ayana', desc: 'Captivating & versatile' },
+  { id: 'jpICOesdLlRSc39O1UB5', label: 'Hallie', desc: 'Fun & feminine' },
+  { id: '6tHWtWy43FFxMeA73K4c', label: 'Cynthia', desc: 'Soft & soothing' },
+  { id: 's50zV0dPjgaPRdN9zm48', label: 'Gabrielle', desc: 'Natural & conversational' },
+  { id: 'z12gfZvqqjJ9oHFbB5i6', label: 'Pixie', desc: 'Magical & bright' },
+  { id: 'ytfkKJNB1AXxIr8dKm5H', label: 'Marta', desc: 'Warm & storytelling' },
+  { id: 'OHY6EjdeHKeQymoihwfz', label: 'Riyanka', desc: 'Cute & cheerful' },
+  { id: 'nPpkc230TdYdntJKFNby', label: 'Mia', desc: 'Clear & emotive' },
 ];
 
 const INITIAL_AVATAR_COUNT = 13;

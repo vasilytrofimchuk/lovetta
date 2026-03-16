@@ -391,36 +391,30 @@ const MIGRATIONS = [
   {
     name: 'v11_elevenlabs_voices',
     sql: `
-      -- Assign ElevenLabs voice IDs to templates (7 female voices across 18 templates)
-      -- Jessica (cgSgspJ2msm6clMCkdW9) — Playful, Bright, Warm
-      -- Sarah (EXAVITQu4vr4xnSDxMaL) — Mature, Reassuring, Confident
-      -- Laura (FGY2WhTYpPnrIDTdsKH5) — Enthusiast, Quirky
-      -- Alice (Xb7hH8MSUJpSbSDYk0k2) — Clear, Engaging
-      -- Lily (pFZP5JQG7iQjIQuC4Bku) — Velvety Actress
-      -- Bella (hpp4J3VqNfWAUOO0d1Us) — Professional, Bright
-      -- Matilda (XrExE9yKIg1WjnnlVkGX) — Knowledgeable, Professional
+      -- Assign unique ElevenLabs voice IDs to all 18 templates
+      -- 7 premade + 11 shared library voices = 18 unique voices
 
       -- Realistic templates
-      UPDATE companion_templates SET voice_id = 'cgSgspJ2msm6clMCkdW9' WHERE name = 'Luna';
-      UPDATE companion_templates SET voice_id = 'Xb7hH8MSUJpSbSDYk0k2' WHERE name = 'Sophia';
-      UPDATE companion_templates SET voice_id = 'pFZP5JQG7iQjIQuC4Bku' WHERE name = 'Aria';
-      UPDATE companion_templates SET voice_id = 'EXAVITQu4vr4xnSDxMaL' WHERE name = 'Emma';
-      UPDATE companion_templates SET voice_id = 'FGY2WhTYpPnrIDTdsKH5' WHERE name = 'Mia';
-      UPDATE companion_templates SET voice_id = 'hpp4J3VqNfWAUOO0d1Us' WHERE name = 'Isabella';
-      UPDATE companion_templates SET voice_id = 'cgSgspJ2msm6clMCkdW9' WHERE name = 'Chloe';
-      UPDATE companion_templates SET voice_id = 'pFZP5JQG7iQjIQuC4Bku' WHERE name = 'Lily';
-      UPDATE companion_templates SET voice_id = 'XrExE9yKIg1WjnnlVkGX' WHERE name = 'Zara';
-      UPDATE companion_templates SET voice_id = 'FGY2WhTYpPnrIDTdsKH5' WHERE name = 'Ruby';
-      UPDATE companion_templates SET voice_id = 'EXAVITQu4vr4xnSDxMaL' WHERE name = 'Jade';
-      UPDATE companion_templates SET voice_id = 'hpp4J3VqNfWAUOO0d1Us' WHERE name = 'Violet';
+      UPDATE companion_templates SET voice_id = 'cgSgspJ2msm6clMCkdW9' WHERE name = 'Luna';     -- Jessica: Playful, Bright
+      UPDATE companion_templates SET voice_id = 'Xb7hH8MSUJpSbSDYk0k2' WHERE name = 'Sophia';   -- Alice: Clear, Engaging
+      UPDATE companion_templates SET voice_id = 'KF337ZXYjoHdNuYUrufC' WHERE name = 'Aria';      -- Cadence: Calm, Sultry
+      UPDATE companion_templates SET voice_id = 'EXAVITQu4vr4xnSDxMaL' WHERE name = 'Emma';     -- Sarah: Reassuring
+      UPDATE companion_templates SET voice_id = 'jpICOesdLlRSc39O1UB5' WHERE name = 'Mia';       -- Hallie: Fun, Young
+      UPDATE companion_templates SET voice_id = 'rBUHN6YO9PJUwGXk13Jt' WHERE name = 'Isabella';  -- Ayana: Captivating
+      UPDATE companion_templates SET voice_id = 'lhgliD0TncfFOY1Nc93M' WHERE name = 'Chloe';     -- Chloe: Effortless British
+      UPDATE companion_templates SET voice_id = 'pFZP5JQG7iQjIQuC4Bku' WHERE name = 'Lily';      -- Lily: Velvety Actress
+      UPDATE companion_templates SET voice_id = 'XrExE9yKIg1WjnnlVkGX' WHERE name = 'Zara';      -- Matilda: Commanding
+      UPDATE companion_templates SET voice_id = 's50zV0dPjgaPRdN9zm48' WHERE name = 'Ruby';       -- Gabrielle: Conversational
+      UPDATE companion_templates SET voice_id = '6tHWtWy43FFxMeA73K4c' WHERE name = 'Jade';       -- Cynthia: Calm hostess
+      UPDATE companion_templates SET voice_id = 'AyCt0WmAXUcPJR11zeeP' WHERE name = 'Violet';    -- Sasha: Vibrant British
 
       -- Anime templates
-      UPDATE companion_templates SET voice_id = 'cgSgspJ2msm6clMCkdW9' WHERE name = 'Sakura';
-      UPDATE companion_templates SET voice_id = 'pFZP5JQG7iQjIQuC4Bku' WHERE name = 'Yuki';
-      UPDATE companion_templates SET voice_id = 'FGY2WhTYpPnrIDTdsKH5' WHERE name = 'Hana';
-      UPDATE companion_templates SET voice_id = 'XrExE9yKIg1WjnnlVkGX' WHERE name = 'Rei';
-      UPDATE companion_templates SET voice_id = 'hpp4J3VqNfWAUOO0d1Us' WHERE name = 'Aiko';
-      UPDATE companion_templates SET voice_id = 'EXAVITQu4vr4xnSDxMaL' WHERE name = 'Mei';
+      UPDATE companion_templates SET voice_id = 'z12gfZvqqjJ9oHFbB5i6' WHERE name = 'Sakura';    -- Pixie: Ultra-high magical
+      UPDATE companion_templates SET voice_id = 'hpp4J3VqNfWAUOO0d1Us' WHERE name = 'Yuki';       -- Bella: Professional
+      UPDATE companion_templates SET voice_id = 'ytfkKJNB1AXxIr8dKm5H' WHERE name = 'Hana';       -- Marta: Warm storyteller
+      UPDATE companion_templates SET voice_id = 'FGY2WhTYpPnrIDTdsKH5' WHERE name = 'Rei';        -- Laura: Quirky
+      UPDATE companion_templates SET voice_id = 'OHY6EjdeHKeQymoihwfz' WHERE name = 'Aiko';       -- Riyanka: Cute cheerful
+      UPDATE companion_templates SET voice_id = 'nPpkc230TdYdntJKFNby' WHERE name = 'Mei';        -- Mia: Clear emotive
 
       -- Update existing user_companions with old OpenAI voice names
       UPDATE user_companions SET voice_id = ct.voice_id
