@@ -125,7 +125,11 @@ export default function useChat(companionId) {
                 setShouldRequestTip(true);
               }
             } else if (event.type === 'error') {
-              setError(event.code === 'subscription_required' ? 'subscription_required' : (event.message || 'Chat error'));
+              if (event.code === 'subscription_required') {
+                setError('subscription_required');
+              } else {
+                setError("She's a bit overwhelmed right now. Try again in a moment.");
+              }
             }
           } catch {}
         }

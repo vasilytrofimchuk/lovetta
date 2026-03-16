@@ -152,8 +152,8 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
 
   const settings = await getAISettings();
-  const primaryModel = opts.model || settings.openrouter_model || 'meta-llama/llama-3.1-70b-instruct';
-  const fallbackModel = settings.openrouter_fallback_model || 'meta-llama/llama-3.1-70b-instruct';
+  const primaryModel = opts.model || settings.openrouter_model || 'thedrummer/rocinante-12b';
+  const fallbackModel = settings.openrouter_fallback_model || 'thedrummer/rocinante-12b';
   let model = primaryModel;
   const platform = opts.platform || 'web';
 
@@ -266,7 +266,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
 
   const settings = await getAISettings();
-  const model = opts.model || settings.openrouter_model || 'venice/uncensored';
+  const model = opts.model || settings.openrouter_model || 'thedrummer/rocinante-12b';
   const platform = opts.platform || 'web';
 
   const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform);

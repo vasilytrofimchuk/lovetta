@@ -67,8 +67,8 @@ const MIGRATIONS = [
         ('image_level_telegram', '1'),
         ('max_companions', '3'),
         ('tip_request_threshold_usd', '"2.00"'),
-        ('openrouter_model', '"cognitivecomputations/dolphin-mistral-24b-venice-edition:free"'),
-        ('openrouter_fallback_model', '"meta-llama/llama-3.1-70b-instruct"'),
+        ('openrouter_model', '"thedrummer/rocinante-12b"'),
+        ('openrouter_fallback_model', '"sao10k/l3.1-euryale-70b"'),
         ('fal_image_model', '"fal-ai/flux-dev"'),
         ('fal_video_model', '"wan/v2.6/image-to-video"')
       ON CONFLICT (key) DO NOTHING;
