@@ -14,7 +14,8 @@
     "kill:dev": "node scripts/kill-lovetta-runtime.js && node scripts/kill-ports.js 3900 5173",
     "kill:ports": "node scripts/kill-ports.js",
     "kill:runtime": "node scripts/kill-lovetta-runtime.js",
-    "test:e2e": "npx playwright test"
+    "test:e2e": "npx playwright test --project=default",
+    "test:e2e:demo": "npx playwright test --project=demo"
   },
   "dependencies": {
     "@sentry/node": "^10.43.0",
@@ -23,7 +24,8 @@
     "express": "^4.21.0",
     "express-rate-limit": "^7.5.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "stripe": "^20.4.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

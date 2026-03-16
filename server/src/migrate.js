@@ -124,6 +124,50 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash);
     `,
   },
+  {
+    name: '006_subscriptions',
+    sql: `
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        id              SERIAL PRIMARY KEY,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        plan            TEXT NOT NULL,
+        status          TEXT NOT NULL DEFAULT 'active',
+        stripe_subscription_id TEXT UNIQUE,
+        stripe_customer_id TEXT,
+        current_period_end TIMESTAMPTZ,
+        trial_ends_at   TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe ON subscriptions(stripe_subscription_id);
+    `,
+  },
+  {
+    name: '007_billing_events',
+    sql: `
+      CREATE TABLE IF NOT EXISTS billing_events (
+        event_id    TEXT PRIMARY KEY,
+        event_type  TEXT NOT NULL,
+        processed_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `,
+  },
+  {
+    name: '008_tips',
+    sql: `
+      CREATE TABLE IF NOT EXISTS tips (
+        id              SERIAL PRIMARY KEY,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount          INTEGER NOT NULL,
+        currency        TEXT DEFAULT 'usd',
+        stripe_payment_id TEXT UNIQUE,
+        status          TEXT DEFAULT 'succeeded',
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_tips_user ON tips(user_id);
+    `,
+  },
 ];
 
 async function migrate() {

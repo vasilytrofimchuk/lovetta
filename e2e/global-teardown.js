@@ -22,6 +22,9 @@ module.exports = async function globalTeardown() {
   try {
     const pool = new Pool({ connectionString: testDbUrl });
     await pool.query(`
+      DROP TABLE IF EXISTS tips CASCADE;
+      DROP TABLE IF EXISTS billing_events CASCADE;
+      DROP TABLE IF EXISTS subscriptions CASCADE;
       DROP TABLE IF EXISTS refresh_tokens CASCADE;
       DROP TABLE IF EXISTS users CASCADE;
       DROP TABLE IF EXISTS app_settings CASCADE;

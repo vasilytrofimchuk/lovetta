@@ -28,10 +28,27 @@ const trackingApi = require('./src/tracking-api');
 const leadsApi = require('./src/leads-api');
 const adminApi = require('./src/admin-api');
 const authApi = require('./src/auth-api');
+const billingApi = require('./src/billing-api');
 
 const app = express();
 const PORT = process.env.PORT || 3900;
 app.set('trust proxy', 1);
+
+// Stripe webhook MUST come before express.json() — raw body needed for signature
+app.post('/api/webhooks/stripe',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    try {
+      const { handleWebhook } = require('./src/billing');
+      const sig = req.headers['stripe-signature'];
+      const result = await handleWebhook(req.body, sig);
+      res.json({ received: true, ...result });
+    } catch (err) {
+      console.error('[stripe-webhook]', err.message);
+      res.status(400).json({ error: err.message });
+    }
+  }
+);
 
 app.use(express.json());
 app.use(cookieParser());
@@ -41,6 +58,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/api', trackingApi);
 app.use('/api', leadsApi);
 app.use('/api/auth', authApi);
+app.use('/api/billing', billingApi);
 app.use('/api/admin', adminApi);
 
 // Health check
