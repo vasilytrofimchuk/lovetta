@@ -12,6 +12,49 @@ const { trackConsumption } = require('./consumption');
 
 const router = Router();
 
+// Map *actions* to vocal sounds TTS can actually produce
+// Visual/physical actions get stripped, vocal ones become sounds
+const ACTION_SOUNDS = {
+  'giggle': 'hehe!',
+  'giggles': 'hehe!',
+  'giggling': 'hehe!',
+  'laugh': 'haha!',
+  'laughs': 'haha!',
+  'laughing': 'haha!',
+  'chuckle': 'heh,',
+  'chuckles': 'heh,',
+  'sigh': '...sigh...',
+  'sighs': '...sigh...',
+  'sighing': '...sigh...',
+  'gasp': '...oh!',
+  'gasps': '...oh!',
+  'moan': 'mmm...',
+  'moans': 'mmm...',
+  'moaning': 'mmm...',
+  'hum': 'hmm...',
+  'hums': 'hmm...',
+  'purr': 'mmmm...',
+  'purrs': 'mmmm...',
+  'whisper': '',  // just let TTS read the text naturally
+  'whispers': '',
+  'whispering': '',
+  'yawn': '...aaah...',
+  'yawns': '...aaah...',
+};
+
+function actionToSound(actionText) {
+  const lower = actionText.toLowerCase().trim();
+  // Check if the first word is a known vocal action
+  const firstWord = lower.split(/\s+/)[0];
+  if (firstWord in ACTION_SOUNDS) return ACTION_SOUNDS[firstWord];
+  // Check full phrase for vocal keywords
+  for (const [key, sound] of Object.entries(ACTION_SOUNDS)) {
+    if (lower.includes(key)) return sound;
+  }
+  // Physical/visual action — strip it
+  return '';
+}
+
 // POST /api/chat/tts
 router.post('/tts', authenticate, async (req, res) => {
   const pool = getPool();
@@ -54,8 +97,9 @@ router.post('/tts', authenticate, async (req, res) => {
     );
     const voiceId = companion?.voice_id || 'nova';
 
-    // Strip *action* text — only speak the dialogue, not "giggles" or "smirks"
-    const ttsText = msg.content.replace(/\*[^*]+\*/g, '').replace(/\s+/g, ' ').trim();
+    // Convert *actions* to vocal sounds or strip visual-only actions
+    // "*giggles* Hey!" → "hehe! Hey!"  |  "*leans closer* Hey!" → "Hey!"
+    const ttsText = msg.content.replace(/\*([^*]+)\*/g, (_, action) => actionToSound(action)).replace(/\s+/g, ' ').trim();
     if (!ttsText) return res.status(400).json({ error: 'No speakable text' });
 
     // Generate speech
