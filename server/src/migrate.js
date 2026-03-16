@@ -222,7 +222,7 @@ const MIGRATIONS = [
     sql: `
       INSERT INTO app_settings (key, value) VALUES
         ('tip_request_threshold_usd', '"2.00"'),
-        ('openrouter_model', '"venice/uncensored"'),
+        ('openrouter_model', '"cognitivecomputations/dolphin-mistral-24b-venice-edition:free"'),
         ('openrouter_fallback_model', '"meta-llama/llama-3.1-70b-instruct"'),
         ('fal_image_model', '"fal-ai/flux-dev"'),
         ('fal_video_model', '"fal-ai/wan-2.6"')

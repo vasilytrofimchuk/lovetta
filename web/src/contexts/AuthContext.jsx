@@ -72,9 +72,9 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  const signup = async ({ email, password, birthMonth, birthYear, termsAccepted, privacyAccepted }) => {
+  const signup = async ({ email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted }) => {
     const { data } = await api.post('/api/auth/signup', {
-      email, password, birthMonth, birthYear, termsAccepted, privacyAccepted,
+      email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted,
     })
     localStorage.setItem('lovetta-token', data.accessToken)
     localStorage.setItem('lovetta-refresh-token', data.refreshToken)

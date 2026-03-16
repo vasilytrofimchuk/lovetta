@@ -40,11 +40,26 @@ async function waitForServer(url, maxRetries = 30) {
   throw new Error('Server did not start');
 }
 
+function runCommand(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: 'pipe', cwd: process.cwd() });
+    child.on('error', reject);
+    child.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`${cmd} ${args.join(' ')} exited ${code}`)));
+  });
+}
+
 module.exports = async function globalSetup() {
+  // Build React app so UI tests work against server on random port
+  console.log('[setup] Building React app...');
+  await runCommand('npm', ['-w', 'web', 'run', 'build']);
+
   const testDbUrl = process.env.TEST_DATABASE_URL || 'postgres://localhost:5432/lovetta_test';
   const port = await getFreePort();
 
   fs.writeFileSync(PORT_FILE, String(port));
+
+  // Load .env to get API keys for real API tests
+  try { process.loadEnvFile('.env'); } catch {}
 
   const server = spawn('node', ['server/index.js'], {
     env: {
