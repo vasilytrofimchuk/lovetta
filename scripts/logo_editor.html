@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lovetta Logo + Icon Editor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #0a0a0f; color: #aaa; display: flex; height: 100vh; overflow: hidden; }
+  #sidebar { width: 340px; background: #101018; padding: 20px; overflow-y: auto; border-right: 1px solid #1a1a2e; flex-shrink: 0; }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .preview-area { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; min-height: 0; }
+  .preview-area.checkerboard { background: repeating-conic-gradient(#151520 0% 25%, #1a1a28 0% 50%) 0 0 / 24px 24px; }
+  .preview-area.dark-bg { background: #0d1117; }
+  .preview-label { position: absolute; top: 10px; left: 14px; font-size: 10px; color: #444; text-transform: uppercase; letter-spacing: 2px; }
+  .divider { height: 1px; background: #1a1a2e; }
+  #iconPreview { background: repeating-conic-gradient(#151520 0% 25%, #1a1a28 0% 50%) 0 0 / 16px 16px; }
+  #iconPreview .icon-grid { display: flex; align-items: center; gap: 30px; }
+  #iconPreview canvas { border-radius: 8px; }
+  .size-label { font-size: 10px; color: #444; text-align: center; margin-top: 4px; }
+  h2 { color: #e84393; margin-bottom: 4px; font-size: 16px; letter-spacing: 2px; }
+  .subtitle { color: #444; font-size: 11px; margin-bottom: 16px; }
+  h3 { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid #1a1a2e; }
+  label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+  label span { min-width: 100px; color: #777; }
+  input[type="text"], input[type="number"], select {
+    background: #16161e; border: 1px solid #2a2a3a; color: #ddd; padding: 5px 8px;
+    border-radius: 4px; width: 160px; font-size: 12px; outline: none;
+  }
+  input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: #e84393; }
+  select { cursor: pointer; }
+  input[type="color"] { width: 32px; height: 26px; border: 1px solid #2a2a3a; background: #16161e; cursor: pointer; border-radius: 3px; padding: 1px; }
+  .color-pair { display: flex; align-items: center; gap: 4px; width: 160px; }
+  .color-pair input[type="text"] { width: 100px; }
+  input[type="range"] { width: 90px; accent-color: #e84393; }
+  .range-wrap { display: flex; align-items: center; gap: 6px; width: 160px; }
+  .range-wrap .rv { font-size: 11px; min-width: 30px; text-align: right; color: #e84393; font-family: monospace; }
+  input[type="checkbox"] { accent-color: #e84393; }
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+  .presets button {
+    padding: 5px 10px; font-size: 11px; border: 1px solid #2a2a3a; background: #16161e;
+    color: #888; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  }
+  .presets button:hover { background: #1e1e2e; color: #e84393; border-color: #e84393; }
+  .btn-row { display: flex; gap: 6px; margin-top: 18px; }
+  .btn-row button {
+    flex: 1; padding: 11px 8px; background: linear-gradient(135deg, #e84393, #a855f7);
+    color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; letter-spacing: 1px; transition: all 0.2s;
+  }
+  .btn-row button:hover { background: linear-gradient(135deg, #f472b6, #c084fc); transform: translateY(-1px); }
+  canvas { max-width: 90%; max-height: 90%; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Dancing+Script:wght@700&family=Pacifico&family=Sacramento&family=Alex+Brush&family=Satisfy&family=Lobster&family=Kaushan+Script&family=Tangerine:wght@700&family=Allura&family=Cookie&family=Italianno&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Lovetta</h2>
+  <div class="subtitle">LOGO + ICON EDITOR</div>
+
+  <h3>Presets</h3>
+  <div class="presets" id="presetBtns"></div>
+
+  <h3>Text Logo</h3>
+  <label><span>Text</span><input type="text" id="text" value="Lovetta"></label>
+  <label><span>Font</span>
+    <select id="fontFamily">
+      <option value="Great Vibes" selected>Great Vibes</option>
+      <option value="Dancing Script">Dancing Script</option>
+      <option value="Pacifico">Pacifico</option>
+      <option value="Sacramento">Sacramento</option>
+      <option value="Alex Brush">Alex Brush</option>
+      <option value="Satisfy">Satisfy</option>
+      <option value="Lobster">Lobster</option>
+      <option value="Kaushan Script">Kaushan Script</option>
+      <option value="Tangerine">Tangerine</option>
+      <option value="Allura">Allura</option>
+      <option value="Cookie">Cookie</option>
+      <option value="Italianno">Italianno</option>
+    </select>
+  </label>
+  <label><span>Font Size</span><input type="number" id="fontSize" value="100" min="20" max="400"></label>
+  <label><span>Letter Spacing</span><input type="number" id="letterSpacing" value="2" min="-10" max="40"></label>
+
+  <h3>Colors</h3>
+  <label><span>Color 1 (Start)</span><div class="color-pair"><input type="color" id="color1Pick" value="#f472b6"><input type="text" id="color1" value="#f472b6"></div></label>
+  <label><span>Color 2 (End)</span><div class="color-pair"><input type="color" id="color2Pick" value="#a855f7"><input type="text" id="color2" value="#a855f7"></div></label>
+  <label><span>Gradient Angle</span><div class="range-wrap"><input type="range" id="gradAngle" min="0" max="360" value="160"><span class="rv" id="gradAngleVal">160°</span></div></label>
+  <label><span>Background</span><div class="color-pair"><input type="color" id="bgColorPick" value="#110c1e"><input type="text" id="bgColor" value="transparent"></div></label>
+
+  <h3>Icon — L</h3>
+  <label><span>Icon Font</span>
+    <select id="iconFont">
+      <option value="Great Vibes" selected>Great Vibes</option>
+      <option value="Dancing Script">Dancing Script</option>
+      <option value="Pacifico">Pacifico</option>
+      <option value="Sacramento">Sacramento</option>
+      <option value="Alex Brush">Alex Brush</option>
+      <option value="Satisfy">Satisfy</option>
+      <option value="Lobster">Lobster</option>
+      <option value="Kaushan Script">Kaushan Script</option>
+      <option value="Tangerine">Tangerine</option>
+      <option value="Allura">Allura</option>
+      <option value="Cookie">Cookie</option>
+      <option value="Italianno">Italianno</option>
+    </select>
+  </label>
+  <label><span>L Size %</span><div class="range-wrap"><input type="range" id="iconFontSize" min="50" max="130" value="82"><span class="rv" id="iconFontSizeVal">82%</span></div></label>
+  <label><span>L Offset X %</span><div class="range-wrap"><input type="range" id="iconOffX" min="-30" max="30" value="-2"><span class="rv" id="iconOffXVal">-2%</span></div></label>
+  <label><span>L Offset Y %</span><div class="range-wrap"><input type="range" id="iconOffY" min="-30" max="30" value="5"><span class="rv" id="iconOffYVal">5%</span></div></label>
+  <label><span>Corner Radius</span><div class="range-wrap"><input type="range" id="iconRadius" min="0" max="50" value="22"><span class="rv" id="iconRadiusVal">22%</span></div></label>
+  <label><span>Icon BG</span>
+    <select id="iconBg">
+      <option value="transparent">Transparent</option>
+      <option value="color" selected>Color Fill</option>
+    </select>
+  </label>
+  <label><span>Icon BG Color</span><div class="color-pair"><input type="color" id="iconBgColorPick" value="#110c1e"><input type="text" id="iconBgColor" value="#110c1e"></div></label>
+
+  <h3>Social Card</h3>
+  <label><span>Slogan</span><input type="text" id="socialSlogan" value="Your AI companion"></label>
+  <label><span>Slogan Size</span><input type="number" id="socialSloganSize" value="32" min="12" max="80"></label>
+  <label><span>Slogan Color</span><div class="color-pair"><input type="color" id="socialSloganColorPick" value="#6b7280"><input type="text" id="socialSloganColor" value="#6b7280"></div></label>
+  <label><span>Card BG</span><div class="color-pair"><input type="color" id="socialBgColorPick" value="#110c1e"><input type="text" id="socialBgColor" value="#110c1e"></div></label>
+
+  <h3>Layout</h3>
+  <label><span>Padding X</span><input type="number" id="paddingX" value="60" min="0" max="200"></label>
+  <label><span>Padding Y</span><input type="number" id="paddingY" value="40" min="0" max="200"></label>
+  <label><span>Export Scale</span><input type="number" id="scale" value="3" min="1" max="6"></label>
+
+  <div class="btn-row">
+    <button id="downloadBtn">LOGO</button>
+    <button id="downloadIconBtn">ICON</button>
+    <button id="downloadSocialBtn">SOCIAL</button>
+    <button id="compareAllBtn">COMPARE</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="logoPreview" class="preview-area checkerboard">
+    <div class="preview-label">Text Logo</div>
+    <canvas id="canvas"></canvas>
+  </div>
+  <div class="divider"></div>
+  <div id="iconPreview" class="preview-area" style="flex:0.5;">
+    <div class="preview-label">Icon — L</div>
+    <div class="icon-grid">
+      <div><canvas id="iconCanvas512" width="512" height="512"></canvas><div class="size-label">512</div></div>
+      <div><canvas id="iconCanvas128" width="128" height="128" style="border-radius:4px;"></canvas><div class="size-label">128</div></div>
+      <div><canvas id="iconCanvas64" width="64" height="64" style="border-radius:3px;"></canvas><div class="size-label">64</div></div>
+      <div><canvas id="iconCanvas32" width="32" height="32" style="border-radius:2px;"></canvas><div class="size-label">32</div></div>
+      <div><canvas id="iconCanvas16" width="16" height="16" style="border-radius:1px;"></canvas><div class="size-label">16</div></div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div id="socialPreview" class="preview-area" style="flex:0.5; background:#1a1a28;">
+    <div class="preview-label">Social Card (1200×630)</div>
+    <canvas id="socialCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+const PRESETS = {
+  pink_purple: { color1:"#f472b6", color2:"#a855f7", bgColor:"transparent", gradAngle:160 },
+  hot_pink:    { color1:"#ec4899", color2:"#f43f5e", bgColor:"#110a10", gradAngle:180 },
+  rose_gold:   { color1:"#fda4af", color2:"#d4a024", bgColor:"#0d0a08", gradAngle:150 },
+  coral:       { color1:"#fb7185", color2:"#f97316", bgColor:"#110a08", gradAngle:170 },
+  violet:      { color1:"#c084fc", color2:"#7c3aed", bgColor:"#0d0a14", gradAngle:160 },
+  fuchsia:     { color1:"#e879f9", color2:"#a855f7", bgColor:"#100a14", gradAngle:140 },
+  white_clean: { color1:"#ffffff", color2:"#e2e8f0", bgColor:"transparent", gradAngle:180 },
+  dark_solid:  { color1:"#1a1a2e", color2:"#1a1a2e", bgColor:"#ffffff", gradAngle:0 },
+};
+
+const presetContainer = document.getElementById('presetBtns');
+Object.keys(PRESETS).forEach(name => {
+  const btn = document.createElement('button');
+  btn.textContent = name.replace(/_/g,' ');
+  btn.onclick = () => applyPreset(PRESETS[name]);
+  presetContainer.appendChild(btn);
+});
+
+function applyPreset(p) {
+  setVal('color1', p.color1); setVal('color1Pick', p.color1);
+  setVal('color2', p.color2); setVal('color2Pick', p.color2);
+  setVal('bgColor', p.bgColor);
+  if (p.bgColor && p.bgColor !== 'transparent') setVal('bgColorPick', p.bgColor);
+  document.getElementById('gradAngle').value = p.gradAngle;
+  document.getElementById('gradAngleVal').textContent = p.gradAngle + '°';
+  if (p.bgColor && p.bgColor !== "transparent") {
+    setVal("iconBgColor", p.bgColor); setVal("iconBgColorPick", p.bgColor); setVal("iconBg", "color");
+  } else {
+    setVal("iconBg", "transparent");
+  }
+  updatePreviewBg();
+  renderAll();
+}
+
+function setVal(id, v) { document.getElementById(id).value = v; }
+function getVal(id) { return document.getElementById(id).value; }
+function getNum(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#','');
+  return `rgba(${parseInt(h.substring(0,2),16)},${parseInt(h.substring(2,4),16)},${parseInt(h.substring(4,6),16)},${alpha})`;
+}
+
+// Sync color pickers
+['color1','color2','iconBgColor','socialSloganColor','socialBgColor'].forEach(id => {
+  const pick = document.getElementById(id+'Pick');
+  const txt = document.getElementById(id);
+  if (!pick || !txt) return;
+  pick.addEventListener('input', () => { txt.value = pick.value; renderAll(); });
+  txt.addEventListener('input', () => { if(/^#[0-9a-f]{6}$/i.test(txt.value)) pick.value = txt.value; renderAll(); });
+});
+document.getElementById('bgColorPick').addEventListener('input', () => {
+  const bg = document.getElementById('bgColorPick').value;
+  document.getElementById('bgColor').value = bg;
+  if (bg && bg !== "transparent") { setVal("iconBgColor", bg); setVal("iconBgColorPick", bg); setVal("iconBg", "color"); } else { setVal("iconBg", "transparent"); }
+  updatePreviewBg(); renderAll();
+});
+document.getElementById('bgColor').addEventListener('input', () => { updatePreviewBg(); renderAll(); });
+
+function updatePreviewBg() {
+  const bg = getVal('bgColor');
+  const preview = document.getElementById('logoPreview');
+  if (bg && bg !== 'transparent') {
+    preview.className = 'preview-area dark-bg';
+    preview.style.background = bg;
+  } else {
+    preview.className = 'preview-area checkerboard';
+    preview.style.background = '';
+  }
+}
+
+// Range display sync
+['gradAngle','iconFontSize','iconOffX','iconOffY','iconRadius'].forEach(id => {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(id+'Val');
+  if (!el || !valEl) return;
+  el.addEventListener('input', () => {
+    valEl.textContent = el.value + (id === 'gradAngle' ? '°' : '%');
+    renderAll();
+  });
+});
+
+// Bind all inputs
+document.querySelectorAll('#sidebar input, #sidebar select').forEach(el => {
+  el.addEventListener('input', renderAll);
+  el.addEventListener('change', renderAll);
+});
+
+function createGradient(ctx, x1, y1, x2, y2) {
+  const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+  grad.addColorStop(0, getVal('color1'));
+  grad.addColorStop(1, getVal('color2'));
+  return grad;
+}
+
+function gradientFromAngle(ctx, size, angle) {
+  const rad = (angle - 90) * Math.PI / 180;
+  const cx = size / 2, cy = size / 2, len = size * 0.7;
+  return createGradient(ctx,
+    cx - Math.cos(rad) * len, cy - Math.sin(rad) * len,
+    cx + Math.cos(rad) * len, cy + Math.sin(rad) * len
+  );
+}
+
+function measureTextWithSpacing(ctx, text, spacing) {
+  let w = 0;
+  for (let i = 0; i < text.length; i++) {
+    w += ctx.measureText(text[i]).width;
+    if (i < text.length - 1) w += spacing;
+  }
+  return w;
+}
+
+function drawTextWithSpacing(ctx, text, x, y, spacing) {
+  for (const char of text) {
+    ctx.fillText(char, x, y);
+    x += ctx.measureText(char).width + spacing;
+  }
+}
+
+function renderAll() { render(); renderIcon(); renderSocial(); }
+
+// ========== TEXT LOGO ==========
+function render(forExport) {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const exportScale = getNum('scale');
+  const dpr = window.devicePixelRatio || 1;
+  const scale = forExport ? exportScale : dpr;
+  const text = getVal('text');
+  const fontSize = getNum('fontSize');
+  const spacing = getNum('letterSpacing');
+  const padX = getNum('paddingX');
+  const padY = getNum('paddingY');
+  const fontFamily = getVal('fontFamily');
+  const angle = getNum('gradAngle');
+
+  const font = `700 ${fontSize * scale}px "${fontFamily}", cursive`;
+  ctx.font = font;
+  ctx.textBaseline = 'alphabetic';
+  const textW = measureTextWithSpacing(ctx, text, spacing * scale);
+  const textMetrics = ctx.measureText(text);
+  const textAsc = textMetrics.actualBoundingBoxAscent || fontSize * scale * 0.75;
+  const textDesc = textMetrics.actualBoundingBoxDescent || fontSize * scale * 0.15;
+  const textH = textAsc + textDesc;
+
+  const cw = Math.ceil(textW + padX * 2 * scale);
+  const ch = Math.ceil(textH + padY * 2 * scale);
+  canvas.width = cw;
+  canvas.height = ch;
+  if (!forExport) {
+    canvas.style.width = (cw / scale) + 'px';
+    canvas.style.height = (ch / scale) + 'px';
+  }
+
+  ctx.clearRect(0, 0, cw, ch);
+  const bgColor = getVal('bgColor');
+  if (bgColor && bgColor !== 'transparent') {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, cw, ch);
+  }
+
+  const tx = (cw - textW) / 2;
+  const ty = padY * scale + textAsc;
+
+  ctx.save();
+  ctx.font = font;
+  ctx.textBaseline = 'alphabetic';
+  const rad = (angle - 90) * Math.PI / 180;
+  const len = Math.max(cw, ch) * 0.7;
+  const cx = cw / 2, cy = ch / 2;
+  ctx.fillStyle = createGradient(ctx,
+    cx - Math.cos(rad) * len, cy - Math.sin(rad) * len,
+    cx + Math.cos(rad) * len, cy + Math.sin(rad) * len
+  );
+  ctx.filter = 'none';
+  drawTextWithSpacing(ctx, text, tx, ty, spacing * scale);
+  ctx.restore();
+
+  return canvas;
+}
+
+// ========== ICON RENDERER ==========
+function renderIconToCanvas(canvas, size) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = size;
+  canvas.height = size;
+  ctx.clearRect(0, 0, size, size);
+
+  const fontFamily = getVal('iconFont');
+  const fontSizePct = getNum('iconFontSize') / 100;
+  const offXPct = getNum('iconOffX') / 100;
+  const offYPct = getNum('iconOffY') / 100;
+  const angle = getNum('gradAngle');
+  const radiusPct = getNum('iconRadius') / 100;
+  const radius = size * radiusPct;
+
+  // Background
+  if (getVal('iconBg') === 'color') {
+    ctx.beginPath();
+    ctx.roundRect(0, 0, size, size, radius);
+    ctx.fillStyle = getVal('iconBgColor');
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(0, 0, size, size, radius);
+  ctx.clip();
+
+  // Draw L
+  const fs = size * fontSizePct;
+  ctx.font = `700 ${fs}px "${fontFamily}", cursive`;
+  ctx.textBaseline = 'alphabetic';
+  const metrics = ctx.measureText('L');
+  const tw = metrics.width;
+  const ta = metrics.actualBoundingBoxAscent || fs * 0.75;
+  const td = metrics.actualBoundingBoxDescent || fs * 0.15;
+  const th = ta + td;
+  const x = (size - tw) / 2 + size * offXPct;
+  const y = (size - th) / 2 + ta + size * offYPct;
+
+  ctx.fillStyle = gradientFromAngle(ctx, size, angle);
+  ctx.fillText('L', x, y);
+  ctx.restore();
+  return canvas;
+}
+
+function renderIcon() {
+  [512, 128, 64, 32, 16].forEach(size => {
+    const c = document.getElementById('iconCanvas' + size);
+    renderIconToCanvas(c, size);
+  });
+}
+
+// ========== SOCIAL CARD ==========
+function renderSocial(forExport) {
+  const canvas = document.getElementById('socialCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 1200, H = 630;
+  const dpr = window.devicePixelRatio || 1;
+  const scale = forExport ? 1 : dpr;
+
+  canvas.width = W * scale;
+  canvas.height = H * scale;
+  if (!forExport) {
+    canvas.style.width = (W * 0.5) + 'px';
+    canvas.style.height = (H * 0.5) + 'px';
+  }
+
+  ctx.fillStyle = getVal('socialBgColor');
+  ctx.fillRect(0, 0, W * scale, H * scale);
+
+  const text = getVal('text');
+  const slogan = getVal('socialSlogan');
+  const fontFamily = getVal('fontFamily');
+  const angle = getNum('gradAngle');
+
+  // Draw L icon
+  const iconSize = 180 * scale;
+  const iconCanvas = document.createElement('canvas');
+  renderIconToCanvas(iconCanvas, iconSize);
+
+  // Logo text
+  const logoFontSize = 72 * scale;
+  ctx.font = `700 ${logoFontSize}px "${fontFamily}", cursive`;
+  ctx.textBaseline = 'middle';
+  const textW = ctx.measureText(text).width;
+  const gap = 20 * scale;
+  const totalW = iconSize + gap + textW;
+  const startX = (W * scale - totalW) / 2;
+  const centerY = H * scale / 2;
+  const sloganFontSize = getNum('socialSloganSize') * scale;
+  const sloganGap = 24 * scale;
+
+  const groupY = slogan ? centerY - sloganFontSize / 2 : centerY;
+
+  ctx.drawImage(iconCanvas, startX, groupY - iconSize / 2);
+
+  const rad = (angle - 90) * Math.PI / 180;
+  const len = W * scale * 0.5;
+  const gcx = W * scale / 2;
+  ctx.fillStyle = createGradient(ctx,
+    gcx - Math.cos(rad) * len, 0,
+    gcx + Math.cos(rad) * len, H * scale
+  );
+  ctx.font = `700 ${logoFontSize}px "${fontFamily}", cursive`;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, startX + iconSize + gap, groupY);
+
+  if (slogan) {
+    ctx.save();
+    ctx.font = `400 ${sloganFontSize}px -apple-system, sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = getVal('socialSloganColor');
+    ctx.fillText(slogan, W * scale / 2, groupY + iconSize / 2 + sloganGap);
+    ctx.restore();
+  }
+
+  return canvas;
+}
+
+// Download handlers
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const c = render(true);
+  const link = document.createElement('a');
+  link.download = 'logo_lovetta.png';
+  link.href = c.toDataURL('image/png');
+  link.click();
+  renderAll();
+});
+
+document.getElementById('downloadIconBtn').addEventListener('click', () => {
+  const c = document.createElement('canvas');
+  renderIconToCanvas(c, 1024);
+  const link = document.createElement('a');
+  link.download = 'icon_lovetta.png';
+  link.href = c.toDataURL('image/png');
+  link.click();
+});
+
+document.getElementById('downloadSocialBtn').addEventListener('click', () => {
+  const c = renderSocial(true);
+  const link = document.createElement('a');
+  link.download = 'og_lovetta.png';
+  link.href = c.toDataURL('image/png');
+  link.click();
+  renderAll();
+});
+
+// ========== COMPARE ALL ==========
+document.getElementById('compareAllBtn').addEventListener('click', () => {
+  const fonts = [
+    'Great Vibes', 'Dancing Script', 'Pacifico', 'Sacramento', 'Alex Brush',
+    'Satisfy', 'Lobster', 'Kaushan Script', 'Tangerine', 'Allura', 'Cookie', 'Italianno'
+  ];
+  const origLogoFont = getVal('fontFamily');
+  const origIconFont = getVal('iconFont');
+
+  const allLogos = {};
+  const allIcons = {};
+
+  fonts.forEach(font => {
+    // Render logo with this font
+    document.getElementById('fontFamily').value = font;
+    const lc = render(true);
+    const scale = getNum('scale') || 3;
+    allLogos[font] = { src: lc.toDataURL('image/png'), w: Math.round(lc.width / scale), h: Math.round(lc.height / scale) };
+
+    // Render icon with this font
+    document.getElementById('iconFont').value = font;
+    const ic = document.createElement('canvas');
+    renderIconToCanvas(ic, 128);
+    allIcons[font] = ic.toDataURL('image/png');
+  });
+
+  // Restore
+  document.getElementById('fontFamily').value = origLogoFont;
+  document.getElementById('iconFont').value = origIconFont;
+  renderAll();
+
+  const bg = getVal('iconBgColor') || '#110c1e';
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Lovetta Font Compare</title>
+<style>*{margin:0;padding:0;box-sizing:border-box;}
+body{background:${bg};font-family:sans-serif;padding:20px;color:#888;}
+h1{color:#e84393;font-size:18px;margin-bottom:16px;letter-spacing:2px;}
+.row{display:flex;align-items:center;gap:16px;margin-bottom:8px;padding:8px;border-radius:8px;}
+.row:hover{background:rgba(255,255,255,0.03);}
+.font-name{width:160px;font-size:11px;color:#666;flex-shrink:0;}
+.icon-col img{display:block;border-radius:8px;}
+.logo-col{flex:1;display:flex;align-items:center;}
+.logo-col img{max-height:60px;height:auto;}
+</style></head><body>
+<h1>LOVETTA — FONT COMPARISON</h1>`;
+  fonts.forEach(f => {
+    html += `<div class="row">
+  <div class="font-name">${f}</div>
+  <div class="icon-col"><img src="${allIcons[f]}" width="64" height="64"></div>
+  <div class="logo-col"><img src="${allLogos[f].src}"></div>
+</div>`;
+  });
+  html += `</body></html>`;
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+});
+
+// Force-load fonts
+const fontList = ['Great Vibes','Dancing Script','Pacifico','Sacramento','Alex Brush','Satisfy','Lobster','Kaushan Script','Tangerine','Allura','Cookie','Italianno'];
+const loader = document.createElement('div');
+loader.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;';
+fontList.forEach(f => {
+  const span = document.createElement('span');
+  span.style.fontFamily = '"' + f + '", cursive';
+  span.style.fontWeight = '700';
+  span.style.fontSize = '48px';
+  span.textContent = 'L Lovetta test';
+  loader.appendChild(span);
+});
+document.body.appendChild(loader);
+
+document.fonts.ready.then(() => { applyPreset(PRESETS['pink_purple']); });
+setTimeout(renderAll, 300);
+setTimeout(renderAll, 1000);
+setTimeout(renderAll, 2500);
+</script>
+</body>
+</html>

@@ -63,9 +63,25 @@ Shared tracking files exist in the project root:
 - `plan.md`
 - `PROGRESS.md`
 
-**BEFORE writing ANY code**: Read both files, update with current task scope.
-**DURING execution**: Keep both current, mark items as completed.
-**AFTER execution**: Update both with final status.
+#### BEFORE writing ANY code:
+1. **Read `plan.md` and `PROGRESS.md`** — check what's done, avoid duplicating work
+2. **Update `plan.md`** with the current task scope and planned execution steps
+3. **Add a new section header** for your task in `PROGRESS.md`
+4. **List ALL planned tasks** as unchecked `- [ ]` items in `PROGRESS.md` BEFORE executing
+
+#### DURING execution:
+- Keep `plan.md` current if scope or execution order changes
+- Mark each task in `PROGRESS.md` as `[x]` immediately after completing it
+- Add new sub-tasks as discovered to both files
+
+#### AFTER execution:
+1. **Update `plan.md`** with final status and implementation notes
+2. **Update `PROGRESS.md`** by marking completed items and noting remaining follow-ups
+3. Do NOT mark the task complete until both files are updated
+
+#### Rules:
+- Do NOT remove existing items. Only append and update statuses.
+- ALL work gets logged in both files — no exceptions.
 
 ### Tech Stack
 
@@ -133,6 +149,38 @@ lovetta/
 | `npm run kill:ports -- 3900` | Free a specific port |
 | `npm run test:e2e` | Run E2E tests (no video) |
 | `npm run test:e2e:demo` | Run demo tests with video recording |
+
+### Admin Dashboard
+
+Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
+
+**Tabs:** Overview | Visitors | Users | Leads | Economics | Settings | Sentry
+
+| Tab | Content |
+|-----|---------|
+| Overview | Stat cards (visitors, leads, users, economics) + top-10 breakdowns |
+| Visitors | Paginated table: session, page, device (emoji+OS), country, city, UTM, referrer, dates |
+| Users | Search + paginated table: id, email, name, auth provider, geo, device, subscription, dates |
+| Leads | Search + paginated table: email, birth, source, country, date |
+| Economics | Period filter + cost/tips/margin cards + companion/model/daily tables + AI settings |
+| Settings | Content level dropdowns per platform + app limits |
+| Sentry | Unresolved error issues with resolve/ignore actions |
+
+**Admin API endpoints** (all require `ADMIN_TOKEN`):
+- `GET /api/admin/stats` — overview counters + top-10 breakdowns (visitors, leads, users)
+- `GET /api/admin/visitors?page=&limit=` — paginated visitor rows
+- `GET /api/admin/users?page=&limit=&search=` — paginated user rows with subscription join
+- `GET /api/admin/leads?page=&limit=&search=` — paginated lead rows
+- `GET/PUT /api/admin/settings` — app settings CRUD
+- `GET /api/admin/consumption/summary?period=` — economics data
+- `GET/PATCH /api/admin/sentry/*` — Sentry integration
+
+**Pattern for new admin tabs:**
+1. Add `<button class="tab">` to `.tabs` div
+2. Add `<div id="tab-{name}" class="tab-content">` section
+3. Add loader in `switchTab()` to call `load{Name}()` on tab switch
+4. Use `apiFetch()` for data, `esc()` for XSS safety, `renderPagination()` for paged tables
+5. Helper functions: `deviceEmoji()`, `osIcon()`, `parseOS()`, `shortCountry()`, `timeAgo()`, `fmtDate()`
 
 ### Git Setup
 

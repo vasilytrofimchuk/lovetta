@@ -64,7 +64,7 @@
 
     /* Tabs */
     .tabs {
-      display: flex; gap: 4px; margin-bottom: 24px;
+      display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 24px;
       border-bottom: 1px solid var(--border); padding-bottom: 0;
     }
     .tab {
@@ -135,6 +135,14 @@
     .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 768px) { .breakdown-grid { grid-template-columns: 1fr; } }
 
+    /* Mono & truncate */
+    .mono { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace; font-size: 0.8rem; }
+    .truncate { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+    .section-title { font-size: 1rem; color: var(--text2); margin: 24px 0 12px 0; }
+    .section-title:first-child { margin-top: 0; }
+    .empty-row { text-align: center; color: var(--muted); padding: 40px 0; }
+    tr:hover td { background: var(--bg2); }
+
     /* Sentry issues */
     .sentry-issue {
       display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
@@ -190,17 +198,54 @@
     </div>
 
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('visitors')">Visitors</button>
+      <button class="tab active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab" onclick="switchTab('visitors')">Visitors</button>
+      <button class="tab" onclick="switchTab('users')">Users</button>
       <button class="tab" onclick="switchTab('leads')">Leads</button>
-      <button class="tab" onclick="switchTab('settings')">Settings</button>
       <button class="tab" onclick="switchTab('economics')">Economics</button>
+      <button class="tab" onclick="switchTab('settings')">Settings</button>
       <button class="tab" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
     </div>
 
+    <!-- Overview Tab -->
+    <div id="tab-overview" class="tab-content active">
+      <h3 class="section-title" style="margin-top:0;">Visitors</h3>
+      <div class="stat-cards" id="overview-visitor-cards"></div>
+      <div class="breakdown-grid" id="overview-visitor-breakdowns"></div>
+      <h3 class="section-title">Leads</h3>
+      <div class="stat-cards" id="overview-lead-cards"></div>
+      <h3 class="section-title">Users</h3>
+      <div class="stat-cards" id="overview-user-cards"></div>
+      <h3 class="section-title">Economics</h3>
+      <div class="stat-cards" id="overview-econ-cards"></div>
+    </div>
+
     <!-- Visitors Tab -->
-    <div id="tab-visitors" class="tab-content active">
-      <div class="stat-cards" id="visitor-cards"></div>
-      <div class="breakdown-grid" id="visitor-breakdowns"></div>
+    <div id="tab-visitors" class="tab-content">
+      <table>
+        <thead><tr>
+          <th>Session</th><th>Page</th><th>Device</th><th>Country</th><th>City</th>
+          <th>Source</th><th>Medium</th><th>Campaign</th><th>Referrer</th>
+          <th>First Visit</th><th>Last Active</th>
+        </tr></thead>
+        <tbody id="visitor-rows"></tbody>
+      </table>
+      <div class="pagination" id="visitor-pagination"></div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="tab-users" class="tab-content">
+      <div class="search-bar">
+        <input type="text" id="user-search" placeholder="Search by email or name..." onkeydown="if(event.key==='Enter'){userPage=1;loadUsers();}">
+      </div>
+      <table>
+        <thead><tr>
+          <th>ID</th><th>Email</th><th>Name</th><th>Auth</th><th>Country</th><th>City</th>
+          <th>Device</th><th>Subscription</th><th>Created</th><th>Last Active</th>
+        </tr></thead>
+        <tbody id="user-rows"></tbody>
+      </table>
+      <div class="pagination" id="user-pagination"></div>
     </div>
 
     <!-- Leads Tab -->
@@ -256,8 +301,11 @@
 
   <script>
     var TOKEN = localStorage.getItem('lovetta-admin-token') || '';
-    var currentLeadPage = 1;
+    var visitorPage = 1;
+    var userPage = 1;
+    var leadPage = 1;
     var leadSearchTimeout;
+    var userSearchTimeout;
 
     // Auth
     function headers() {
@@ -292,8 +340,7 @@
     function showDashboard() {
       document.getElementById('auth-gate').style.display = 'none';
       document.getElementById('dashboard').style.display = 'block';
-      loadStats();
-      loadLeads();
+      loadOverview();
       loadSettings();
       loadSentryBadge();
     }
@@ -304,24 +351,111 @@
       document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
       event.target.closest('.tab').classList.add('active');
       document.getElementById('tab-' + name).classList.add('active');
-      if (name === 'sentry') loadSentry();
-      if (name === 'economics') loadEconomics('7d');
+      if (name === 'overview') loadOverview();
+      else if (name === 'visitors') loadVisitors();
+      else if (name === 'users') loadUsers();
+      else if (name === 'leads') loadLeads();
+      else if (name === 'sentry') loadSentry();
+      else if (name === 'economics') loadEconomics('7d');
     }
 
-    // Stats
-    function loadStats() {
-      fetch('/api/admin/stats', { headers: headers() }).then(function(r) { return r.json(); }).then(function(data) {
+    // --- Helper functions (ported from KeyID) ---
+    function deviceEmoji(type) {
+      var t = (type || '').toLowerCase();
+      if (t === 'mobile' || t === 'tablet') return '📱';
+      if (t === 'desktop') return '💻';
+      return '';
+    }
+
+    function parseOS(ua) {
+      if (!ua) return '';
+      if (/Windows/i.test(ua)) return 'Windows';
+      if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS';
+      if (/Macintosh|Mac OS/i.test(ua)) return 'macOS';
+      if (/Android/i.test(ua)) return 'Android';
+      if (/Linux/i.test(ua)) return 'Linux';
+      if (/CrOS/i.test(ua)) return 'ChromeOS';
+      return '';
+    }
+
+    function osIcon(os) {
+      if (os === 'Windows') return '🪟️';
+      if (os === 'macOS' || os === 'iOS') return '🍎';
+      if (os === 'Android') return '🟢';
+      if (os === 'Linux') return '🐧';
+      if (os === 'ChromeOS') return '🌐';
+      return '';
+    }
+
+    var SHORT_COUNTRIES = {
+      'United States': 'US', 'United Kingdom': 'UK', 'United Arab Emirates': 'UAE',
+      'Germany': 'DE', 'France': 'FR', 'Spain': 'ES', 'Italy': 'IT', 'Netherlands': 'NL',
+      'Canada': 'CA', 'Australia': 'AU', 'Brazil': 'BR', 'Japan': 'JP', 'South Korea': 'KR',
+      'India': 'IN', 'China': 'CN', 'Russia': 'RU', 'Mexico': 'MX', 'Turkey': 'TR',
+      'Poland': 'PL', 'Sweden': 'SE', 'Norway': 'NO', 'Denmark': 'DK', 'Finland': 'FI',
+      'Switzerland': 'CH', 'Austria': 'AT', 'Belgium': 'BE', 'Portugal': 'PT', 'Ireland': 'IE',
+      'Singapore': 'SG', 'Israel': 'IL', 'Argentina': 'AR', 'Colombia': 'CO', 'Chile': 'CL',
+      'Ukraine': 'UA', 'Czech Republic': 'CZ', 'Romania': 'RO', 'Hungary': 'HU',
+      'New Zealand': 'NZ', 'South Africa': 'ZA', 'Thailand': 'TH', 'Philippines': 'PH',
+      'Indonesia': 'ID', 'Malaysia': 'MY', 'Vietnam': 'VN', 'Egypt': 'EG', 'Nigeria': 'NG',
+      'Saudi Arabia': 'SA', 'Pakistan': 'PK', 'Bangladesh': 'BD', 'Taiwan': 'TW',
+    };
+
+    function shortCountry(c) {
+      if (!c) return '';
+      return SHORT_COUNTRIES[c] || c;
+    }
+
+    function timeAgo(d) {
+      if (!d) return '-';
+      var now = Date.now();
+      var then = new Date(d).getTime();
+      var sec = Math.floor((now - then) / 1000);
+      if (sec < 60) return 'now';
+      var min = Math.floor(sec / 60);
+      if (min < 60) return min + 'm';
+      var hr = Math.floor(min / 60);
+      if (hr < 24) return hr + 'h';
+      var day = Math.floor(hr / 24);
+      return day + 'd';
+    }
+
+    function fmtDate(d) {
+      if (!d) return '-';
+      var dt = new Date(d);
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return months[dt.getMonth()] + ' ' + dt.getDate();
+    }
+
+    // --- Pagination ---
+    function renderPagination(elId, total, page, limit, loadFn) {
+      var totalPages = Math.max(1, Math.ceil(total / limit));
+      var el = document.getElementById(elId);
+      el.innerHTML =
+        '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="' + loadFn + '(' + (page - 1) + ')">Prev</button>' +
+        '<span>Page ' + page + ' of ' + totalPages + ' (' + total + ' total)</span>' +
+        '<button ' + (page >= totalPages ? 'disabled' : '') + ' onclick="' + loadFn + '(' + (page + 1) + ')">Next</button>';
+    }
+
+    // --- Overview ---
+    function loadOverview() {
+      apiFetch('/api/admin/stats').then(function(data) {
         var v = data.visitors || {};
-        document.getElementById('visitor-cards').innerHTML =
+        document.getElementById('overview-visitor-cards').innerHTML =
           card('Total Visitors', v.total || 0) +
           card('Today', v.today || 0) +
           card('Active Now', v.active || 0);
 
         var l = data.leads || {};
-        document.getElementById('lead-cards').innerHTML =
+        document.getElementById('overview-lead-cards').innerHTML =
           card('Total Leads', l.total || 0) +
           card('Today', l.today || 0) +
           card('Unique Emails', l.unique_emails || 0);
+
+        var u = data.users || {};
+        document.getElementById('overview-user-cards').innerHTML =
+          card('Total Users', u.total || 0) +
+          card('Today', u.today || 0);
 
         var breakdowns = '';
         breakdowns += breakdownTable('Countries', 'country', data.countries || []);
@@ -331,7 +465,17 @@
         breakdowns += breakdownTable('UTM Mediums', 'utm_medium', data.mediums || []);
         breakdowns += breakdownTable('Campaigns', 'utm_campaign', data.campaigns || []);
         breakdowns += breakdownTable('Referrers', 'referrer_domain', data.referrers || []);
-        document.getElementById('visitor-breakdowns').innerHTML = breakdowns;
+        document.getElementById('overview-visitor-breakdowns').innerHTML = breakdowns;
+      });
+
+      apiFetch('/api/admin/consumption/summary?period=7d').then(function(data) {
+        var cost = parseFloat(data.totalCostUsd) || 0;
+        var tips = parseFloat(data.totalTips) || 0;
+        var margin = tips - cost;
+        document.getElementById('overview-econ-cards').innerHTML =
+          card('API Cost (7d)', '$' + cost.toFixed(2)) +
+          card('Tips (7d)', '$' + tips.toFixed(2)) +
+          card('Net (7d)', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>');
       });
     }
 
@@ -349,41 +493,91 @@
       return html + '</table></div>';
     }
 
-    // Leads
-    function loadLeads(page) {
-      currentLeadPage = page || 1;
-      var search = (document.getElementById('lead-search') || {}).value || '';
-      var url = '/api/admin/leads?page=' + currentLeadPage + '&limit=50';
+    // --- Visitors (paginated table) ---
+    function loadVisitors(page) {
+      visitorPage = page || visitorPage;
+      apiFetch('/api/admin/visitors?page=' + visitorPage + '&limit=50').then(function(data) {
+        var rows = (data.rows || []).map(function(r) {
+          var os = parseOS(r.user_agent);
+          var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '');
+          return '<tr>' +
+            '<td class="mono truncate" title="' + esc(r.session_id || '') + '">' + esc((r.session_id || '').slice(0, 8)) + '</td>' +
+            '<td>' + esc(r.current_page || '-') + '</td>' +
+            '<td title="' + esc((r.device_type || '') + (os ? ' ' + os : '')) + '">' + dev + '</td>' +
+            '<td>' + esc(shortCountry(r.country) || '-') + '</td>' +
+            '<td>' + esc(r.city || '-') + '</td>' +
+            '<td>' + esc(r.utm_source || '-') + '</td>' +
+            '<td>' + esc(r.utm_medium || '-') + '</td>' +
+            '<td>' + esc(r.utm_campaign || '-') + '</td>' +
+            '<td class="truncate" title="' + esc(r.referrer || '') + '">' + esc(r.referrer || '-') + '</td>' +
+            '<td class="mono">' + timeAgo(r.created_at) + '</td>' +
+            '<td class="mono">' + timeAgo(r.last_activity) + '</td>' +
+          '</tr>';
+        }).join('');
+        document.getElementById('visitor-rows').innerHTML = rows ||
+          '<tr><td colspan="11" class="empty-row">No visitors yet</td></tr>';
+        renderPagination('visitor-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadVisitors');
+      });
+    }
+
+    // --- Users (paginated table) ---
+    function loadUsers(page) {
+      userPage = page || userPage;
+      var search = (document.getElementById('user-search') || {}).value || '';
+      var url = '/api/admin/users?page=' + userPage + '&limit=50';
       if (search) url += '&search=' + encodeURIComponent(search);
 
-      fetch(url, { headers: headers() }).then(function(r) { return r.json(); }).then(function(data) {
-        var leads = data.leads || [];
-        var total = data.total || 0;
-        var totalPages = Math.ceil(total / (data.limit || 50));
+      apiFetch(url).then(function(data) {
+        var rows = (data.rows || []).map(function(r) {
+          var os = parseOS(r.user_agent);
+          var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '');
+          var sub = r.sub_status ? esc(r.sub_plan) + ' (' + esc(r.sub_status) + ')' : 'Free';
+          return '<tr>' +
+            '<td class="mono" title="' + esc(r.id || '') + '">' + esc((r.id || '').slice(0, 8)) + '</td>' +
+            '<td class="mono">' + esc(r.email || '-') + '</td>' +
+            '<td>' + esc(r.display_name || '-') + '</td>' +
+            '<td>' + esc(r.auth_provider || '-') + '</td>' +
+            '<td>' + esc(shortCountry(r.country) || '-') + '</td>' +
+            '<td>' + esc(r.city || '-') + '</td>' +
+            '<td title="' + esc((r.device_type || '') + (os ? ' ' + os : '')) + '">' + dev + '</td>' +
+            '<td>' + sub + '</td>' +
+            '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
+            '<td class="mono">' + timeAgo(r.last_activity) + '</td>' +
+          '</tr>';
+        }).join('');
+        document.getElementById('user-rows').innerHTML = rows ||
+          '<tr><td colspan="10" class="empty-row">No users yet</td></tr>';
+        renderPagination('user-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadUsers');
+      });
+    }
 
+    // --- Leads ---
+    function loadLeads(page) {
+      leadPage = page || leadPage;
+      var search = (document.getElementById('lead-search') || {}).value || '';
+      var url = '/api/admin/leads?page=' + leadPage + '&limit=50';
+      if (search) url += '&search=' + encodeURIComponent(search);
+
+      apiFetch(url).then(function(data) {
+        var leads = data.leads || [];
         var html = '<table><tr><th>Email</th><th>Birth</th><th>Source</th><th>Country</th><th>Date</th></tr>';
         leads.forEach(function(l) {
-          html += '<tr><td>' + esc(l.email) + '</td>' +
+          html += '<tr><td class="mono">' + esc(l.email) + '</td>' +
             '<td>' + (l.birth_month || '?') + '/' + (l.birth_year || '?') + '</td>' +
             '<td>' + esc(l.utm_source || l.source || '-') + '</td>' +
-            '<td>' + esc(l.country || '-') + '</td>' +
-            '<td>' + new Date(l.created_at).toLocaleDateString() + '</td></tr>';
+            '<td>' + esc(shortCountry(l.country) || '-') + '</td>' +
+            '<td class="mono">' + fmtDate(l.created_at) + '</td></tr>';
         });
         html += '</table>';
         if (!leads.length) html = '<p style="color: var(--muted); text-align: center; padding: 40px;">No leads yet</p>';
         document.getElementById('leads-table-wrap').innerHTML = html;
-
-        var pag = '';
-        pag += '<button ' + (currentLeadPage <= 1 ? 'disabled' : '') + ' onclick="loadLeads(' + (currentLeadPage - 1) + ')">Prev</button>';
-        pag += '<span>Page ' + currentLeadPage + ' of ' + Math.max(1, totalPages) + ' (' + total + ' total)</span>';
-        pag += '<button ' + (currentLeadPage >= totalPages ? 'disabled' : '') + ' onclick="loadLeads(' + (currentLeadPage + 1) + ')">Next</button>';
-        document.getElementById('leads-pagination').innerHTML = pag;
+        renderPagination('leads-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadLeads');
       });
     }
 
     function debounceLeadSearch() {
       clearTimeout(leadSearchTimeout);
-      leadSearchTimeout = setTimeout(function() { loadLeads(1); }, 300);
+      leadSearchTimeout = setTimeout(function() { leadPage = 1; loadLeads(1); }, 300);
     }
 
     // Settings

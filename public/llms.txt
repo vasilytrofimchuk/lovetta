@@ -1,0 +1,23 @@
+# Lovetta.ai
+
+AI companion app — entertaining and intimate chat with AI-generated women companions.
+
+Website: https://lovetta.ai
+
+## Features
+
+- Natural conversations with AI companions that remember you
+- Up to 3 unique companions, each with their own personality and style
+- 20+ personality types or create your own
+- AI-generated photos consistent with companion character
+- Cross-device notifications — she reaches out to you
+
+## Pages
+
+- / — Landing page with waitlist signup
+- /privacy.html — Privacy Policy
+- /terms.html — Terms of Service
+
+## Status
+
+Currently in waitlist phase. Join at https://lovetta.ai to be first in line.

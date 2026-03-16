@@ -103,6 +103,7 @@ async function* _streamRequest(systemPrompt, messages, model) {
   let fullText = '';
   let inputTokens = 0;
   let outputTokens = 0;
+  let usageCost = 0;
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -132,12 +133,13 @@ async function* _streamRequest(systemPrompt, messages, model) {
         if (parsed.usage) {
           inputTokens = parsed.usage.prompt_tokens || 0;
           outputTokens = parsed.usage.completion_tokens || 0;
+          usageCost = parsed.usage.cost || 0;
         }
       } catch {}
     }
   }
 
-  const costUsd = headerCost ? parseFloat(headerCost) : estimateChatCost(inputTokens, outputTokens);
+  const costUsd = headerCost ? parseFloat(headerCost) : estimateChatCost(inputTokens, outputTokens, usageCost);
   yield { type: '_meta', data: { fullText, inputTokens, outputTokens, costUsd } };
 }
 
@@ -303,7 +305,8 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
     const content = result.choices?.[0]?.message?.content || '';
     const inputTokens = result.usage?.prompt_tokens || 0;
     const outputTokens = result.usage?.completion_tokens || 0;
-    const costUsd = headerCost ? parseFloat(headerCost) : estimateChatCost(inputTokens, outputTokens);
+    const usageCost = result.usage?.cost || 0;
+    const costUsd = headerCost ? parseFloat(headerCost) : estimateChatCost(inputTokens, outputTokens, usageCost);
 
     totalCostUsd += costUsd;
     totalInputTokens += inputTokens;
@@ -353,7 +356,9 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   }
 }
 
-function estimateChatCost(inputTokens, outputTokens) {
+function estimateChatCost(inputTokens, outputTokens, usageCost) {
+  // Prefer cost from OpenRouter usage object if available
+  if (usageCost && usageCost > 0) return usageCost;
   return (inputTokens * 0.0000005) + (outputTokens * 0.0000015);
 }
 

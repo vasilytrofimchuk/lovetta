@@ -50,9 +50,38 @@ async function saveNamedDemoVideo(page, filename) {
   return destination;
 }
 
+/**
+ * Create a test user and return { accessToken, refreshToken, user, userId }.
+ * @param {import('@playwright/test').APIRequestContext} request
+ */
+async function createTestUser(request) {
+  const email = `test_${Date.now()}_${Math.random().toString(36).slice(2, 6)}@example.com`;
+  const res = await request.post(`${BASE}/api/auth/signup`, {
+    data: {
+      email,
+      password: 'Test1234!',
+      birthMonth: 6,
+      birthYear: 1995,
+      termsAccepted: true,
+      privacyAccepted: true,
+    },
+  });
+  const data = await res.json();
+  return {
+    ...data,
+    userId: data.user?.id,
+    email,
+    authHeaders: {
+      'Authorization': `Bearer ${data.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  };
+}
+
 module.exports = {
   BASE,
   base,
   adminHeaders,
   saveNamedDemoVideo,
+  createTestUser,
 };

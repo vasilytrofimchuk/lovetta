@@ -83,10 +83,17 @@ router.get('/stats', async (req, res) => {
           FROM visitors
           WHERE referrer IS NOT NULL AND referrer != ''
           GROUP BY referrer_domain ORDER BY count DESC LIMIT 10
+        ),
+        user_stats AS (
+          SELECT
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS today
+          FROM users
         )
       SELECT
         (SELECT row_to_json(visitor_stats) FROM visitor_stats) AS visitors,
         (SELECT row_to_json(lead_stats) FROM lead_stats) AS leads,
+        (SELECT row_to_json(user_stats) FROM user_stats) AS users,
         (SELECT COALESCE(json_agg(countries), '[]') FROM countries) AS countries,
         (SELECT COALESCE(json_agg(cities), '[]') FROM cities) AS cities,
         (SELECT COALESCE(json_agg(devices), '[]') FROM devices) AS devices,
@@ -100,6 +107,84 @@ router.get('/stats', async (req, res) => {
   } catch (err) {
     console.error('[admin] stats error:', err.message);
     res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
+// -- GET /api/admin/visitors (paginated) ------------------
+router.get('/visitors', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ rows: [], total: 0 });
+
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+
+    const [countResult, dataResult] = await Promise.all([
+      pool.query('SELECT COUNT(*) AS total FROM visitors'),
+      pool.query(`SELECT session_id, current_page, device_type, user_agent, country, city,
+                         utm_source, utm_medium, utm_campaign, referrer, created_at, last_activity
+                  FROM visitors ORDER BY last_activity DESC LIMIT $1 OFFSET $2`, [limit, offset]),
+    ]);
+
+    res.json({
+      rows: dataResult.rows,
+      total: parseInt(countResult.rows[0].total, 10),
+      page,
+      limit,
+    });
+  } catch (err) {
+    console.error('[admin] visitors error:', err.message);
+    res.status(500).json({ error: 'Failed to load visitors' });
+  }
+});
+
+// -- GET /api/admin/users (paginated) --------------------
+router.get('/users', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ rows: [], total: 0 });
+
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+    const search = (req.query.search || '').trim().toLowerCase();
+
+    let where = '';
+    const params = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      where = `WHERE LOWER(u.email) LIKE $1 OR LOWER(u.display_name) LIKE $1`;
+    }
+
+    const countQuery = `SELECT COUNT(*) AS total FROM users u ${where}`;
+    const dataQuery = `
+      SELECT u.id, u.email, u.display_name, u.auth_provider, u.country, u.city,
+             u.device_type, u.user_agent, u.created_at, u.last_activity,
+             s.plan AS sub_plan, s.status AS sub_status
+      FROM users u
+      LEFT JOIN LATERAL (
+        SELECT plan, status FROM subscriptions WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
+      ) s ON true
+      ${where}
+      ORDER BY u.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(countQuery, params),
+      pool.query(dataQuery, [...params, limit, offset]),
+    ]);
+
+    res.json({
+      rows: dataResult.rows,
+      total: parseInt(countResult.rows[0].total, 10),
+      page,
+      limit,
+    });
+  } catch (err) {
+    console.error('[admin] users error:', err.message);
+    res.status(500).json({ error: 'Failed to load users' });
   }
 });
 

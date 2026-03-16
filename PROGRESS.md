@@ -52,3 +52,58 @@
 - [x] Lead capture tests (5 tests)
 - [x] Admin tests (7 tests)
 - [x] All 20 tests passing
+
+## Phase 2a: React App Scaffold with Auth System
+
+- [x] React SPA at /my/ with Vite build, Tailwind CSS, React Router
+- [x] Auth system (signup, login, logout, JWT refresh tokens)
+- [x] Email verification + password reset flows
+- [x] Google Sign-In integration
+- [x] Auth E2E tests (13 tests)
+- [x] All 33 tests passing
+
+## Brand & UI Polish
+
+- [x] Crop logo.png and logo_text.png — remove whitespace padding
+- [x] Crop favicon icons (icon-16, icon-32, icon-180) — remove whitespace
+- [x] Update favicons to "L" icon on dark background (logo_l.png)
+- [x] Fix header layout — icon + text logo inline (flexbox)
+- [x] Make text logo bigger (160px → 200px)
+- [x] Fix CSS specificity bug — success/error messages showing before form submit
+- [x] Use text logo (logo_text.png) in React app pages (Login, Signup, Home)
+
+## Google Analytics
+
+- [x] Add gtag.js (G-K97R3YJFGW) to all 5 HTML pages (index, privacy, terms, admin, my/index)
+
+## Demo Tests (Video Recording)
+
+- [x] Add `demo` Playwright project with video: 'on' in playwright.config.js
+- [x] Add `saveNamedDemoVideo()` helper in e2e/helpers.js
+- [x] Create e2e/demo-landing.test.js (landing page + login page demos)
+- [x] Add `test:e2e:demo` script to package.json
+- [x] Update CLAUDE.md with demo test instructions
+
+## Billing & Stripe Integration
+
+- [x] Add stripe dependency
+- [x] Pricing page component
+- [x] Billing status API
+- [x] Home page subscription management UI
+
+## Deployment
+
+- [x] Heroku auto-deploy from GitHub enabled
+
+## Admin Dashboard Restructure (KeyID Pattern)
+
+- [x] Backend: Add `GET /api/admin/visitors` — paginated individual visitor rows
+- [x] Backend: Add `GET /api/admin/users` — paginated user list with subscription join
+- [x] Backend: Add user_stats CTE to `GET /api/admin/stats`
+- [x] Frontend: New Overview tab (default) — visitor/lead/user/economics stat cards + breakdowns
+- [x] Frontend: Visitors tab — full paginated table with device emoji, OS icons, country codes
+- [x] Frontend: Users tab — search + paginated table with subscription status
+- [x] Frontend: Helper functions (deviceEmoji, osIcon, parseOS, shortCountry, timeAgo, fmtDate)
+- [x] Frontend: Generic renderPagination() for all paginated tabs
+- [x] Frontend: Tabs flex-wrap for responsive layout
+- [x] Docs: CLAUDE.md — admin dashboard section with tab pattern docs
