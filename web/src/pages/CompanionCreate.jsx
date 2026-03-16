@@ -78,7 +78,12 @@ export default function CompanionCreate() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border px-4 py-3">
         <div className="max-w-md mx-auto flex items-center gap-3">
-          <button onClick={() => step === 'choose' ? navigate('/') : setStep('choose')}
+          <button onClick={() => {
+            if (step === 'choose') navigate('/');
+            else if (step === 'confirm' && selected?.isTemplate) setStep('templates');
+            else if (step === 'confirm') setStep('custom');
+            else setStep('choose');
+          }}
             className="text-brand-muted hover:text-brand-text transition-colors">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -126,10 +131,15 @@ export default function CompanionCreate() {
               return (
                 <button key={t.id} onClick={() => selectTemplate(t)}
                   className="p-4 rounded-xl bg-brand-card border border-brand-border hover:border-brand-accent/40 transition-colors text-left">
-                  <div className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-white font-bold text-xl"
-                    style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
-                    {t.name[0]}
-                  </div>
+                  {t.avatar_url ? (
+                    <img src={t.avatar_url} alt={t.name}
+                      className="w-16 h-16 rounded-full mx-auto mb-3 object-cover" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-white font-bold text-xl"
+                      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
+                      {t.name[0]}
+                    </div>
+                  )}
                   <div className="text-center">
                     <div className="font-semibold text-brand-text text-sm">{t.name}</div>
                     <div className="text-xs text-brand-text-secondary mt-1 line-clamp-2">{t.tagline}</div>
@@ -175,7 +185,10 @@ export default function CompanionCreate() {
           <div className="space-y-4">
             {/* Avatar preview */}
             <div className="text-center">
-              {(() => {
+              {selected.avatar_url ? (
+                <img src={selected.avatar_url} alt={selected.name}
+                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover" />
+              ) : (() => {
                 const [from, to] = getGradient(selected.name);
                 return (
                   <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-white font-bold text-3xl"
