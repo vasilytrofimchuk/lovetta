@@ -414,6 +414,27 @@ const MIGRATIONS = [
       ON CONFLICT DO NOTHING;
     `,
   },
+  {
+    name: '018_ai_consent_and_content_reports',
+    sql: `
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_consent_at TIMESTAMPTZ;
+
+      CREATE TABLE IF NOT EXISTS content_reports (
+        id              SERIAL PRIMARY KEY,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        companion_id    UUID NOT NULL REFERENCES user_companions(id) ON DELETE CASCADE,
+        conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+        reason          TEXT NOT NULL,
+        details         TEXT,
+        context_messages JSONB DEFAULT '[]',
+        status          TEXT NOT NULL DEFAULT 'pending',
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_content_reports_status ON content_reports(status);
+      CREATE INDEX IF NOT EXISTS idx_content_reports_created ON content_reports(created_at DESC);
+    `,
+  },
 ];
 
 async function migrate() {

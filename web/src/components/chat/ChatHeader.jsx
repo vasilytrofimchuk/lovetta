@@ -11,7 +11,7 @@ function getGradient(name) {
   return GRADIENT_COLORS[Math.abs(hash) % GRADIENT_COLORS.length];
 }
 
-export default function ChatHeader({ companion }) {
+export default function ChatHeader({ companion, onCompanionTap }) {
   const navigate = useNavigate();
   const [from, to] = getGradient(companion?.name || '');
 
@@ -24,18 +24,20 @@ export default function ChatHeader({ companion }) {
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
-        {companion?.avatar_url ? (
-          <img src={companion.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-        ) : (
-          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-            style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
-            {(companion?.name || '?')[0]}
+        <button onClick={onCompanionTap} className="flex items-center gap-3 min-w-0">
+          {companion?.avatar_url ? (
+            <img src={companion.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+              style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
+              {(companion?.name || '?')[0]}
+            </div>
+          )}
+          <div className="min-w-0 text-left">
+            <div className="font-semibold text-brand-text truncate">{companion?.name || 'Loading...'}</div>
+            <div className="text-xs text-brand-success">online</div>
           </div>
-        )}
-        <div className="min-w-0">
-          <div className="font-semibold text-brand-text truncate">{companion?.name || 'Loading...'}</div>
-          <div className="text-xs text-brand-success">online</div>
-        </div>
+        </button>
       </div>
     </div>
   );

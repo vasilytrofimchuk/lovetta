@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useChat from '../hooks/useChat';
 import ChatHeader from '../components/chat/ChatHeader';
 import MessageList from '../components/chat/MessageList';
 import ChatInput from '../components/chat/ChatInput';
+import CompanionSheet from '../components/chat/CompanionSheet';
+import ReportModal from '../components/chat/ReportModal';
 
 export default function ChatPage() {
   const { companionId } = useParams();
@@ -13,6 +15,8 @@ export default function ChatPage() {
     hasMore, error, shouldRequestTip,
     loadChat, loadMore, sendMessage, triggerNext, dismissTip,
   } = useChat(companionId);
+  const [showSheet, setShowSheet] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     loadChat();
@@ -54,7 +58,7 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen bg-brand-bg flex flex-col">
-      <ChatHeader companion={companion} />
+      <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
 
       <MessageList
         messages={messages}
@@ -94,6 +98,21 @@ export default function ChatPage() {
         onNext={triggerNext}
         disabled={streaming}
       />
+
+      {showSheet && (
+        <CompanionSheet
+          companion={companion}
+          onClose={() => setShowSheet(false)}
+          onReport={() => { setShowSheet(false); setShowReport(true); }}
+        />
+      )}
+
+      {showReport && (
+        <ReportModal
+          companionId={companionId}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 }

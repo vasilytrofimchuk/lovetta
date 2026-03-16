@@ -107,3 +107,16 @@
 - [x] Frontend: Generic renderPagination() for all paginated tabs
 - [x] Frontend: Tabs flex-wrap for responsive layout
 - [x] Docs: CLAUDE.md — admin dashboard section with tab pattern docs
+
+## App Store Compliance: Privacy, Terms & Report Feature
+
+- [x] Privacy policy: third-party AI processing disclosure, image generation, consent language, content safety
+- [x] Terms of service: AI consent, content moderation, reporting sections
+- [x] DB migration: `ai_consent_at` column on users, `content_reports` table
+- [x] AI consent checkbox in signup LegalPopup (required for all new users)
+- [x] `ai_consent_at` stored for email, Google, and Telegram signups
+- [x] Companion bottom sheet: tap avatar/name in ChatHeader → profile + actions
+- [x] Report modal: reason selector + details → `POST /api/chat/:companionId/report`
+- [x] Admin Reports tab: paginated table, status badges, Review/Resolve/Dismiss actions
+- [x] Admin API: `GET /api/admin/reports`, `PATCH /api/admin/reports/:id`
+- [x] Reports badge on admin dashboard tab

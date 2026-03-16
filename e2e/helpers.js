@@ -64,6 +64,7 @@ async function createTestUser(request) {
       birthYear: 1995,
       termsAccepted: true,
       privacyAccepted: true,
+      aiConsentAccepted: true,
     },
   });
   const data = await res.json();

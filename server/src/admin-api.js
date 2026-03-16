@@ -285,6 +285,80 @@ router.get('/consumption/summary', async (req, res) => {
   }
 });
 
+// -- GET /api/admin/reports (paginated) -------------------------
+router.get('/reports', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ reports: [], total: 0, pendingCount: 0 });
+
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+    const status = req.query.status;
+
+    let where = '';
+    const params = [];
+    if (status && ['pending', 'reviewed', 'resolved', 'dismissed'].includes(status)) {
+      params.push(status);
+      where = `WHERE cr.status = $1`;
+    }
+
+    const countQuery = `SELECT COUNT(*) AS total FROM content_reports cr ${where}`;
+    const pendingQuery = `SELECT COUNT(*) AS count FROM content_reports WHERE status = 'pending'`;
+    const dataQuery = `
+      SELECT cr.id, cr.user_id, cr.companion_id, cr.reason, cr.details, cr.status,
+             cr.created_at, cr.context_messages,
+             u.email AS user_email, uc.name AS companion_name
+      FROM content_reports cr
+      LEFT JOIN users u ON u.id = cr.user_id
+      LEFT JOIN user_companions uc ON uc.id = cr.companion_id
+      ${where}
+      ORDER BY cr.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+
+    const [countResult, pendingResult, dataResult] = await Promise.all([
+      pool.query(countQuery, params),
+      pool.query(pendingQuery),
+      pool.query(dataQuery, [...params, limit, offset]),
+    ]);
+
+    res.json({
+      reports: dataResult.rows,
+      total: parseInt(countResult.rows[0].total, 10),
+      pendingCount: parseInt(pendingResult.rows[0].count, 10),
+      page,
+      limit,
+    });
+  } catch (err) {
+    console.error('[admin] reports error:', err.message);
+    res.status(500).json({ error: 'Failed to load reports' });
+  }
+});
+
+// -- PATCH /api/admin/reports/:id -------------------------------
+router.patch('/reports/:id', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'No database' });
+
+  try {
+    const { status } = req.body || {};
+    if (!['pending', 'reviewed', 'resolved', 'dismissed'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const { rowCount } = await pool.query(
+      'UPDATE content_reports SET status = $1, updated_at = NOW() WHERE id = $2',
+      [status, req.params.id]
+    );
+
+    if (rowCount === 0) return res.status(404).json({ error: 'Report not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[admin] report update error:', err.message);
+    res.status(500).json({ error: 'Failed to update report' });
+  }
+});
+
 // -- Sentry ---------------------------------------------------
 const SENTRY_AUTH = process.env.SENTRY_AUTH_TOKEN;
 const SENTRY_ORG = process.env.SENTRY_ORG_SLUG;

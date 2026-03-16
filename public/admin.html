@@ -171,6 +171,15 @@
     .profit { color: var(--success); }
     .loss { color: var(--error); }
 
+    /* Report status badges */
+    .status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 500;
+    }
+    .status-pending { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+    .status-reviewed { background: rgba(64, 160, 224, 0.15); color: #40a0e0; }
+    .status-resolved { background: rgba(77, 214, 122, 0.15); color: var(--success); }
+    .status-dismissed { background: rgba(124, 106, 154, 0.15); color: var(--muted); }
+
     /* Economics settings inputs */
     .econ-setting-input {
       padding: 8px 12px; background: var(--bg2); border: 1px solid var(--border);
@@ -204,6 +213,7 @@
       <button class="tab" onclick="switchTab('leads')">Leads</button>
       <button class="tab" onclick="switchTab('economics')">Economics</button>
       <button class="tab" onclick="switchTab('settings')">Settings</button>
+      <button class="tab" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
       <button class="tab" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
     </div>
 
@@ -293,6 +303,20 @@
       </div>
     </div>
 
+    <!-- Reports Tab -->
+    <div id="tab-reports" class="tab-content">
+      <div class="stat-cards" id="reports-cards"></div>
+      <div style="display:flex;gap:8px;margin-bottom:20px;">
+        <button class="econ-period active" onclick="loadReports(1, 'all', this)">All</button>
+        <button class="econ-period" onclick="loadReports(1, 'pending', this)">Pending</button>
+        <button class="econ-period" onclick="loadReports(1, 'reviewed', this)">Reviewed</button>
+        <button class="econ-period" onclick="loadReports(1, 'resolved', this)">Resolved</button>
+        <button class="econ-period" onclick="loadReports(1, 'dismissed', this)">Dismissed</button>
+      </div>
+      <div id="reports-table-wrap"></div>
+      <div class="pagination" id="reports-pagination"></div>
+    </div>
+
     <!-- Sentry Tab -->
     <div id="tab-sentry" class="tab-content">
       <div id="sentry-content" style="font-size:14px;color:var(--muted);">Loading...</div>
@@ -343,6 +367,7 @@
       loadOverview();
       loadSettings();
       loadSentryBadge();
+      loadReportsBadge();
     }
 
     // Tabs
@@ -355,6 +380,7 @@
       else if (name === 'visitors') loadVisitors();
       else if (name === 'users') loadUsers();
       else if (name === 'leads') loadLeads();
+      else if (name === 'reports') loadReports();
       else if (name === 'sentry') loadSentry();
       else if (name === 'economics') loadEconomics('7d');
     }
@@ -720,6 +746,83 @@
 
     function sentryAction(id, status) {
       apiPatch('/api/admin/sentry/issues/' + id, { status: status }).then(function() { loadSentry(); });
+    }
+
+    // --- Reports ---
+    var reportPage = 1;
+    var reportStatus = 'all';
+
+    function loadReports(page, status, btn) {
+      reportPage = page || reportPage;
+      if (status) reportStatus = status;
+
+      // Update active filter button
+      if (btn) {
+        document.querySelectorAll('#tab-reports .econ-period').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+      }
+
+      var url = '/api/admin/reports?page=' + reportPage + '&limit=50';
+      if (reportStatus !== 'all') url += '&status=' + reportStatus;
+
+      apiFetch(url).then(function(data) {
+        var reports = data.reports || [];
+        var pending = data.pendingCount || 0;
+
+        // Badge
+        var badge = document.getElementById('reports-badge');
+        badge.textContent = pending > 99 ? '99+' : pending;
+        badge.style.display = pending > 0 ? 'inline' : 'none';
+
+        // Cards
+        document.getElementById('reports-cards').innerHTML =
+          card('Pending', pending) +
+          card('Total', data.total || 0);
+
+        // Table
+        if (!reports.length) {
+          document.getElementById('reports-table-wrap').innerHTML =
+            '<p style="color: var(--muted); text-align: center; padding: 40px;">No reports</p>';
+          document.getElementById('reports-pagination').innerHTML = '';
+          return;
+        }
+
+        var html = '<table><tr><th>ID</th><th>User</th><th>Companion</th><th>Reason</th><th>Details</th><th>Date</th><th>Status</th><th>Actions</th></tr>';
+        reports.forEach(function(r) {
+          var details = esc(r.details || '-');
+          if (details.length > 60) details = details.slice(0, 60) + '...';
+          html += '<tr>' +
+            '<td class="mono">' + r.id + '</td>' +
+            '<td class="mono">' + esc(r.user_email || r.user_id.slice(0, 8)) + '</td>' +
+            '<td>' + esc(r.companion_name || r.companion_id.slice(0, 8)) + '</td>' +
+            '<td>' + esc(r.reason) + '</td>' +
+            '<td title="' + esc(r.details || '') + '">' + details + '</td>' +
+            '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
+            '<td><span class="status-badge status-' + esc(r.status) + '">' + esc(r.status) + '</span></td>' +
+            '<td><div class="sentry-actions">' +
+              (r.status === 'pending' ? '<button onclick="reportAction(' + r.id + ', \'reviewed\')">Review</button>' : '') +
+              (r.status !== 'resolved' ? '<button onclick="reportAction(' + r.id + ', \'resolved\')">Resolve</button>' : '') +
+              (r.status !== 'dismissed' ? '<button onclick="reportAction(' + r.id + ', \'dismissed\')">Dismiss</button>' : '') +
+            '</div></td>' +
+          '</tr>';
+        });
+        html += '</table>';
+        document.getElementById('reports-table-wrap').innerHTML = html;
+        renderPagination('reports-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadReports');
+      });
+    }
+
+    function reportAction(id, status) {
+      apiPatch('/api/admin/reports/' + id, { status: status }).then(function() { loadReports(); });
+    }
+
+    function loadReportsBadge() {
+      apiFetch('/api/admin/reports?page=1&limit=1&status=pending').then(function(data) {
+        var badge = document.getElementById('reports-badge');
+        var count = data.pendingCount || 0;
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? 'inline' : 'none';
+      }).catch(function() {});
     }
 
     // Economics

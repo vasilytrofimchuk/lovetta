@@ -69,7 +69,7 @@ router.post('/signup', authLimiter, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'Service unavailable' });
 
   try {
-    const { email, password, birthMonth, birthYear, termsAccepted, privacyAccepted } = req.body || {};
+    const { email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted } = req.body || {};
 
     // Validate
     if (!email || !EMAIL_RE.test(email)) {
@@ -89,6 +89,9 @@ router.post('/signup', authLimiter, async (req, res) => {
     if (!termsAccepted || !privacyAccepted) {
       return res.status(400).json({ error: 'You must accept the terms and privacy policy' });
     }
+    if (!aiConsentAccepted) {
+      return res.status(400).json({ error: 'You must consent to AI data processing' });
+    }
 
     // Check duplicate
     const { rows: existing } = await pool.query(
@@ -106,8 +109,8 @@ router.post('/signup', authLimiter, async (req, res) => {
 
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (email, password_hash, birth_month, birth_year, terms_accepted, privacy_accepted,
-                          verify_token, ip_address, country, city, user_agent, auth_provider)
-       VALUES (LOWER($1), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'email')
+                          ai_consent_at, verify_token, ip_address, country, city, user_agent, auth_provider)
+       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, 'email')
        RETURNING *`,
       [email.trim(), passwordHash, month, year, true, true,
        verifyToken, ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
@@ -452,8 +455,8 @@ router.get('/google/callback', async (req, res) => {
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ip_address, country, city, user_agent, auth_provider)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, 1, 2000, TRUE, TRUE, $5, $6, $7, $8, 'google')
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, 1, 2000, TRUE, TRUE, NOW(), $5, $6, $7, $8, 'google')
            RETURNING *`,
           [email, googleId, name, picture,
            ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
@@ -539,8 +542,8 @@ router.post('/telegram', authLimiter, async (req, res) => {
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ip_address, country, city, user_agent, auth_provider)
-           VALUES ($1, $2, $3, $4, TRUE, 1, 2000, TRUE, TRUE, $5, $6, $7, $8, 'telegram')
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider)
+           VALUES ($1, $2, $3, $4, TRUE, 1, 2000, TRUE, TRUE, NOW(), $5, $6, $7, $8, 'telegram')
            RETURNING *`,
           [syntheticEmail, telegramId, displayName, tgUser.photoUrl,
            ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]

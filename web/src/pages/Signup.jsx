@@ -42,7 +42,7 @@ export default function Signup() {
     setShowLegal(true)
   }
 
-  const handleAccept = async ({ termsAccepted, privacyAccepted }) => {
+  const handleAccept = async ({ termsAccepted, privacyAccepted, aiConsentAccepted }) => {
     setShowLegal(false)
     setLoading(true)
     try {
@@ -53,6 +53,7 @@ export default function Signup() {
         birthYear: parseInt(birthYear),
         termsAccepted,
         privacyAccepted,
+        aiConsentAccepted,
       })
     } catch (err) {
       setError(getErrorMessage(err))

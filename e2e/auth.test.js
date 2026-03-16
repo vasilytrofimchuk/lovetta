@@ -14,6 +14,7 @@ test.describe('Auth API', () => {
         birthYear: 1995,
         termsAccepted: true,
         privacyAccepted: true,
+        aiConsentAccepted: true,
       },
     });
     expect(res.ok()).toBeTruthy();
@@ -33,6 +34,7 @@ test.describe('Auth API', () => {
         birthYear: 2015,
         termsAccepted: true,
         privacyAccepted: true,
+        aiConsentAccepted: true,
       },
     });
     expect(res.status()).toBe(403);
@@ -47,6 +49,7 @@ test.describe('Auth API', () => {
         birthYear: 1995,
         termsAccepted: true,
         privacyAccepted: true,
+        aiConsentAccepted: true,
       },
     });
     expect(res.status()).toBe(409);
@@ -61,6 +64,7 @@ test.describe('Auth API', () => {
         birthYear: 1995,
         termsAccepted: false,
         privacyAccepted: true,
+        aiConsentAccepted: true,
       },
     });
     expect(res.status()).toBe(400);

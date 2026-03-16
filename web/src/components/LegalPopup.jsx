@@ -3,6 +3,7 @@ import { useState } from 'react'
 export default function LegalPopup({ onAccept, onClose }) {
   const [terms, setTerms] = useState(false)
   const [privacy, setPrivacy] = useState(false)
+  const [aiConsent, setAiConsent] = useState(false)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
@@ -27,7 +28,7 @@ export default function LegalPopup({ onAccept, onClose }) {
           </span>
         </label>
 
-        <label className="flex items-start gap-3 mb-6 cursor-pointer">
+        <label className="flex items-start gap-3 mb-4 cursor-pointer">
           <input
             type="checkbox"
             checked={privacy}
@@ -42,6 +43,18 @@ export default function LegalPopup({ onAccept, onClose }) {
           </span>
         </label>
 
+        <label className="flex items-start gap-3 mb-6 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={aiConsent}
+            onChange={(e) => setAiConsent(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-brand-accent flex-shrink-0"
+          />
+          <span className="text-sm text-brand-text-secondary">
+            I understand my messages are processed by third-party AI services to generate responses
+          </span>
+        </label>
+
         <div className="flex gap-3">
           <button
             onClick={onClose}
@@ -50,8 +63,8 @@ export default function LegalPopup({ onAccept, onClose }) {
             Cancel
           </button>
           <button
-            onClick={() => onAccept({ termsAccepted: true, privacyAccepted: true })}
-            disabled={!terms || !privacy}
+            onClick={() => onAccept({ termsAccepted: true, privacyAccepted: true, aiConsentAccepted: true })}
+            disabled={!terms || !privacy || !aiConsent}
             className="flex-1 py-3 rounded-lg bg-brand-accent text-white font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Continue

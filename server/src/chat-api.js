@@ -331,4 +331,39 @@ router.get('/:companionId/history', authenticate, async (req, res) => {
   }
 });
 
+// -- POST /api/chat/:companionId/report -----------------------
+router.post('/:companionId/report', authenticate, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'No database' });
+
+  try {
+    const companion = await verifyCompanionOwnership(pool, req.params.companionId, req.userId);
+    if (!companion) return res.status(404).json({ error: 'Companion not found' });
+
+    const { reason, details } = req.body || {};
+    if (!reason) return res.status(400).json({ error: 'Reason is required' });
+
+    const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
+
+    // Get last 10 messages as context
+    const { rows: contextMessages } = await pool.query(
+      `SELECT role, content, context_text, created_at FROM messages
+       WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 10`,
+      [conversation.id]
+    );
+    contextMessages.reverse();
+
+    await pool.query(
+      `INSERT INTO content_reports (user_id, companion_id, conversation_id, reason, details, context_messages)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [req.userId, companion.id, conversation.id, reason, details || null, JSON.stringify(contextMessages)]
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[chat] report error:', err.message);
+    res.status(500).json({ error: 'Failed to submit report' });
+  }
+});
+
 module.exports = router;

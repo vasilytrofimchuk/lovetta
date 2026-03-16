@@ -22,6 +22,15 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
+      animation: {
+        'slide-up': 'slide-up 0.25s ease-out',
+      },
+      keyframes: {
+        'slide-up': {
+          from: { transform: 'translateY(100%)' },
+          to: { transform: 'translateY(0)' },
+        },
+      },
     },
   },
   plugins: [],
