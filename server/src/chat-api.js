@@ -101,7 +101,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
   res.write(': heartbeat\n\n');
 
   let aborted = false;
-  req.on('close', () => { aborted = true; });
+  res.on('close', () => { aborted = true; });
 
   try {
     // Check subscription
@@ -146,27 +146,32 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     let fullText = '';
     let doneData = null;
 
-    for await (const event of streamChat(systemPrompt, aiMessages, {
-      userId: req.userId,
-      companionId: companion.id,
-      platform,
-    })) {
-      if (aborted) break;
+    // Send typing indicator immediately
+    res.write(`data: ${JSON.stringify({ type: 'typing' })}\n\n`);
 
-      if (event.type === 'chunk') {
-        fullText += event.data;
-        res.write(`data: ${JSON.stringify({ type: 'chunk', text: event.data })}\n\n`);
-      } else if (event.type === 'regenerate') {
-        fullText = '';
-        res.write(`data: ${JSON.stringify({ type: 'regenerate' })}\n\n`);
-      } else if (event.type === 'done') {
-        doneData = event.data;
-      }
+    // Keep-alive heartbeats while waiting for AI
+    const heartbeat = setInterval(() => {
+      if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
+    }, 3000);
+
+    // Use chatCompletion (non-generator)
+    const { chatCompletion } = require('./ai');
+    let aiResult;
+    try {
+      aiResult = await chatCompletion(systemPrompt, aiMessages, {
+        userId: req.userId,
+        companionId: companion.id,
+        platform,
+      });
+    } finally {
+      clearInterval(heartbeat);
     }
 
-    if (!aborted && doneData) {
-      // Parse context text and save assistant message
-      const parsed = parseContextText(doneData.fullText);
+    if (!aborted && aiResult) {
+      fullText = aiResult.content;
+      res.write(`data: ${JSON.stringify({ type: 'chunk', text: aiResult.content })}\n\n`);
+
+      const parsed = parseContextText(aiResult.content);
 
       const { rows: [savedMsg] } = await pool.query(
         `INSERT INTO messages (conversation_id, role, content, context_text)
@@ -183,7 +188,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         type: 'done',
         messageId: savedMsg.id,
         contextText: parsed.contextText,
-        shouldRequestTip: doneData.shouldRequestTip || false,
+        shouldRequestTip: aiResult.shouldRequestTip || false,
       })}\n\n`);
     }
   } catch (err) {
@@ -209,7 +214,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
   res.write(': heartbeat\n\n');
 
   let aborted = false;
-  req.on('close', () => { aborted = true; });
+  res.on('close', () => { aborted = true; });
 
   try {
     const sub = await getUserSubscription(req.userId);

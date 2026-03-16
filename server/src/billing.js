@@ -256,6 +256,8 @@ async function getUserSubscription(userId) {
 }
 
 function isSubscriptionActive(sub) {
+  // In development, always allow access for testing
+  if (process.env.NODE_ENV === 'development') return true;
   if (!sub) return false;
   if (sub.status !== 'active' && sub.status !== 'canceling' && sub.status !== 'trialing') return false;
   if (sub.current_period_end && new Date(sub.current_period_end) <= new Date()) return false;

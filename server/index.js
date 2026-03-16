@@ -20,6 +20,7 @@ if (SENTRY_ENABLED) {
 }
 
 const express = require('express');
+const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
@@ -79,6 +80,92 @@ app.use('/api/billing', billingApi);
 app.use('/api/admin', adminApi);
 app.use('/api/companions', companionApi);
 app.use('/api/chat', chatApi);
+
+// -- Resend inbound webhook --
+const RESEND_INBOUND_SECRET = (process.env.RESEND_INBOUND_SECRET || '').trim();
+
+app.post('/api/inbound', async (req, res) => {
+  if (RESEND_INBOUND_SECRET) {
+    const signature = req.get('svix-signature') || '';
+    const timestamp = req.get('svix-timestamp') || '';
+    const msgId = req.get('svix-id') || '';
+
+    if (!signature || !timestamp) {
+      return res.status(401).json({ error: 'Missing webhook signature' });
+    }
+
+    const timestampSec = parseInt(timestamp, 10);
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (isNaN(timestampSec) || Math.abs(nowSec - timestampSec) > 300) {
+      return res.status(401).json({ error: 'Webhook timestamp too old or invalid' });
+    }
+
+    const payload = JSON.stringify(req.body);
+    const toSign = `${msgId}.${timestamp}.${payload}`;
+    const expected = crypto
+      .createHmac('sha256', Buffer.from(RESEND_INBOUND_SECRET.replace('whsec_', ''), 'base64'))
+      .update(toSign)
+      .digest('base64');
+
+    const sigParts = signature.split(' ');
+    const valid = sigParts.some(s => s.replace(/^v1,/, '') === expected);
+
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid webhook signature' });
+    }
+  }
+
+  try {
+    const body = req.body || {};
+    const eventType = body.type;
+    const payload = body.data || body;
+
+    console.log(`[inbound] Webhook received: type=${eventType}, email_id=${payload.email_id || 'none'}`);
+
+    if (eventType && eventType !== 'email.received') {
+      return res.json({ ok: true });
+    }
+
+    let { from, to, cc, subject, text, html, headers } = payload;
+
+    // Resend webhooks may not include body — fetch via API
+    if (payload.email_id && (!text && !html)) {
+      const RESEND_KEY = (process.env.RESEND_API_KEY || '').trim();
+      if (RESEND_KEY) {
+        try {
+          const fetchRes = await fetch(`https://api.resend.com/emails/receiving/${payload.email_id}`, {
+            headers: { Authorization: `Bearer ${RESEND_KEY}` },
+          });
+          if (fetchRes.ok) {
+            const emailContent = await fetchRes.json();
+            text = emailContent.text || text;
+            html = emailContent.html || html;
+            headers = emailContent.headers || headers;
+            if (!from) from = emailContent.from;
+            if (!to) to = emailContent.to;
+            if (!subject) subject = emailContent.subject;
+            console.log(`[inbound] Fetched content for ${payload.email_id}: subject="${subject}"`);
+          }
+        } catch (fetchErr) {
+          console.warn(`[inbound] Error fetching email content: ${fetchErr.message}`);
+        }
+      }
+    }
+
+    // Route to admin inbox
+    const { ADMIN_EMAILS, processAdminInbound } = require('./src/email');
+    const recipientAddr = (Array.isArray(to) ? to[0] : to) || '';
+    const recipientStr = typeof recipientAddr === 'object' ? (recipientAddr.address || recipientAddr.email || String(recipientAddr)) : String(recipientAddr);
+    if (ADMIN_EMAILS.includes(recipientStr.toLowerCase())) {
+      await processAdminInbound({ from, to: recipientStr, cc, subject, text, html, headers });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[inbound] error:', err.message);
+    res.json({ ok: true });
+  }
+});
 
 // Health check
 app.get('/api/health', (req, res) => {

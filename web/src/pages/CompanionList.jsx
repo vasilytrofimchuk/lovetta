@@ -23,7 +23,13 @@ export default function CompanionList() {
   useEffect(() => {
     const checkout = searchParams.get('checkout');
     const tip = searchParams.get('tip');
-    if (checkout === 'success') setToast('Subscription activated!');
+    if (checkout === 'success') {
+      setToast('Subscription activated!');
+      // Mark as subscribed locally (webhook may not have fired yet on dev)
+      setSubscription(prev => prev ? { ...prev, hasSubscription: true, plan: prev.plan || 'monthly' } : { hasSubscription: true, plan: 'monthly' });
+      // Also try to re-fetch in case webhook did fire
+      api.get('/api/billing/status').then(({ data }) => setSubscription(data)).catch(() => {});
+    }
     if (checkout === 'cancel') setToast('Checkout canceled');
     if (tip === 'success') setToast('Thank you for the tip!');
     if (tip === 'cancel') setToast('Tip canceled');

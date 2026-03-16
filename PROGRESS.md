@@ -120,3 +120,14 @@
 - [x] Admin Reports tab: paginated table, status badges, Review/Resolve/Dismiss actions
 - [x] Admin API: `GET /api/admin/reports`, `PATCH /api/admin/reports/:id`
 - [x] Reports badge on admin dashboard tab
+
+## Template Video Previews
+
+- [x] DB migration: add `video_url` column to `companion_templates`
+- [x] Video generation script (`scripts/generate-template-videos.js`) — fal.ai wan-2.6
+- [x] Frontend: template grid shows `<video>` with autoplay/muted/loop/playsInline
+- [x] Frontend: confirm screen shows video if available
+- [x] Generate videos for all 12 templates via script ($3.00 total)
+- [x] Update seed migration with generated video URLs
+- [x] Fix fal.ai video model ID: `wan/v2.6/image-to-video` (was `fal-ai/wan-2.6`)
+- [x] Add duration/resolution params to generateVideo()

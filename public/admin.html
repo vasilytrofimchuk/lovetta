@@ -185,6 +185,20 @@
       padding: 8px 12px; background: var(--bg2); border: 1px solid var(--border);
       border-radius: 8px; color: var(--text); font-size: 0.9rem; width: 220px;
     }
+
+    /* Email inbox */
+    .email-unread td { font-weight: 700; }
+    .email-unread td:first-child { border-left: 3px solid var(--accent); }
+    .email-row { cursor: pointer; }
+    .badge-mktg { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; margin-left: 6px; background: rgba(124,106,154,0.15); color: var(--muted); }
+    .badge-fwd { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; margin-left: 6px; background: rgba(77,214,122,0.15); color: var(--success); }
+    .badge-sent { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; margin-left: 6px; background: rgba(214,51,108,0.15); color: var(--accent); }
+    .email-filter { padding: 6px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 0.85rem; }
+    .email-filter.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .email-compose-input { padding: 8px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem; width: 100%; margin-bottom: 8px; }
+    .email-compose-input:focus { outline: none; border-color: var(--accent); }
+    .from-badge { font-size: 11px !important; padding: 2px 10px !important; }
+    .from-badge.active { background: var(--accent) !important; color: white !important; border-color: var(--accent) !important; }
   </style>
 </head>
 <body>
@@ -215,6 +229,7 @@
       <button class="tab" onclick="switchTab('settings')">Settings</button>
       <button class="tab" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
       <button class="tab" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
     </div>
 
     <!-- Overview Tab -->
@@ -321,6 +336,50 @@
     <div id="tab-sentry" class="tab-content">
       <div id="sentry-content" style="font-size:14px;color:var(--muted);">Loading...</div>
     </div>
+
+    <!-- Email Tab -->
+    <div id="tab-email" class="tab-content">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;">
+        <button class="email-filter active" data-dir="inbound" onclick="filterEmail('inbound')">Inbox</button>
+        <button class="email-filter" data-dir="outbound" onclick="filterEmail('outbound')">Sent</button>
+        <button class="email-filter" data-dir="all" onclick="filterEmail('all')">All</button>
+        <div style="flex:1"></div>
+        <button class="tab" style="background:var(--accent);color:white;border-color:var(--accent);" onclick="composeEmail()">Compose</button>
+      </div>
+      <div id="email-compose" style="display:none;margin-bottom:16px;padding:16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">
+        <h3 class="section-title" id="compose-title" style="margin-top:0;">New Email</h3>
+        <div id="compose-from" style="margin-bottom:8px;display:flex;gap:6px;align-items:center;"><span style="color:var(--muted);font-size:12px;">From:</span></div>
+        <input type="text" id="compose-to" class="email-compose-input" placeholder="To">
+        <input type="text" id="compose-subject" class="email-compose-input" placeholder="Subject">
+        <textarea id="compose-body" class="email-compose-input" placeholder="Message..." rows="6" style="resize:vertical;"></textarea>
+        <input type="hidden" id="compose-reply-to">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="tab" style="background:var(--accent);color:white;border-color:var(--accent);" onclick="sendAdminEmail()">Send</button>
+          <button class="tab" onclick="closeCompose()">Cancel</button>
+          <span id="compose-status" style="margin-left:8px;font-size:13px;"></span>
+        </div>
+      </div>
+      <div id="email-detail" style="display:none;margin-bottom:16px;padding:16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+          <div>
+            <div style="font-weight:600;font-size:15px;" id="detail-subject"></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+              <span id="detail-from"></span> &rarr; <span id="detail-to"></span>
+              &middot; <span id="detail-date"></span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="tab" onclick="replyToEmail()">Reply</button>
+            <button class="tab" onclick="closeDetail()">Close</button>
+          </div>
+        </div>
+        <div id="detail-body" style="font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:400px;overflow-y:auto;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);"></div>
+      </div>
+      <table><thead><tr>
+        <th>From/To</th><th>Subject</th><th>Date</th><th></th>
+      </tr></thead><tbody id="email-rows"></tbody></table>
+      <div class="pagination" id="email-pagination"></div>
+    </div>
   </div>
 
   <script>
@@ -330,6 +389,11 @@
     var leadPage = 1;
     var leadSearchTimeout;
     var userSearchTimeout;
+    var emailPage = 1;
+    var emailFilter = 'inbound';
+    var selectedEmail = null;
+    var selectedFromAddr = '';
+    var adminAddressesLoaded = false;
 
     // Auth
     function headers() {
@@ -383,6 +447,7 @@
       else if (name === 'reports') loadReports();
       else if (name === 'sentry') loadSentry();
       else if (name === 'economics') loadEconomics('7d');
+      else if (name === 'email') loadEmails();
     }
 
     // --- Helper functions (ported from KeyID) ---
@@ -956,6 +1021,157 @@
       if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
       return n;
     }
+
+    // -- Email Inbox --------------------------------------------
+    function apiPost(url, body) {
+      return fetch(url, { method: 'POST', headers: headers(), body: JSON.stringify(body) }).then(function(r) { return r.json(); });
+    }
+
+    function loadAdminAddresses() {
+      if (adminAddressesLoaded) return;
+      adminAddressesLoaded = true;
+      apiFetch('/api/admin/emails/addresses').then(function(data) {
+        var container = document.getElementById('compose-from');
+        var addrs = data.addresses || [];
+        selectedFromAddr = data.default || (addrs[0] && addrs[0].address) || '';
+        var html = '<span style="color:var(--muted);font-size:12px;">From:</span>';
+        addrs.forEach(function(item) {
+          var addr = item.address || item;
+          var name = item.name || addr;
+          var active = addr === selectedFromAddr;
+          html += '<button class="email-filter from-badge' + (active ? ' active' : '') + '" data-addr="' + esc(addr) + '" onclick="selectFromAddr(this)" style="font-size:11px;padding:2px 10px;">' + esc(name) + ' &lt;' + esc(addr) + '&gt;</button>';
+        });
+        container.innerHTML = html;
+      }).catch(function(err) {
+        console.error('[admin] Failed to load addresses:', err);
+        adminAddressesLoaded = false;
+      });
+    }
+
+    function selectFromAddr(el) {
+      selectedFromAddr = el.dataset.addr;
+      document.querySelectorAll('.from-badge').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.addr === selectedFromAddr);
+      });
+    }
+
+    function loadEmailStats() {
+      apiFetch('/api/admin/emails/stats').then(function(data) {
+        var badge = document.getElementById('email-badge');
+        if (data.unread > 0) {
+          badge.textContent = data.unread;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      }).catch(function() {});
+    }
+
+    function loadEmails(page) {
+      emailPage = page || emailPage;
+      loadAdminAddresses();
+      loadEmailStats();
+      var dir = emailFilter === 'inbound' ? 'inbound' : emailFilter === 'outbound' ? 'sent' : 'all';
+      apiFetch('/api/admin/emails?direction=' + dir + '&page=' + emailPage + '&limit=50').then(function(data) {
+        var rows = (data.rows || []).map(function(r) {
+          var isInbound = r.direction === 'inbound';
+          var addr = isInbound ? r.from_address : r.to_address;
+          var unread = isInbound && !r.read;
+          var badges = '';
+          if (r.is_marketing) badges += ' <span class="badge-mktg">mktg</span>';
+          if (r.forwarded) badges += ' <span class="badge-fwd">fwd</span>';
+          if (!isInbound) badges += ' <span class="badge-sent">sent</span>';
+          return '<tr class="email-row' + (unread ? ' email-unread' : '') + '" onclick="viewEmail(' + r.id + ')">' +
+            '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">' + esc(addr) + '</td>' +
+            '<td>' + esc(r.subject || '(no subject)') + badges + '</td>' +
+            '<td style="white-space:nowrap;font-size:13px;color:var(--muted);">' + timeAgo(r.created_at) + '</td>' +
+            '<td></td>' +
+          '</tr>';
+        }).join('');
+        document.getElementById('email-rows').innerHTML = rows || '<tr><td colspan="4" class="empty-row">No emails yet</td></tr>';
+        renderPagination('email-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadEmails');
+      });
+    }
+
+    function filterEmail(dir) {
+      emailFilter = dir;
+      emailPage = 1;
+      document.querySelectorAll('.email-filter:not(.from-badge)').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.dir === dir);
+      });
+      closeDetail();
+      loadEmails();
+    }
+
+    function viewEmail(id) {
+      apiFetch('/api/admin/emails/' + id).then(function(data) {
+        if (data.error) return;
+        var e = data.email;
+        selectedEmail = e;
+        document.getElementById('detail-subject').textContent = e.subject || '(no subject)';
+        document.getElementById('detail-from').textContent = e.from_address;
+        document.getElementById('detail-to').textContent = e.to_address;
+        document.getElementById('detail-date').textContent = new Date(e.created_at).toLocaleString();
+        document.getElementById('detail-body').textContent = e.body_text || '(no body)';
+        document.getElementById('email-detail').style.display = 'block';
+        document.getElementById('email-compose').style.display = 'none';
+        loadEmails();
+      });
+    }
+
+    function closeDetail() {
+      document.getElementById('email-detail').style.display = 'none';
+      selectedEmail = null;
+    }
+
+    function replyToEmail() {
+      if (!selectedEmail) return;
+      document.getElementById('compose-title').textContent = 'Reply';
+      document.getElementById('compose-to').value = selectedEmail.from_address;
+      document.getElementById('compose-subject').value = (selectedEmail.subject || '').startsWith('Re:') ? selectedEmail.subject : 'Re: ' + (selectedEmail.subject || '');
+      document.getElementById('compose-body').value = '';
+      document.getElementById('compose-reply-to').value = selectedEmail.message_id || '';
+      document.getElementById('email-compose').style.display = 'block';
+      document.getElementById('compose-body').focus();
+    }
+
+    function composeEmail() {
+      document.getElementById('compose-title').textContent = 'New Email';
+      document.getElementById('compose-to').value = '';
+      document.getElementById('compose-subject').value = '';
+      document.getElementById('compose-body').value = '';
+      document.getElementById('compose-reply-to').value = '';
+      document.getElementById('email-compose').style.display = 'block';
+      document.getElementById('email-detail').style.display = 'none';
+      document.getElementById('compose-to').focus();
+    }
+
+    function closeCompose() {
+      document.getElementById('email-compose').style.display = 'none';
+    }
+
+    function sendAdminEmail() {
+      var from = selectedFromAddr;
+      var to = document.getElementById('compose-to').value.trim();
+      var subject = document.getElementById('compose-subject').value.trim();
+      var text = document.getElementById('compose-body').value;
+      var inReplyTo = document.getElementById('compose-reply-to').value || undefined;
+      if (!to || !subject) { alert('To and Subject are required'); return; }
+
+      var el = document.getElementById('compose-status');
+      el.innerHTML = '<span style="color:var(--muted);">Sending...</span>';
+      apiPost('/api/admin/emails/send', { from: from, to: to, subject: subject, text: text, inReplyTo: inReplyTo }).then(function(data) {
+        if (data.error) { el.innerHTML = '<span style="color:var(--error);">' + esc(data.error) + '</span>'; return; }
+        el.innerHTML = '<span style="color:var(--success);">Sent!</span>';
+        setTimeout(function() { closeCompose(); el.innerHTML = ''; }, 1500);
+        loadEmails();
+      }).catch(function(err) {
+        el.innerHTML = '<span style="color:var(--error);">' + esc(err.message) + '</span>';
+      });
+    }
+
+    // Load email stats on dashboard init
+    setTimeout(loadEmailStats, 500);
 
     // Auto-login if token saved
     if (TOKEN) {

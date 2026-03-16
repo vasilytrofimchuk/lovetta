@@ -84,7 +84,7 @@
       <option value="700">Bold (700)</option>
     </select>
   </label>
-  <label><span>Italic</span><div class="range-wrap"><input type="range" id="fontSlant" min="-15" max="15" value="-3"><span class="rv" id="fontSlantVal">-3°</span></div></label>
+  <label><span>Italic</span><div class="range-wrap"><input type="range" id="fontSlant" min="-15" max="15" value="0"><span class="rv" id="fontSlantVal">0°</span></div></label>
   <label><span>Color 1 (Start)</span><div class="color-pair"><input type="color" id="color1Pick" value="#f472b6"><input type="text" id="color1" value="#f472b6"></div></label>
   <label><span>Color 2 (End)</span><div class="color-pair"><input type="color" id="color2Pick" value="#a855f7"><input type="text" id="color2" value="#a855f7"></div></label>
   <label><span>Gradient Angle</span><div class="range-wrap"><input type="range" id="gradAngle" min="0" max="360" value="160"><span class="rv" id="gradAngleVal">160°</span></div></label>
@@ -460,9 +460,7 @@ function renderSocial(forExport) {
   ctx.font = getFont(logoFontSize);
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
-  ctx.translate(W * scale / 2, groupY);
-  applySlant(ctx);
-  ctx.fillText(text, 0, 0);
+  ctx.fillText(text, W * scale / 2, groupY);
   ctx.restore();
 
   if (slogan) {

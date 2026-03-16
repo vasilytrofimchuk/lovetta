@@ -70,7 +70,7 @@ const MIGRATIONS = [
         ('openrouter_model', '"cognitivecomputations/dolphin-mistral-24b-venice-edition:free"'),
         ('openrouter_fallback_model', '"meta-llama/llama-3.1-70b-instruct"'),
         ('fal_image_model', '"fal-ai/flux-dev"'),
-        ('fal_video_model', '"fal-ai/wan-2.6"')
+        ('fal_video_model', '"wan/v2.6/image-to-video"')
       ON CONFLICT (key) DO NOTHING;
 
       CREATE TABLE IF NOT EXISTS users (
@@ -279,6 +279,47 @@ const MIGRATIONS = [
         communication_style = EXCLUDED.communication_style,
         age = EXCLUDED.age,
         sort_order = EXCLUDED.sort_order;
+    `,
+  },
+  {
+    name: 'v2_template_video_url',
+    sql: `
+      ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS video_url TEXT;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/1/a96e011f-a0ca-4567-b8d9-35e84b332d96.mp4' WHERE name = 'Luna' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/2/a3836f1b-3d60-4ffb-9f1b-29ba9b3799a1.mp4' WHERE name = 'Sophia' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/3/38002ba0-7f30-4b11-b89d-83a598c97e0d.mp4' WHERE name = 'Aria' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/4/fc72be74-f82a-47e7-b9dd-82ab347c3a00.mp4' WHERE name = 'Emma' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/5/7c8a4fae-d5a1-4309-ab55-5cc570718078.mp4' WHERE name = 'Mia' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/6/08a95c0a-eb57-4349-9e34-f2be427232f5.mp4' WHERE name = 'Isabella' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/7/dab0cffa-a969-44ee-8d10-460d7b52868a.mp4' WHERE name = 'Chloe' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/8/b7679f09-8b60-4336-a4e5-acd13825a2b8.mp4' WHERE name = 'Lily' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/9/4e693a86-af99-4d8f-b340-aa7e5c204aea.mp4' WHERE name = 'Zara' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/10/cee890d3-e0e9-4997-88fc-5af9bbd6a31f.mp4' WHERE name = 'Ruby' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/11/fadff26a-f026-4e9f-8c8b-fd760a0f8dca.mp4' WHERE name = 'Jade' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/12/b339544a-cf01-4863-b69d-9ab15075bc56.mp4' WHERE name = 'Violet' AND video_url IS NULL;
+    `,
+  },
+  {
+    name: 'v3_admin_emails',
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_emails (
+        id SERIAL PRIMARY KEY,
+        direction TEXT NOT NULL,
+        from_address TEXT NOT NULL,
+        to_address TEXT NOT NULL,
+        subject TEXT,
+        body_text TEXT,
+        body_html TEXT,
+        message_id TEXT,
+        in_reply_to TEXT,
+        headers JSONB,
+        is_marketing BOOLEAN DEFAULT false,
+        forwarded BOOLEAN DEFAULT false,
+        read BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_emails_dir ON admin_emails(direction, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_admin_emails_created ON admin_emails(created_at DESC);
     `,
   },
 ];

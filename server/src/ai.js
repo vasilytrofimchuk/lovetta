@@ -9,6 +9,7 @@ const { processResponse, scanUserMessage, STRICT_REGENERATE_PROMPT } = require('
 const { getPool } = require('./db');
 const { uploadFromUrl } = require('./r2');
 
+const https = require('https');
 const OPENROUTER_API_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
 const FAL_KEY = (process.env.FAL_KEY || '').trim();
 
@@ -26,6 +27,7 @@ const FAL_PRICING = {
   'fal-ai/flux-schnell': 0.003,
   'fal-ai/wan-2.6': 0.25,
   'fal-ai/wan/v2.6/image-to-video': 0.25,
+  'wan/v2.6/image-to-video': 0.25,
 };
 
 // -- Settings cache -------------------------------------------
@@ -73,75 +75,61 @@ async function buildSystemPrompt(basePrompt, platform = 'web') {
  * Internal: make a single OpenRouter streaming request.
  * Does NOT run age guard — that's done by the caller.
  */
-async function* _streamRequest(systemPrompt, messages, model) {
+async function _chatRequest(systemPrompt, messages, model) {
   const body = {
     model,
     messages: [
       { role: 'system', content: systemPrompt },
       ...messages,
     ],
-    stream: true,
   };
 
-  const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://lovetta.ai',
-      'X-Title': 'Lovetta',
-    },
-    body: JSON.stringify(body),
+  const jsonBody = JSON.stringify(body);
+
+  // Use https module — Node's native fetch streaming is unreliable
+  const { responseChunks, statusCode, headers } = await new Promise((resolve, reject) => {
+    const url = new URL(`${OPENROUTER_BASE}/chat/completions`);
+    const agent = new https.Agent({ keepAlive: false });
+    const req = https.request({
+      hostname: url.hostname,
+      path: url.pathname,
+      method: 'POST',
+      agent,
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://lovetta.ai',
+        'X-Title': 'Lovetta',
+        'Content-Length': Buffer.byteLength(jsonBody),
+      },
+    }, (res) => {
+      const responseChunks = [];
+      res.on('data', chunk => responseChunks.push(chunk));
+      res.on('end', () => resolve({ responseChunks, statusCode: res.statusCode, headers: res.headers }));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(25000, () => { req.destroy(new Error('Request timeout')); });
+    req.write(jsonBody);
+    req.end();
   });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenRouter ${response.status}: ${err}`);
+  if (statusCode !== 200) {
+    const errText = Buffer.concat(responseChunks).toString();
+    const err = new Error(`OpenRouter ${statusCode}: ${errText}`);
+    err.status = statusCode;
+    throw err;
   }
 
-  const headerCost = response.headers.get('x-openrouter-cost');
-
-  let fullText = '';
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let usageCost = 0;
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data: ')) continue;
-      const data = trimmed.slice(6);
-      if (data === '[DONE]') continue;
-
-      try {
-        const parsed = JSON.parse(data);
-        const delta = parsed.choices?.[0]?.delta?.content;
-        if (delta) {
-          fullText += delta;
-          yield { type: 'chunk', data: delta };
-        }
-        if (parsed.usage) {
-          inputTokens = parsed.usage.prompt_tokens || 0;
-          outputTokens = parsed.usage.completion_tokens || 0;
-          usageCost = parsed.usage.cost || 0;
-        }
-      } catch {}
-    }
-  }
-
+  const headerCost = headers['x-openrouter-cost'];
+  const rawBody = Buffer.concat(responseChunks).toString();
+  const result = JSON.parse(rawBody);
+  const fullText = result.choices?.[0]?.message?.content || '';
+  const inputTokens = result.usage?.prompt_tokens || 0;
+  const outputTokens = result.usage?.completion_tokens || 0;
+  const usageCost = result.usage?.cost || 0;
   const costUsd = headerCost ? parseFloat(headerCost) : estimateChatCost(inputTokens, outputTokens, usageCost);
-  yield { type: '_meta', data: { fullText, inputTokens, outputTokens, costUsd } };
+
+  return { fullText, inputTokens, outputTokens, costUsd };
 }
 
 /**
@@ -164,10 +152,11 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
 
   const settings = await getAISettings();
-  const model = opts.model || settings.openrouter_model || 'venice/uncensored';
+  const primaryModel = opts.model || settings.openrouter_model || 'meta-llama/llama-3.1-70b-instruct';
+  const fallbackModel = settings.openrouter_fallback_model || 'meta-llama/llama-3.1-70b-instruct';
+  let model = primaryModel;
   const platform = opts.platform || 'web';
 
-  // Append content level rules to system prompt
   const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform);
 
   // Pre-screen user's last message for underage solicitation
@@ -176,7 +165,6 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
     const userScan = scanUserMessage(lastUserMsg.content);
     if (userScan.flagged) {
       console.warn(`[age-guard] User message flagged: ${userScan.reason}`);
-      // Don't block — the system prompt rules + age guard will handle the AI response
     }
   }
 
@@ -185,21 +173,32 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   let totalCostUsd = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let triedFallback = false;
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
-    let meta = null;
+    let result;
 
-    for await (const event of _streamRequest(currentPrompt, messages, model)) {
-      if (event.type === '_meta') {
-        meta = event.data;
-      } else {
-        yield event; // chunk
+    try {
+      result = await _chatRequest(currentPrompt, messages, model);
+    } catch (err) {
+      // Auto-fallback on rate limit (429) or model unavailable (503)
+      if ((err.status === 429 || err.status === 503) && !triedFallback && fallbackModel !== model) {
+        console.warn(`[ai] ${model} returned ${err.status}, falling back to ${fallbackModel}`);
+        model = fallbackModel;
+        triedFallback = true;
+        continue;
       }
+      throw err;
     }
 
-    totalCostUsd += meta.costUsd;
-    totalInputTokens += meta.inputTokens;
-    totalOutputTokens += meta.outputTokens;
+    // Yield response as a single chunk (non-streaming for reliability)
+    yield { type: 'chunk', data: result.fullText };
+
+    totalCostUsd += result.costUsd;
+    totalInputTokens += result.inputTokens;
+    totalOutputTokens += result.outputTokens;
+
+    const meta = result;
 
     // Run age guard on the complete response
     const guardResult = processResponse(meta.fullText);
@@ -279,35 +278,11 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   let totalOutputTokens = 0;
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
-    const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://lovetta.ai',
-        'X-Title': 'Lovetta',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: currentPrompt },
-          ...messages,
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`OpenRouter ${response.status}: ${err}`);
-    }
-
-    const headerCost = response.headers.get('x-openrouter-cost');
-    const result = await response.json();
-    const content = result.choices?.[0]?.message?.content || '';
-    const inputTokens = result.usage?.prompt_tokens || 0;
-    const outputTokens = result.usage?.completion_tokens || 0;
-    const usageCost = result.usage?.cost || 0;
-    const costUsd = headerCost ? parseFloat(headerCost) : estimateChatCost(inputTokens, outputTokens, usageCost);
+    const result = await _chatRequest(currentPrompt, messages, model);
+    const content = result.fullText;
+    const inputTokens = result.inputTokens;
+    const outputTokens = result.outputTokens;
+    const costUsd = result.costUsd;
 
     totalCostUsd += costUsd;
     totalInputTokens += inputTokens;
@@ -443,7 +418,7 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
   if (!FAL_KEY) throw new Error('FAL_KEY not configured');
 
   const settings = await getAISettings();
-  const model = opts.model || settings.fal_video_model || 'fal-ai/wan-2.6';
+  const model = opts.model || settings.fal_video_model || 'wan/v2.6/image-to-video';
 
   const response = await fetch(`${FAL_BASE}/${model}`, {
     method: 'POST',
@@ -454,6 +429,8 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
     body: JSON.stringify({
       image_url: imageUrl,
       prompt,
+      duration: opts.duration || '5',
+      resolution: opts.resolution || '720p',
     }),
   });
 

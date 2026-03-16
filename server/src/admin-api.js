@@ -422,4 +422,130 @@ router.patch('/sentry/issues/:id', async (req, res) => {
   }
 });
 
+// -- Admin Email Inbox ----------------------------------------
+const { sendEmail, ADMIN_EMAIL, ADMIN_EMAILS } = require('./email');
+
+// GET /api/admin/emails/stats — unread count
+router.get('/emails/stats', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ unread: 0 });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*) AS unread FROM admin_emails WHERE read = false AND direction = 'inbound'`
+    );
+    res.json({ unread: parseInt(rows[0].unread) });
+  } catch (err) {
+    console.error('[admin] email stats error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/emails/addresses — list available send-from addresses
+// Must be before /emails/:id to avoid matching "addresses" as an ID
+router.get('/emails/addresses', (req, res) => {
+  const names = { 'v@lovetta.ai': 'Vasily Trofimchuk', 'hello@lovetta.ai': 'Lovetta.ai Team' };
+  const list = ADMIN_EMAILS.map(addr => ({ address: addr, name: names[addr] || addr }));
+  res.json({ addresses: list, default: ADMIN_EMAIL });
+});
+
+// GET /api/admin/emails — paginated list
+router.get('/emails', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ rows: [], total: 0 });
+
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const direction = req.query.direction || 'all';
+
+    let dirClause = '';
+    const params = [limit, offset];
+    if (direction !== 'all') {
+      dirClause = `WHERE direction = $3`;
+      params.push(direction === 'sent' ? 'outbound' : 'inbound');
+    }
+
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*) AS total FROM admin_emails ${dirClause}`,
+      dirClause ? [params[2]] : []
+    );
+    const { rows } = await pool.query(
+      `SELECT id, direction, from_address, to_address, subject, is_marketing, forwarded, read, created_at
+       FROM admin_emails ${dirClause}
+       ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      params
+    );
+
+    res.json({ rows, total: parseInt(countRows[0].total), page, limit });
+  } catch (err) {
+    console.error('[admin] emails list error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/emails/:id — full detail + mark as read
+router.get('/emails/:id', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not configured' });
+
+  try {
+    const { rows } = await pool.query('SELECT * FROM admin_emails WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Email not found' });
+
+    if (!rows[0].read) {
+      await pool.query('UPDATE admin_emails SET read = true WHERE id = $1', [req.params.id]);
+      rows[0].read = true;
+    }
+
+    res.json({ email: rows[0] });
+  } catch (err) {
+    console.error('[admin] email detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/emails/send — send from admin address
+router.post('/emails/send', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not configured' });
+
+  try {
+    const { to, subject, text, html, inReplyTo, from } = req.body;
+    if (!to || !subject) return res.status(400).json({ error: 'to and subject required' });
+
+    const fromAddr = from && ADMIN_EMAILS.includes(from) ? from : ADMIN_EMAIL;
+    const fromNames = { 'v@lovetta.ai': 'Vasily Trofimchuk', 'hello@lovetta.ai': 'Lovetta.ai Team' };
+    const fromName = fromNames[fromAddr] || 'Lovetta';
+
+    const hdrs = {};
+    if (inReplyTo) {
+      hdrs['In-Reply-To'] = inReplyTo;
+      hdrs['References'] = inReplyTo;
+    }
+
+    const result = await sendEmail({
+      from: `${fromName} <${fromAddr}>`,
+      to,
+      subject,
+      text: text || '',
+      html: html || undefined,
+      headers: Object.keys(hdrs).length ? hdrs : undefined,
+    });
+
+    // Store outbound
+    await pool.query(
+      `INSERT INTO admin_emails (direction, from_address, to_address, subject, body_text, body_html, message_id, in_reply_to)
+       VALUES ('outbound', $1, $2, $3, $4, $5, $6, $7)`,
+      [fromAddr, to, subject, text || '', html || '', result.id || null, inReplyTo || null]
+    );
+
+    res.json({ ok: true, id: result.id });
+  } catch (err) {
+    console.error('[admin] email send error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

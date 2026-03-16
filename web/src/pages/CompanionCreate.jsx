@@ -123,30 +123,34 @@ export default function CompanionCreate() {
           </div>
         )}
 
-        {/* Step: Template grid */}
+        {/* Step: Template grid — photo cards like dating app */}
         {step === 'templates' && (
           <div className="grid grid-cols-2 gap-3">
-            {templates.map(t => {
-              const [from, to] = getGradient(t.name);
-              return (
-                <button key={t.id} onClick={() => selectTemplate(t)}
-                  className="p-4 rounded-xl bg-brand-card border border-brand-border hover:border-brand-accent/40 transition-colors text-left">
-                  {t.avatar_url ? (
-                    <img src={t.avatar_url} alt={t.name}
-                      className="w-16 h-16 rounded-full mx-auto mb-3 object-cover" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-white font-bold text-xl"
-                      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
-                      {t.name[0]}
-                    </div>
-                  )}
-                  <div className="text-center">
-                    <div className="font-semibold text-brand-text text-sm">{t.name}</div>
-                    <div className="text-xs text-brand-text-secondary mt-1 line-clamp-2">{t.tagline}</div>
+            {templates.map(t => (
+              <button key={t.id} onClick={() => selectTemplate(t)}
+                className="relative rounded-2xl overflow-hidden aspect-[3/4] group">
+                {t.video_url ? (
+                  <video src={t.video_url} autoPlay muted loop playsInline
+                    poster={t.avatar_url} preload="metadata"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                ) : t.avatar_url ? (
+                  <img src={t.avatar_url} alt={t.name}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                ) : (
+                  <div className="absolute inset-0 bg-brand-card" />
+                )}
+                {/* Gradient overlay for text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                {/* Name + age + tagline */}
+                <div className="absolute bottom-0 left-0 right-0 p-3">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-white font-bold text-lg leading-tight">{t.name}</span>
+                    <span className="text-brand-accent font-semibold text-base">{t.age}</span>
                   </div>
-                </button>
-              );
-            })}
+                  <p className="text-white/70 text-xs mt-0.5 line-clamp-2 leading-snug">{t.tagline}</p>
+                </div>
+              </button>
+            ))}
           </div>
         )}
 
@@ -183,25 +187,45 @@ export default function CompanionCreate() {
         {/* Step: Confirm */}
         {step === 'confirm' && selected && (
           <div className="space-y-4">
-            {/* Avatar preview */}
-            <div className="text-center">
-              {selected.avatar_url ? (
-                <img src={selected.avatar_url} alt={selected.name}
-                  className="w-24 h-24 rounded-full mx-auto mb-4 object-cover" />
-              ) : (() => {
-                const [from, to] = getGradient(selected.name);
-                return (
-                  <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-white font-bold text-3xl"
-                    style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
-                    {selected.name[0]}
+            {/* Hero photo card */}
+            {selected.avatar_url || selected.video_url ? (
+              <div className="relative rounded-2xl overflow-hidden aspect-[3/4]">
+                {selected.video_url ? (
+                  <video src={selected.video_url} autoPlay muted loop playsInline
+                    poster={selected.avatar_url}
+                    className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <img src={selected.avatar_url} alt={selected.name}
+                    className="absolute inset-0 w-full h-full object-cover" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-4">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-white font-bold text-2xl">{selected.name}</span>
+                    <span className="text-brand-accent font-semibold text-xl">{selected.age}</span>
                   </div>
-                );
-              })()}
-              <h2 className="text-xl font-bold text-brand-text">{selected.name}</h2>
-              {selected.tagline && (
-                <p className="text-brand-text-secondary mt-1">{selected.tagline}</p>
-              )}
-            </div>
+                  {selected.tagline && (
+                    <p className="text-white/70 text-sm mt-1">{selected.tagline}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center">
+                {(() => {
+                  const [from, to] = getGradient(selected.name);
+                  return (
+                    <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-white font-bold text-3xl"
+                      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}>
+                      {selected.name[0]}
+                    </div>
+                  );
+                })()}
+                <h2 className="text-xl font-bold text-brand-text">{selected.name}</h2>
+                {selected.tagline && (
+                  <p className="text-brand-text-secondary mt-1">{selected.tagline}</p>
+                )}
+              </div>
+            )}
 
             {/* Personality preview */}
             <div className="bg-brand-card border border-brand-border rounded-xl p-4">
