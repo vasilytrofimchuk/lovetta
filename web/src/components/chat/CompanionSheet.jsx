@@ -1,6 +1,27 @@
 import { useEffect, useState } from 'react';
 import api, { getErrorMessage } from '../../lib/api';
 
+const VOICES = [
+  { id: 'cgSgspJ2msm6clMCkdW9', label: 'Jessica', desc: 'Playful & warm' },
+  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'Sarah', desc: 'Confident & reassuring' },
+  { id: 'FGY2WhTYpPnrIDTdsKH5', label: 'Laura', desc: 'Quirky & enthusiastic' },
+  { id: 'Xb7hH8MSUJpSbSDYk0k2', label: 'Alice', desc: 'Clear & engaging' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', label: 'Lily', desc: 'Velvety & expressive' },
+  { id: 'hpp4J3VqNfWAUOO0d1Us', label: 'Bella', desc: 'Bright & polished' },
+  { id: 'XrExE9yKIg1WjnnlVkGX', label: 'Matilda', desc: 'Confident & commanding' },
+  { id: 'KF337ZXYjoHdNuYUrufC', label: 'Cadence', desc: 'Calm & sultry' },
+  { id: 'AyCt0WmAXUcPJR11zeeP', label: 'Sasha', desc: 'Vibrant British' },
+  { id: 'lhgliD0TncfFOY1Nc93M', label: 'Chloe', desc: 'Effortless & modern' },
+  { id: 'rBUHN6YO9PJUwGXk13Jt', label: 'Ayana', desc: 'Captivating & versatile' },
+  { id: 'jpICOesdLlRSc39O1UB5', label: 'Hallie', desc: 'Fun & feminine' },
+  { id: '6tHWtWy43FFxMeA73K4c', label: 'Cynthia', desc: 'Soft & soothing' },
+  { id: 's50zV0dPjgaPRdN9zm48', label: 'Gabrielle', desc: 'Natural & conversational' },
+  { id: 'z12gfZvqqjJ9oHFbB5i6', label: 'Pixie', desc: 'Magical & bright' },
+  { id: 'ytfkKJNB1AXxIr8dKm5H', label: 'Marta', desc: 'Warm & storytelling' },
+  { id: 'OHY6EjdeHKeQymoihwfz', label: 'Riyanka', desc: 'Cute & cheerful' },
+  { id: 'nPpkc230TdYdntJKFNby', label: 'Mia', desc: 'Clear & emotive' },
+];
+
 const GRADIENT_COLORS = [
   ['#ec4899', '#8040e0'], ['#f06060', '#ec4899'], ['#6060f0', '#40a0e0'],
   ['#40c080', '#40a0e0'], ['#f0a040', '#f06060'], ['#a040e0', '#6060f0'],
@@ -12,18 +33,23 @@ function getGradient(name) {
   return GRADIENT_COLORS[Math.abs(hash) % GRADIENT_COLORS.length];
 }
 
-const TIP_AMOUNTS = [10, 20, 50, 100];
+const TIP_AMOUNTS = [9.99, 19.99, 49.99, 99.99];
 
-export default function CompanionSheet({ companion, onClose, onReport }) {
+export default function CompanionSheet({ companion, onClose, onReport, onUpdate }) {
   const [from, to] = getGradient(companion?.name || '');
   const [tipLoading, setTipLoading] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [editPersonality, setEditPersonality] = useState('');
+  const [editTraits, setEditTraits] = useState([]);
+  const [newTrait, setNewTrait] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Close on Escape
   useEffect(() => {
-    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const handleKey = (e) => { if (e.key === 'Escape') { if (editing) setEditing(false); else onClose(); } };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  }, [onClose, editing]);
 
   if (!companion) return null;
 
@@ -33,7 +59,7 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
     setTipLoading(amount);
     try {
       const { data } = await api.post('/api/billing/tip', {
-        amount: amount * 100,
+        amount: Math.round(amount * 100),
         companionId: companion.id,
       });
       window.location.href = data.url;
@@ -44,6 +70,46 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
     }
   };
 
+  const [editVoice, setEditVoice] = useState('');
+
+  const startEdit = () => {
+    setEditPersonality(companion.personality || '');
+    setEditTraits(Array.isArray(companion.traits) ? [...companion.traits] : []);
+    setEditVoice(companion.voice_id || '');
+    setNewTrait('');
+    setEditing(true);
+  };
+
+  const addTrait = () => {
+    const t = newTrait.trim().toLowerCase();
+    if (t && !editTraits.includes(t) && editTraits.length < 10) {
+      setEditTraits([...editTraits, t]);
+      setNewTrait('');
+    }
+  };
+
+  const removeTrait = (t) => setEditTraits(editTraits.filter(x => x !== t));
+
+  const saveEdit = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const body = {};
+      if (editPersonality.trim() !== (companion.personality || '')) body.personality = editPersonality.trim();
+      const traitsChanged = JSON.stringify(editTraits) !== JSON.stringify(companion.traits || []);
+      if (traitsChanged) body.traits = editTraits;
+      if (editVoice && editVoice !== (companion.voice_id || '')) body.voiceId = editVoice;
+      if (!Object.keys(body).length) { setEditing(false); setSaving(false); return; }
+      const { data } = await api.patch(`/api/companions/${companion.id}`, body);
+      if (onUpdate) onUpdate(data.companion);
+      setEditing(false);
+    } catch (err) {
+      alert(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
       {/* Backdrop */}
@@ -51,7 +117,7 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
 
       {/* Sheet */}
       <div
-        className="relative w-full max-w-md bg-brand-card border-t border-brand-border rounded-t-2xl p-6 pb-8 animate-slide-up"
+        className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-brand-card border-t border-brand-border rounded-t-2xl p-6 pb-8 animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle */}
@@ -69,7 +135,7 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
           </svg>
         </button>
 
-        {/* Avatar + Name */}
+        {/* Avatar + Name + Age */}
         <div className="flex flex-col items-center mb-4">
           {companion.avatar_url ? (
             <img src={companion.avatar_url} alt="" className="w-20 h-20 rounded-full object-cover mb-3" />
@@ -81,17 +147,115 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
               {(companion.name || '?')[0]}
             </div>
           )}
-          <h3 className="text-lg font-semibold text-brand-text">{companion.name}</h3>
-          {traits.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2 justify-center">
-              {traits.slice(0, 5).map((t) => (
-                <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-brand-surface border border-brand-border text-brand-text-secondary">
-                  {t}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-lg font-semibold text-brand-text">{companion.name}</h3>
+            {companion.age && (
+              <span className="text-brand-accent font-semibold">{companion.age}</span>
+            )}
+          </div>
         </div>
+
+        {/* Edit mode — personality + traits */}
+        {editing ? (
+          <div className="mb-4 space-y-3">
+            <div>
+              <label className="text-xs text-brand-muted mb-1 block">Personality</label>
+              <textarea
+                value={editPersonality}
+                onChange={(e) => setEditPersonality(e.target.value)}
+                rows={4}
+                placeholder="Describe her personality..."
+                className="w-full p-3 rounded-lg bg-brand-surface border border-brand-border text-brand-text text-sm focus:outline-none focus:border-brand-accent resize-none"
+                maxLength={2000}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-brand-muted mb-1 block">Traits (tap to remove)</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {editTraits.map((t) => (
+                  <button key={t} type="button" onClick={() => removeTrait(t)}
+                    className="text-xs px-2 py-0.5 rounded-full bg-brand-accent/10 text-brand-accent border border-brand-accent/20 hover:bg-brand-accent/20 transition-colors flex items-center gap-1">
+                    {t} <span className="text-brand-accent/60">x</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text" value={newTrait}
+                  onChange={(e) => setNewTrait(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTrait(); } }}
+                  placeholder="Add trait..."
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-brand-surface border border-brand-border text-brand-text text-xs focus:outline-none focus:border-brand-accent"
+                  maxLength={30}
+                />
+                <button type="button" onClick={addTrait} disabled={!newTrait.trim()}
+                  className="px-3 py-1.5 rounded-lg bg-brand-surface border border-brand-border text-brand-text-secondary text-xs hover:bg-brand-border disabled:opacity-30 transition-colors">
+                  +
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-brand-muted mb-1 block">Voice</label>
+              <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
+                {VOICES.map(v => (
+                  <button key={v.id} type="button" onClick={() => setEditVoice(v.id)}
+                    className={`px-2 py-1.5 rounded-lg border text-left transition-colors ${editVoice === v.id ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border bg-brand-surface hover:border-brand-accent/40'}`}>
+                    <div className={`text-xs font-medium ${editVoice === v.id ? 'text-brand-accent' : 'text-brand-text'}`}>{v.label}</div>
+                    <div className="text-[10px] text-brand-muted leading-tight">{v.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={saveEdit} disabled={saving}
+                className="flex-1 py-2 rounded-lg bg-brand-accent text-white text-sm font-medium disabled:opacity-50 hover:bg-brand-accent-hover transition-colors">
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button onClick={() => setEditing(false)}
+                className="px-4 py-2 rounded-lg bg-brand-surface text-brand-text-secondary text-sm hover:bg-brand-border transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Traits (view) */}
+            {traits.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
+                {traits.map((t) => (
+                  <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-brand-surface border border-brand-border text-brand-text-secondary">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Personality + Voice (view) */}
+            <div className="mb-4 rounded-xl bg-brand-surface/50 border border-brand-border p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-brand-muted">Personality</span>
+                <button onClick={startEdit}
+                  className="text-xs text-brand-accent hover:text-brand-accent-hover transition-colors">
+                  Edit
+                </button>
+              </div>
+              <p className="text-sm text-brand-text-secondary leading-relaxed">
+                {companion.personality || 'No personality set'}
+              </p>
+              {companion.voice_id && (
+                <div className="mt-2 pt-2 border-t border-brand-border/50 flex items-center gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-brand-muted">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  </svg>
+                  <span className="text-xs text-brand-muted">
+                    {VOICES.find(v => v.id === companion.voice_id)?.label || 'Custom'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Tips */}
         <div className="rounded-xl border border-brand-accent/20 bg-brand-accent/5 p-4">
