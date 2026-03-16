@@ -131,3 +131,32 @@
 - [x] Update seed migration with generated video URLs
 - [x] Fix fal.ai video model ID: `wan/v2.6/image-to-video` (was `fal-ai/wan-2.6`)
 - [x] Add duration/resolution params to generateVideo()
+
+## Chat UI Fixes
+
+- [x] Add max-w-lg centered constraint to ChatPage for desktop
+- [x] Auto-scroll to bottom on user send, AI response, and triggerNext
+- [x] Move lightning bolt "let her message" button to floating FAB in message list area
+- [x] Remove lightning button from ChatInput (cleaner input bar)
+- [x] Admin Settings tab: model badges showing current openrouter_model and fallback with inline edit
+
+## UI Redesign: Header, Profile, Tips, Notifications, Bigger Cards
+
+- [x] DB migration: user_preferences table (notify_new_messages, last_notification_at)
+- [x] DB migration: tips.companion_id column
+- [x] User preferences API: GET/PUT /api/user/preferences (server/src/user-api.js)
+- [x] Header redesign: replace gear+signout with "+" and profile icon buttons
+- [x] Remove "Awaken a new girlfriend" bottom button and floating FAB
+- [x] New Profile page (/profile): user info, subscription, notification toggle, sign out
+- [x] Notification system: email notification when girl sends message and user is away (5min inactive, 30min rate limit)
+- [x] Move tips from Pricing page to CompanionSheet (girl's profile) with companionId
+- [x] Tip banner in chat opens CompanionSheet instead of /pricing
+- [x] Tip thank-you: girl responds with varied grateful messages after tip payment
+- [x] Bigger companion cards: larger avatar (w-16 h-16), bigger padding, text-lg name, 2-line message preview
+- [x] Remove tip section from Pricing.jsx
+- [x] Companion email addresses: {name}.{shortid}@lovetta.email (deterministic from companion UUID)
+- [x] Notification emails sent FROM companion email (plain text, just the message)
+- [x] Email reply handling: inbound webhook routes @lovetta.email replies to companion chat
+- [x] Reply flow: parse reply text → insert as user message → AI response → send back as companion email
+- [x] Email threading via Message-ID / In-Reply-To headers (conversations.last_email_message_id)
+- [x] Profile page: full subscription details (status, plan, trial end, renewal date)

@@ -138,4 +138,203 @@ async function sendResetEmail(email, token) {
   });
 }
 
-module.exports = { sendEmail, sendVerificationEmail, sendResetEmail, processAdminInbound, ADMIN_EMAIL, ADMIN_EMAILS };
+// -- Companion email system -----------------------------------
+
+const COMPANION_EMAIL_DOMAIN = process.env.COMPANION_EMAIL_DOMAIN || 'lovetta.email';
+
+/**
+ * Generate a deterministic email address for a companion.
+ * e.g. luna.a3b2c1@lovetta.email
+ */
+function companionEmailAddress(name, companionId) {
+  const slug = (name || 'girl').toLowerCase().replace(/[^a-z]/g, '') || 'girl';
+  const short = (companionId || '').replace(/-/g, '').slice(0, 6);
+  return `${slug}.${short}@${COMPANION_EMAIL_DOMAIN}`;
+}
+
+/**
+ * Parse companion identifier from an email address like luna.a3b2c1@lovetta.email.
+ * Returns the 6-char hex short ID.
+ */
+function parseCompanionEmailId(address) {
+  const addr = typeof address === 'object' ? (address.address || address.email || String(address)) : String(address || '');
+  const match = addr.match(/^([a-z]+)\.([a-f0-9]{6})@/i);
+  return match ? match[2].toLowerCase() : null;
+}
+
+/**
+ * Send a message from a companion to a user via email.
+ * Returns the Message-ID for threading.
+ */
+async function sendCompanionEmail({ companionName, companionId, toEmail, messageContent, conversationId, inReplyTo }) {
+  // Strip *context text* prefix from message
+  const plainText = (messageContent || '').replace(/^\*[^*]+\*\s*/, '');
+  const fromAddr = companionEmailAddress(companionName, companionId);
+  const msgId = `<conv-${conversationId}-${Date.now()}@${COMPANION_EMAIL_DOMAIN}>`;
+
+  const emailHeaders = { 'Message-ID': msgId };
+  if (inReplyTo) emailHeaders['In-Reply-To'] = inReplyTo;
+
+  await sendEmail({
+    from: `${companionName} <${fromAddr}>`,
+    to: toEmail,
+    subject: `${companionName}`,
+    text: plainText,
+    headers: emailHeaders,
+  });
+
+  return msgId;
+}
+
+/**
+ * Process an inbound reply to a companion email address.
+ * Looks up the companion, inserts user message, gets AI response, emails it back.
+ */
+async function processCompanionReply({ from, to, subject, text, html, headers }) {
+  const pool = getPool();
+  if (!pool) return;
+
+  const fromAddr = typeof from === 'object' ? (from.address || from.email || String(from)) : String(from || '');
+  const toAddr = typeof to === 'object' ? (to.address || to.email || String(to)) : String(to || '');
+
+  // Parse companion short ID from "to" address
+  const shortId = parseCompanionEmailId(toAddr);
+  if (!shortId) {
+    console.warn(`[email] Could not parse companion ID from ${toAddr}`);
+    return;
+  }
+
+  // Find user by email (from address)
+  const userEmail = fromAddr.replace(/^.*</, '').replace(/>.*$/, '').trim().toLowerCase();
+  const { rows: userRows } = await pool.query(
+    'SELECT id FROM users WHERE LOWER(email) = $1', [userEmail]
+  );
+  if (!userRows[0]) {
+    console.warn(`[email] No user found for email ${userEmail}`);
+    return;
+  }
+  const userId = userRows[0].id;
+
+  // Find companion by short ID prefix match
+  const { rows: compRows } = await pool.query(
+    `SELECT id, name, personality, backstory, traits, communication_style, age
+     FROM user_companions
+     WHERE user_id = $1 AND REPLACE(id::text, '-', '') LIKE $2 || '%' AND is_active = TRUE`,
+    [userId, shortId]
+  );
+  if (!compRows[0]) {
+    console.warn(`[email] No companion found for user=${userId} shortId=${shortId}`);
+    return;
+  }
+  const companion = compRows[0];
+
+  // Get or create conversation
+  await pool.query(
+    'INSERT INTO conversations (user_id, companion_id) VALUES ($1, $2) ON CONFLICT (user_id, companion_id) DO NOTHING',
+    [userId, companion.id]
+  );
+  const { rows: convRows } = await pool.query(
+    'SELECT id, last_email_message_id FROM conversations WHERE user_id = $1 AND companion_id = $2',
+    [userId, companion.id]
+  );
+  if (!convRows[0]) return;
+  const conversation = convRows[0];
+
+  // Extract reply text — strip quoted content (lines starting with >)
+  let replyText = (text || '').split('\n').filter(l => !l.startsWith('>')).join('\n').trim();
+  // Also try to strip "On ... wrote:" blocks
+  replyText = replyText.replace(/On .+wrote:\s*$/s, '').trim();
+  if (!replyText) {
+    console.warn('[email] Empty reply text, skipping');
+    return;
+  }
+
+  console.log(`[email] Companion reply: user=${userId} companion=${companion.name} text="${replyText.slice(0, 80)}"`);
+
+  // Insert user message
+  await pool.query(
+    `INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
+    [conversation.id, replyText]
+  );
+  await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
+
+  // Build system prompt and get AI response
+  const { chatCompletion, buildSystemPrompt } = require('./ai');
+  const { detectPlatform } = require('./content-levels');
+
+  const traits = Array.isArray(companion.traits) ? companion.traits.join(', ') : '';
+  const systemPrompt = `You are ${companion.name}, a ${companion.age}-year-old woman.
+
+${companion.personality}
+
+${companion.backstory ? companion.backstory + '\n' : ''}Communication style: ${companion.communication_style}
+${traits ? 'Traits: ' + traits : ''}
+
+Response format: Always start with a brief action or emotional context in *asterisks*, then your message.
+Example: *leans closer with a playful smile* Hey, I was just thinking about you...
+
+Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.
+This conversation is happening via email. Keep responses natural but don't mention email explicitly.`;
+
+  // Load recent messages for context
+  const { rows: recentMessages } = await pool.query(
+    `SELECT role, content FROM messages WHERE conversation_id = $1
+     ORDER BY created_at DESC LIMIT 20`,
+    [conversation.id]
+  );
+  recentMessages.reverse();
+  const aiMessages = recentMessages.map(m => ({ role: m.role, content: m.content }));
+
+  let aiResult;
+  try {
+    aiResult = await chatCompletion(systemPrompt, aiMessages, {
+      userId,
+      companionId: companion.id,
+      platform: 'web',
+    });
+  } catch (err) {
+    console.error('[email] AI response error:', err.message);
+    return;
+  }
+
+  if (!aiResult || !aiResult.content) return;
+
+  // Parse and save assistant message
+  const match = aiResult.content.match(/^\*([^*]+)\*/);
+  const contextText = match ? match[1].trim() : null;
+  const content = match ? aiResult.content.slice(match[0].length).trim() : aiResult.content;
+
+  await pool.query(
+    'INSERT INTO messages (conversation_id, role, content, context_text) VALUES ($1, $2, $3, $4)',
+    [conversation.id, 'assistant', content, contextText]
+  );
+  await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
+
+  // Send AI response back as email
+  const hdrs = headers || {};
+  const userMsgId = hdrs['message-id'] || hdrs['Message-ID'] || hdrs['Message-Id'] || null;
+
+  const sentMsgId = await sendCompanionEmail({
+    companionName: companion.name,
+    companionId: companion.id,
+    toEmail: userEmail,
+    messageContent: aiResult.content,
+    conversationId: conversation.id,
+    inReplyTo: userMsgId,
+  });
+
+  // Store message ID for future threading
+  await pool.query(
+    'UPDATE conversations SET last_email_message_id = $2 WHERE id = $1',
+    [conversation.id, sentMsgId]
+  );
+
+  console.log(`[email] Sent companion reply: ${companion.name} -> ${userEmail}`);
+}
+
+module.exports = {
+  sendEmail, sendVerificationEmail, sendResetEmail,
+  sendCompanionEmail, companionEmailAddress, parseCompanionEmailId,
+  processCompanionReply, processAdminInbound,
+  ADMIN_EMAIL, ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN,
+};

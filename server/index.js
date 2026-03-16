@@ -32,6 +32,8 @@ const authApi = require('./src/auth-api');
 const billingApi = require('./src/billing-api');
 const companionApi = require('./src/companion-api');
 const chatApi = require('./src/chat-api');
+const ttsApi = require('./src/tts-api');
+const userApi = require('./src/user-api');
 
 const app = express();
 const PORT = process.env.PORT || 3900;
@@ -80,6 +82,8 @@ app.use('/api/billing', billingApi);
 app.use('/api/admin', adminApi);
 app.use('/api/companions', companionApi);
 app.use('/api/chat', chatApi);
+app.use('/api/chat', ttsApi);
+app.use('/api/user', userApi);
 
 // -- Resend inbound webhook --
 const RESEND_INBOUND_SECRET = (process.env.RESEND_INBOUND_SECRET || '').trim();
@@ -152,12 +156,16 @@ app.post('/api/inbound', async (req, res) => {
       }
     }
 
-    // Route to admin inbox
-    const { ADMIN_EMAILS, processAdminInbound } = require('./src/email');
+    // Route to admin inbox or companion reply
+    const { ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN, processAdminInbound, processCompanionReply } = require('./src/email');
     const recipientAddr = (Array.isArray(to) ? to[0] : to) || '';
     const recipientStr = typeof recipientAddr === 'object' ? (recipientAddr.address || recipientAddr.email || String(recipientAddr)) : String(recipientAddr);
+
     if (ADMIN_EMAILS.includes(recipientStr.toLowerCase())) {
       await processAdminInbound({ from, to: recipientStr, cc, subject, text, html, headers });
+    } else if (recipientStr.toLowerCase().endsWith(`@${COMPANION_EMAIL_DOMAIN}`)) {
+      // Reply to a companion email — route to chat
+      await processCompanionReply({ from, to: recipientStr, cc, subject, text, html, headers });
     }
 
     res.json({ ok: true });

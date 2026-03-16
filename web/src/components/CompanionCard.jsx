@@ -45,15 +45,15 @@ export default function CompanionCard({ companion }) {
   return (
     <button
       onClick={() => navigate(`/chat/${companion.id}`)}
-      className="w-full flex items-center gap-3 p-3 rounded-xl bg-brand-card border border-brand-border hover:border-brand-accent/40 transition-colors text-left"
+      className="w-full flex items-center gap-4 p-4 rounded-xl bg-brand-card border border-brand-border hover:border-brand-accent/40 transition-colors text-left"
     >
       {/* Avatar */}
       {companion.avatar_url ? (
         <img src={companion.avatar_url} alt={companion.name}
-          className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
+          className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
       ) : (
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+          className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0"
           style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
         >
           {getInitials(companion.name)}
@@ -63,14 +63,14 @@ export default function CompanionCard({ companion }) {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <span className="font-semibold text-brand-text truncate">{companion.name}</span>
+          <span className="font-semibold text-lg text-brand-text truncate">{companion.name}</span>
           {companion.last_message_at && (
             <span className="text-xs text-brand-muted ml-2 flex-shrink-0">
               {timeAgo(companion.last_message_at)}
             </span>
           )}
         </div>
-        <p className="text-sm text-brand-text-secondary truncate mt-0.5">
+        <p className="text-sm text-brand-text-secondary line-clamp-2 mt-0.5">
           {companion.last_message || companion.tagline || 'Start a conversation...'}
         </p>
       </div>

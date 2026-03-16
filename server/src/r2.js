@@ -39,6 +39,7 @@ const MIME_TYPES = {
   '.gif': 'image/gif',
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
 };
 
 /**

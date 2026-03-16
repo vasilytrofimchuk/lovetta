@@ -9,8 +9,59 @@ const { authenticate } = require('./auth-middleware');
 const { streamChat, buildSystemPrompt } = require('./ai');
 const { detectPlatform } = require('./content-levels');
 const { getUserSubscription, isSubscriptionActive } = require('./billing');
+const { sendCompanionEmail } = require('./email');
 
 const router = Router();
+
+// -- Email notification (fire-and-forget) ---------------------
+
+async function maybeNotifyUser(pool, userId, companion, conversationId, messageContent) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT up.notify_new_messages, up.last_notification_at, u.email, u.last_activity,
+              c.last_email_message_id
+       FROM users u
+       LEFT JOIN user_preferences up ON up.user_id = u.id
+       LEFT JOIN conversations c ON c.id = $2
+       WHERE u.id = $1`,
+      [userId, conversationId]
+    );
+    const row = rows[0];
+    if (!row || !row.notify_new_messages || !row.email) return;
+
+    // Only notify if user inactive for 5+ minutes
+    const inactiveMs = Date.now() - new Date(row.last_activity).getTime();
+    if (inactiveMs < 5 * 60 * 1000) return;
+
+    // Rate limit: max once per 30 minutes
+    if (row.last_notification_at) {
+      const sinceLastNotif = Date.now() - new Date(row.last_notification_at).getTime();
+      if (sinceLastNotif < 30 * 60 * 1000) return;
+    }
+
+    // Send as companion email (user can reply directly)
+    const msgId = await sendCompanionEmail({
+      companionName: companion.name,
+      companionId: companion.id,
+      toEmail: row.email,
+      messageContent,
+      conversationId,
+      inReplyTo: row.last_email_message_id || null,
+    });
+
+    // Store message ID for threading + update notification timestamp
+    await pool.query(
+      'UPDATE conversations SET last_email_message_id = $2 WHERE id = $1',
+      [conversationId, msgId]
+    );
+    await pool.query(
+      'UPDATE user_preferences SET last_notification_at = NOW() WHERE user_id = $1',
+      [userId]
+    );
+  } catch (err) {
+    console.warn('[chat] notification error:', err.message);
+  }
+}
 
 // -- Helpers --------------------------------------------------
 
@@ -184,6 +235,9 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         [conversation.id]
       );
 
+      // Fire-and-forget email notification
+      maybeNotifyUser(pool, req.userId, companion, conversation.id, aiResult.content);
+
       res.write(`data: ${JSON.stringify({
         type: 'done',
         messageId: savedMsg.id,
@@ -273,6 +327,10 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
         [conversation.id, parsed.content, parsed.contextText]
       );
       await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
+
+      // Fire-and-forget email notification
+      maybeNotifyUser(pool, req.userId, companion, conversation.id, doneData.fullText);
+
       res.write(`data: ${JSON.stringify({
         type: 'done',
         messageId: savedMsg.id,

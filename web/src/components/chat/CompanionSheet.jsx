@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import api, { getErrorMessage } from '../../lib/api';
 
 const GRADIENT_COLORS = [
   ['#ec4899', '#8040e0'], ['#f06060', '#ec4899'], ['#6060f0', '#40a0e0'],
@@ -11,8 +12,11 @@ function getGradient(name) {
   return GRADIENT_COLORS[Math.abs(hash) % GRADIENT_COLORS.length];
 }
 
+const TIP_AMOUNTS = [10, 20, 50, 100];
+
 export default function CompanionSheet({ companion, onClose, onReport }) {
   const [from, to] = getGradient(companion?.name || '');
+  const [tipLoading, setTipLoading] = useState(null);
 
   // Close on Escape
   useEffect(() => {
@@ -24,6 +28,21 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
   if (!companion) return null;
 
   const traits = Array.isArray(companion.traits) ? companion.traits : [];
+
+  const handleTip = async (amount) => {
+    setTipLoading(amount);
+    try {
+      const { data } = await api.post('/api/billing/tip', {
+        amount: amount * 100,
+        companionId: companion.id,
+      });
+      window.location.href = data.url;
+    } catch (err) {
+      alert(getErrorMessage(err));
+    } finally {
+      setTipLoading(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
@@ -64,10 +83,29 @@ export default function CompanionSheet({ companion, onClose, onReport }) {
 
         {/* Personality excerpt */}
         {companion.personality && (
-          <p className="text-sm text-brand-text-secondary text-center mb-6 line-clamp-3">
+          <p className="text-sm text-brand-text-secondary text-center mb-5 line-clamp-3">
             {companion.personality}
           </p>
         )}
+
+        {/* Tips */}
+        <div className="mb-4">
+          <p className="text-sm text-brand-text-secondary text-center mb-3">
+            Send {companion.name} a tip
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {TIP_AMOUNTS.map((amount) => (
+              <button
+                key={amount}
+                onClick={() => handleTip(amount)}
+                disabled={tipLoading !== null}
+                className="py-2.5 rounded-lg border border-brand-border bg-brand-surface text-brand-text hover:bg-brand-accent/10 hover:border-brand-accent/40 transition-colors disabled:opacity-50 text-sm font-medium"
+              >
+                {tipLoading === amount ? '...' : `$${amount}`}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Actions */}
         <div className="space-y-2">

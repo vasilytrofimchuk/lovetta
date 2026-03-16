@@ -121,42 +121,7 @@ export default function Pricing() {
           </>
         )}
 
-        {/* Tips section */}
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold mb-4 text-center text-brand-text">Send a tip</h2>
-          <div className="grid grid-cols-4 gap-3">
-            {[10, 20, 50, 100].map((amount) => (
-              <TipButton key={amount} amount={amount} />
-            ))}
-          </div>
-        </div>
       </div>
     </div>
-  )
-}
-
-function TipButton({ amount }) {
-  const [loading, setLoading] = useState(false)
-
-  const handleTip = async () => {
-    setLoading(true)
-    try {
-      const { data } = await api.post('/api/billing/tip', { amount: amount * 100 })
-      window.location.href = data.url
-    } catch (err) {
-      alert(getErrorMessage(err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <button
-      onClick={handleTip}
-      disabled={loading}
-      className="py-3 rounded-lg border border-brand-border bg-brand-surface text-brand-text hover:bg-brand-card transition-colors disabled:opacity-50 text-sm font-medium"
-    >
-      ${amount}
-    </button>
   )
 }

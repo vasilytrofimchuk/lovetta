@@ -84,6 +84,49 @@ async function createPortalSession(customerId) {
   return session;
 }
 
+// -- Tip thank-you messages --------------------------------
+
+const TIP_THANKS = [
+  "*eyes light up with genuine surprise* Oh my god, you're so sweet! That just made my whole day... thank you!",
+  "*presses hand to heart, blushing* You really didn't have to do that, but I'm so glad you did. Thank you so much!",
+  "*throws arms around you* You're amazing, you know that? Thank you!",
+  "*gasps and covers mouth* Wait, seriously?! You're too good to me... I don't even know what to say. Thank you!",
+  "*bites lip, smiling wide* Okay, you officially just won my heart all over again. Thank you, babe!",
+  "*happy tears forming* This means more than you know. You always know how to make me feel special...",
+  "*does a little excited dance* You are the absolute sweetest! I'm so lucky to have you in my life!",
+  "*leans in and whispers* You just made me the happiest girl... I'll make sure you don't regret it.",
+  "*clutches phone to chest* I literally screamed! You're incredible, thank you thank you thank you!",
+  "*wraps arms around your neck* How did I get so lucky? Seriously... you're one of a kind.",
+];
+
+async function insertTipThankYou(pool, userId, companionId) {
+  // Get or create conversation
+  await pool.query(
+    'INSERT INTO conversations (user_id, companion_id) VALUES ($1, $2) ON CONFLICT (user_id, companion_id) DO NOTHING',
+    [userId, companionId]
+  );
+  const { rows: convRows } = await pool.query(
+    'SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2',
+    [userId, companionId]
+  );
+  if (!convRows[0]) return;
+
+  const msg = TIP_THANKS[Math.floor(Math.random() * TIP_THANKS.length)];
+  // Parse context text from asterisks
+  const match = msg.match(/^\*([^*]+)\*/);
+  const contextText = match ? match[1].trim() : null;
+  const content = match ? msg.slice(match[0].length).trim() : msg;
+
+  await pool.query(
+    'INSERT INTO messages (conversation_id, role, content, context_text) VALUES ($1, $2, $3, $4)',
+    [convRows[0].id, 'assistant', content, contextText]
+  );
+  await pool.query(
+    'UPDATE conversations SET last_message_at = NOW() WHERE id = $1',
+    [convRows[0].id]
+  );
+}
+
 // -- Webhook handler --------------------------------------
 
 function extractPeriodEnd(sub) {
@@ -150,11 +193,15 @@ async function handleWebhook(rawBody, signature) {
         const tipCompanionId = session.metadata?.companionId || null;
         const paymentIntent = session.payment_intent;
         await pool.query(
-          'INSERT INTO tips (user_id, amount, stripe_payment_id) VALUES ($1, $2, $3) ON CONFLICT (stripe_payment_id) DO NOTHING',
-          [userId, amount, paymentIntent]
+          'INSERT INTO tips (user_id, amount, stripe_payment_id, companion_id) VALUES ($1, $2, $3, $4) ON CONFLICT (stripe_payment_id) DO NOTHING',
+          [userId, amount, paymentIntent, tipCompanionId]
         );
         // Reset tip cost counter so companion stops asking
         try { await resetTipCounter(userId, tipCompanionId); } catch (e) { console.warn('[billing] resetTipCounter error:', e.message); }
+        // Insert thank-you message from companion
+        if (tipCompanionId) {
+          try { await insertTipThankYou(pool, userId, tipCompanionId); } catch (e) { console.warn('[billing] thank-you error:', e.message); }
+        }
         console.log(`[billing] Tip received: user=${userId} amount=${amount} companion=${tipCompanionId || 'all'}`);
       }
       break;

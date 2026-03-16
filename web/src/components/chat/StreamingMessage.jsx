@@ -1,5 +1,16 @@
+function formatActions(text) {
+  const parts = text.split(/(\*[^*]+\*)/g);
+  return parts.map((part, i) => {
+    const actionMatch = part.match(/^\*([^*]+)\*$/);
+    if (actionMatch) {
+      return <em key={i} className="text-brand-accent/70 not-italic text-[13px]">{actionMatch[1]}</em>;
+    }
+    return part;
+  });
+}
+
 export default function StreamingMessage({ text }) {
-  // Parse context from *asterisks*
+  // Parse leading context
   let contextText = null;
   let content = text;
   const match = text.match(/^\*([^*]+)\*/);
@@ -16,15 +27,19 @@ export default function StreamingMessage({ text }) {
             *{contextText}*
           </div>
         )}
-        <div className="px-4 py-2.5 rounded-2xl rounded-bl-md bg-brand-card border border-brand-border text-brand-text text-[15px] leading-relaxed">
-          {content || (
+        <div className="px-4 py-2.5 rounded-2xl rounded-bl-md bg-brand-card border border-brand-border text-brand-text text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+          {content ? (
+            <>
+              {formatActions(content)}
+              <span className="inline-block w-0.5 h-4 bg-brand-accent ml-0.5 animate-pulse" />
+            </>
+          ) : (
             <span className="inline-flex gap-1 text-brand-muted">
               <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
               <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>
               <span className="animate-bounce" style={{ animationDelay: '300ms' }}>.</span>
             </span>
           )}
-          {content && <span className="inline-block w-0.5 h-4 bg-brand-accent ml-0.5 animate-pulse" />}
         </div>
       </div>
     </div>

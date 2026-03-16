@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useChat from '../hooks/useChat';
 import ChatHeader from '../components/chat/ChatHeader';
@@ -17,6 +17,26 @@ export default function ChatPage() {
   } = useChat(companionId);
   const [showSheet, setShowSheet] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [scrollTrigger, setScrollTrigger] = useState(0);
+
+  const scrollToBottom = useCallback(() => {
+    setScrollTrigger(n => n + 1);
+  }, []);
+
+  const handleSend = useCallback((content) => {
+    sendMessage(content);
+    setTimeout(scrollToBottom, 50);
+  }, [sendMessage, scrollToBottom]);
+
+  const handleTriggerNext = useCallback(() => {
+    triggerNext();
+    setTimeout(scrollToBottom, 50);
+  }, [triggerNext, scrollToBottom]);
+
+  // Auto-scroll when new message added
+  useEffect(() => {
+    if (messages.length > 0) scrollToBottom();
+  }, [messages.length, scrollToBottom]);
 
   useEffect(() => {
     loadChat();
@@ -57,7 +77,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen bg-brand-bg flex flex-col">
+    <div className="h-screen bg-brand-bg flex flex-col max-w-lg mx-auto w-full">
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
 
       <MessageList
@@ -66,6 +86,9 @@ export default function ChatPage() {
         streamingText={streamingText}
         hasMore={hasMore}
         onLoadMore={loadMore}
+        onTriggerNext={handleTriggerNext}
+        showNextButton={!streaming}
+        scrollTrigger={scrollTrigger}
       />
 
       {/* Tip banner */}
@@ -76,7 +99,7 @@ export default function ChatPage() {
           </span>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate('/pricing')}
+              onClick={() => setShowSheet(true)}
               className="px-3 py-1 rounded-lg bg-brand-accent text-white text-xs font-medium"
             >
               Send Tip
@@ -94,8 +117,7 @@ export default function ChatPage() {
       )}
 
       <ChatInput
-        onSend={sendMessage}
-        onNext={triggerNext}
+        onSend={handleSend}
         disabled={streaming}
       />
 

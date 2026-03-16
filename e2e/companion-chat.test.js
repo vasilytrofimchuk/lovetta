@@ -42,8 +42,8 @@ async function signupViaUI(page) {
   }
   await page.locator('button:has-text("Continue")').last().click();
 
-  // Wait for redirect to companion list
-  await page.waitForSelector('text=Sign out', { timeout: 15000 });
+  // Wait for redirect to companion list (check for profile button in header)
+  await page.waitForSelector('button[title="Profile"]', { timeout: 15000 });
   return email;
 }
 
@@ -58,10 +58,10 @@ test.describe('Companion List', () => {
     await expect(page.locator('text=Get Started')).toBeVisible();
   });
 
-  test('has settings gear and sign out', async ({ page }) => {
+  test('has create and profile buttons', async ({ page }) => {
     await signupViaUI(page);
-    await expect(page.locator('button[title="Pricing & Account"]')).toBeVisible();
-    await expect(page.locator('text=Sign out')).toBeVisible();
+    await expect(page.locator('button[title="Create new girlfriend"]')).toBeVisible();
+    await expect(page.locator('button[title="Profile"]')).toBeVisible();
   });
 
   test('Get Started navigates to create page', async ({ page }) => {
@@ -190,7 +190,7 @@ test.describe('Companion Creation — real API', () => {
 
     // Back to list
     await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
-    await page.waitForSelector('text=Sign out', { timeout: 10000 });
+    await page.waitForSelector('button[title="Profile"]', { timeout: 10000 });
 
     await expect(page.locator('.font-semibold:has-text("Emma")')).toBeVisible();
     await expect(page.locator('button[title="Create new girlfriend"]')).toBeVisible();
@@ -271,7 +271,7 @@ test.describe('Chat UI', () => {
     await page.waitForURL('**/my/chat/**', { timeout: 30000 });
 
     await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
-    await page.waitForSelector('text=Sign out', { timeout: 10000 });
+    await page.waitForSelector('button[title="Profile"]', { timeout: 10000 });
     await expect(page.locator('.font-semibold:has-text("Jade")')).toBeVisible();
   }, 60000);
 });
@@ -292,9 +292,9 @@ test.describe('Multiple Companions', () => {
     await page.waitForURL('**/my/chat/**', { timeout: 30000 });
 
     await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
-    await page.waitForSelector('text=Sign out', { timeout: 10000 });
+    await page.waitForSelector('button[title="Profile"]', { timeout: 10000 });
 
-    // Create Violet via floating +
+    // Create Violet via + button
     await page.click('button[title="Create new girlfriend"]');
     await page.click('text=Choose a Soul');
     await page.locator('button:has-text("Violet")').click();
@@ -302,7 +302,7 @@ test.describe('Multiple Companions', () => {
     await page.waitForURL('**/my/chat/**', { timeout: 30000 });
 
     await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
-    await page.waitForSelector('text=Sign out', { timeout: 10000 });
+    await page.waitForSelector('button[title="Profile"]', { timeout: 10000 });
 
     // Both visible
     await expect(page.locator('.font-semibold:has-text("Sophia")')).toBeVisible();
@@ -315,32 +315,33 @@ test.describe('Multiple Companions', () => {
 // ============================================================
 
 test.describe('Navigation', () => {
-  test('gear icon goes to pricing page', async ({ page }) => {
+  test('profile button goes to profile page', async ({ page }) => {
     await signupViaUI(page);
-    await page.click('button[title="Pricing & Account"]');
-    await page.waitForURL('**/my/pricing');
+    await page.click('button[title="Profile"]');
+    await page.waitForURL('**/my/profile');
+    await expect(page.locator('h1:has-text("Profile")')).toBeVisible();
+  });
+
+  test('profile page has subscription and sign out', async ({ page }) => {
+    await signupViaUI(page);
+    await page.click('button[title="Profile"]');
+
     await expect(page.locator('text=Subscription')).toBeVisible();
+    await expect(page.locator('text=Sign out')).toBeVisible();
+    await expect(page.locator('text=Notifications')).toBeVisible();
   });
 
-  test('pricing page shows plans and tips', async ({ page }) => {
+  test('profile back button returns to list', async ({ page }) => {
     await signupViaUI(page);
-    await page.click('button[title="Pricing & Account"]');
-
-    await expect(page.locator('text=$20/mo')).toBeVisible();
-    await expect(page.locator('text=$100/yr')).toBeVisible();
-    await expect(page.locator('text=Send a tip')).toBeVisible();
-  });
-
-  test('pricing back button returns to list', async ({ page }) => {
-    await signupViaUI(page);
-    await page.click('button[title="Pricing & Account"]');
-    await page.waitForURL('**/my/pricing');
+    await page.click('button[title="Profile"]');
+    await page.waitForURL('**/my/profile');
     await page.click('text=Back');
-    await page.waitForSelector('text=Sign out', { timeout: 10000 });
+    await page.waitForSelector('button[title="Profile"]', { timeout: 10000 });
   });
 
   test('sign out returns to login', async ({ page }) => {
     await signupViaUI(page);
+    await page.click('button[title="Profile"]');
     await page.click('text=Sign out');
     await page.waitForURL('**/my/login', { timeout: 5000 });
   });

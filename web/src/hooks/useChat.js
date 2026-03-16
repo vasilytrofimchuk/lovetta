@@ -39,6 +39,13 @@ export default function useChat(companionId) {
     } catch {}
   }, [companionId, messages, hasMore]);
 
+  function clearTypewriter() {
+    if (typewriterRef.current) {
+      clearInterval(typewriterRef.current);
+      typewriterRef.current = null;
+    }
+  }
+
   async function processSSE(url, body) {
     setStreaming(true);
     setStreamingText('');
@@ -48,6 +55,8 @@ export default function useChat(companionId) {
     const token = localStorage.getItem('lovetta-token');
     const controller = new AbortController();
     abortRef.current = controller;
+
+    let pendingDone = null;
 
     try {
       const response = await fetch(url, {
@@ -82,48 +91,37 @@ export default function useChat(companionId) {
             const event = JSON.parse(jsonStr);
 
             if (event.type === 'typing') {
-              // Server is thinking — streaming indicator already shows
+              // Server is thinking
             } else if (event.type === 'chunk') {
               accumulated += event.text;
-              // Typewriter effect: reveal text word-by-word
-              const words = accumulated.split(/(\s+)/); // split keeping whitespace
+
+              // Start typewriter: min 1.5s, max 4s
+              const words = accumulated.split(/(\s+)/);
+              const total = words.length;
+              const duration = Math.min(2500, Math.max(1000, total * 20));
+              const tickMs = Math.max(20, duration / total);
               let wi = 0;
-              if (typewriterRef.current) clearInterval(typewriterRef.current);
+
+              clearTypewriter();
               setStreamingText('');
+
               typewriterRef.current = setInterval(() => {
-                wi += 2; // 2 tokens (word + space) per tick
-                if (wi >= words.length) {
+                wi += 1;
+                if (wi >= total) {
                   setStreamingText(accumulated);
-                  clearInterval(typewriterRef.current);
-                  typewriterRef.current = null;
+                  clearTypewriter();
                 } else {
                   setStreamingText(words.slice(0, wi).join(''));
                 }
-              }, 20);
+              }, tickMs);
+
             } else if (event.type === 'regenerate') {
               accumulated = '';
-              if (typewriterRef.current) { clearInterval(typewriterRef.current); typewriterRef.current = null; }
+              clearTypewriter();
               setStreamingText('');
             } else if (event.type === 'done') {
-              if (typewriterRef.current) { clearInterval(typewriterRef.current); typewriterRef.current = null; }
-              // Parse context from accumulated text
-              const contextMatch = accumulated.match(/^\*([^*]+)\*/);
-              const contextText = contextMatch ? contextMatch[1].trim() : (event.contextText || null);
-              const content = contextMatch ? accumulated.slice(contextMatch[0].length).trim() : accumulated;
-
-              const newMsg = {
-                id: event.messageId,
-                role: 'assistant',
-                content,
-                context_text: contextText,
-                created_at: new Date().toISOString(),
-              };
-              setMessages(prev => [...prev, newMsg]);
-              setStreamingText('');
-
-              if (event.shouldRequestTip) {
-                setShouldRequestTip(true);
-              }
+              // Store done event — finalize after typewriter completes
+              pendingDone = { event, accumulated };
             } else if (event.type === 'error') {
               if (event.code === 'subscription_required') {
                 setError('subscription_required');
@@ -138,16 +136,46 @@ export default function useChat(companionId) {
       if (err.name !== 'AbortError') {
         setError('Connection lost. Please try again.');
       }
-    } finally {
-      setStreaming(false);
-      abortRef.current = null;
     }
+
+    // SSE stream ended — now wait for typewriter to finish, then finalize
+    if (pendingDone) {
+      const { event, accumulated } = pendingDone;
+
+      await new Promise((resolve) => {
+        const check = setInterval(() => {
+          if (!typewriterRef.current) {
+            clearInterval(check);
+            resolve();
+          }
+        }, 50);
+        // Safety timeout: don't wait more than 5s
+        setTimeout(() => { clearInterval(check); clearTypewriter(); resolve(); }, 5000);
+      });
+
+      const contextMatch = accumulated.match(/^\*([^*]+)\*/);
+      const contextText = contextMatch ? contextMatch[1].trim() : (event.contextText || null);
+      const content = contextMatch ? accumulated.slice(contextMatch[0].length).trim() : accumulated;
+
+      setMessages(prev => [...prev, {
+        id: event.messageId,
+        role: 'assistant',
+        content,
+        context_text: contextText,
+        created_at: new Date().toISOString(),
+      }]);
+
+      if (event.shouldRequestTip) setShouldRequestTip(true);
+    }
+
+    setStreamingText('');
+    setStreaming(false);
+    abortRef.current = null;
   }
 
   const sendMessage = useCallback(async (content) => {
     if (!content.trim() || streaming) return;
 
-    // Optimistic add user message
     const userMsg = {
       id: 'temp-' + Date.now(),
       role: 'user',

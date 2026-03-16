@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 
-export default function ChatInput({ onSend, onNext, disabled }) {
+export default function ChatInput({ onSend, disabled }) {
   const [text, setText] = useState('');
   const textareaRef = useRef(null);
 
@@ -31,18 +31,6 @@ export default function ChatInput({ onSend, onNext, disabled }) {
   return (
     <div className="border-t border-brand-border bg-brand-bg px-4 py-3">
       <div className="max-w-md mx-auto flex items-end gap-2">
-        {/* Lightning button (companion initiates) */}
-        <button
-          onClick={onNext}
-          disabled={disabled}
-          className="flex-shrink-0 p-2 rounded-lg text-brand-muted hover:text-brand-accent disabled:opacity-30 transition-colors"
-          title="Let her message you"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
-        </button>
-
         {/* Text input */}
         <textarea
           ref={textareaRef}

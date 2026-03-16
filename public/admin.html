@@ -285,6 +285,8 @@
 
     <!-- Settings Tab -->
     <div id="tab-settings" class="tab-content">
+      <h3 style="margin-bottom: 16px; color: var(--text2);">AI Models</h3>
+      <div id="model-badges" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px;"></div>
       <h3 style="margin-bottom: 16px; color: var(--text2);">Content Levels by Platform</h3>
       <div id="settings-list"></div>
     </div>
@@ -688,6 +690,31 @@
     function loadSettings() {
       fetch('/api/admin/settings', { headers: headers() }).then(function(r) { return r.json(); }).then(function(data) {
         var settings = data.settings || {};
+
+        // Render model badges
+        var MODEL_KEYS = [
+          { key: 'openrouter_model', label: 'Primary Model' },
+          { key: 'openrouter_fallback_model', label: 'Fallback Model' },
+        ];
+        var badgesHtml = '';
+        MODEL_KEYS.forEach(function(def) {
+          var val = settings[def.key];
+          if (typeof val === 'string') val = val.replace(/^"|"$/g, '');
+          var displayName = val ? val.split('/').pop() : 'Not set';
+          badgesHtml += '<div style="flex:1;min-width:200px;">' +
+            '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;">' + def.label + '</div>' +
+            '<div id="badge-' + def.key + '" class="model-badge" onclick="editModelBadge(\'' + def.key + '\', \'' + esc(String(val || '')) + '\')" ' +
+            'style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color 0.2s;" ' +
+            'onmouseenter="this.style.borderColor=\'var(--accent)\'" onmouseleave="this.style.borderColor=\'var(--border)\'">' +
+            '<span style="width:8px;height:8px;border-radius:50%;background:' + (val ? 'var(--success)' : 'var(--muted)') + ';flex-shrink:0;"></span>' +
+            '<span style="color:var(--text);font-size:0.9rem;font-family:monospace;">' + esc(displayName) + '</span>' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+            '</span></div>' +
+            '<span class="save-msg" id="msg-badge-' + def.key + '" style="margin-left:8px;">Saved</span>' +
+            '</div>';
+        });
+        document.getElementById('model-badges').innerHTML = badgesHtml;
+
         var html = '';
 
         // Content level dropdowns
@@ -727,6 +754,46 @@
           msg.classList.add('show');
           setTimeout(function() { msg.classList.remove('show'); }, 2000);
         }
+      });
+    }
+
+    function editModelBadge(key, currentValue) {
+      var badge = document.getElementById('badge-' + key);
+      if (!badge) return;
+      var parent = badge.parentElement;
+      // Replace badge with input
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentValue;
+      input.style.cssText = 'width:100%;padding:8px 14px;background:var(--bg2);border:1px solid var(--accent);border-radius:8px;color:var(--text);font-size:0.9rem;font-family:monospace;outline:none;';
+      input.placeholder = 'e.g. venice-ai/venice-uncensored';
+      badge.style.display = 'none';
+      parent.insertBefore(input, badge);
+      input.focus();
+      input.select();
+
+      function save() {
+        var newVal = input.value.trim();
+        fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: headers(),
+          body: JSON.stringify({ key: key, value: newVal })
+        }).then(function(r) {
+          if (r.ok) {
+            var msg = document.getElementById('msg-badge-' + key);
+            if (msg) { msg.classList.add('show'); setTimeout(function() { msg.classList.remove('show'); }, 2000); }
+            // Reload settings to refresh badges
+            loadSettings();
+          }
+        });
+      }
+
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+        if (e.key === 'Escape') { input.remove(); badge.style.display = ''; }
+      });
+      input.addEventListener('blur', function() {
+        if (input.value.trim() !== currentValue) { save(); } else { input.remove(); badge.style.display = ''; }
       });
     }
 

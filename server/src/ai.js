@@ -11,6 +11,7 @@ const { uploadFromUrl } = require('./r2');
 
 const https = require('https');
 const OPENROUTER_API_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
+const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const FAL_KEY = (process.env.FAL_KEY || '').trim();
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
@@ -471,11 +472,70 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
   return { url: videoUrl, cost: costUsd, ...consumptionResult };
 }
 
+// -- OpenAI TTS -----------------------------------------------
+
+const TTS_COST_PER_CHAR = 0.000015; // $15 per 1M characters
+
+/**
+ * Generate speech audio from text via OpenAI TTS API.
+ * @param {string} text - Text to convert to speech (max 4096 chars)
+ * @param {string} voiceId - Voice name (nova, shimmer, alloy, echo, fable, onyx)
+ * @returns {{ buffer: Buffer, costUsd: number }}
+ */
+async function generateSpeech(text, voiceId = 'nova') {
+  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+  if (!text || !text.trim()) throw new Error('Empty text for TTS');
+
+  // Truncate to OpenAI TTS limit
+  const input = text.slice(0, 4096);
+
+  const body = JSON.stringify({
+    model: 'tts-1',
+    voice: voiceId,
+    input,
+    response_format: 'mp3',
+  });
+
+  const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
+    const url = new URL('https://api.openai.com/v1/audio/speech');
+    const req = https.request({
+      hostname: url.hostname,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve({ responseChunks: chunks, statusCode: res.statusCode }));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(new Error('TTS request timeout')); });
+    req.write(body);
+    req.end();
+  });
+
+  if (statusCode !== 200) {
+    const errText = Buffer.concat(responseChunks).toString();
+    throw new Error(`OpenAI TTS ${statusCode}: ${errText}`);
+  }
+
+  const buffer = Buffer.concat(responseChunks);
+  const costUsd = input.length * TTS_COST_PER_CHAR;
+
+  return { buffer, costUsd };
+}
+
 module.exports = {
   streamChat,
   chatCompletion,
   generateImage,
   generateVideo,
+  generateSpeech,
   getAISettings,
   buildSystemPrompt,
 };

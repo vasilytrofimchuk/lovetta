@@ -5,7 +5,7 @@ import api from '../lib/api';
 import CompanionCard from '../components/CompanionCard';
 
 export default function CompanionList() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [companions, setCompanions] = useState([]);
@@ -41,21 +41,26 @@ export default function CompanionList() {
       <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border px-4 py-3">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-7" />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => navigate('/pricing')}
+              onClick={() => navigate('/create')}
               className="p-2 rounded-lg text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"
-              title="Pricing & Account"
+              title="Create new girlfriend"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </button>
             <button
-              onClick={logout}
-              className="text-sm text-brand-muted hover:text-brand-text transition-colors px-2 py-1"
+              onClick={() => navigate('/profile')}
+              className="p-2 rounded-lg text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"
+              title="Profile"
             >
-              Sign out
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M20 21a8 8 0 0 0-16 0" />
+              </svg>
             </button>
           </div>
         </div>
@@ -113,32 +118,13 @@ export default function CompanionList() {
 
         {/* Companion list */}
         {!loading && companions.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {companions.map(c => (
               <CompanionCard key={c.id} companion={c} />
             ))}
-
-            <button
-              onClick={() => navigate('/create')}
-              className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-brand-accent/40 text-brand-accent hover:bg-brand-accent/10 transition-colors mt-4"
-            >
-              <span className="text-xl leading-none">+</span>
-              <span className="text-sm font-medium">Awaken a new girlfriend</span>
-            </button>
           </div>
         )}
       </div>
-
-      {/* Floating create button */}
-      {!loading && companions.length > 0 && (
-        <button
-          onClick={() => navigate('/create')}
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-brand-accent text-white text-2xl font-bold shadow-lg hover:bg-brand-accent-hover transition-colors flex items-center justify-center"
-          title="Create new girlfriend"
-        >
-          +
-        </button>
-      )}
     </div>
   );
 }

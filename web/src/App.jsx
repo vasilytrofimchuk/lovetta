@@ -9,6 +9,7 @@ import CompanionList from './pages/CompanionList'
 import CompanionCreate from './pages/CompanionCreate'
 import ChatPage from './pages/ChatPage'
 import Pricing from './pages/Pricing'
+import Profile from './pages/Profile'
 
 function Loading() {
   return (
@@ -47,6 +48,7 @@ function AppRoutes() {
       <Route path="/create" element={<ProtectedRoute><CompanionCreate /></ProtectedRoute>} />
       <Route path="/chat/:companionId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
       <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

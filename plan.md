@@ -210,9 +210,12 @@ Text and image levels are independent, configurable per platform in admin settin
 - Activity level setting per companion: low (1/day), medium (2-3/day), high (5+/day)
 - Proactive messages are natural — "Hey, thinking about you" style, not system notifications
 
-### Email Notifications
+### Email Notifications — PARTIALLY DONE
 - Resend integration (already configured, hello@lovetta.ai)
-- Templates: new companion message, missed conversation summary, subscription reminder, welcome series
+- [x] New message notification: email sent when girl sends message and user inactive 5+ min (rate limited 30min)
+- [x] user_preferences table with notify_new_messages toggle
+- [x] Notification toggle in Profile page
+- Templates: missed conversation summary, subscription reminder, welcome series
 - Every email has unsubscribe link
 - Frequency capped per user (max 2/day)
 

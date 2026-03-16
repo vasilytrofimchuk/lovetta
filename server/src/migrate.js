@@ -322,6 +322,36 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_admin_emails_created ON admin_emails(created_at DESC);
     `,
   },
+  {
+    name: 'v4_user_preferences',
+    sql: `
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        notify_new_messages BOOLEAN DEFAULT false,
+        last_notification_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `,
+  },
+  {
+    name: 'v5_tips_companion_id',
+    sql: `
+      ALTER TABLE tips ADD COLUMN IF NOT EXISTS companion_id UUID;
+    `,
+  },
+  {
+    name: 'v6_conversation_email_threading',
+    sql: `
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_email_message_id TEXT;
+    `,
+  },
+  {
+    name: 'v7_companion_voice_id',
+    sql: `
+      ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS voice_id TEXT DEFAULT 'nova';
+      ALTER TABLE user_companions ADD COLUMN IF NOT EXISTS voice_id TEXT DEFAULT 'nova';
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
