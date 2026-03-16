@@ -29,11 +29,52 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Desktop background decorations */
+.desktop-bg {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .desktop-bg {
+    display: block;
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .desktop-bg .desktop-glow-pink {
+    position: absolute;
+    top: -10%;
+    left: -5%;
+    width: 40%;
+    height: 50%;
+    background: radial-gradient(ellipse, rgba(214, 51, 108, 0.07) 0%, transparent 70%);
+  }
+  .desktop-bg .desktop-glow-purple {
+    position: absolute;
+    bottom: -10%;
+    right: -5%;
+    width: 40%;
+    height: 50%;
+    background: radial-gradient(ellipse, rgba(26, 17, 40, 0.5) 0%, transparent 70%);
+  }
+  .container {
+    border-left: 1px solid rgba(45, 31, 69, 0.3);
+    border-right: 1px solid rgba(45, 31, 69, 0.3);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    min-height: 100vh;
+    background: var(--bg-primary);
+  }
+}
+
 /* Layout */
 .container {
   max-width: 640px;
   margin: 0 auto;
   padding: 0 24px;
+  position: relative;
+  z-index: 1;
 }
 
 /* Header */
@@ -43,12 +84,6 @@ header {
   align-items: center;
   justify-content: center;
   gap: 16px;
-}
-
-.logo {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
 }
 
 .logo-text {
