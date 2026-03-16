@@ -351,4 +351,106 @@ router.post('/reset-password', authLimiter, async (req, res) => {
   }
 });
 
+// -- POST /api/auth/google --------------------------------
+const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim();
+
+router.post('/google', authLimiter, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Service unavailable' });
+  if (!GOOGLE_CLIENT_ID) return res.status(503).json({ error: 'Google auth not configured' });
+
+  try {
+    const { credential, birthMonth, birthYear } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential is required' });
+    }
+
+    // Verify the ID token with Google
+    const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+    if (!tokenInfoRes.ok) {
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
+    const tokenInfo = await tokenInfoRes.json();
+
+    // Validate audience
+    if (tokenInfo.aud !== GOOGLE_CLIENT_ID) {
+      return res.status(401).json({ error: 'Invalid token audience' });
+    }
+
+    const googleId = tokenInfo.sub;
+    const email = tokenInfo.email;
+    const name = tokenInfo.name || null;
+    const picture = tokenInfo.picture || null;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email not provided by Google' });
+    }
+
+    // Check if user exists by google_id or email
+    const { rows: existingByGoogle } = await pool.query(
+      'SELECT * FROM users WHERE google_id = $1', [googleId]
+    );
+
+    let user;
+
+    if (existingByGoogle.length > 0) {
+      // Existing Google user — login
+      user = existingByGoogle[0];
+      // Update profile pic if changed
+      if (picture && picture !== user.avatar_url) {
+        pool.query('UPDATE users SET avatar_url = $1, last_activity = NOW() WHERE id = $2', [picture, user.id]).catch(() => {});
+      }
+    } else {
+      // Check if email already exists (link Google to existing account)
+      const { rows: existingByEmail } = await pool.query(
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]
+      );
+
+      if (existingByEmail.length > 0) {
+        // Link Google ID to existing email account
+        user = existingByEmail[0];
+        await pool.query(
+          'UPDATE users SET google_id = $1, email_verified = TRUE, avatar_url = COALESCE(avatar_url, $2), display_name = COALESCE(display_name, $3) WHERE id = $4',
+          [googleId, picture, name, user.id]
+        );
+        user.email_verified = true;
+        user.avatar_url = user.avatar_url || picture;
+        user.display_name = user.display_name || name;
+      } else {
+        // New user — require age verification
+        const month = parseInt(birthMonth, 10);
+        const year = parseInt(birthYear, 10);
+        if (!month || month < 1 || month > 12 || !year || year < 1900) {
+          return res.status(400).json({ error: 'age_required', message: 'Birth month and year are required for new accounts' });
+        }
+        if (!isAtLeast18(month, year)) {
+          return res.status(403).json({ error: 'You must be 18 or older' });
+        }
+
+        const ip = req.ip || '';
+        const geo = await geoFromIp(ip).catch(() => ({}));
+
+        const { rows: [newUser] } = await pool.query(
+          `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
+                              terms_accepted, privacy_accepted, ip_address, country, city, user_agent, auth_provider)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, $7, $8, $9, $10, 'google')
+           RETURNING *`,
+          [email, googleId, name, picture, month, year,
+           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
+        );
+        user = newUser;
+      }
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+    await storeRefreshToken(pool, user.id, refreshToken);
+
+    res.json({ user: sanitizeUser(user), accessToken, refreshToken });
+  } catch (err) {
+    console.error('[auth] google error:', err.message);
+    res.status(500).json({ error: 'Google auth failed' });
+  }
+});
+
 module.exports = router;

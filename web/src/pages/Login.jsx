@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getErrorMessage } from '../lib/api'
+import GoogleSignIn from '../components/GoogleSignIn'
 
 export default function Login() {
   const { login } = useAuth()
@@ -28,7 +29,7 @@ export default function Login() {
     <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src="/assets/brand/logo.png" alt="Lovetta" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
+          <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="text-brand-text-secondary mt-1">Sign in to continue</p>
         </div>
@@ -83,6 +84,10 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <GoogleSignIn
+          onError={(msg) => setError(msg)}
+        />
 
         <div className="mt-4 text-center">
           <Link to="/forgot-password" className="text-sm text-brand-accent hover:underline">
