@@ -8,8 +8,7 @@ export default function Home() {
       <div className="max-w-md mx-auto pt-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <img src="/assets/brand/logo.png" alt="Lovetta" className="w-10 h-10 rounded-xl" />
-            <h1 className="text-xl font-bold">Lovetta</h1>
+            <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-8" />
           </div>
           <button
             onClick={logout}

@@ -1,16 +1,33 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getErrorMessage } from '../lib/api'
 import GoogleSignIn from '../components/GoogleSignIn'
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, refreshUser } = useAuth()
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Handle Google OAuth callback
+  useEffect(() => {
+    const oauth = searchParams.get('oauth')
+    const accessToken = searchParams.get('accessToken')
+    const refreshToken = searchParams.get('refreshToken')
+    const oauthError = searchParams.get('error')
+
+    if (oauthError) {
+      setError('Google sign-in failed. Please try again.')
+    } else if (oauth === 'success' && accessToken && refreshToken) {
+      localStorage.setItem('lovetta-token', accessToken)
+      localStorage.setItem('lovetta-refresh-token', refreshToken)
+      refreshUser()
+    }
+  }, [searchParams, refreshUser])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -85,9 +102,7 @@ export default function Login() {
           </button>
         </form>
 
-        <GoogleSignIn
-          onError={(msg) => setError(msg)}
-        />
+        <GoogleSignIn />
 
         <div className="mt-4 text-center">
           <Link to="/forgot-password" className="text-sm text-brand-accent hover:underline">

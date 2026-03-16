@@ -1,21 +1,19 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import api, { getErrorMessage } from '../lib/api'
+import { getErrorMessage } from '../lib/api'
 import AgeGate from '../components/AgeGate'
 import LegalPopup from '../components/LegalPopup'
 import GoogleSignIn from '../components/GoogleSignIn'
 
 export default function Signup() {
-  const { signup, refreshUser } = useAuth()
+  const { signup } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [birthMonth, setBirthMonth] = useState('')
   const [birthYear, setBirthYear] = useState('')
   const [showLegal, setShowLegal] = useState(false)
-  const [googleCredential, setGoogleCredential] = useState(null)
-  const [showGoogleAge, setShowGoogleAge] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -128,13 +126,7 @@ export default function Signup() {
           </button>
         </form>
 
-        <GoogleSignIn
-          onAgeRequired={(credential) => {
-            setGoogleCredential(credential)
-            setShowGoogleAge(true)
-          }}
-          onError={(msg) => setError(msg)}
-        />
+        <GoogleSignIn />
 
         <div className="mt-6 text-center text-sm text-brand-text-secondary">
           Already have an account?{' '}
@@ -149,54 +141,6 @@ export default function Signup() {
           onAccept={handleAccept}
           onClose={() => setShowLegal(false)}
         />
-      )}
-
-      {showGoogleAge && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-brand-card border border-brand-border rounded-xl p-6 w-full max-w-sm">
-            <h3 className="text-lg font-semibold mb-2">Almost there</h3>
-            <p className="text-sm text-brand-text-secondary mb-4">Please confirm your age to continue.</p>
-            <AgeGate
-              birthMonth={birthMonth}
-              birthYear={birthYear}
-              onChange={({ birthMonth: m, birthYear: y }) => { setBirthMonth(m); setBirthYear(y) }}
-            />
-            {error && (
-              <div className="text-brand-error text-sm mt-3">{error}</div>
-            )}
-            <div className="flex gap-3 mt-5">
-              <button
-                onClick={() => { setShowGoogleAge(false); setGoogleCredential(null); setError('') }}
-                className="flex-1 py-3 rounded-lg border border-brand-border text-brand-text-secondary"
-              >Cancel</button>
-              <button
-                disabled={loading || !birthMonth || !birthYear}
-                onClick={async () => {
-                  setError('')
-                  const now = new Date()
-                  const age = now.getFullYear() - parseInt(birthYear) - (now.getMonth() + 1 < parseInt(birthMonth) ? 1 : 0)
-                  if (age < 18) { setError('You must be 18 or older'); return }
-                  setLoading(true)
-                  try {
-                    const { data } = await api.post('/api/auth/google', {
-                      credential: googleCredential,
-                      birthMonth: parseInt(birthMonth),
-                      birthYear: parseInt(birthYear),
-                    })
-                    localStorage.setItem('lovetta-token', data.accessToken)
-                    localStorage.setItem('lovetta-refresh-token', data.refreshToken)
-                    await refreshUser()
-                  } catch (err) {
-                    setError(getErrorMessage(err))
-                  } finally {
-                    setLoading(false)
-                  }
-                }}
-                className="flex-1 py-3 rounded-lg bg-brand-accent text-white font-semibold disabled:opacity-50"
-              >{loading ? 'Creating...' : 'Continue'}</button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )

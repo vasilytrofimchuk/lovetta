@@ -1,75 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
-import api, { getErrorMessage } from '../lib/api'
-import { useAuth } from '../contexts/AuthContext'
+import { useState } from 'react'
 
-const GOOGLE_CLIENT_ID = '1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com'
+export default function GoogleSignIn() {
+  const [loading, setLoading] = useState(false)
 
-export default function GoogleSignIn({ onAgeRequired, onError }) {
-  const { refreshUser } = useAuth()
-  const btnRef = useRef(null)
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    // Load Google GSI script
-    if (window.google?.accounts) {
-      initGoogle()
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.onload = () => initGoogle()
-    document.head.appendChild(script)
-
-    return () => {
-      // cleanup not needed — script persists
-    }
-  }, [])
-
-  function initGoogle() {
-    if (!window.google?.accounts) return
-
-    window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: handleCredentialResponse,
-      auto_select: false,
-    })
-
-    if (btnRef.current) {
-      window.google.accounts.id.renderButton(btnRef.current, {
-        type: 'standard',
-        theme: 'filled_black',
-        size: 'large',
-        width: btnRef.current.offsetWidth,
-        text: 'continue_with',
-        shape: 'pill',
-      })
-    }
-
-    setLoaded(true)
-  }
-
-  async function handleCredentialResponse(response) {
-    try {
-      const { data } = await api.post('/api/auth/google', {
-        credential: response.credential,
-      })
-
-      if (data.accessToken) {
-        localStorage.setItem('lovetta-token', data.accessToken)
-        localStorage.setItem('lovetta-refresh-token', data.refreshToken)
-        await refreshUser()
-      }
-    } catch (err) {
-      const msg = getErrorMessage(err)
-      if (msg === 'age_required') {
-        // New Google user needs age verification — pass credential up
-        if (onAgeRequired) onAgeRequired(response.credential)
-      } else {
-        if (onError) onError(msg)
-      }
-    }
+  const handleClick = () => {
+    setLoading(true)
+    window.location.href = '/api/auth/google'
   }
 
   return (
@@ -82,17 +18,21 @@ export default function GoogleSignIn({ onAgeRequired, onError }) {
           <span className="bg-brand-bg px-3 text-brand-muted">or</span>
         </div>
       </div>
-      <div ref={btnRef} className="flex justify-center" style={{ minHeight: 44 }}>
-        {!loaded && (
-          <button
-            type="button"
-            disabled
-            className="w-full py-3 rounded-full border border-brand-border text-brand-text-secondary text-sm opacity-50"
-          >
-            Loading Google...
-          </button>
-        )}
-      </div>
+
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={loading}
+        className="w-full py-3 rounded-lg border border-brand-border bg-brand-surface text-brand-text font-medium hover:bg-brand-card transition-colors disabled:opacity-50 flex items-center justify-center gap-3"
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+          <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+          <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+          <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 2.58 9 3.58z" fill="#EA4335"/>
+        </svg>
+        {loading ? 'Redirecting...' : 'Continue with Google'}
+      </button>
     </div>
   )
 }

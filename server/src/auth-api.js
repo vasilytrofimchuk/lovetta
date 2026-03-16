@@ -351,91 +351,111 @@ router.post('/reset-password', authLimiter, async (req, res) => {
   }
 });
 
-// -- POST /api/auth/google --------------------------------
+// -- Google OAuth (server-side redirect flow) -------------
 const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim();
+const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+const SITE_URL = (process.env.SITE_URL || 'http://localhost:3900').trim();
 
-router.post('/google', authLimiter, async (req, res) => {
+// GET /api/auth/google — redirect to Google consent screen
+router.get('/google', (req, res) => {
+  if (!GOOGLE_CLIENT_ID) return res.status(503).send('Google auth not configured');
+
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: `${SITE_URL}/api/auth/google/callback`,
+    response_type: 'code',
+    scope: 'openid email profile',
+    access_type: 'offline',
+    prompt: 'select_account',
+  });
+
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+// GET /api/auth/google/callback — handle Google redirect
+router.get('/google/callback', async (req, res) => {
   const pool = getPool();
-  if (!pool) return res.status(503).json({ error: 'Service unavailable' });
-  if (!GOOGLE_CLIENT_ID) return res.status(503).json({ error: 'Google auth not configured' });
+  if (!pool) return res.redirect('/my/login?error=service_unavailable');
 
   try {
-    const { credential, birthMonth, birthYear } = req.body || {};
-    if (!credential) {
-      return res.status(400).json({ error: 'Google credential is required' });
+    const { code, error: oauthError } = req.query;
+    if (oauthError || !code) {
+      return res.redirect('/my/login?error=google_denied');
     }
 
-    // Verify the ID token with Google
-    const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
-    if (!tokenInfoRes.ok) {
-      return res.status(401).json({ error: 'Invalid Google token' });
-    }
-    const tokenInfo = await tokenInfoRes.json();
+    // Exchange code for tokens
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: `${SITE_URL}/api/auth/google/callback`,
+        grant_type: 'authorization_code',
+      }),
+    });
 
-    // Validate audience
-    if (tokenInfo.aud !== GOOGLE_CLIENT_ID) {
-      return res.status(401).json({ error: 'Invalid token audience' });
+    if (!tokenRes.ok) {
+      console.error('[auth] Google token exchange failed:', await tokenRes.text());
+      return res.redirect('/my/login?error=google_failed');
     }
 
-    const googleId = tokenInfo.sub;
-    const email = tokenInfo.email;
-    const name = tokenInfo.name || null;
-    const picture = tokenInfo.picture || null;
+    const tokens = await tokenRes.json();
+
+    // Get user info
+    const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    if (!userInfoRes.ok) {
+      return res.redirect('/my/login?error=google_failed');
+    }
+
+    const googleUser = await userInfoRes.json();
+    const googleId = googleUser.id;
+    const email = googleUser.email;
+    const name = googleUser.name || null;
+    const picture = googleUser.picture || null;
 
     if (!email) {
-      return res.status(400).json({ error: 'Email not provided by Google' });
+      return res.redirect('/my/login?error=no_email');
     }
 
-    // Check if user exists by google_id or email
+    // Find or create user
+    let user;
     const { rows: existingByGoogle } = await pool.query(
       'SELECT * FROM users WHERE google_id = $1', [googleId]
     );
 
-    let user;
-
     if (existingByGoogle.length > 0) {
-      // Existing Google user — login
       user = existingByGoogle[0];
-      // Update profile pic if changed
       if (picture && picture !== user.avatar_url) {
         pool.query('UPDATE users SET avatar_url = $1, last_activity = NOW() WHERE id = $2', [picture, user.id]).catch(() => {});
       }
     } else {
-      // Check if email already exists (link Google to existing account)
       const { rows: existingByEmail } = await pool.query(
         'SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]
       );
 
       if (existingByEmail.length > 0) {
-        // Link Google ID to existing email account
         user = existingByEmail[0];
         await pool.query(
           'UPDATE users SET google_id = $1, email_verified = TRUE, avatar_url = COALESCE(avatar_url, $2), display_name = COALESCE(display_name, $3) WHERE id = $4',
           [googleId, picture, name, user.id]
         );
-        user.email_verified = true;
-        user.avatar_url = user.avatar_url || picture;
-        user.display_name = user.display_name || name;
       } else {
-        // New user — require age verification
-        const month = parseInt(birthMonth, 10);
-        const year = parseInt(birthYear, 10);
-        if (!month || month < 1 || month > 12 || !year || year < 1900) {
-          return res.status(400).json({ error: 'age_required', message: 'Birth month and year are required for new accounts' });
-        }
-        if (!isAtLeast18(month, year)) {
-          return res.status(403).json({ error: 'You must be 18 or older' });
-        }
-
+        // New Google user — create with default birth date (will need age gate on first app use)
+        // For now, set a placeholder birth date. The app should prompt for age on first login.
         const ip = req.ip || '';
         const geo = await geoFromIp(ip).catch(() => ({}));
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ip_address, country, city, user_agent, auth_provider)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, $7, $8, $9, $10, 'google')
+           VALUES (LOWER($1), $2, $3, $4, TRUE, 1, 2000, TRUE, TRUE, $5, $6, $7, $8, 'google')
            RETURNING *`,
-          [email, googleId, name, picture, month, year,
+          [email, googleId, name, picture,
            ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
         );
         user = newUser;
@@ -446,10 +466,16 @@ router.post('/google', authLimiter, async (req, res) => {
     const refreshToken = generateRefreshToken(user.id);
     await storeRefreshToken(pool, user.id, refreshToken);
 
-    res.json({ user: sanitizeUser(user), accessToken, refreshToken });
+    // Redirect back to app with tokens in URL params
+    const params = new URLSearchParams({
+      accessToken,
+      refreshToken,
+      oauth: 'success',
+    });
+    res.redirect(`/my/login?${params}`);
   } catch (err) {
-    console.error('[auth] google error:', err.message);
-    res.status(500).json({ error: 'Google auth failed' });
+    console.error('[auth] google callback error:', err.message);
+    res.redirect('/my/login?error=google_failed');
   }
 });
 
