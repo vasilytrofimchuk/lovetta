@@ -54,8 +54,12 @@ router.post('/tts', authenticate, async (req, res) => {
     );
     const voiceId = companion?.voice_id || 'nova';
 
+    // Strip *action* text — only speak the dialogue, not "giggles" or "smirks"
+    const ttsText = msg.content.replace(/\*[^*]+\*/g, '').replace(/\s+/g, ' ').trim();
+    if (!ttsText) return res.status(400).json({ error: 'No speakable text' });
+
     // Generate speech
-    const { buffer, costUsd } = await generateSpeech(msg.content, voiceId);
+    const { buffer, costUsd } = await generateSpeech(ttsText, voiceId);
 
     // Upload to R2
     const { url: audioUrl } = await uploadBuffer(buffer, 'audio', {
