@@ -3,7 +3,7 @@
 ## Overview
 AI companion app for entertaining and intimate chats with AI-generated women companions. Domain: lovetta.ai, app at lovetta.ai/my, Telegram mini-app via @lovetta_bot.
 
-**Stack:** Express.js + PostgreSQL + Heroku | React + Vite + Tailwind | Claude API | Stripe
+**Stack:** Express.js + PostgreSQL + Heroku | React + Vite + Tailwind | OpenRouter + fal.ai | Stripe
 
 ---
 
@@ -82,7 +82,7 @@ Users create up to 3 AI companions (configurable via admin). Each has name, pers
 ## Phase 2c: Chat UI + AI Engine
 
 ### What
-Real-time chat with AI companions using Claude API. Messages have styled context (what she's doing) and message text. User can trigger companion messages without input. Roleplay templates available.
+Real-time chat with AI companions using OpenRouter API (uncensored models). Messages have styled context (what she's doing) and message text. User can trigger companion messages without input. Roleplay templates available.
 
 ### DB Tables
 - **conversations**: id (UUID), user_id, companion_id, created_at, last_message_at
@@ -97,7 +97,8 @@ Real-time chat with AI companions using Claude API. Messages have styled context
 - `GET /api/chat/roleplay-templates` — list available roleplay scenarios
 - `POST /api/chat/:companionId/roleplay` — activate a roleplay scenario
 
-### Claude AI Integration (server/src/ai.js)
+### OpenRouter AI Integration (server/src/ai.js)
+- **Provider**: OpenRouter API (OpenAI-compatible) with uncensored models (Venice, MN-Celeste, etc.)
 - **System prompt builder**: assembles companion personality + traits + content level rules + memory context
 - **Streaming**: SSE via `res.write()` chunks, frontend uses EventSource
 - **Response format**: `*she smiles softly* Hey, how was your day?`
@@ -105,6 +106,8 @@ Real-time chat with AI companions using Claude API. Messages have styled context
   - Context displayed as italic/transparent above message bubble
 - **First message**: "Thank you for bringing me to life" format (configurable per template)
 - **Content level enforcement**: system prompt appendix based on platform setting (0-3)
+- **Cost tracking**: every API call logged to `api_consumption` table with token counts and cost
+- **Tip threshold**: when cumulative cost exceeds `tip_request_threshold_usd`, companion naturally asks for a tip
 
 ### React Components
 - **ChatPage**: full-screen chat with companion header (avatar + name + status)
@@ -133,8 +136,8 @@ Persistent companion memory that never forgets. Multi-tier approach to save toke
 - **user_facts**: id, user_id, companion_id, fact_key, fact_value, source (extracted/stated), created_at, updated_at
 
 **How it works:**
-1. **Recent messages** (Tier 1): last 20 messages sent as full context to Claude
-2. **Session summaries** (Tier 2): every 50 messages, older messages summarized via Claude and stored
+1. **Recent messages** (Tier 1): last 20 messages sent as full context to OpenRouter
+2. **Session summaries** (Tier 2): every 50 messages, older messages summarized via OpenRouter and stored
 3. **Long-term facts** (Tier 3): key-value facts extracted from conversations (user's name, preferences, important events, relationship milestones)
 4. **System prompt assembly**: personality + recent messages + relevant summaries + all facts
 5. **Background job**: cron runs summarization for conversations with >50 unsummarized messages
@@ -170,7 +173,7 @@ Text and image levels are independent, configurable per platform in admin settin
 ## Phase 2e: Media + Notifications
 
 ### Image Generation
-- API: ZenCreator, Stability AI, or similar erotic-capable model
+- API: fal.ai (Flux Dev for images, Wan 2.6 for video) — uncensored models
 - `POST /api/media/generate` — generate image based on companion avatar + scene prompt
 - Character consistency: companion's base avatar used as reference/seed image
 - Image level enforced server-side in generation prompt
@@ -199,7 +202,7 @@ Text and image levels are independent, configurable per platform in admin settin
 ### Proactive Messaging
 - Cron job checks engagement patterns per user+companion:
   - Time since last message, user's typical activity hours, companion activity_level setting
-- If user inactive > configured threshold: generate proactive companion message via Claude
+- If user inactive > configured threshold: generate proactive companion message via OpenRouter
 - Delivery channels (all simultaneously):
   - Push notification (web push or APNs)
   - Email via Resend (with unsubscribe link)
@@ -277,17 +280,17 @@ Native iOS app wrapping the web app via Capacitor. Separate payment flow via Rev
 | `/api/webhooks/telegram` | POST | - | Telegram webhook |
 | `/api/health` | GET | - | Health check |
 
-### Database Tables (9 tables)
-visitors, leads, app_settings, users, refresh_tokens, subscriptions, billing_events, tips, telegram_users
+### Database Tables (11 tables)
+visitors, leads, app_settings, users, refresh_tokens, subscriptions, billing_events, tips, telegram_users, api_consumption, user_companion_cost_balance
 
 ### Environment Variables
-DATABASE_URL, TEST_DATABASE_URL, PORT, NODE_ENV, ADMIN_TOKEN, SITE_URL, JWT_SECRET, JWT_REFRESH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ANTHROPIC_API_KEY, RESEND_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, TELEGRAM_WEBHOOK_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_MONTHLY_PRICE_ID, STRIPE_YEARLY_PRICE_ID, SENTRY_DSN, SENTRY_AUTH_TOKEN, SENTRY_ORG_SLUG, SENTRY_PROJECT_SLUG, GOOGLE_ANALYTICS_ID
+DATABASE_URL, TEST_DATABASE_URL, PORT, NODE_ENV, ADMIN_TOKEN, SITE_URL, JWT_SECRET, JWT_REFRESH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OPENROUTER_API_KEY, FAL_KEY, RESEND_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, TELEGRAM_WEBHOOK_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_MONTHLY_PRICE_ID, STRIPE_YEARLY_PRICE_ID, SENTRY_DSN, SENTRY_AUTH_TOKEN, SENTRY_ORG_SLUG, SENTRY_PROJECT_SLUG, GOOGLE_ANALYTICS_ID
 
 ---
 
 ## Priority Order (remaining)
 1. **Companion system** — templates + creation + management
-2. **Chat UI + Claude AI** — streaming, message format, roleplay
+2. **Chat UI + OpenRouter AI** — streaming, message format, roleplay
 3. **Memory system** — summaries + facts extraction
 4. **Content moderation** — age guard + level enforcement
 5. **Image generation** — consistent characters, level-based

@@ -1,0 +1,191 @@
+/**
+ * API consumption tracking + tip threshold logic.
+ * Tracks every AI API call cost and checks when to request tips.
+ */
+
+const { getPool } = require('./db');
+
+/**
+ * Record an API call and update running cost balance.
+ * Returns { shouldRequestTip } indicating if the companion should ask for a tip.
+ */
+async function trackConsumption({ userId, companionId, provider, model, callType, inputTokens = 0, outputTokens = 0, costUsd, metadata = {} }) {
+  const pool = getPool();
+  if (!pool) return { shouldRequestTip: false };
+
+  // Insert consumption record
+  await pool.query(
+    `INSERT INTO api_consumption (user_id, companion_id, provider, model, call_type, input_tokens, output_tokens, cost_usd, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [userId, companionId || null, provider, model, callType, inputTokens, outputTokens, costUsd, JSON.stringify(metadata)]
+  );
+
+  // If no companion, skip threshold check
+  if (!companionId) return { shouldRequestTip: false };
+
+  // Upsert running balance
+  const { rows } = await pool.query(
+    `INSERT INTO user_companion_cost_balance (user_id, companion_id, cumulative_cost_usd)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, companion_id) DO UPDATE
+       SET cumulative_cost_usd = user_companion_cost_balance.cumulative_cost_usd + $3
+     RETURNING cumulative_cost_usd, last_tip_reset_cost`,
+    [userId, companionId, costUsd]
+  );
+
+  const balance = rows[0];
+  const costSinceLastTip = parseFloat(balance.cumulative_cost_usd) - parseFloat(balance.last_tip_reset_cost);
+
+  // Load threshold from settings
+  const { rows: settings } = await pool.query(
+    `SELECT value FROM app_settings WHERE key = 'tip_request_threshold_usd'`
+  );
+  const threshold = parseFloat(settings[0]?.value || '2.00');
+
+  return {
+    shouldRequestTip: costSinceLastTip >= threshold,
+    costSinceLastTip,
+  };
+}
+
+/**
+ * Reset the tip counter for a user-companion pair (called when tip is received).
+ * If no companionId, resets all balances for the user.
+ */
+async function resetTipCounter(userId, companionId) {
+  const pool = getPool();
+  if (!pool) return;
+
+  if (companionId) {
+    await pool.query(
+      `UPDATE user_companion_cost_balance
+       SET last_tip_at = NOW(), last_tip_reset_cost = cumulative_cost_usd
+       WHERE user_id = $1 AND companion_id = $2`,
+      [userId, companionId]
+    );
+  } else {
+    await pool.query(
+      `UPDATE user_companion_cost_balance
+       SET last_tip_at = NOW(), last_tip_reset_cost = cumulative_cost_usd
+       WHERE user_id = $1`,
+      [userId]
+    );
+  }
+}
+
+/**
+ * Get consumption summary for admin dashboard.
+ * @param {string} period - '7d', '30d', '90d', or 'all'
+ */
+async function getConsumptionSummary(period = '30d') {
+  const pool = getPool();
+  if (!pool) return null;
+
+  const interval = period === 'all' ? null
+    : period === '7d' ? '7 days'
+    : period === '90d' ? '90 days'
+    : '30 days';
+
+  const dateFilter = interval
+    ? `WHERE ac.created_at >= NOW() - INTERVAL '${interval}'`
+    : '';
+  const tipDateFilter = interval
+    ? `WHERE t.created_at >= NOW() - INTERVAL '${interval}'`
+    : '';
+
+  const { rows: [result] } = await pool.query(`
+    WITH consumption AS (
+      SELECT
+        ac.provider,
+        ac.model,
+        ac.call_type,
+        ac.companion_id,
+        SUM(ac.cost_usd) AS cost,
+        COUNT(*) AS calls,
+        SUM(ac.input_tokens + ac.output_tokens) AS tokens
+      FROM api_consumption ac
+      ${dateFilter}
+      GROUP BY ac.provider, ac.model, ac.call_type, ac.companion_id
+    ),
+    tip_totals AS (
+      SELECT
+        COALESCE(SUM(t.amount), 0) / 100.0 AS total_tips
+      FROM tips t
+      ${tipDateFilter}
+    ),
+    by_provider AS (
+      SELECT provider, SUM(cost) AS cost, SUM(calls) AS calls
+      FROM consumption
+      GROUP BY provider
+    ),
+    by_model AS (
+      SELECT model, provider, SUM(cost) AS cost, SUM(calls) AS calls, SUM(tokens) AS tokens
+      FROM consumption
+      GROUP BY model, provider
+    ),
+    by_companion AS (
+      SELECT
+        companion_id,
+        SUM(cost) AS cost,
+        SUM(calls) AS calls,
+        SUM(CASE WHEN call_type = 'chat' THEN cost ELSE 0 END) AS chat_cost,
+        SUM(CASE WHEN call_type = 'image' THEN cost ELSE 0 END) AS image_cost,
+        SUM(CASE WHEN call_type = 'video' THEN cost ELSE 0 END) AS video_cost
+      FROM consumption
+      WHERE companion_id IS NOT NULL
+      GROUP BY companion_id
+    )
+    SELECT
+      (SELECT COALESCE(SUM(cost), 0) FROM consumption) AS total_cost_usd,
+      (SELECT total_tips FROM tip_totals) AS total_tips,
+      (SELECT COALESCE(json_agg(json_build_object('provider', provider, 'cost', cost, 'calls', calls)), '[]') FROM by_provider) AS by_provider,
+      (SELECT COALESCE(json_agg(json_build_object('model', model, 'provider', provider, 'cost', cost, 'calls', calls, 'tokens', tokens)), '[]') FROM by_model) AS by_model,
+      (SELECT COALESCE(json_agg(json_build_object('companion_id', companion_id, 'cost', cost, 'calls', calls, 'chat_cost', chat_cost, 'image_cost', image_cost, 'video_cost', video_cost)), '[]') FROM by_companion) AS by_companion
+  `);
+
+  // Daily breakdown
+  const dailyDateFilter = interval
+    ? `WHERE created_at >= NOW() - INTERVAL '${interval}'`
+    : '';
+  const dailyTipFilter = interval
+    ? `WHERE created_at >= NOW() - INTERVAL '${interval}'`
+    : '';
+
+  const { rows: daily } = await pool.query(`
+    WITH daily_cost AS (
+      SELECT DATE(created_at) AS date, SUM(cost_usd) AS cost
+      FROM api_consumption
+      ${dailyDateFilter}
+      GROUP BY DATE(created_at)
+    ),
+    daily_tips AS (
+      SELECT DATE(created_at) AS date, SUM(amount) / 100.0 AS tips
+      FROM tips
+      ${dailyTipFilter}
+      GROUP BY DATE(created_at)
+    )
+    SELECT
+      COALESCE(dc.date, dt.date) AS date,
+      COALESCE(dc.cost, 0) AS cost,
+      COALESCE(dt.tips, 0) AS tips
+    FROM daily_cost dc
+    FULL OUTER JOIN daily_tips dt ON dc.date = dt.date
+    ORDER BY date DESC
+    LIMIT 90
+  `);
+
+  return {
+    totalCostUsd: parseFloat(result.total_cost_usd) || 0,
+    totalTips: parseFloat(result.total_tips) || 0,
+    byProvider: result.by_provider,
+    byModel: result.by_model,
+    byCompanion: result.by_companion,
+    daily,
+  };
+}
+
+module.exports = {
+  trackConsumption,
+  resetTipCounter,
+  getConsumptionSummary,
+};

@@ -153,6 +153,21 @@
       border-radius: 6px; color: var(--text2); cursor: pointer; font-size: 0.8rem;
     }
     .sentry-actions button:hover { border-color: var(--accent); color: var(--text); }
+
+    /* Economics period buttons */
+    .econ-period {
+      padding: 6px 14px; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 0.85rem;
+    }
+    .econ-period.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .profit { color: var(--success); }
+    .loss { color: var(--error); }
+
+    /* Economics settings inputs */
+    .econ-setting-input {
+      padding: 8px 12px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.9rem; width: 220px;
+    }
   </style>
 </head>
 <body>
@@ -178,6 +193,7 @@
       <button class="tab active" onclick="switchTab('visitors')">Visitors</button>
       <button class="tab" onclick="switchTab('leads')">Leads</button>
       <button class="tab" onclick="switchTab('settings')">Settings</button>
+      <button class="tab" onclick="switchTab('economics')">Economics</button>
       <button class="tab" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
     </div>
 
@@ -201,6 +217,35 @@
     <div id="tab-settings" class="tab-content">
       <h3 style="margin-bottom: 16px; color: var(--text2);">Content Levels by Platform</h3>
       <div id="settings-list"></div>
+    </div>
+
+    <!-- Economics Tab -->
+    <div id="tab-economics" class="tab-content">
+      <div style="display:flex;gap:8px;margin-bottom:20px;">
+        <button class="econ-period active" onclick="loadEconomics('7d', this)">7d</button>
+        <button class="econ-period" onclick="loadEconomics('30d', this)">30d</button>
+        <button class="econ-period" onclick="loadEconomics('90d', this)">90d</button>
+        <button class="econ-period" onclick="loadEconomics('all', this)">All</button>
+      </div>
+      <div class="stat-cards" id="econ-cards"></div>
+      <div class="breakdown-grid">
+        <div class="section">
+          <h3>By Companion</h3>
+          <div id="econ-companion-table"></div>
+        </div>
+        <div class="section">
+          <h3>By Model</h3>
+          <div id="econ-model-table"></div>
+        </div>
+      </div>
+      <div class="section" style="margin-top:24px;">
+        <h3>Daily Cost vs Tips</h3>
+        <div id="econ-daily-table"></div>
+      </div>
+      <div class="section" style="margin-top:24px;">
+        <h3>AI Settings</h3>
+        <div id="econ-settings"></div>
+      </div>
     </div>
 
     <!-- Sentry Tab -->
@@ -260,6 +305,7 @@
       event.target.closest('.tab').classList.add('active');
       document.getElementById('tab-' + name).classList.add('active');
       if (name === 'sentry') loadSentry();
+      if (name === 'economics') loadEconomics('7d');
     }
 
     // Stats
@@ -480,6 +526,138 @@
 
     function sentryAction(id, status) {
       apiPatch('/api/admin/sentry/issues/' + id, { status: status }).then(function() { loadSentry(); });
+    }
+
+    // Economics
+    var econPeriod = '7d';
+
+    function loadEconomics(period, btn) {
+      econPeriod = period || '7d';
+      // Update active button
+      document.querySelectorAll('.econ-period').forEach(function(b) { b.classList.remove('active'); });
+      if (btn) btn.classList.add('active');
+      else {
+        document.querySelectorAll('.econ-period').forEach(function(b) {
+          if (b.textContent.trim() === econPeriod) b.classList.add('active');
+        });
+      }
+
+      apiFetch('/api/admin/consumption/summary?period=' + econPeriod).then(function(data) {
+        var cost = parseFloat(data.totalCostUsd) || 0;
+        var tips = parseFloat(data.totalTips) || 0;
+        var margin = tips - cost;
+
+        document.getElementById('econ-cards').innerHTML =
+          card('API Cost', '$' + cost.toFixed(2)) +
+          card('Tips Revenue', '$' + tips.toFixed(2)) +
+          card('Net Margin', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>');
+
+        // Companion table
+        var companions = data.byCompanion || [];
+        if (companions.length) {
+          var html = '<table><tr><th>Companion</th><th>Chat</th><th>Image</th><th>Video</th><th>Total</th></tr>';
+          companions.forEach(function(c) {
+            var total = parseFloat(c.cost) || 0;
+            html += '<tr><td>' + esc(c.companion_id ? c.companion_id.slice(0, 8) + '...' : 'N/A') + '</td>' +
+              '<td>$' + (parseFloat(c.chat_cost) || 0).toFixed(3) + '</td>' +
+              '<td>$' + (parseFloat(c.image_cost) || 0).toFixed(3) + '</td>' +
+              '<td>$' + (parseFloat(c.video_cost) || 0).toFixed(3) + '</td>' +
+              '<td>$' + total.toFixed(3) + '</td></tr>';
+          });
+          html += '</table>';
+          document.getElementById('econ-companion-table').innerHTML = html;
+        } else {
+          document.getElementById('econ-companion-table').innerHTML = '<p style="color:var(--muted);padding:16px;">No consumption data yet</p>';
+        }
+
+        // Model table
+        var models = data.byModel || [];
+        if (models.length) {
+          var html = '<table><tr><th>Model</th><th>Provider</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr>';
+          models.forEach(function(m) {
+            html += '<tr><td>' + esc(m.model) + '</td>' +
+              '<td>' + esc(m.provider) + '</td>' +
+              '<td>' + (parseInt(m.calls) || 0) + '</td>' +
+              '<td>' + formatNumber(parseInt(m.tokens) || 0) + '</td>' +
+              '<td>$' + (parseFloat(m.cost) || 0).toFixed(3) + '</td></tr>';
+          });
+          html += '</table>';
+          document.getElementById('econ-model-table').innerHTML = html;
+        } else {
+          document.getElementById('econ-model-table').innerHTML = '<p style="color:var(--muted);padding:16px;">No consumption data yet</p>';
+        }
+
+        // Daily table
+        var daily = data.daily || [];
+        if (daily.length) {
+          var html = '<table><tr><th>Date</th><th>Cost</th><th>Tips</th><th>Net</th></tr>';
+          daily.slice(0, 30).forEach(function(d) {
+            var c = parseFloat(d.cost) || 0;
+            var t = parseFloat(d.tips) || 0;
+            var net = t - c;
+            html += '<tr><td>' + d.date + '</td>' +
+              '<td>$' + c.toFixed(2) + '</td>' +
+              '<td>$' + t.toFixed(2) + '</td>' +
+              '<td class="' + (net >= 0 ? 'profit' : 'loss') + '">$' + net.toFixed(2) + '</td></tr>';
+          });
+          html += '</table>';
+          document.getElementById('econ-daily-table').innerHTML = html;
+        } else {
+          document.getElementById('econ-daily-table').innerHTML = '<p style="color:var(--muted);padding:16px;">No data yet</p>';
+        }
+
+        // Load AI settings
+        loadEconSettings();
+      });
+    }
+
+    function loadEconSettings() {
+      apiFetch('/api/admin/settings').then(function(data) {
+        var settings = data.settings || {};
+        var ECON_SETTINGS = [
+          { key: 'tip_request_threshold_usd', label: 'Tip Request Threshold (USD)', desc: 'API cost before companion asks for a tip', type: 'number' },
+          { key: 'openrouter_model', label: 'OpenRouter Model', desc: 'Default chat model', type: 'text' },
+          { key: 'openrouter_fallback_model', label: 'OpenRouter Fallback Model', desc: 'Fallback if primary fails', type: 'text' },
+          { key: 'fal_image_model', label: 'fal.ai Image Model', desc: 'Default image generation model', type: 'text' },
+          { key: 'fal_video_model', label: 'fal.ai Video Model', desc: 'Default video generation model', type: 'text' },
+        ];
+
+        var html = '';
+        ECON_SETTINGS.forEach(function(def) {
+          var val = settings[def.key];
+          // Strip quotes from JSONB string values
+          if (typeof val === 'string') val = val.replace(/^"|"$/g, '');
+          val = val || '';
+          html += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
+            '<div style="display:flex;align-items:center;">' +
+            '<input type="' + def.type + '" class="econ-setting-input" value="' + esc(String(val)) + '" ' +
+            (def.type === 'number' ? 'step="0.01" min="0" style="width:100px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;text-align:center;" ' : '') +
+            'onchange="saveEconSetting(\'' + def.key + '\', this.value, \'' + def.type + '\', this)">' +
+            '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
+        });
+        document.getElementById('econ-settings').innerHTML = html;
+      });
+    }
+
+    function saveEconSetting(key, value, type, el) {
+      var v = type === 'number' ? value : value;
+      fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({ key: key, value: v })
+      }).then(function(r) {
+        if (r.ok) {
+          var msg = document.getElementById('msg-' + key);
+          msg.classList.add('show');
+          setTimeout(function() { msg.classList.remove('show'); }, 2000);
+        }
+      });
+    }
+
+    function formatNumber(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return n;
     }
 
     // Auto-login if token saved

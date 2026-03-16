@@ -182,6 +182,53 @@ const MIGRATIONS = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_telegram_users_user ON telegram_users(user_id);
     `,
   },
+  {
+    name: '010_api_consumption',
+    sql: `
+      CREATE TABLE IF NOT EXISTS api_consumption (
+        id            BIGSERIAL PRIMARY KEY,
+        user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        companion_id  UUID,
+        provider      TEXT NOT NULL,
+        model         TEXT NOT NULL,
+        call_type     TEXT NOT NULL,
+        input_tokens  INTEGER DEFAULT 0,
+        output_tokens INTEGER DEFAULT 0,
+        cost_usd      NUMERIC(10,6) NOT NULL,
+        metadata      JSONB DEFAULT '{}',
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_api_consumption_user ON api_consumption(user_id);
+      CREATE INDEX IF NOT EXISTS idx_api_consumption_companion ON api_consumption(companion_id) WHERE companion_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_api_consumption_created ON api_consumption(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_api_consumption_user_companion ON api_consumption(user_id, companion_id);
+    `,
+  },
+  {
+    name: '011_user_companion_cost_balance',
+    sql: `
+      CREATE TABLE IF NOT EXISTS user_companion_cost_balance (
+        user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        companion_id        UUID NOT NULL,
+        cumulative_cost_usd NUMERIC(10,6) NOT NULL DEFAULT 0,
+        last_tip_at         TIMESTAMPTZ,
+        last_tip_reset_cost NUMERIC(10,6) NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, companion_id)
+      );
+    `,
+  },
+  {
+    name: '012_consumption_settings',
+    sql: `
+      INSERT INTO app_settings (key, value) VALUES
+        ('tip_request_threshold_usd', '"2.00"'),
+        ('openrouter_model', '"venice/uncensored"'),
+        ('openrouter_fallback_model', '"meta-llama/llama-3.1-70b-instruct"'),
+        ('fal_image_model', '"fal-ai/flux-dev"'),
+        ('fal_video_model', '"fal-ai/wan-2.6"')
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
 ];
 
 async function migrate() {

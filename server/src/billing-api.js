@@ -59,7 +59,7 @@ router.post('/subscribe', authenticate, async (req, res) => {
 // -- POST /api/billing/tip --------------------------------
 router.post('/tip', authenticate, async (req, res) => {
   try {
-    const { amount } = req.body || {};
+    const { amount, companionId } = req.body || {};
     const amountCents = parseInt(amount, 10);
     if (!TIP_AMOUNTS.includes(amountCents)) {
       return res.status(400).json({ error: `Invalid amount. Use: ${TIP_AMOUNTS.join(', ')} (in cents)` });
@@ -69,7 +69,7 @@ router.post('/tip', authenticate, async (req, res) => {
     const { rows } = await pool.query('SELECT email FROM users WHERE id = $1', [req.userId]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
-    const session = await createTipCheckout(req.userId, amountCents, rows[0].email);
+    const session = await createTipCheckout(req.userId, amountCents, rows[0].email, companionId || null);
     res.json({ url: session.url });
   } catch (err) {
     console.error('[billing] tip error:', err.message);

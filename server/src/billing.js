@@ -5,6 +5,7 @@
  */
 
 const { getPool } = require('./db');
+const { resetTipCounter } = require('./consumption');
 
 let stripe = null;
 function getStripe() {
@@ -47,10 +48,13 @@ async function createSubscriptionCheckout(userId, plan, email) {
   return session;
 }
 
-async function createTipCheckout(userId, amount, email) {
+async function createTipCheckout(userId, amount, email, companionId) {
   const s = getStripe();
   if (!s) throw new Error('Stripe not configured');
   if (!TIP_AMOUNTS.includes(amount)) throw new Error(`Invalid tip amount: ${amount}`);
+
+  const metadata = { userId: String(userId), type: 'tip', amount: String(amount) };
+  if (companionId) metadata.companionId = String(companionId);
 
   const session = await s.checkout.sessions.create({
     mode: 'payment',
@@ -65,7 +69,7 @@ async function createTipCheckout(userId, amount, email) {
     }],
     success_url: `${SITE_URL}/my/?tip=success`,
     cancel_url: `${SITE_URL}/my/?tip=cancel`,
-    metadata: { userId: String(userId), type: 'tip', amount: String(amount) },
+    metadata,
   });
   return session;
 }
@@ -143,12 +147,15 @@ async function handleWebhook(rawBody, signature) {
 
       if (session.mode === 'payment' && session.metadata?.type === 'tip') {
         const amount = parseInt(session.metadata?.amount || '0', 10);
+        const tipCompanionId = session.metadata?.companionId || null;
         const paymentIntent = session.payment_intent;
         await pool.query(
           'INSERT INTO tips (user_id, amount, stripe_payment_id) VALUES ($1, $2, $3) ON CONFLICT (stripe_payment_id) DO NOTHING',
           [userId, amount, paymentIntent]
         );
-        console.log(`[billing] Tip received: user=${userId} amount=${amount}`);
+        // Reset tip cost counter so companion stops asking
+        try { await resetTipCounter(userId, tipCompanionId); } catch (e) { console.warn('[billing] resetTipCounter error:', e.message); }
+        console.log(`[billing] Tip received: user=${userId} amount=${amount} companion=${tipCompanionId || 'all'}`);
       }
       break;
     }

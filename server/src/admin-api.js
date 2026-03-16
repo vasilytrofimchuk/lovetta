@@ -5,6 +5,7 @@
 
 const { Router } = require('express');
 const { getPool } = require('./db');
+const { getConsumptionSummary } = require('./consumption');
 
 const router = Router();
 
@@ -183,6 +184,19 @@ router.put('/settings', async (req, res) => {
   } catch (err) {
     console.error('[admin] settings update error:', err.message);
     res.status(500).json({ error: 'Failed to update setting' });
+  }
+});
+
+// -- GET /api/admin/consumption/summary ----------------------
+router.get('/consumption/summary', async (req, res) => {
+  try {
+    const period = ['7d', '30d', '90d', 'all'].includes(req.query.period) ? req.query.period : '30d';
+    const summary = await getConsumptionSummary(period);
+    if (!summary) return res.json({ totalCostUsd: 0, totalTips: 0, byProvider: [], byModel: [], byCompanion: [], daily: [] });
+    res.json(summary);
+  } catch (err) {
+    console.error('[admin] consumption summary error:', err.message);
+    res.status(500).json({ error: 'Failed to load consumption summary' });
   }
 });
 
