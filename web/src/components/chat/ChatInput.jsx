@@ -1,14 +1,12 @@
 import { useState, useRef, useCallback } from 'react';
-
-const SpeechRecognition = typeof window !== 'undefined'
-  ? (window.SpeechRecognition || window.webkitSpeechRecognition)
-  : null;
+import api from '../../lib/api';
 
 export default function ChatInput({ onSend, disabled }) {
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const textareaRef = useRef(null);
-  const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
 
   function handleSend() {
     if (!text.trim() || disabled) return;
@@ -28,54 +26,65 @@ export default function ChatInput({ onSend, disabled }) {
 
   function handleInput(e) {
     setText(e.target.value);
-    // Auto-grow textarea
     const el = e.target;
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }
 
-  const toggleMic = useCallback(() => {
-    if (listening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setListening(false);
+  const toggleMic = useCallback(async () => {
+    // Stop recording
+    if (listening && mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
       return;
     }
 
-    if (!SpeechRecognition) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4',
+      });
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
+      chunksRef.current = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
 
-    recognition.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript || '';
-      if (transcript) {
-        setText(prev => prev ? prev + ' ' + transcript : transcript);
-      }
-      setListening(false);
-    };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        setListening(false);
 
-    recognition.onerror = () => {
-      setListening(false);
-    };
+        const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
+        if (blob.size < 100) return; // too short
 
-    recognition.onend = () => {
-      setListening(false);
-    };
+        try {
+          // Send to server for ElevenLabs STT
+          const arrayBuf = await blob.arrayBuffer();
+          const res = await api.post('/api/chat/stt', arrayBuf, {
+            headers: { 'Content-Type': mediaRecorder.mimeType },
+          });
+          const transcript = res.data?.text || '';
+          if (transcript.trim()) {
+            setText(prev => prev ? prev + ' ' + transcript.trim() : transcript.trim());
+          }
+        } catch (err) {
+          console.error('[stt]', err);
+        }
+      };
 
-    recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setListening(true);
+    } catch (err) {
+      console.error('[mic]', err);
+    }
   }, [listening]);
 
   const hasText = text.trim().length > 0;
-  const showMic = SpeechRecognition && !hasText && !disabled;
+  const hasMic = typeof navigator !== 'undefined' && navigator.mediaDevices;
 
   return (
     <div className="border-t border-brand-border bg-brand-bg px-4 py-3">
       <div className="max-w-md mx-auto flex items-end gap-2">
-        {/* Text input */}
         <textarea
           ref={textareaRef}
           value={text}
@@ -88,8 +97,8 @@ export default function ChatInput({ onSend, disabled }) {
           style={{ maxHeight: '120px' }}
         />
 
-        {/* Mic button (shown when no text) */}
-        {showMic ? (
+        {/* Mic button (no text) or Send button (has text) */}
+        {!hasText && hasMic && !disabled ? (
           <button
             onClick={toggleMic}
             className={`flex-shrink-0 p-2.5 rounded-full transition-colors ${
@@ -107,7 +116,6 @@ export default function ChatInput({ onSend, disabled }) {
             </svg>
           </button>
         ) : (
-          /* Send button (shown when text present) */
           <button
             onClick={handleSend}
             disabled={!hasText || disabled}

@@ -172,3 +172,10 @@
 - [x] Frontend: MessageBubble play button — speaker icon on assistant messages
 - [x] Frontend: ChatInput mic button — Web Speech API voice-to-text (Chrome/Edge/Safari)
 - [x] OPENAI_API_KEY added to .env
+
+## Anime Companion Templates
+- [x] Migration v9: Add `style` column to companion_templates and user_companions
+- [x] Migration v10: Seed 6 anime templates (Sakura, Yuki, Hana, Rei, Aiko, Mei)
+- [x] companion-api.js: Propagate `style` field when creating from template
+- [x] CompanionCreate.jsx: Section template grid into "Realistic" and "Anime" groups
+- [x] CompanionCreate.jsx: Remove 6 anime avatar URLs used for templates from CUSTOM_AVATARS

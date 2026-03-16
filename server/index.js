@@ -70,6 +70,25 @@ app.post('/api/webhooks/telegram', express.json(), async (req, res) => {
   }
 });
 
+// STT needs raw body — mount before express.json()
+app.post('/api/chat/stt',
+  express.raw({ type: ['audio/*', 'application/octet-stream'], limit: '10mb' }),
+  async (req, res) => {
+    try {
+      const { authenticate } = require('./src/auth-middleware');
+      await new Promise((resolve, reject) => authenticate(req, res, (err) => err ? reject(err) : resolve()));
+      const { transcribeSpeech } = require('./src/ai');
+      const ct = req.headers['content-type'] || 'audio/webm';
+      const ext = ct.includes('wav') ? 'wav' : ct.includes('mp4') ? 'mp4' : 'webm';
+      const { text } = await transcribeSpeech(req.body, `voice.${ext}`);
+      res.json({ text });
+    } catch (err) {
+      console.error('[stt] error:', err.message);
+      if (!res.headersSent) res.status(500).json({ error: 'Failed to transcribe' });
+    }
+  }
+);
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, '..', 'public')));

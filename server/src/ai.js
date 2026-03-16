@@ -11,7 +11,7 @@ const { uploadFromUrl } = require('./r2');
 
 const https = require('https');
 const OPENROUTER_API_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
-const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || '').trim();
+const ELEVENLABS_API_KEY = (process.env.ELEVENLABS_API_KEY || '').trim();
 const FAL_KEY = (process.env.FAL_KEY || '').trim();
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
@@ -473,38 +473,34 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
   return { url: videoUrl, cost: costUsd, ...consumptionResult };
 }
 
-// -- OpenAI TTS -----------------------------------------------
+// -- ElevenLabs TTS -------------------------------------------
 
-const TTS_COST_PER_CHAR = 0.000015; // $15 per 1M characters
+const TTS_COST_PER_CHAR = 0.00024; // ~$0.24 per 1K chars (Creator tier)
 
 /**
- * Generate speech audio from text via OpenAI TTS API.
- * @param {string} text - Text to convert to speech (max 4096 chars)
- * @param {string} voiceId - Voice name (nova, shimmer, alloy, echo, fable, onyx)
+ * Generate speech audio from text via ElevenLabs TTS API.
+ * Uses eleven_v3 model for audio tag support ([laughs], [giggles], etc.)
+ * @param {string} text - Text to convert to speech
+ * @param {string} voiceId - ElevenLabs voice ID
  * @returns {{ buffer: Buffer, costUsd: number }}
  */
-async function generateSpeech(text, voiceId = 'nova') {
-  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+async function generateSpeech(text, voiceId = 'cgSgspJ2msm6clMCkdW9') {
+  if (!ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not configured');
   if (!text || !text.trim()) throw new Error('Empty text for TTS');
 
-  // Truncate to OpenAI TTS limit
-  const input = text.slice(0, 4096);
-
   const body = JSON.stringify({
-    model: 'tts-1',
-    voice: voiceId,
-    input,
-    response_format: 'mp3',
+    text,
+    model_id: 'eleven_v3',
+    voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.4 },
   });
 
   const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
-    const url = new URL('https://api.openai.com/v1/audio/speech');
     const req = https.request({
-      hostname: url.hostname,
-      path: url.pathname,
+      hostname: 'api.elevenlabs.io',
+      path: `/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'xi-api-key': ELEVENLABS_API_KEY,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
       },
@@ -522,13 +518,65 @@ async function generateSpeech(text, voiceId = 'nova') {
 
   if (statusCode !== 200) {
     const errText = Buffer.concat(responseChunks).toString();
-    throw new Error(`OpenAI TTS ${statusCode}: ${errText}`);
+    throw new Error(`ElevenLabs TTS ${statusCode}: ${errText}`);
   }
 
   const buffer = Buffer.concat(responseChunks);
-  const costUsd = input.length * TTS_COST_PER_CHAR;
+  const costUsd = text.length * TTS_COST_PER_CHAR;
 
   return { buffer, costUsd };
+}
+
+/**
+ * Transcribe audio via ElevenLabs Speech-to-Text (Scribe v2).
+ * @param {Buffer} audioBuffer - Audio file buffer
+ * @param {string} fileName - Original filename
+ * @returns {{ text: string }}
+ */
+async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
+  if (!ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not configured');
+
+  const boundary = '----ELBoundary' + Date.now();
+  const parts = [];
+
+  // model_id field
+  parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="model_id"\r\n\r\nscribe_v2`);
+  // file field
+  parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n`);
+
+  const head = Buffer.from(parts.join('\r\n') + '\r\n', 'utf-8');
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
+  const body = Buffer.concat([head, audioBuffer, tail]);
+
+  const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.elevenlabs.io',
+      path: '/v1/speech-to-text',
+      method: 'POST',
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
+      },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve({ responseChunks: chunks, statusCode: res.statusCode }));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(new Error('STT request timeout')); });
+    req.write(body);
+    req.end();
+  });
+
+  if (statusCode !== 200) {
+    const errText = Buffer.concat(responseChunks).toString();
+    throw new Error(`ElevenLabs STT ${statusCode}: ${errText}`);
+  }
+
+  const result = JSON.parse(Buffer.concat(responseChunks).toString());
+  return { text: result.text || '' };
 }
 
 module.exports = {
@@ -537,6 +585,7 @@ module.exports = {
   generateImage,
   generateVideo,
   generateSpeech,
+  transcribeSpeech,
   getAISettings,
   buildSystemPrompt,
 };
