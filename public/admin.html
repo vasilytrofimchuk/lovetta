@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-K97R3YJFGW"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-K97R3YJFGW');
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lovetta Admin</title>
@@ -126,6 +134,25 @@
 
     .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 768px) { .breakdown-grid { grid-template-columns: 1fr; } }
+
+    /* Sentry issues */
+    .sentry-issue {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+      margin-bottom: 8px; padding: 12px 16px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--bg3);
+    }
+    .sentry-issue-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .sentry-issue-title.level-error { color: var(--error); }
+    .sentry-issue-title.level-warning { color: #d29922; }
+    .sentry-issue-title.level-info { color: var(--muted); }
+    .sentry-meta { font-size: 12px; color: var(--muted); }
+    .sentry-meta span { margin-right: 12px; }
+    .sentry-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .sentry-actions button {
+      padding: 6px 12px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text2); cursor: pointer; font-size: 0.8rem;
+    }
+    .sentry-actions button:hover { border-color: var(--accent); color: var(--text); }
   </style>
 </head>
 <body>
@@ -151,6 +178,7 @@
       <button class="tab active" onclick="switchTab('visitors')">Visitors</button>
       <button class="tab" onclick="switchTab('leads')">Leads</button>
       <button class="tab" onclick="switchTab('settings')">Settings</button>
+      <button class="tab" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
     </div>
 
     <!-- Visitors Tab -->
@@ -173,6 +201,11 @@
     <div id="tab-settings" class="tab-content">
       <h3 style="margin-bottom: 16px; color: var(--text2);">Content Levels by Platform</h3>
       <div id="settings-list"></div>
+    </div>
+
+    <!-- Sentry Tab -->
+    <div id="tab-sentry" class="tab-content">
+      <div id="sentry-content" style="font-size:14px;color:var(--muted);">Loading...</div>
     </div>
   </div>
 
@@ -217,14 +250,16 @@
       loadStats();
       loadLeads();
       loadSettings();
+      loadSentryBadge();
     }
 
     // Tabs
     function switchTab(name) {
       document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
       document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
-      event.target.classList.add('active');
+      event.target.closest('.tab').classList.add('active');
       document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'sentry') loadSentry();
     }
 
     // Stats
@@ -369,6 +404,82 @@
       var d = document.createElement('div');
       d.textContent = s;
       return d.innerHTML;
+    }
+
+    // Sentry
+    function apiFetch(url) {
+      return fetch(url, { headers: headers() }).then(function(r) { return r.json(); });
+    }
+    function apiPatch(url, body) {
+      return fetch(url, { method: 'PATCH', headers: headers(), body: JSON.stringify(body) }).then(function(r) { return r.json(); });
+    }
+
+    function loadSentryBadge() {
+      apiFetch('/api/admin/sentry/status').then(function(data) {
+        if (!data.configured) return;
+        apiFetch('/api/admin/sentry/issues?query=is:unresolved&limit=100').then(function(d) {
+          var issues = d.issues || [];
+          var badge = document.getElementById('sentry-badge');
+          var count = issues.length;
+          badge.textContent = count > 99 ? '99+' : count;
+          badge.style.display = count > 0 ? 'inline' : 'none';
+        });
+      });
+    }
+
+    function loadSentry() {
+      apiFetch('/api/admin/sentry/status').then(function(data) {
+        if (!data.configured) {
+          document.getElementById('sentry-content').innerHTML =
+            '<div style="padding:24px;color:var(--muted);">Sentry not configured. Set <code>SENTRY_AUTH_TOKEN</code>, <code>SENTRY_ORG_SLUG</code>, and <code>SENTRY_PROJECT_SLUG</code> env vars.</div>';
+          document.getElementById('sentry-badge').style.display = 'none';
+          return;
+        }
+        apiFetch('/api/admin/sentry/issues?query=is:unresolved&limit=50').then(function(d) {
+          var issues = d.issues || [];
+          var badge = document.getElementById('sentry-badge');
+          if (issues.length > 0) {
+            badge.style.display = 'inline';
+            badge.textContent = issues.length > 99 ? '99+' : issues.length;
+          } else {
+            badge.style.display = 'none';
+          }
+
+          if (!issues.length) {
+            document.getElementById('sentry-content').innerHTML =
+              '<div style="padding:24px;color:var(--muted);">No unresolved issues.</div>';
+            return;
+          }
+
+          var html = '';
+          for (var i = 0; i < issues.length; i++) {
+            var issue = issues[i];
+            var level = issue.level || 'error';
+            var levelClass = 'level-' + (level === 'warning' ? 'warning' : level === 'info' ? 'info' : 'error');
+            html += '<div class="sentry-issue">' +
+              '<div style="flex:1;min-width:0;">' +
+                '<div class="sentry-issue-title ' + levelClass + '">' + esc(issue.title) + '</div>' +
+                '<div class="sentry-meta">' +
+                  (issue.culprit ? '<span>' + esc(issue.culprit) + '</span>' : '') +
+                  '<span>Events: ' + (issue.count || 0) + '</span>' +
+                  '<span>Users: ' + (issue.userCount || 0) + '</span>' +
+                  '<span>First: ' + new Date(issue.firstSeen).toLocaleDateString() + '</span>' +
+                  '<span>Last: ' + new Date(issue.lastSeen).toLocaleDateString() + '</span>' +
+                '</div>' +
+              '</div>' +
+              '<div class="sentry-actions">' +
+                '<button onclick="sentryAction(\'' + issue.id + '\', \'resolved\')">Resolve</button>' +
+                '<button onclick="sentryAction(\'' + issue.id + '\', \'ignored\')">Ignore</button>' +
+              '</div>' +
+            '</div>';
+          }
+          document.getElementById('sentry-content').innerHTML = html;
+        });
+      });
+    }
+
+    function sentryAction(id, status) {
+      apiPatch('/api/admin/sentry/issues/' + id, { status: status }).then(function() { loadSentry(); });
     }
 
     // Auto-login if token saved

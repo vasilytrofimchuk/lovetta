@@ -6,6 +6,19 @@ if (process.env.NODE_ENV !== 'test') {
   } catch {}
 }
 
+// Sentry must initialize before other imports
+const Sentry = require('@sentry/node');
+const SENTRY_ENABLED = Boolean(process.env.SENTRY_DSN)
+  && (process.env.NODE_ENV === 'production' || process.env.SENTRY_ENABLE_NON_PROD === 'true');
+if (SENTRY_ENABLED) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 0.1,
+  });
+  console.log('[lovetta] Sentry initialized');
+}
+
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
@@ -44,6 +57,11 @@ app.get('/my/*', (req, res) => {
     res.status(404).send('App not built yet. Run: npm run build');
   }
 });
+
+// Sentry error handler (must be after all routes)
+if (SENTRY_ENABLED) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 // Start
 async function start() {

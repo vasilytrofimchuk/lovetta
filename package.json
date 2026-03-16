@@ -2,7 +2,9 @@
   "name": "lovetta",
   "version": "0.0.1",
   "private": true,
-  "workspaces": ["web"],
+  "workspaces": [
+    "web"
+  ],
   "scripts": {
     "start": "node server/index.js",
     "dev": "node scripts/run-dev.js",
@@ -15,6 +17,7 @@
     "test:e2e": "npx playwright test"
   },
   "dependencies": {
+    "@sentry/node": "^10.43.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "express": "^4.21.0",

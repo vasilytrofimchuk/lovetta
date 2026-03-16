@@ -4,7 +4,7 @@
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const SITE_URL = process.env.SITE_URL || 'http://localhost:3900';
-const FROM_EMAIL = 'Lovetta <noreply@lovetta.ai>';
+const FROM_EMAIL = 'Lovetta <hello@lovetta.ai>';
 
 async function sendEmail({ to, subject, html }) {
   if (!RESEND_API_KEY) {

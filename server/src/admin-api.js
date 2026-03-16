@@ -186,4 +186,67 @@ router.put('/settings', async (req, res) => {
   }
 });
 
+// -- Sentry ---------------------------------------------------
+const SENTRY_AUTH = process.env.SENTRY_AUTH_TOKEN;
+const SENTRY_ORG = process.env.SENTRY_ORG_SLUG;
+const SENTRY_PROJECT = process.env.SENTRY_PROJECT_SLUG;
+const SENTRY_API = 'https://sentry.io/api/0';
+
+// GET /api/admin/sentry/status
+router.get('/sentry/status', (req, res) => {
+  res.json({ configured: Boolean(SENTRY_AUTH && SENTRY_ORG && SENTRY_PROJECT) });
+});
+
+// GET /api/admin/sentry/issues
+router.get('/sentry/issues', async (req, res) => {
+  if (!SENTRY_AUTH || !SENTRY_ORG || !SENTRY_PROJECT) {
+    return res.json({ issues: [], configured: false });
+  }
+  try {
+    const query = req.query.query || 'is:unresolved';
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 25));
+    const r = await fetch(
+      `${SENTRY_API}/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/issues/?query=${encodeURIComponent(query)}&limit=${limit}&shortIdLookup=0&statsPeriod=14d`,
+      { headers: { Authorization: `Bearer ${SENTRY_AUTH}` } }
+    );
+    if (!r.ok) {
+      const err = await r.text();
+      return res.status(r.status).json({ error: `Sentry API: ${r.status} ${err}` });
+    }
+    const issues = await r.json();
+    res.json({ issues });
+  } catch (err) {
+    console.error('[admin] sentry issues error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/admin/sentry/issues/:id
+router.patch('/sentry/issues/:id', async (req, res) => {
+  if (!SENTRY_AUTH) return res.status(503).json({ error: 'Sentry not configured' });
+  try {
+    const { status } = req.body;
+    if (!['resolved', 'ignored', 'unresolved'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Use: resolved, ignored, unresolved' });
+    }
+    const r = await fetch(`${SENTRY_API}/issues/${req.params.id}/`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${SENTRY_AUTH}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    });
+    if (!r.ok) {
+      const err = await r.text();
+      return res.status(r.status).json({ error: `Sentry API: ${r.status} ${err}` });
+    }
+    const issue = await r.json();
+    res.json({ issue });
+  } catch (err) {
+    console.error('[admin] sentry issue update error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
