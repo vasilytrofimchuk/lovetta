@@ -9,6 +9,15 @@ export function useAuth() {
   return ctx
 }
 
+// Detect Telegram Mini App
+function getTelegramWebApp() {
+  try {
+    const tg = window.Telegram?.WebApp
+    if (tg?.initData) return tg
+  } catch {}
+  return null
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -33,7 +42,26 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    refreshUser()
+    const tgWebApp = getTelegramWebApp()
+
+    if (tgWebApp) {
+      // Telegram Mini App — auto-auth via initData
+      api.post('/api/auth/telegram', { initData: tgWebApp.initData })
+        .then(({ data }) => {
+          localStorage.setItem('lovetta-token', data.accessToken)
+          localStorage.setItem('lovetta-refresh-token', data.refreshToken)
+          setUser(data.user)
+          tgWebApp.ready?.()
+          tgWebApp.expand?.()
+        })
+        .catch(() => {
+          // Fallback to normal auth check
+          refreshUser()
+        })
+        .finally(() => setLoading(false))
+    } else {
+      refreshUser()
+    }
   }, [refreshUser])
 
   const login = async (email, password) => {
@@ -61,6 +89,10 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('lovetta-token')
     localStorage.removeItem('lovetta-refresh-token')
     setUser(null)
+
+    // If in Telegram, close the mini app
+    const tg = getTelegramWebApp()
+    if (tg) tg.close?.()
   }
 
   return (

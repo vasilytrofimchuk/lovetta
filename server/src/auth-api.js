@@ -479,4 +479,93 @@ router.get('/google/callback', async (req, res) => {
   }
 });
 
+// -- Telegram auth ----------------------------------------
+const { validateInitData, BOT_USERNAME } = require('./telegram');
+
+// POST /api/auth/telegram — validate Mini App initData, return tokens
+router.post('/telegram', authLimiter, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Service unavailable' });
+
+  try {
+    const { initData } = req.body || {};
+    if (!initData) {
+      return res.status(400).json({ error: 'initData is required' });
+    }
+
+    const tgUser = validateInitData(initData);
+    if (!tgUser) {
+      return res.status(401).json({ error: 'Invalid Telegram auth data' });
+    }
+
+    const telegramId = String(tgUser.id);
+    const displayName = [tgUser.firstName, tgUser.lastName].filter(Boolean).join(' ')
+      || tgUser.username
+      || `tg_${tgUser.id}`;
+
+    // Check if telegram user exists
+    const { rows: existingTg } = await pool.query(
+      'SELECT u.* FROM telegram_users tu JOIN users u ON u.id = tu.user_id WHERE tu.telegram_id = $1',
+      [telegramId]
+    );
+
+    let user;
+
+    if (existingTg.length > 0) {
+      user = existingTg[0];
+      // Update telegram info
+      pool.query(
+        'UPDATE telegram_users SET telegram_username = $2, telegram_first_name = $3, telegram_photo_url = $4 WHERE telegram_id = $1',
+        [telegramId, tgUser.username, tgUser.firstName, tgUser.photoUrl]
+      ).catch(() => {});
+    } else {
+      // Check if user has telegram_id in users table (legacy)
+      const { rows: existingById } = await pool.query(
+        'SELECT * FROM users WHERE telegram_id = $1', [telegramId]
+      );
+
+      if (existingById.length > 0) {
+        user = existingById[0];
+        // Create telegram_users record
+        await pool.query(
+          'INSERT INTO telegram_users (telegram_id, user_id, telegram_username, telegram_first_name, telegram_photo_url) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
+          [telegramId, user.id, tgUser.username, tgUser.firstName, tgUser.photoUrl]
+        );
+      } else {
+        // Create new user
+        const syntheticEmail = `tg_${tgUser.id}@telegram.lovetta.ai`;
+        const ip = req.ip || '';
+        const geo = await geoFromIp(ip).catch(() => ({}));
+
+        const { rows: [newUser] } = await pool.query(
+          `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
+                              terms_accepted, privacy_accepted, ip_address, country, city, user_agent, auth_provider)
+           VALUES ($1, $2, $3, $4, TRUE, 1, 2000, TRUE, TRUE, $5, $6, $7, $8, 'telegram')
+           RETURNING *`,
+          [syntheticEmail, telegramId, displayName, tgUser.photoUrl,
+           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
+        );
+        user = newUser;
+
+        // Create telegram_users record
+        await pool.query(
+          'INSERT INTO telegram_users (telegram_id, user_id, telegram_username, telegram_first_name, telegram_photo_url) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
+          [telegramId, user.id, tgUser.username, tgUser.firstName, tgUser.photoUrl]
+        );
+      }
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+    await storeRefreshToken(pool, user.id, refreshToken);
+
+    pool.query('UPDATE users SET last_activity = NOW() WHERE id = $1', [user.id]).catch(() => {});
+
+    res.json({ user: sanitizeUser(user), accessToken, refreshToken });
+  } catch (err) {
+    console.error('[auth] telegram error:', err.message);
+    res.status(500).json({ error: 'Telegram auth failed' });
+  }
+});
+
 module.exports = router;

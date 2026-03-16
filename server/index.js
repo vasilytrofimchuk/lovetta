@@ -50,6 +50,21 @@ app.post('/api/webhooks/stripe',
   }
 );
 
+// Telegram webhook (also needs raw/json body but after stripe raw handler)
+app.post('/api/webhooks/telegram', express.json(), async (req, res) => {
+  try {
+    const { handleBotUpdate, verifyWebhookSecret } = require('./src/telegram');
+    if (!verifyWebhookSecret(req)) {
+      return res.status(403).json({ error: 'Invalid secret' });
+    }
+    await handleBotUpdate(req.body);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[telegram-webhook]', err.message);
+    res.status(200).json({ ok: true }); // Always 200 to prevent Telegram retries
+  }
+});
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, '..', 'public')));

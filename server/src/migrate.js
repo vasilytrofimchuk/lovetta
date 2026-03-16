@@ -168,6 +168,20 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_tips_user ON tips(user_id);
     `,
   },
+  {
+    name: '009_telegram_users',
+    sql: `
+      CREATE TABLE IF NOT EXISTS telegram_users (
+        telegram_id BIGINT PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        telegram_username TEXT,
+        telegram_first_name TEXT,
+        telegram_photo_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_telegram_users_user ON telegram_users(user_id);
+    `,
+  },
 ];
 
 async function migrate() {

@@ -5,6 +5,7 @@ import { getErrorMessage } from '../lib/api'
 import AgeGate from '../components/AgeGate'
 import LegalPopup from '../components/LegalPopup'
 import GoogleSignIn from '../components/GoogleSignIn'
+import TelegramSignIn from '../components/TelegramSignIn'
 
 export default function Signup() {
   const { signup } = useAuth()
@@ -127,6 +128,9 @@ export default function Signup() {
         </form>
 
         <GoogleSignIn />
+        <div className="mt-3">
+          <TelegramSignIn />
+        </div>
 
         <div className="mt-6 text-center text-sm text-brand-text-secondary">
           Already have an account?{' '}
