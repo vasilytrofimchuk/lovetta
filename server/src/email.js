@@ -42,7 +42,7 @@ async function sendVerificationEmail(email, token) {
         <p style="color: #666; line-height: 1.6;">
           Click the button below to verify your email address.
         </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #e040a0; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #ec4899; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
           Verify Email
         </a>
         <p style="color: #999; font-size: 13px; margin-top: 24px;">
@@ -64,7 +64,7 @@ async function sendResetEmail(email, token) {
         <p style="color: #666; line-height: 1.6;">
           Click the button below to reset your password. This link expires in 1 hour.
         </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #e040a0; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #ec4899; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
           Reset Password
         </a>
         <p style="color: #999; font-size: 13px; margin-top: 24px;">

@@ -1,8 +1,38 @@
 # Claude Instructions for Lovetta.ai
 
-AI companion app — entertaining and intimate chat with AI-generated women companions. Domain: lovetta.ai
+AI girlfriend app — entertaining and intimate chat with AI-generated women. Domain: lovetta.ai
 
 Express.js server + PostgreSQL + monorepo (flat structure for Phase 1).
+
+### Brand & Style Guide
+
+**Accent color: `#d6336c` (hot pink).** Use this for ALL buttons, links, highlights, and interactive elements.
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--accent` / `brand-accent` | `#d6336c` | Buttons, links, active states |
+| `--accent-hover` / `brand-accent-hover` | `#e8437a` | Hover states |
+| `--accent-glow` | `rgba(214, 51, 108, 0.3)` | Glows, shadows |
+| `--bg-primary` / `brand-bg` | `#0f0a1a` | Page background |
+| `--bg-secondary` / `brand-surface` | `#1a1128` | Card/surface background |
+| `--bg-card` / `brand-card` | `#231838` | Elevated card background |
+| `--border` / `brand-border` | `#2d1f45` | Borders |
+| `--text-primary` / `brand-text` | `#f0e6ff` | Primary text |
+| `--text-secondary` / `brand-text-secondary` | `#b8a4d6` | Secondary text |
+| `--text-muted` / `brand-muted` | `#7c6a9a` | Muted/placeholder text |
+
+**Rules:**
+- Landing page (`public/`): use CSS variables (`var(--accent)`, etc.) from `style.css`
+- React app (`web/`): use Tailwind classes (`bg-brand-accent`, `text-brand-text`, etc.) from `tailwind.config.js`
+- Email templates (`server/src/email.js`): use raw hex `#d6336c`
+- **NEVER** use old colors `#e040a0` or `#f050b0` — these are deprecated
+- User-facing copy says "girlfriend" not "companion" (code variables/APIs keep "companion")
+- Slogan: "Your AI Girlfriend"
+
+**Brand assets:** Generated via `scripts/logo_editor.html` + `scripts/export_logos.js`
+- Font: Tangerine (400 weight, -3° slant)
+- Gradient: `#d6336c` → `#f43f5e` (hot pink)
+- Run `node scripts/export_logos.js` to regenerate all icons/logos
 
 ### Operator Preference (Mandatory)
 

@@ -55,7 +55,7 @@ export default function Home() {
             Welcome, {user?.display_name || user?.email}
           </p>
           <p className="text-brand-muted text-sm">
-            Your companions are coming soon. We're building something special for you.
+            Your girlfriends are coming soon. We're building something special for you.
           </p>
         </div>
 

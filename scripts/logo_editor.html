@@ -52,7 +52,7 @@
   .btn-row button:hover { background: linear-gradient(135deg, #f472b6, #c084fc); transform: translateY(-1px); }
   canvas { max-width: 90%; max-height: 90%; }
 </style>
-<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Dancing+Script:wght@700&family=Pacifico&family=Sacramento&family=Alex+Brush&family=Satisfy&family=Lobster&family=Kaushan+Script&family=Tangerine:wght@700&family=Allura&family=Cookie&family=Italianno&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Italianno&family=Tangerine:wght@400;700&family=Kaushan+Script&family=Dancing+Script:wght@400;700&family=Rouge+Script&family=Marck+Script&family=Niconne&family=Courgette&family=Petit+Formal+Script&family=Bilbo+Swash+Caps&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -63,50 +63,39 @@
   <h3>Presets</h3>
   <div class="presets" id="presetBtns"></div>
 
-  <h3>Text Logo</h3>
-  <label><span>Text</span><input type="text" id="text" value="Lovetta"></label>
+  <h3>Common</h3>
   <label><span>Font</span>
     <select id="fontFamily">
-      <option value="Great Vibes" selected>Great Vibes</option>
-      <option value="Dancing Script">Dancing Script</option>
-      <option value="Pacifico">Pacifico</option>
-      <option value="Sacramento">Sacramento</option>
-      <option value="Alex Brush">Alex Brush</option>
-      <option value="Satisfy">Satisfy</option>
-      <option value="Lobster">Lobster</option>
-      <option value="Kaushan Script">Kaushan Script</option>
-      <option value="Tangerine">Tangerine</option>
-      <option value="Allura">Allura</option>
-      <option value="Cookie">Cookie</option>
+      <option value="Tangerine" selected>Tangerine</option>
       <option value="Italianno">Italianno</option>
+      <option value="Kaushan Script">Kaushan Script</option>
+      <option value="Dancing Script">Dancing Script</option>
+      <option value="Rouge Script">Rouge Script</option>
+      <option value="Marck Script">Marck Script</option>
+      <option value="Niconne">Niconne</option>
+      <option value="Courgette">Courgette</option>
+      <option value="Petit Formal Script">Petit Formal Script</option>
+      <option value="Bilbo Swash Caps">Bilbo Swash Caps</option>
     </select>
   </label>
-  <label><span>Font Size</span><input type="number" id="fontSize" value="100" min="20" max="400"></label>
-  <label><span>Letter Spacing</span><input type="number" id="letterSpacing" value="2" min="-10" max="40"></label>
-
-  <h3>Colors</h3>
+  <label><span>Weight</span>
+    <select id="fontWeight">
+      <option value="400" selected>Regular (400)</option>
+      <option value="700">Bold (700)</option>
+    </select>
+  </label>
+  <label><span>Italic</span><div class="range-wrap"><input type="range" id="fontSlant" min="-15" max="15" value="-3"><span class="rv" id="fontSlantVal">-3°</span></div></label>
   <label><span>Color 1 (Start)</span><div class="color-pair"><input type="color" id="color1Pick" value="#f472b6"><input type="text" id="color1" value="#f472b6"></div></label>
   <label><span>Color 2 (End)</span><div class="color-pair"><input type="color" id="color2Pick" value="#a855f7"><input type="text" id="color2" value="#a855f7"></div></label>
   <label><span>Gradient Angle</span><div class="range-wrap"><input type="range" id="gradAngle" min="0" max="360" value="160"><span class="rv" id="gradAngleVal">160°</span></div></label>
   <label><span>Background</span><div class="color-pair"><input type="color" id="bgColorPick" value="#110c1e"><input type="text" id="bgColor" value="transparent"></div></label>
 
+  <h3>Text Logo</h3>
+  <label><span>Text</span><input type="text" id="text" value="Lovetta"></label>
+  <label><span>Font Size</span><input type="number" id="fontSize" value="100" min="20" max="400"></label>
+  <label><span>Letter Spacing</span><input type="number" id="letterSpacing" value="2" min="-10" max="40"></label>
+
   <h3>Icon — L</h3>
-  <label><span>Icon Font</span>
-    <select id="iconFont">
-      <option value="Great Vibes" selected>Great Vibes</option>
-      <option value="Dancing Script">Dancing Script</option>
-      <option value="Pacifico">Pacifico</option>
-      <option value="Sacramento">Sacramento</option>
-      <option value="Alex Brush">Alex Brush</option>
-      <option value="Satisfy">Satisfy</option>
-      <option value="Lobster">Lobster</option>
-      <option value="Kaushan Script">Kaushan Script</option>
-      <option value="Tangerine">Tangerine</option>
-      <option value="Allura">Allura</option>
-      <option value="Cookie">Cookie</option>
-      <option value="Italianno">Italianno</option>
-    </select>
-  </label>
   <label><span>L Size %</span><div class="range-wrap"><input type="range" id="iconFontSize" min="50" max="130" value="82"><span class="rv" id="iconFontSizeVal">82%</span></div></label>
   <label><span>L Offset X %</span><div class="range-wrap"><input type="range" id="iconOffX" min="-30" max="30" value="-2"><span class="rv" id="iconOffXVal">-2%</span></div></label>
   <label><span>L Offset Y %</span><div class="range-wrap"><input type="range" id="iconOffY" min="-30" max="30" value="5"><span class="rv" id="iconOffYVal">5%</span></div></label>
@@ -120,10 +109,10 @@
   <label><span>Icon BG Color</span><div class="color-pair"><input type="color" id="iconBgColorPick" value="#110c1e"><input type="text" id="iconBgColor" value="#110c1e"></div></label>
 
   <h3>Social Card</h3>
-  <label><span>Slogan</span><input type="text" id="socialSlogan" value="Your AI companion"></label>
-  <label><span>Slogan Size</span><input type="number" id="socialSloganSize" value="32" min="12" max="80"></label>
+  <label><span>Slogan</span><input type="text" id="socialSlogan" value="Your AI Girlfriend"></label>
+  <label><span>Logo Size</span><input type="number" id="socialLogoSize" value="240" min="40" max="400"></label>
+  <label><span>Slogan Size</span><input type="number" id="socialSloganSize" value="48" min="12" max="120"></label>
   <label><span>Slogan Color</span><div class="color-pair"><input type="color" id="socialSloganColorPick" value="#6b7280"><input type="text" id="socialSloganColor" value="#6b7280"></div></label>
-  <label><span>Card BG</span><div class="color-pair"><input type="color" id="socialBgColorPick" value="#110c1e"><input type="text" id="socialBgColor" value="#110c1e"></div></label>
 
   <h3>Layout</h3>
   <label><span>Padding X</span><input type="number" id="paddingX" value="60" min="0" max="200"></label>
@@ -165,6 +154,7 @@
 const PRESETS = {
   pink_purple: { color1:"#f472b6", color2:"#a855f7", bgColor:"transparent", gradAngle:160 },
   hot_pink:    { color1:"#ec4899", color2:"#f43f5e", bgColor:"#110a10", gradAngle:180 },
+  hot_pink_nb: { color1:"#ec4899", color2:"#f43f5e", bgColor:"transparent", gradAngle:180 },
   rose_gold:   { color1:"#fda4af", color2:"#d4a024", bgColor:"#0d0a08", gradAngle:150 },
   coral:       { color1:"#fb7185", color2:"#f97316", bgColor:"#110a08", gradAngle:170 },
   violet:      { color1:"#c084fc", color2:"#7c3aed", bgColor:"#0d0a14", gradAngle:160 },
@@ -206,8 +196,17 @@ function hexToRgba(hex, alpha) {
   return `rgba(${parseInt(h.substring(0,2),16)},${parseInt(h.substring(2,4),16)},${parseInt(h.substring(4,6),16)},${alpha})`;
 }
 
+// Common font string builder
+function getFont(sizePx) {
+  const family = getVal('fontFamily');
+  const weight = getVal('fontWeight');
+  return `${weight} ${sizePx}px "${family}", cursive`;
+}
+
+function getSlantDeg() { return getNum('fontSlant'); }
+
 // Sync color pickers
-['color1','color2','iconBgColor','socialSloganColor','socialBgColor'].forEach(id => {
+['color1','color2','iconBgColor','socialSloganColor'].forEach(id => {
   const pick = document.getElementById(id+'Pick');
   const txt = document.getElementById(id);
   if (!pick || !txt) return;
@@ -235,12 +234,12 @@ function updatePreviewBg() {
 }
 
 // Range display sync
-['gradAngle','iconFontSize','iconOffX','iconOffY','iconRadius'].forEach(id => {
+['gradAngle','fontSlant','iconFontSize','iconOffX','iconOffY','iconRadius'].forEach(id => {
   const el = document.getElementById(id);
   const valEl = document.getElementById(id+'Val');
   if (!el || !valEl) return;
   el.addEventListener('input', () => {
-    valEl.textContent = el.value + (id === 'gradAngle' ? '°' : '%');
+    valEl.textContent = el.value + (id === 'gradAngle' || id === 'fontSlant' ? '°' : '%');
     renderAll();
   });
 });
@@ -283,6 +282,15 @@ function drawTextWithSpacing(ctx, text, x, y, spacing) {
   }
 }
 
+// Apply slant via skew transform
+function applySlant(ctx) {
+  const deg = getSlantDeg();
+  if (deg !== 0) {
+    const rad = -deg * Math.PI / 180;
+    ctx.transform(1, 0, Math.tan(rad), 1, 0, 0);
+  }
+}
+
 function renderAll() { render(); renderIcon(); renderSocial(); }
 
 // ========== TEXT LOGO ==========
@@ -297,10 +305,10 @@ function render(forExport) {
   const spacing = getNum('letterSpacing');
   const padX = getNum('paddingX');
   const padY = getNum('paddingY');
-  const fontFamily = getVal('fontFamily');
   const angle = getNum('gradAngle');
+  const slant = Math.abs(getSlantDeg());
 
-  const font = `700 ${fontSize * scale}px "${fontFamily}", cursive`;
+  const font = getFont(fontSize * scale);
   ctx.font = font;
   ctx.textBaseline = 'alphabetic';
   const textW = measureTextWithSpacing(ctx, text, spacing * scale);
@@ -309,7 +317,9 @@ function render(forExport) {
   const textDesc = textMetrics.actualBoundingBoxDescent || fontSize * scale * 0.15;
   const textH = textAsc + textDesc;
 
-  const cw = Math.ceil(textW + padX * 2 * scale);
+  // Extra width for slant
+  const slantExtra = Math.tan(slant * Math.PI / 180) * textH;
+  const cw = Math.ceil(textW + slantExtra + padX * 2 * scale);
   const ch = Math.ceil(textH + padY * 2 * scale);
   canvas.width = cw;
   canvas.height = ch;
@@ -331,6 +341,10 @@ function render(forExport) {
   ctx.save();
   ctx.font = font;
   ctx.textBaseline = 'alphabetic';
+  // Apply slant around text center
+  ctx.translate(cw / 2, ch / 2);
+  applySlant(ctx);
+  ctx.translate(-cw / 2, -ch / 2);
   const rad = (angle - 90) * Math.PI / 180;
   const len = Math.max(cw, ch) * 0.7;
   const cx = cw / 2, cy = ch / 2;
@@ -352,7 +366,6 @@ function renderIconToCanvas(canvas, size) {
   canvas.height = size;
   ctx.clearRect(0, 0, size, size);
 
-  const fontFamily = getVal('iconFont');
   const fontSizePct = getNum('iconFontSize') / 100;
   const offXPct = getNum('iconOffX') / 100;
   const offYPct = getNum('iconOffY') / 100;
@@ -373,9 +386,9 @@ function renderIconToCanvas(canvas, size) {
   ctx.roundRect(0, 0, size, size, radius);
   ctx.clip();
 
-  // Draw L
+  // Draw L with slant
   const fs = size * fontSizePct;
-  ctx.font = `700 ${fs}px "${fontFamily}", cursive`;
+  ctx.font = getFont(fs);
   ctx.textBaseline = 'alphabetic';
   const metrics = ctx.measureText('L');
   const tw = metrics.width;
@@ -384,6 +397,10 @@ function renderIconToCanvas(canvas, size) {
   const th = ta + td;
   const x = (size - tw) / 2 + size * offXPct;
   const y = (size - th) / 2 + ta + size * offYPct;
+
+  ctx.translate(size / 2, size / 2);
+  applySlant(ctx);
+  ctx.translate(-size / 2, -size / 2);
 
   ctx.fillStyle = gradientFromAngle(ctx, size, angle);
   ctx.fillText('L', x, y);
@@ -413,34 +430,23 @@ function renderSocial(forExport) {
     canvas.style.height = (H * 0.5) + 'px';
   }
 
-  ctx.fillStyle = getVal('socialBgColor');
+  const bgColor = getVal('bgColor');
+  ctx.fillStyle = (bgColor && bgColor !== 'transparent') ? bgColor : getVal('iconBgColor');
   ctx.fillRect(0, 0, W * scale, H * scale);
 
   const text = getVal('text');
   const slogan = getVal('socialSlogan');
-  const fontFamily = getVal('fontFamily');
   const angle = getNum('gradAngle');
 
-  // Draw L icon
-  const iconSize = 180 * scale;
-  const iconCanvas = document.createElement('canvas');
-  renderIconToCanvas(iconCanvas, iconSize);
-
-  // Logo text
-  const logoFontSize = 72 * scale;
-  ctx.font = `700 ${logoFontSize}px "${fontFamily}", cursive`;
+  // Logo text centered
+  const logoFontSize = getNum('socialLogoSize') * scale;
+  ctx.font = getFont(logoFontSize);
   ctx.textBaseline = 'middle';
-  const textW = ctx.measureText(text).width;
-  const gap = 20 * scale;
-  const totalW = iconSize + gap + textW;
-  const startX = (W * scale - totalW) / 2;
   const centerY = H * scale / 2;
   const sloganFontSize = getNum('socialSloganSize') * scale;
   const sloganGap = 24 * scale;
 
   const groupY = slogan ? centerY - sloganFontSize / 2 : centerY;
-
-  ctx.drawImage(iconCanvas, startX, groupY - iconSize / 2);
 
   const rad = (angle - 90) * Math.PI / 180;
   const len = W * scale * 0.5;
@@ -449,9 +455,15 @@ function renderSocial(forExport) {
     gcx - Math.cos(rad) * len, 0,
     gcx + Math.cos(rad) * len, H * scale
   );
-  ctx.font = `700 ${logoFontSize}px "${fontFamily}", cursive`;
+
+  ctx.save();
+  ctx.font = getFont(logoFontSize);
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, startX + iconSize + gap, groupY);
+  ctx.textAlign = 'center';
+  ctx.translate(W * scale / 2, groupY);
+  applySlant(ctx);
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
 
   if (slogan) {
     ctx.save();
@@ -459,7 +471,7 @@ function renderSocial(forExport) {
     ctx.textBaseline = 'top';
     ctx.textAlign = 'center';
     ctx.fillStyle = getVal('socialSloganColor');
-    ctx.fillText(slogan, W * scale / 2, groupY + iconSize / 2 + sloganGap);
+    ctx.fillText(slogan, W * scale / 2, groupY + logoFontSize * 0.6 + sloganGap);
     ctx.restore();
   }
 
@@ -496,33 +508,24 @@ document.getElementById('downloadSocialBtn').addEventListener('click', () => {
 
 // ========== COMPARE ALL ==========
 document.getElementById('compareAllBtn').addEventListener('click', () => {
-  const fonts = [
-    'Great Vibes', 'Dancing Script', 'Pacifico', 'Sacramento', 'Alex Brush',
-    'Satisfy', 'Lobster', 'Kaushan Script', 'Tangerine', 'Allura', 'Cookie', 'Italianno'
-  ];
-  const origLogoFont = getVal('fontFamily');
-  const origIconFont = getVal('iconFont');
+  const fonts = ['Italianno', 'Tangerine', 'Kaushan Script', 'Dancing Script', 'Rouge Script', 'Marck Script', 'Niconne', 'Courgette', 'Petit Formal Script', 'Bilbo Swash Caps'];
+  const origFont = getVal('fontFamily');
 
   const allLogos = {};
   const allIcons = {};
 
   fonts.forEach(font => {
-    // Render logo with this font
     document.getElementById('fontFamily').value = font;
     const lc = render(true);
     const scale = getNum('scale') || 3;
     allLogos[font] = { src: lc.toDataURL('image/png'), w: Math.round(lc.width / scale), h: Math.round(lc.height / scale) };
 
-    // Render icon with this font
-    document.getElementById('iconFont').value = font;
     const ic = document.createElement('canvas');
     renderIconToCanvas(ic, 128);
     allIcons[font] = ic.toDataURL('image/png');
   });
 
-  // Restore
-  document.getElementById('fontFamily').value = origLogoFont;
-  document.getElementById('iconFont').value = origIconFont;
+  document.getElementById('fontFamily').value = origFont;
   renderAll();
 
   const bg = getVal('iconBgColor') || '#110c1e';
@@ -552,23 +555,24 @@ h1{color:#e84393;font-size:18px;margin-bottom:16px;letter-spacing:2px;}
 });
 
 // Force-load fonts
-const fontList = ['Great Vibes','Dancing Script','Pacifico','Sacramento','Alex Brush','Satisfy','Lobster','Kaushan Script','Tangerine','Allura','Cookie','Italianno'];
+const fontList = ['Italianno','Tangerine','Kaushan Script','Dancing Script','Rouge Script','Marck Script','Niconne','Courgette','Petit Formal Script','Bilbo Swash Caps'];
 const loader = document.createElement('div');
 loader.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;';
 fontList.forEach(f => {
-  const span = document.createElement('span');
-  span.style.fontFamily = '"' + f + '", cursive';
-  span.style.fontWeight = '700';
-  span.style.fontSize = '48px';
-  span.textContent = 'L Lovetta test';
-  loader.appendChild(span);
+  ['400','700'].forEach(wt => {
+    const span = document.createElement('span');
+    span.style.fontFamily = '"' + f + '", cursive';
+    span.style.fontWeight = wt;
+    span.style.fontSize = '48px';
+    span.textContent = 'L Lovetta test';
+    loader.appendChild(span);
+  });
 });
 document.body.appendChild(loader);
 
-document.fonts.ready.then(() => { applyPreset(PRESETS['pink_purple']); });
-setTimeout(renderAll, 300);
-setTimeout(renderAll, 1000);
-setTimeout(renderAll, 2500);
+document.fonts.ready.then(() => {
+  applyPreset(PRESETS['hot_pink']);
+});
 </script>
 </body>
 </html>

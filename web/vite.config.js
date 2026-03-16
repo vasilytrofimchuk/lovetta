@@ -18,6 +18,10 @@ export default defineConfig({
         target: 'http://localhost:3900',
         changeOrigin: true,
       },
+      '/assets': {
+        target: 'http://localhost:3900',
+        changeOrigin: true,
+      },
     },
   },
 })
