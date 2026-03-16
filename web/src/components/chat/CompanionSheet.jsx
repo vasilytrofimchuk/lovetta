@@ -135,6 +135,20 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate 
           </svg>
         </button>
 
+        {/* Edit button — top right */}
+        {!editing && (
+          <button
+            onClick={startEdit}
+            className="absolute top-5 right-5 p-2 rounded-lg text-brand-muted hover:text-brand-accent hover:bg-brand-surface transition-colors"
+            title="Edit"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
+        )}
+
         {/* Avatar + Name + Age */}
         <div className="flex flex-col items-center mb-4">
           {companion.avatar_url ? (
@@ -232,12 +246,8 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate 
 
             {/* Personality + Voice (view) */}
             <div className="mb-4 rounded-xl bg-brand-surface/50 border border-brand-border p-3">
-              <div className="flex items-center justify-between mb-1">
+              <div className="mb-1">
                 <span className="text-xs text-brand-muted">Personality</span>
-                <button onClick={startEdit}
-                  className="text-xs text-brand-accent hover:text-brand-accent-hover transition-colors">
-                  Edit
-                </button>
               </div>
               <p className="text-sm text-brand-text-secondary leading-relaxed">
                 {companion.personality || 'No personality set'}
