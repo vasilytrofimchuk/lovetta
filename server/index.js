@@ -26,7 +26,7 @@ const path = require('path');
 const fs = require('fs');
 const { migrate } = require('./src/migrate');
 const trackingApi = require('./src/tracking-api');
-const leadsApi = require('./src/leads-api');
+
 const adminApi = require('./src/admin-api');
 const authApi = require('./src/auth-api');
 const billingApi = require('./src/billing-api');
@@ -100,7 +100,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // API routes
 app.use('/api', trackingApi);
-app.use('/api', leadsApi);
+
 app.use('/api/auth', authApi);
 app.use('/api/billing', billingApi);
 app.use('/api/admin', adminApi);

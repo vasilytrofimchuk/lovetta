@@ -123,6 +123,7 @@ export default function ChatPage() {
         mediaLoadingType={mediaLoadingType}
         showMediaButton={showMediaButton}
         onRequestMedia={handleRequestMedia}
+        companionAvatarUrl={companion?.avatar_url}
       />
 
       {/* Error banner */}

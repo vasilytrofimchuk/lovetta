@@ -515,6 +515,17 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_companion_emails_created ON companion_emails(created_at DESC);
     `,
   },
+  {
+    name: 'v18_drop_leads',
+    sql: `DROP TABLE IF EXISTS leads CASCADE;`,
+  },
+  {
+    name: 'v19_update_ai_models',
+    sql: `
+      UPDATE app_settings SET value = '"sao10k/l3.3-euryale-70b"' WHERE key = 'openrouter_model';
+      UPDATE app_settings SET value = '"thedrummer/rocinante-12b"' WHERE key = 'openrouter_fallback_model';
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

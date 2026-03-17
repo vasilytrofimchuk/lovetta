@@ -225,3 +225,44 @@
 - [x] ChatPage.jsx: wire up media props from useChat to MessageList
 - [ ] Verify media generation + reuse in dev
 - [ ] Verify video generation flow
+
+## Landing Page Overhaul + Structured Signup
+
+### Remove Waitlist/Leads Infrastructure
+- [x] Delete server/src/leads-api.js
+- [x] Remove leads route from server/index.js
+- [x] Remove leads endpoint and stats from admin-api.js
+- [x] Remove Leads tab/section/functions from admin.html
+- [x] Delete e2e/leads.test.js, remove from playwright.config.js
+- [x] Remove leads from e2e/global-teardown.js
+- [x] Remove leads-related admin test cases
+- [x] Add migration v18_drop_leads to drop table
+
+### Landing Page Updates
+- [x] Replace "Join Waitlist" with "Start Free Trial"
+- [x] Update hero text (remove "3 girlfriends" limit)
+- [x] Add template carousel with auto-scroll animation
+- [x] Update "Generated Images" feature to "Photos & Videos"
+- [x] Add 3 checkboxes (Terms, Privacy, AI consent) instead of 1
+- [x] Save form data to localStorage, redirect to /my/signup
+- [x] Add carousel CSS styles
+
+### Public Template Preview API
+- [x] Add GET /api/companions/templates/preview (no auth required)
+
+### Structured Signup Flow
+- [x] Signup.jsx reads pre-filled data from localStorage (from=landing)
+- [x] Skip LegalPopup when consents already given on landing
+- [x] GoogleSignIn passes age/consent via base64 state param
+- [x] Signup.jsx passes birthData to GoogleSignIn
+
+### Fix OAuth Age/Consent Bypass
+- [x] Google OAuth: forward state param, decode in callback, use real birth date
+- [x] Google OAuth: redirect new users without age data to /my/signup
+- [x] Telegram auth: accept birthMonth/birthYear/consents in POST body
+- [x] Telegram auth: require age/consent for new users (return age_consent_required)
+- [x] AuthContext: pass landing data with Telegram initData
+- [x] AuthContext: handle age_consent_required error → redirect to signup
+
+### Demo Test Update
+- [x] Update demo-landing.test.js for 3 checkboxes

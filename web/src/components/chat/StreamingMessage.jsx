@@ -9,7 +9,7 @@ function formatActions(text) {
   });
 }
 
-export default function StreamingMessage({ text, mediaLoading, mediaLoadingType }) {
+export default function StreamingMessage({ text, mediaLoading, mediaLoadingType, avatarUrl }) {
   // Parse leading scene and context
   let sceneText = null;
   let contextText = null;
@@ -40,6 +40,30 @@ export default function StreamingMessage({ text, mediaLoading, mediaLoadingType 
             *{contextText}*
           </div>
         )}
+
+        {/* Blurred avatar placeholder while media generates */}
+        {mediaLoading && (
+          <div className="mb-2 relative w-[280px] aspect-[3/4] rounded-xl overflow-hidden bg-brand-surface">
+            {avatarUrl && (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: 'blur(28px) saturate(1.3) brightness(1.1)', transform: 'scale(1.15)' }}
+              />
+            )}
+            {/* Dark overlay so text is readable */}
+            <div className="absolute inset-0 bg-black/30" />
+            {/* Centered spinner + text */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <div className="w-10 h-10 border-3 border-white/30 border-t-white/90 rounded-full animate-spin" />
+              <span className="text-white text-sm font-medium drop-shadow-lg">
+                {mediaLoadingType === 'video' ? 'Sending video...' : 'Sending photo...'}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="px-4 py-2.5 rounded-2xl rounded-bl-md bg-brand-card border border-brand-border text-brand-text text-[15px] leading-relaxed whitespace-pre-wrap break-words">
           {content ? (
             <>
@@ -54,14 +78,6 @@ export default function StreamingMessage({ text, mediaLoading, mediaLoadingType 
             </span>
           )}
         </div>
-        {mediaLoading && (
-          <div className="mt-2 flex items-center gap-1.5 text-brand-muted text-xs px-1">
-            <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-            </svg>
-            <span>Sending {mediaLoadingType === 'video' ? 'video' : 'photo'}...</span>
-          </div>
-        )}
       </div>
     </div>
   );

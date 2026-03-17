@@ -46,15 +46,36 @@ export function AuthProvider({ children }) {
 
     if (tgWebApp) {
       // Telegram Mini App — auto-auth via initData
-      api.post('/api/auth/telegram', { initData: tgWebApp.initData })
+      // Include age/consent data from landing page if available
+      const payload = { initData: tgWebApp.initData }
+      try {
+        const raw = localStorage.getItem('lovetta-landing-data')
+        if (raw) {
+          const ld = JSON.parse(raw)
+          if (ld.birthMonth) payload.birthMonth = ld.birthMonth
+          if (ld.birthYear) payload.birthYear = ld.birthYear
+          if (ld.termsAccepted) payload.termsAccepted = ld.termsAccepted
+          if (ld.privacyAccepted) payload.privacyAccepted = ld.privacyAccepted
+          if (ld.aiConsentAccepted) payload.aiConsentAccepted = ld.aiConsentAccepted
+        }
+      } catch {}
+
+      api.post('/api/auth/telegram', payload)
         .then(({ data }) => {
           localStorage.setItem('lovetta-token', data.accessToken)
           localStorage.setItem('lovetta-refresh-token', data.refreshToken)
+          localStorage.removeItem('lovetta-landing-data')
           setUser(data.user)
           tgWebApp.ready?.()
           tgWebApp.expand?.()
         })
-        .catch(() => {
+        .catch((err) => {
+          // If age/consent required, redirect to signup
+          const errMsg = err?.response?.data?.error
+          if (errMsg === 'age_consent_required') {
+            window.location.href = '/my/signup?from=telegram'
+            return
+          }
           // Fallback to normal auth check
           refreshUser()
         })

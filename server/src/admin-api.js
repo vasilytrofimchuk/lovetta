@@ -26,7 +26,7 @@ router.use(requireAdmin);
 // -- GET /api/admin/stats ---------------------------------
 router.get('/stats', async (req, res) => {
   const pool = getPool();
-  if (!pool) return res.json({ visitors: {}, leads: {} });
+  if (!pool) return res.json({ visitors: {} });
 
   try {
     const { rows: [stats] } = await pool.query(`
@@ -37,13 +37,6 @@ router.get('/stats', async (req, res) => {
             COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS today,
             COUNT(*) FILTER (WHERE last_activity >= NOW() - INTERVAL '15 minutes') AS active
           FROM visitors
-        ),
-        lead_stats AS (
-          SELECT
-            COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS today,
-            COUNT(DISTINCT LOWER(email)) AS unique_emails
-          FROM leads
         ),
         countries AS (
           SELECT country, COUNT(*) AS count FROM visitors
@@ -92,7 +85,6 @@ router.get('/stats', async (req, res) => {
         )
       SELECT
         (SELECT row_to_json(visitor_stats) FROM visitor_stats) AS visitors,
-        (SELECT row_to_json(lead_stats) FROM lead_stats) AS leads,
         (SELECT row_to_json(user_stats) FROM user_stats) AS users,
         (SELECT COALESCE(json_agg(countries), '[]') FROM countries) AS countries,
         (SELECT COALESCE(json_agg(cities), '[]') FROM cities) AS cities,
@@ -185,48 +177,6 @@ router.get('/users', async (req, res) => {
   } catch (err) {
     console.error('[admin] users error:', err.message);
     res.status(500).json({ error: 'Failed to load users' });
-  }
-});
-
-// -- GET /api/admin/leads ---------------------------------
-router.get('/leads', async (req, res) => {
-  const pool = getPool();
-  if (!pool) return res.json({ leads: [], total: 0 });
-
-  try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
-    const offset = (page - 1) * limit;
-    const search = (req.query.search || '').trim().toLowerCase();
-
-    let where = '';
-    const params = [];
-
-    if (search) {
-      params.push(`%${search}%`);
-      where = `WHERE LOWER(email) LIKE $1`;
-    }
-
-    const countQuery = `SELECT COUNT(*) AS total FROM leads ${where}`;
-    const dataQuery = `SELECT id, email, birth_month, birth_year, source, utm_source, utm_medium, utm_campaign, country, city, created_at
-      FROM leads ${where}
-      ORDER BY created_at DESC
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-
-    const [countResult, dataResult] = await Promise.all([
-      pool.query(countQuery, params),
-      pool.query(dataQuery, [...params, limit, offset]),
-    ]);
-
-    res.json({
-      leads: dataResult.rows,
-      total: parseInt(countResult.rows[0].total, 10),
-      page,
-      limit,
-    });
-  } catch (err) {
-    console.error('[admin] leads error:', err.message);
-    res.status(500).json({ error: 'Failed to load leads' });
   }
 });
 

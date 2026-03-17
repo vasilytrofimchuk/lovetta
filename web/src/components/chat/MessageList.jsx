@@ -3,7 +3,7 @@ import MessageBubble from './MessageBubble';
 import StreamingMessage from './StreamingMessage';
 import TipPromoMessage from './TipPromoMessage';
 
-export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, companionId, mediaLoading, mediaLoadingType, showMediaButton, onRequestMedia }) {
+export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, companionId, mediaLoading, mediaLoadingType, showMediaButton, onRequestMedia, companionAvatarUrl }) {
   const bottomRef = useRef(null);
   const containerRef = useRef(null);
   const sentinelRef = useRef(null);
@@ -62,7 +62,7 @@ export default function MessageList({ messages, streaming, streamingText, hasMor
         )}
 
         {/* Streaming indicator */}
-        {streaming && <StreamingMessage text={streamingText} mediaLoading={mediaLoading} mediaLoadingType={mediaLoadingType} />}
+        {streaming && <StreamingMessage text={streamingText} mediaLoading={mediaLoading} mediaLoadingType={mediaLoadingType} avatarUrl={companionAvatarUrl} />}
 
         <div ref={bottomRef} />
       </div>

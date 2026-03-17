@@ -14,44 +14,7 @@ test.describe('Admin API', () => {
     expect(res.ok()).toBeTruthy();
     const data = await res.json();
     expect(data.visitors).toBeDefined();
-    expect(data.leads).toBeDefined();
     expect(data.countries).toBeDefined();
-  });
-
-  test('GET /api/admin/leads returns paginated list', async ({ request }) => {
-    // Create a lead first
-    await request.post(`${BASE}/api/leads`, {
-      data: {
-        email: `admin_test_${Date.now()}@example.com`,
-        birthMonth: 1,
-        birthYear: 1990,
-      },
-    });
-
-    const res = await request.get(`${BASE}/api/admin/leads?page=1&limit=10`, {
-      headers: adminHeaders(),
-    });
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data.leads).toBeDefined();
-    expect(Array.isArray(data.leads)).toBe(true);
-    expect(data.total).toBeGreaterThan(0);
-    expect(data.page).toBe(1);
-  });
-
-  test('GET /api/admin/leads supports search', async ({ request }) => {
-    const unique = `searchtest_${Date.now()}@example.com`;
-    await request.post(`${BASE}/api/leads`, {
-      data: { email: unique, birthMonth: 5, birthYear: 1992 },
-    });
-
-    const res = await request.get(`${BASE}/api/admin/leads?search=searchtest`, {
-      headers: adminHeaders(),
-    });
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data.leads.length).toBeGreaterThan(0);
-    expect(data.leads[0].email).toContain('searchtest');
   });
 
   test('GET /api/admin/settings returns settings', async ({ request }) => {

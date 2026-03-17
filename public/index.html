@@ -49,7 +49,12 @@
 
     <section class="hero">
       <h1>Meet Your AI Girlfriend</h1>
-      <p>She remembers everything, adapts to you, and is always there when you need her. Create up to 3 unique girlfriends with their own personality and style.</p>
+      <p>She remembers everything, adapts to you, and is always there when you need her. Choose your girlfriends or create your own.</p>
+    </section>
+
+    <!-- Template carousel -->
+    <section class="carousel-section" id="carousel-section">
+      <div class="carousel-viewport" id="carousel-viewport"></div>
     </section>
 
     <section class="features">
@@ -61,12 +66,12 @@
       <div class="feature">
         <div class="feature-icon">🎭</div>
         <h3>Unique Personality</h3>
-        <p>Choose from 20+ personalities or create your own. Each girlfriend is one of a kind.</p>
+        <p>Choose from diverse personalities or create your own. Each girlfriend is one of a kind.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">📸</div>
-        <h3>Generated Images</h3>
-        <p>She can send you photos. AI-generated and consistent with her character.</p>
+        <h3>Photos & Videos</h3>
+        <p>She can send you photos and videos. AI-generated and consistent with her character.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">🔔</div>
@@ -77,8 +82,14 @@
 
     <section class="signup-section">
       <div class="signup-card">
-        <h2>Join the Waitlist</h2>
-        <p class="subtitle">Be the first to meet your girlfriend. We'll reach out when your spot is ready.</p>
+        <h2>Start Free Trial</h2>
+        <p class="subtitle">Create your account and meet your girlfriend in minutes.</p>
+
+        <div class="trial-info">
+          <div class="trial-badge">3 days free</div>
+          <p>Then $19.99/mo or $99.99/yr <span class="save-tag">save 58%</span></p>
+          <p class="trial-note">Cancel anytime during trial — no charge.</p>
+        </div>
 
         <form id="signup-form">
           <div class="form-group">
@@ -115,15 +126,22 @@
 
           <div class="checkbox-group">
             <input type="checkbox" id="agree-terms" required>
-            <label for="agree-terms">I agree to the <a href="/privacy.html" target="_blank">Privacy Policy</a> and <a href="/terms.html" target="_blank">Terms of Service</a></label>
+            <label for="agree-terms">I agree to the <a href="/terms.html" target="_blank">Terms of Service</a></label>
           </div>
 
-          <button type="submit" class="btn-primary" id="submit-btn">Join Waitlist</button>
+          <div class="checkbox-group">
+            <input type="checkbox" id="agree-privacy" required>
+            <label for="agree-privacy">I agree to the <a href="/privacy.html" target="_blank">Privacy Policy</a></label>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="agree-ai" required>
+            <label for="agree-ai">I understand my messages are processed by third-party AI services to generate responses</label>
+          </div>
+
+          <button type="submit" class="btn-primary" id="submit-btn">Start Free Trial</button>
         </form>
 
-        <div id="form-success" class="form-message success">
-          Thanks for joining! We'll reach out when your spot is ready.
-        </div>
         <div id="form-error" class="form-message error"></div>
       </div>
     </section>
@@ -151,14 +169,126 @@
       }
     })();
 
+    // Template carousel — dating-app style cards with video
+    (function() {
+      fetch('/api/companions/templates/preview')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var templates = data.templates || [];
+          if (!templates.length) return;
+
+          var viewport = document.getElementById('carousel-viewport');
+
+          // Build cards
+          templates.forEach(function(t) {
+            var card = document.createElement('div');
+            card.className = 'tpl-card';
+            card.setAttribute('data-video', t.video_url || '');
+
+            var media = '<img class="tpl-media" src="' + t.avatar_url + '" alt="' + t.name + '" loading="lazy">';
+            if (t.video_url) {
+              media += '<video class="tpl-video" src="' + t.video_url + '" muted loop playsinline preload="none"></video>';
+            }
+
+            card.innerHTML = media +
+              '<div class="tpl-overlay">' +
+                '<div class="tpl-info">' +
+                  '<span class="tpl-name">' + t.name + '</span>' +
+                  '<span class="tpl-age">' + t.age + '</span>' +
+                '</div>' +
+                '<p class="tpl-tagline">' + t.tagline + '</p>' +
+              '</div>';
+
+            viewport.appendChild(card);
+          });
+
+          // Scroll handling — play video of centered card
+          var cards = viewport.querySelectorAll('.tpl-card');
+          var currentVideo = null;
+
+          function updateActive() {
+            var viewRect = viewport.getBoundingClientRect();
+            var center = viewRect.left + viewRect.width / 2;
+
+            var closest = null;
+            var closestDist = Infinity;
+
+            cards.forEach(function(c) {
+              var r = c.getBoundingClientRect();
+              var cardCenter = r.left + r.width / 2;
+              var dist = Math.abs(cardCenter - center);
+              if (dist < closestDist) {
+                closestDist = dist;
+                closest = c;
+              }
+            });
+
+            cards.forEach(function(c) {
+              var video = c.querySelector('.tpl-video');
+              if (c === closest) {
+                c.classList.add('active');
+                if (video && video !== currentVideo) {
+                  if (currentVideo) { currentVideo.pause(); currentVideo.currentTime = 0; }
+                  video.play().catch(function() {});
+                  currentVideo = video;
+                }
+              } else {
+                c.classList.remove('active');
+                if (video && video === currentVideo) {
+                  video.pause();
+                  video.currentTime = 0;
+                  currentVideo = null;
+                }
+              }
+            });
+          }
+
+          viewport.addEventListener('scroll', updateActive, { passive: true });
+
+          // Auto-scroll
+          var autoScrollInterval;
+          var scrollPaused = false;
+          var pauseTimeout;
+
+          function startAutoScroll() {
+            autoScrollInterval = setInterval(function() {
+              if (scrollPaused) return;
+              var cardWidth = cards[0].offsetWidth + 12; // gap
+              var maxScroll = viewport.scrollWidth - viewport.clientWidth;
+              var next = viewport.scrollLeft + cardWidth;
+              if (next >= maxScroll - 10) next = 0;
+              viewport.scrollTo({ left: next, behavior: 'smooth' });
+            }, 3500);
+          }
+
+          // Pause auto-scroll on user interaction
+          viewport.addEventListener('touchstart', function() {
+            scrollPaused = true;
+            clearTimeout(pauseTimeout);
+            pauseTimeout = setTimeout(function() { scrollPaused = false; }, 5000);
+          }, { passive: true });
+
+          viewport.addEventListener('mousedown', function() {
+            scrollPaused = true;
+            clearTimeout(pauseTimeout);
+            pauseTimeout = setTimeout(function() { scrollPaused = false; }, 5000);
+          });
+
+          // Initial activation + auto-scroll
+          setTimeout(function() {
+            updateActive();
+            startAutoScroll();
+          }, 300);
+        })
+        .catch(function() {});
+    })();
+
     // Form submission
     document.getElementById('signup-form').addEventListener('submit', function(e) {
       e.preventDefault();
 
       var btn = document.getElementById('submit-btn');
-      var successEl = document.getElementById('form-success');
       var errorEl = document.getElementById('form-error');
-      successEl.style.display = 'none';
       errorEl.style.display = 'none';
 
       var email = document.getElementById('email').value.trim();
@@ -172,46 +302,50 @@
       }
 
       if (!document.getElementById('agree-terms').checked) {
-        errorEl.textContent = 'Please agree to the Privacy Policy and Terms of Service.';
+        errorEl.textContent = 'Please agree to the Terms of Service.';
         errorEl.style.display = 'block';
         return;
       }
 
-      btn.disabled = true;
-      btn.textContent = 'Joining...';
-
-      fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email,
-          birthMonth: parseInt(birthMonth, 10),
-          birthYear: parseInt(birthYear, 10),
-          sessionId: window.LovettaTracking ? window.LovettaTracking.getSessionId() : null
-        })
-      }).then(function(r) {
-        return r.json().then(function(data) { return { status: r.status, data: data }; });
-      }).then(function(result) {
-        if (result.data.ok) {
-          document.getElementById('signup-form').style.display = 'none';
-          successEl.style.display = 'block';
-        } else if (result.data.error === 'age_restricted') {
-          errorEl.textContent = 'You must be 18 or older to join.';
-          errorEl.style.display = 'block';
-        } else if (result.data.error === 'invalid_email') {
-          errorEl.textContent = 'Please enter a valid email address.';
-          errorEl.style.display = 'block';
-        } else {
-          errorEl.textContent = 'Something went wrong. Please try again.';
-          errorEl.style.display = 'block';
-        }
-      }).catch(function() {
-        errorEl.textContent = 'Connection error. Please try again.';
+      if (!document.getElementById('agree-privacy').checked) {
+        errorEl.textContent = 'Please agree to the Privacy Policy.';
         errorEl.style.display = 'block';
-      }).finally(function() {
-        btn.disabled = false;
-        btn.textContent = 'Join Waitlist';
-      });
+        return;
+      }
+
+      if (!document.getElementById('agree-ai').checked) {
+        errorEl.textContent = 'Please agree to AI data processing.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      // Client-side age check
+      var now = new Date();
+      var age = now.getFullYear() - parseInt(birthYear) - (now.getMonth() + 1 < parseInt(birthMonth) ? 1 : 0);
+      if (age < 18) {
+        errorEl.textContent = 'You must be 18 or older to join.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      // Save data to localStorage for signup page
+      var landingData = {
+        email: email,
+        birthMonth: parseInt(birthMonth, 10),
+        birthYear: parseInt(birthYear, 10),
+        termsAccepted: true,
+        privacyAccepted: true,
+        aiConsentAccepted: true
+      };
+      try {
+        localStorage.setItem('lovetta-landing-data', JSON.stringify(landingData));
+      } catch(ex) {}
+
+      btn.disabled = true;
+      btn.textContent = 'Redirecting...';
+
+      // Redirect to signup
+      window.location.href = '/my/signup?from=landing';
     });
   </script>
 </body>

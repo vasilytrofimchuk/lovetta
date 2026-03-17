@@ -10,6 +10,22 @@ const { chatCompletion } = require('./ai');
 
 const router = Router();
 
+// -- GET /api/companions/templates/preview (public, no auth) --
+router.get('/templates/preview', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ templates: [] });
+
+  try {
+    const { rows } = await pool.query(
+      'SELECT name, tagline, avatar_url, video_url, age, style FROM companion_templates WHERE is_active = TRUE ORDER BY sort_order, id'
+    );
+    res.json({ templates: rows });
+  } catch (err) {
+    console.error('[companions] templates preview error:', err.message);
+    res.json({ templates: [] });
+  }
+});
+
 // -- GET /api/companions/templates ---------------------------
 router.get('/templates', authenticate, async (req, res) => {
   const pool = getPool();
@@ -125,7 +141,7 @@ router.post('/', authenticate, async (req, res) => {
         const sceneResult = await chatCompletion(
           `Write a brief cinematic scene description (max 15 words). Describe setting and mood. Third person, no quotes, no brackets. Just one short sentence.`,
           [{ role: 'user', content: `Character: ${companion.name}, ${companion.age}. ${companion.personality}\n\nHer first words: ${content}` }],
-          { model: 'thedrummer/rocinante-12b' }
+          { model: 'sao10k/l3.3-euryale-70b' }
         );
         sceneText = sceneResult.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
       } catch (err) {

@@ -31,6 +31,8 @@ const FAL_PRICING = {
   'fal-ai/wan/v2.6/image-to-video': 0.25,
   'wan/v2.6/image-to-video': 0.25,
   'fal-ai/instant-character': 0.04,
+  'fal-ai/flux-pro/kontext': 0.04,
+  'fal-ai/flux-pulid': 0.025,
 };
 
 // -- Settings cache -------------------------------------------
@@ -155,7 +157,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
 
   const settings = await getAISettings();
-  const primaryModel = opts.model || settings.openrouter_model || 'thedrummer/rocinante-12b';
+  const primaryModel = opts.model || settings.openrouter_model || 'sao10k/l3.3-euryale-70b';
   const fallbackModel = settings.openrouter_fallback_model || 'thedrummer/rocinante-12b';
   let model = primaryModel;
   const platform = opts.platform || 'web';
@@ -269,7 +271,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
 
   const settings = await getAISettings();
-  const model = opts.model || settings.openrouter_model || 'thedrummer/rocinante-12b';
+  const model = opts.model || settings.openrouter_model || 'sao10k/l3.3-euryale-70b';
   const platform = opts.platform || 'web';
 
   const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform);
@@ -432,8 +434,9 @@ async function generateImage(prompt, opts = {}) {
 // -- fal.ai (character-consistent image generation) -----------
 
 /**
- * Generate an image of a character using a full body reference image.
- * Uses fal.ai Instant Character to preserve the character's appearance.
+ * Generate an image of a character using a reference image.
+ * Uses PuLID Flux (no safety filter, supports NSFW, ~20-30s, ~$0.025).
+ * Falls back to Kontext (faster but blocks NSFW) for SFW content.
  * @param {string} referenceImageUrl - Full body avatar URL of the companion
  * @param {string} prompt - Scene/pose description
  * @param {object} opts - { userId, companionId, platform? }
@@ -441,33 +444,67 @@ async function generateImage(prompt, opts = {}) {
 async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   if (!FAL_KEY) throw new Error('FAL_KEY not configured');
 
-  const model = 'fal-ai/instant-character';
-  const platform = opts.platform || 'web';
+  const model = 'fal-ai/flux-pulid';
+  const fullPrompt = `${prompt}, photorealistic, beautiful adult woman, 20+ years old`;
 
-  const imageRules = await buildImagePrompt(platform);
-  const constrainedPrompt = `${prompt}\n\n${imageRules}\n\nMANDATORY: The subject must be a clearly adult woman, 20+ years old. Never generate images of minors or anyone appearing underage.`;
+  let response;
+  let usedModel = model;
+  let falData = null;
 
-  const response = await fetch(`${FAL_BASE}/${model}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Key ${FAL_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      image_url: referenceImageUrl,
-      prompt: constrainedPrompt,
-      image_size: 'portrait_4_3',
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`fal.ai instant-character ${response.status}: ${err}`);
+  // Use PuLID — supports NSFW with enable_safety_checker: false
+  try {
+    response = await fetch(`${FAL_BASE}/${model}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Key ${FAL_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reference_image_url: referenceImageUrl,
+        prompt: fullPrompt,
+        image_size: 'portrait_4_3',
+        enable_safety_checker: false,
+        id_weight: 0.9,
+      }),
+    });
+    if (response.ok) {
+      falData = await response.json();
+    }
+  } catch (e) {
+    console.warn('[ai] PuLID fetch failed, trying Kontext:', e.message);
+    response = null;
   }
 
-  const result = await response.json();
-  const falUrl = result.images?.[0]?.url || null;
-  const costUsd = FAL_PRICING[model] || 0.04;
+  // Fallback to Kontext if PuLID fails (Kontext is faster but blocks NSFW)
+  if (!falData) {
+    if (response && !response.ok) {
+      const errText = await response.text();
+      console.warn(`[ai] PuLID ${response.status}, falling back to Kontext:`, errText.slice(0, 100));
+    }
+    usedModel = 'fal-ai/flux-pro/kontext';
+    response = await fetch(`${FAL_BASE}/${usedModel}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Key ${FAL_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_url: referenceImageUrl,
+        prompt: `Change the scene: ${prompt}. The subject is a clearly adult woman, 20+ years old.`,
+      }),
+    });
+  }
+
+  if (!falData) {
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`fal.ai ${usedModel} ${response.status}: ${err}`);
+    }
+    falData = await response.json();
+  }
+
+  const falUrl = falData.images?.[0]?.url || null;
+  const costUsd = FAL_PRICING[usedModel] || 0.04;
 
   let imageUrl = falUrl;
   if (falUrl) {
@@ -486,7 +523,7 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
       userId: opts.userId,
       companionId: opts.companionId || null,
       provider: 'fal',
-      model,
+      model: usedModel,
       callType: 'image',
       costUsd,
       metadata: { prompt: prompt.slice(0, 200), type: 'character' },
@@ -510,7 +547,8 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
   const settings = await getAISettings();
   const model = opts.model || settings.fal_video_model || 'wan/v2.6/image-to-video';
 
-  const response = await fetch(`${FAL_BASE}/${model}`, {
+  // Submit to async queue instead of synchronous call
+  const submitRes = await fetch(`https://queue.fal.run/${model}`, {
     method: 'POST',
     headers: {
       'Authorization': `Key ${FAL_KEY}`,
@@ -524,12 +562,43 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
     }),
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`fal.ai ${response.status}: ${err}`);
+  if (!submitRes.ok) {
+    const err = await submitRes.text();
+    throw new Error(`fal.ai queue submit ${submitRes.status}: ${err}`);
   }
 
-  const result = await response.json();
+  const { request_id, status_url, response_url } = await submitRes.json();
+  console.log(`[fal] Video queued: ${request_id}`);
+
+  // Poll for completion
+  const pollUrl = status_url || `https://queue.fal.run/${model}/requests/${request_id}/status`;
+  const maxWait = 300000; // 5 min max
+  const pollInterval = 3000;
+  const start = Date.now();
+
+  while (Date.now() - start < maxWait) {
+    await new Promise(r => setTimeout(r, pollInterval));
+    const statusRes = await fetch(pollUrl, {
+      headers: { 'Authorization': `Key ${FAL_KEY}` },
+    });
+    if (!statusRes.ok) continue;
+    const status = await statusRes.json();
+    if (status.status === 'COMPLETED') break;
+    if (status.status === 'FAILED') throw new Error(`fal.ai video generation failed: ${JSON.stringify(status)}`);
+  }
+
+  // Fetch result
+  const resultUrl = response_url || `https://queue.fal.run/${model}/requests/${request_id}`;
+  const resultRes = await fetch(resultUrl, {
+    headers: { 'Authorization': `Key ${FAL_KEY}` },
+  });
+
+  if (!resultRes.ok) {
+    const err = await resultRes.text();
+    throw new Error(`fal.ai result fetch ${resultRes.status}: ${err}`);
+  }
+
+  const result = await resultRes.json();
   const falUrl = result.video?.url || result.url || null;
   const costUsd = FAL_PRICING[model] || 0.25;
 

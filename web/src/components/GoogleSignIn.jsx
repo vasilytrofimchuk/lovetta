@@ -1,11 +1,27 @@
 import { useState } from 'react'
 
-export default function GoogleSignIn() {
+export default function GoogleSignIn({ birthData }) {
   const [loading, setLoading] = useState(false)
 
   const handleClick = () => {
     setLoading(true)
-    window.location.href = '/api/auth/google'
+    // Try to pass age/consent data via state param
+    let stateData = null
+    if (birthData && birthData.birthMonth && birthData.birthYear) {
+      stateData = birthData
+    } else {
+      try {
+        const raw = localStorage.getItem('lovetta-landing-data')
+        if (raw) stateData = JSON.parse(raw)
+      } catch {}
+    }
+
+    let url = '/api/auth/google'
+    if (stateData) {
+      const state = btoa(JSON.stringify(stateData))
+      url += '?state=' + encodeURIComponent(state)
+    }
+    window.location.href = url
   }
 
   return (

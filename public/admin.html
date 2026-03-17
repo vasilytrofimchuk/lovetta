@@ -224,7 +224,6 @@
       <button class="tab active" onclick="switchTab('overview')">Overview</button>
       <button class="tab" onclick="switchTab('visitors')">Visitors</button>
       <button class="tab" onclick="switchTab('users')">Users</button>
-      <button class="tab" onclick="switchTab('leads')">Leads</button>
       <button class="tab" onclick="switchTab('economics')">Economics</button>
       <button class="tab" onclick="switchTab('settings')">Settings</button>
       <button class="tab" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
@@ -238,8 +237,6 @@
       <h3 class="section-title" style="margin-top:0;">Visitors</h3>
       <div class="stat-cards" id="overview-visitor-cards"></div>
       <div class="breakdown-grid" id="overview-visitor-breakdowns"></div>
-      <h3 class="section-title">Leads</h3>
-      <div class="stat-cards" id="overview-lead-cards"></div>
       <h3 class="section-title">Users</h3>
       <div class="stat-cards" id="overview-user-cards"></div>
       <h3 class="section-title">Economics</h3>
@@ -272,16 +269,6 @@
         <tbody id="user-rows"></tbody>
       </table>
       <div class="pagination" id="user-pagination"></div>
-    </div>
-
-    <!-- Leads Tab -->
-    <div id="tab-leads" class="tab-content">
-      <div class="stat-cards" id="lead-cards"></div>
-      <div class="search-bar">
-        <input type="text" id="lead-search" placeholder="Search by email..." oninput="debounceLeadSearch()">
-      </div>
-      <div id="leads-table-wrap"></div>
-      <div class="pagination" id="leads-pagination"></div>
     </div>
 
     <!-- Settings Tab -->
@@ -400,8 +387,6 @@
     var TOKEN = localStorage.getItem('lovetta-admin-token') || '';
     var visitorPage = 1;
     var userPage = 1;
-    var leadPage = 1;
-    var leadSearchTimeout;
     var userSearchTimeout;
     var emailPage = 1;
     var emailFilter = 'inbound';
@@ -458,7 +443,6 @@
       if (name === 'overview') loadOverview();
       else if (name === 'visitors') loadVisitors();
       else if (name === 'users') loadUsers();
-      else if (name === 'leads') loadLeads();
       else if (name === 'reports') loadReports();
       else if (name === 'sentry') loadSentry();
       else if (name === 'economics') loadEconomics('7d');
@@ -552,12 +536,6 @@
           card('Total Visitors', v.total || 0) +
           card('Today', v.today || 0) +
           card('Active Now', v.active || 0);
-
-        var l = data.leads || {};
-        document.getElementById('overview-lead-cards').innerHTML =
-          card('Total Leads', l.total || 0) +
-          card('Today', l.today || 0) +
-          card('Unique Emails', l.unique_emails || 0);
 
         var u = data.users || {};
         document.getElementById('overview-user-cards').innerHTML =
@@ -656,35 +634,6 @@
           '<tr><td colspan="10" class="empty-row">No users yet</td></tr>';
         renderPagination('user-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadUsers');
       });
-    }
-
-    // --- Leads ---
-    function loadLeads(page) {
-      leadPage = page || leadPage;
-      var search = (document.getElementById('lead-search') || {}).value || '';
-      var url = '/api/admin/leads?page=' + leadPage + '&limit=50';
-      if (search) url += '&search=' + encodeURIComponent(search);
-
-      apiFetch(url).then(function(data) {
-        var leads = data.leads || [];
-        var html = '<table><tr><th>Email</th><th>Birth</th><th>Source</th><th>Country</th><th>Date</th></tr>';
-        leads.forEach(function(l) {
-          html += '<tr><td class="mono">' + esc(l.email) + '</td>' +
-            '<td>' + (l.birth_month || '?') + '/' + (l.birth_year || '?') + '</td>' +
-            '<td>' + esc(l.utm_source || l.source || '-') + '</td>' +
-            '<td>' + esc(shortCountry(l.country) || '-') + '</td>' +
-            '<td class="mono">' + fmtDate(l.created_at) + '</td></tr>';
-        });
-        html += '</table>';
-        if (!leads.length) html = '<p style="color: var(--muted); text-align: center; padding: 40px;">No leads yet</p>';
-        document.getElementById('leads-table-wrap').innerHTML = html;
-        renderPagination('leads-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadLeads');
-      });
-    }
-
-    function debounceLeadSearch() {
-      clearTimeout(leadSearchTimeout);
-      leadSearchTimeout = setTimeout(function() { leadPage = 1; loadLeads(1); }, 300);
     }
 
     // Settings

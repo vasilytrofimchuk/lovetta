@@ -372,6 +372,10 @@ router.get('/google', (req, res) => {
     prompt: 'select_account',
   });
 
+  // Forward state param (contains age/consent data from landing page)
+  const state = req.query.state;
+  if (state) params.set('state', state);
+
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 });
 
@@ -381,7 +385,7 @@ router.get('/google/callback', async (req, res) => {
   if (!pool) return res.redirect('/my/login?error=service_unavailable');
 
   try {
-    const { code, error: oauthError } = req.query;
+    const { code, error: oauthError, state: oauthState } = req.query;
     if (oauthError || !code) {
       return res.redirect('/my/login?error=google_denied');
     }
@@ -448,17 +452,37 @@ router.get('/google/callback', async (req, res) => {
           [googleId, picture, name, user.id]
         );
       } else {
-        // New Google user — create with default birth date (will need age gate on first app use)
-        // For now, set a placeholder birth date. The app should prompt for age on first login.
+        // New Google user — try to use age/consent data from state param
+        let birthMonth = null, birthYear = null, hasConsent = false;
+
+        if (oauthState) {
+          try {
+            const stateData = JSON.parse(Buffer.from(oauthState, 'base64').toString());
+            if (stateData.birthMonth && stateData.birthYear) {
+              birthMonth = parseInt(stateData.birthMonth, 10);
+              birthYear = parseInt(stateData.birthYear, 10);
+              if (!isAtLeast18(birthMonth, birthYear)) {
+                return res.redirect('/my/login?error=age_restricted');
+              }
+              hasConsent = !!(stateData.termsAccepted && stateData.privacyAccepted && stateData.aiConsentAccepted);
+            }
+          } catch {}
+        }
+
+        if (!birthMonth || !birthYear || !hasConsent) {
+          // Redirect to signup to collect age/consent first
+          return res.redirect(`/my/signup?provider=google&email=${encodeURIComponent(email)}`);
+        }
+
         const ip = req.ip || '';
         const geo = await geoFromIp(ip).catch(() => ({}));
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, 1, 2000, TRUE, TRUE, NOW(), $5, $6, $7, $8, 'google')
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'google')
            RETURNING *`,
-          [email, googleId, name, picture,
+          [email, googleId, name, picture, birthMonth, birthYear,
            ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
         );
         user = newUser;
@@ -491,7 +515,8 @@ router.post('/telegram', authLimiter, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'Service unavailable' });
 
   try {
-    const { initData } = req.body || {};
+    const { initData, birthMonth: bm, birthYear: by,
+            termsAccepted, privacyAccepted, aiConsentAccepted } = req.body || {};
     if (!initData) {
       return res.status(400).json({ error: 'initData is required' });
     }
@@ -535,7 +560,16 @@ router.post('/telegram', authLimiter, async (req, res) => {
           [telegramId, user.id, tgUser.username, tgUser.firstName, tgUser.photoUrl]
         );
       } else {
-        // Create new user
+        // Create new user — require age/consent data
+        const month = parseInt(bm, 10);
+        const year = parseInt(by, 10);
+        if (!month || !year || !termsAccepted || !privacyAccepted || !aiConsentAccepted) {
+          return res.status(400).json({ error: 'age_consent_required' });
+        }
+        if (!isAtLeast18(month, year)) {
+          return res.status(403).json({ error: 'age_restricted' });
+        }
+
         const syntheticEmail = `tg_${tgUser.id}@telegram.lovetta.ai`;
         const ip = req.ip || '';
         const geo = await geoFromIp(ip).catch(() => ({}));
@@ -543,9 +577,9 @@ router.post('/telegram', authLimiter, async (req, res) => {
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider)
-           VALUES ($1, $2, $3, $4, TRUE, 1, 2000, TRUE, TRUE, NOW(), $5, $6, $7, $8, 'telegram')
+           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'telegram')
            RETURNING *`,
-          [syntheticEmail, telegramId, displayName, tgUser.photoUrl,
+          [syntheticEmail, telegramId, displayName, tgUser.photoUrl, month, year,
            ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
         );
         user = newUser;

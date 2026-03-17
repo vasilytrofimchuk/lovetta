@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getErrorMessage } from '../lib/api'
 import AgeGate from '../components/AgeGate'
@@ -9,6 +9,7 @@ import TelegramSignIn from '../components/TelegramSignIn'
 
 export default function Signup() {
   const { signup } = useAuth()
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -17,6 +18,31 @@ export default function Signup() {
   const [showLegal, setShowLegal] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const landingConsents = useRef(null)
+
+  // Pre-fill from landing page data
+  useEffect(() => {
+    const from = searchParams.get('from')
+    if (from === 'landing' || from === 'telegram') {
+      try {
+        const raw = localStorage.getItem('lovetta-landing-data')
+        if (raw) {
+          const data = JSON.parse(raw)
+          if (data.email) setEmail(data.email)
+          if (data.birthMonth) setBirthMonth(String(data.birthMonth))
+          if (data.birthYear) setBirthYear(String(data.birthYear))
+          if (data.termsAccepted && data.privacyAccepted && data.aiConsentAccepted) {
+            landingConsents.current = {
+              termsAccepted: true,
+              privacyAccepted: true,
+              aiConsentAccepted: true,
+            }
+          }
+          localStorage.removeItem('lovetta-landing-data')
+        }
+      } catch {}
+    }
+  }, [searchParams])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -36,6 +62,12 @@ export default function Signup() {
     const age = now.getFullYear() - parseInt(birthYear) - (now.getMonth() + 1 < parseInt(birthMonth) ? 1 : 0)
     if (age < 18) {
       setError('You must be 18 or older to use Lovetta')
+      return
+    }
+
+    // Skip legal popup if consents already given on landing page
+    if (landingConsents.current) {
+      handleAccept(landingConsents.current)
       return
     }
 
@@ -128,7 +160,13 @@ export default function Signup() {
           </button>
         </form>
 
-        <GoogleSignIn />
+        <GoogleSignIn birthData={birthMonth && birthYear ? {
+          birthMonth: parseInt(birthMonth),
+          birthYear: parseInt(birthYear),
+          termsAccepted: landingConsents.current?.termsAccepted || false,
+          privacyAccepted: landingConsents.current?.privacyAccepted || false,
+          aiConsentAccepted: landingConsents.current?.aiConsentAccepted || false,
+        } : null} />
         <div className="mt-3">
           <TelegramSignIn />
         </div>

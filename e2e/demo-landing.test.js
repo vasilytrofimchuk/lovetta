@@ -25,8 +25,12 @@ test('demo: landing page and signup form', async ({ page }) => {
   await page.selectOption('#birth-year', '1995');
   await page.waitForTimeout(300);
 
-  // Check terms
+  // Check all consent boxes
   await page.check('#agree-terms');
+  await page.waitForTimeout(300);
+  await page.check('#agree-privacy');
+  await page.waitForTimeout(300);
+  await page.check('#agree-ai');
   await page.waitForTimeout(500);
 
   // Pause on filled form

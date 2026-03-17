@@ -76,8 +76,9 @@ ${companion.personality}
 ${companion.backstory ? companion.backstory + '\n' : ''}Communication style: ${companion.communication_style}
 ${traits ? 'Traits: ' + traits : ''}
 
-Response format: Always start with a brief action or emotional context in *asterisks*, then your message. Use *actions* throughout your message too for expressiveness.
+Response format: Start with a short action in *asterisks* (max 8 words, one simple action — NO narration, NO scene-setting, NO describing your appearance), then your spoken message.
 Example: *leans closer with a playful smile* Hey, I was just thinking about you...
+BAD (too long): *She slowly walks across the room, her eyes sparkling as she settles onto the couch and looks up at him with a warm smile*
 
 Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.
 
@@ -106,7 +107,12 @@ function parseContextText(text) {
 
   // Extract leading *action*
   const match = remaining.match(/^\*([^*]+)\*/);
-  const contextText = match ? match[1].trim() : null;
+  let contextText = match ? match[1].trim() : null;
+  // Truncate context to max 12 words — LLMs sometimes ignore the prompt limit
+  if (contextText) {
+    const words = contextText.split(/\s+/);
+    if (words.length > 12) contextText = words.slice(0, 12).join(' ');
+  }
   const content = match ? remaining.slice(match[0].length).trim() : remaining;
 
   return { sceneText, contextText, content };
@@ -123,7 +129,7 @@ Examples:
 - Rain patters against the window, a mug of tea in her hands
 - She leans against the kitchen counter, barefoot on cool tiles`,
       [{ role: 'user', content: `Character: ${companion.name}, ${companion.age}. ${companion.personality}\n\nHer message: ${messageContent}` }],
-      { model: 'thedrummer/rocinante-12b' }
+      { model: 'sao10k/l3.3-euryale-70b' }
     );
     // Clean up — remove any accidental quotes, brackets, or "Scene:" prefix
     return result.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
@@ -277,18 +283,22 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         parsed.sceneText = await generateScene(companion, parsed.content);
       }
 
-      // Handle media generation if LLM requested it
+      // Handle media — LLM tag OR user explicitly asked for image/photo
       let mediaUrl = null;
       let mediaType = null;
-      if (mediaRequest && !aborted) {
-        res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: mediaRequest.type })}\n\n`);
+      let effectiveMediaRequest = mediaRequest;
+      if (!effectiveMediaRequest && /send.*(image|photo|pic|selfie|video|nude)|show me|send me.*(photo|pic|selfie|image)/i.test(content || '')) {
+        effectiveMediaRequest = { type: 'image', description: 'a flirty selfie, looking at camera with a playful expression' };
+      }
+      if (effectiveMediaRequest && !aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: effectiveMediaRequest.type })}\n\n`);
 
         const mediaHeartbeat = setInterval(() => {
           if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
         }, 3000);
 
         try {
-          const mediaResult = await generateOrReuseMedia(companion, mediaRequest, {
+          const mediaResult = await generateOrReuseMedia(companion, effectiveMediaRequest, {
             userId: req.userId,
             companionId: companion.id,
             platform,
@@ -519,7 +529,7 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     recentMessages.reverse();
     const aiMessages = [
       ...recentMessages.map(m => ({ role: m.role, content: m.content })),
-      { role: 'user', content: '[The user tapped the photo button. Send them a flirty photo with a playful message. You MUST include a [SEND_IMAGE: ...] tag.]' },
+      { role: 'user', content: 'send me a photo of you right now' },
     ];
 
     const basePrompt = buildCompanionSystemPrompt(companion);
@@ -555,7 +565,18 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       let mediaType = null;
 
       // Force image generation even if LLM didn't include the tag
-      const effectiveMediaRequest = mediaRequest || { type: 'image', description: 'a casual selfie, looking at camera with a warm smile' };
+      // Build a contextual description from the AI's response text
+      let fallbackDescription = 'a flirty selfie, looking at camera with a playful smile, casual setting';
+      if (parsed.content) {
+        // Use the AI's text to inform the image — look for scene hints
+        const text = parsed.content.toLowerCase();
+        if (text.includes('bed') || text.includes('bedroom') || text.includes('pillow')) fallbackDescription = 'lying on bed, soft lighting, flirty pose, looking at camera';
+        else if (text.includes('shower') || text.includes('bath') || text.includes('towel')) fallbackDescription = 'in bathroom, wrapped in towel, wet hair, playful expression';
+        else if (text.includes('lingerie') || text.includes('lace') || text.includes('underwear')) fallbackDescription = 'posing in lingerie, soft bedroom lighting, seductive look at camera';
+        else if (text.includes('beach') || text.includes('pool') || text.includes('swim') || text.includes('bikini')) fallbackDescription = 'at the beach in bikini, sun-kissed skin, playful smile';
+        else if (text.includes('dress') || text.includes('outfit') || text.includes('wearing')) fallbackDescription = 'showing off outfit, posing playfully, looking at camera with a smile';
+      }
+      const effectiveMediaRequest = mediaRequest || { type: 'image', description: fallbackDescription };
 
       if (!aborted) {
         res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: effectiveMediaRequest.type })}\n\n`);

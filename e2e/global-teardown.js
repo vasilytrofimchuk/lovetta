@@ -35,7 +35,6 @@ module.exports = async function globalTeardown() {
       DROP TABLE IF EXISTS refresh_tokens CASCADE;
       DROP TABLE IF EXISTS users CASCADE;
       DROP TABLE IF EXISTS app_settings CASCADE;
-      DROP TABLE IF EXISTS leads CASCADE;
       DROP TABLE IF EXISTS visitors CASCADE;
       DROP TABLE IF EXISTS _migrations CASCADE;
       DROP TYPE IF EXISTS _migrations CASCADE;
