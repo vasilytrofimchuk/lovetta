@@ -362,6 +362,11 @@ This conversation is happening via email. Keep responses natural but don't menti
 }
 
 async function sendNewRegistrationNotification(user) {
+  if (process.env.NODE_ENV === 'test' ||
+      /^(test_|uitest_|loadtest_).*@(example\.com|test\.com)$/.test(user.email)) {
+    console.log(`[email] Skipping admin notification for test user: ${user.email}`);
+    return {};
+  }
   await sendEmail({
     to: ADMIN_FORWARD_EMAIL,
     subject: `New registration: ${user.email}`,

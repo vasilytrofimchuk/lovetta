@@ -368,3 +368,12 @@
 - [x] Email frequency cap: checkEmailFrequencyCap() — max 2/user/day via Redis (DB fallback)
 - [x] All jobs skip Telegram-only users (no real email)
 - [x] proactive_messages added to user-api.js GET/PUT preferences
+
+## Load Testing
+- [x] Created e2e/load-test.js — standalone Node.js load test script
+- [x] Phase 1: 30 concurrent chat messages via SSE streaming (OpenRouter)
+- [x] Phase 2: 30 concurrent media requests (fal.ai async generation)
+- [x] Phase 3: Media polling until generation completes
+- [x] Metrics: TTFB, total response time, p50/p95/max, error breakdown
+- [x] CLI flags: --url, --users, --skip-media, --rounds
+- [x] Added npm run test:load script
