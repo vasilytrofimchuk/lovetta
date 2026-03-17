@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import usePwaInstall from './hooks/usePwaInstall'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
@@ -34,6 +35,36 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+function PwaInstallBanner() {
+  const { user } = useAuth()
+  const { showPrompt, install, dismiss } = usePwaInstall()
+  const isTelegram = !!window.Telegram?.WebApp?.initData
+
+  if (!user || !showPrompt || isTelegram) return null
+
+  return (
+    <div className="fixed bottom-4 left-4 right-4 z-50 bg-brand-card border border-brand-border rounded-2xl p-4 shadow-lg flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-brand-text text-sm font-medium">Install Lovetta</p>
+        <p className="text-brand-text-secondary text-xs">Add to home screen for the best experience</p>
+      </div>
+      <button
+        onClick={install}
+        className="shrink-0 bg-brand-accent hover:bg-brand-accent-hover text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+      >
+        Install
+      </button>
+      <button
+        onClick={dismiss}
+        className="shrink-0 text-brand-muted hover:text-brand-text-secondary text-lg leading-none transition-colors"
+        aria-label="Dismiss"
+      >
+        &times;
+      </button>
+    </div>
+  )
+}
+
 function AppRoutes() {
   const { loading } = useAuth()
   if (loading) return <Loading />
@@ -61,6 +92,7 @@ export default function App() {
       <AuthProvider>
         <DesktopShell>
           <AppRoutes />
+          <PwaInstallBanner />
         </DesktopShell>
       </AuthProvider>
     </BrowserRouter>

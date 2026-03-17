@@ -1,0 +1,29 @@
+{
+  "name": "Lovetta — Your AI Girlfriend",
+  "short_name": "Lovetta",
+  "start_url": "/my/",
+  "scope": "/my/",
+  "display": "standalone",
+  "background_color": "#0f0a1a",
+  "theme_color": "#d6336c",
+  "icons": [
+    {
+      "src": "/assets/brand/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/brand/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

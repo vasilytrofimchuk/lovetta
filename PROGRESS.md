@@ -320,3 +320,11 @@
 - [x] Admin Users tab: added Refs and Ref $ columns
 - [x] Admin Settings: added referral_commission_pct to AI Settings section
 - [x] Admin Cashouts tab: paginated cashout requests with status filter, approve/mark paid/reject actions, pending count badge
+
+### PWA (Mobile, Non-Telegram)
+- [x] public/manifest.json: app name, icons (128/180/512), standalone display, theme #d6336c, scope /my/
+- [x] public/sw.js: minimal no-op service worker (network-only, zero caching)
+- [x] web/index.html: manifest link, theme-color meta, apple-mobile-web-app-capable/status-bar-style
+- [x] web/src/main.jsx: SW registration (skipped for Telegram WebApp)
+- [x] web/src/hooks/usePwaInstall.js: beforeinstallprompt capture, localStorage dismiss, standalone detection
+- [x] web/src/App.jsx: PwaInstallBanner — fixed bottom banner for logged-in non-Telegram users, Install + dismiss buttons

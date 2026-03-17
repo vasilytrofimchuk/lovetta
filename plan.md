@@ -225,17 +225,18 @@ Text and image levels are independent, configurable per platform in admin settin
 
 ---
 
-## Phase 2f: PWA
+## Phase 2f: PWA — DONE
 
 ### What
-Progressive Web App for mobile users who don't want to install from App Store.
+Progressive Web App for mobile users (non-Telegram) — installable from browser, no caching.
 
 ### Implementation
-- `web/public/manifest.json`: name "Lovetta", icons (192, 512), start_url "/my/", display "standalone", theme_color, background_color
-- Service worker: cache app shell (HTML, CSS, JS) only — NOT content (UI updates frequently)
-- Install prompt component: shown on mobile after 2+ visits, dismissible
-- iOS meta tags: apple-mobile-web-app-capable, apple-mobile-web-app-status-bar-style
-- Minimal caching strategy — user always gets latest UI
+- `public/manifest.json`: name "Lovetta", icons (128, 180, 512), start_url "/my/", scope "/my/", display "standalone", theme #d6336c
+- `public/sw.js`: minimal no-op service worker (network-only, no caching — UI changes frequently)
+- `web/index.html`: manifest link + theme-color + apple-mobile-web-app meta tags
+- `web/src/main.jsx`: SW registration (skipped for Telegram WebApp)
+- `web/src/hooks/usePwaInstall.js`: captures beforeinstallprompt, localStorage dismissal
+- `web/src/App.jsx`: PwaInstallBanner component — shown only for logged-in, non-Telegram users, dismissible
 
 ---
 
