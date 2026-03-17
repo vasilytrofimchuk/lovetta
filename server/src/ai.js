@@ -537,15 +537,17 @@ async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
   if (!ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not configured');
 
   const boundary = '----ELBoundary' + Date.now();
-  const parts = [];
 
-  // model_id field
-  parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="model_id"\r\n\r\nscribe_v2`);
-  // file field
-  parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n`);
-
-  const head = Buffer.from(parts.join('\r\n') + '\r\n', 'utf-8');
-  const tail = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
+  // Build multipart/form-data body
+  const head = Buffer.from(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="model_id"\r\n\r\n` +
+    `scribe_v2\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
+    `Content-Type: application/octet-stream\r\n\r\n`
+  );
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
   const body = Buffer.concat([head, audioBuffer, tail]);
 
   const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
@@ -570,12 +572,13 @@ async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
     req.end();
   });
 
+  const respText = Buffer.concat(responseChunks).toString();
   if (statusCode !== 200) {
-    const errText = Buffer.concat(responseChunks).toString();
-    throw new Error(`ElevenLabs STT ${statusCode}: ${errText}`);
+    console.error('[stt] ElevenLabs error:', statusCode, respText);
+    throw new Error(`ElevenLabs STT ${statusCode}: ${respText}`);
   }
 
-  const result = JSON.parse(Buffer.concat(responseChunks).toString());
+  const result = JSON.parse(respText);
   return { text: result.text || '' };
 }
 

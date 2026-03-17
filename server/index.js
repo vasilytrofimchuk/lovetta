@@ -77,12 +77,14 @@ app.post('/api/chat/stt',
     try {
       const { authenticate } = require('./src/auth-middleware');
       await new Promise((resolve, reject) => authenticate(req, res, (err) => err ? reject(err) : resolve()));
-      if (!req.body || req.body.length < 1000) {
-        return res.status(400).json({ error: 'Recording too short' });
+      const bodyLen = req.body ? req.body.length : 0;
+      console.log(`[stt] Received ${bodyLen} bytes, content-type: ${req.headers['content-type']}`);
+      if (!req.body || bodyLen < 500) {
+        return res.status(400).json({ error: 'Recording too short', received: bodyLen });
       }
       const { transcribeSpeech } = require('./src/ai');
       const ct = req.headers['content-type'] || 'audio/webm';
-      const ext = ct.includes('wav') ? 'wav' : ct.includes('mp4') ? 'mp4' : 'webm';
+      const ext = ct.includes('wav') ? 'wav' : ct.includes('mp4') ? 'mp4' : ct.includes('mp3') || ct.includes('mpeg') ? 'mp3' : 'webm';
       const { text } = await transcribeSpeech(req.body, `voice.${ext}`);
       res.json({ text });
     } catch (err) {

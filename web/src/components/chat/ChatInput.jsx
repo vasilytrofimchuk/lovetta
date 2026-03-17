@@ -80,6 +80,11 @@ export default function ChatInput({ onSend, disabled }) {
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start();
       setListening(true);
+
+      // Auto-stop after 30 seconds
+      setTimeout(() => {
+        if (mediaRecorder.state === 'recording') mediaRecorder.stop();
+      }, 30000);
     } catch (err) {
       console.error('[mic]', err);
     }
