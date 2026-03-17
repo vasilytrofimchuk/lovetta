@@ -85,22 +85,14 @@ const CUSTOM_AVATARS = [
   { url: `${R2C}/60142c55-d9ae-4d08-8d6e-d69c5010f85e.jpg`, hair: 'black', skin: 'dark', style: 'real', age: '30-39' },
   { url: `${R2C}/45d282b0-2f86-4a85-bf83-a50e214e128d.jpg`, hair: 'brunette', skin: 'medium', style: 'real', age: '23-29' },
   { url: `${R2C}/5e475f9b-ca82-49bf-98ef-cc1b794444ff.jpg`, hair: 'black', skin: 'asian', style: 'real', age: '18-22' },
-  // Anime — young (20-22)
-  { url: `${R2A}/0830f45e-9a2c-404a-857a-93b7fb8e2f60.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '18-22' },
-  { url: `${R2A}/ad94b84a-84ac-4b5b-a2e7-4e2f9e9e3a10.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '18-22' },
-  { url: `${R2A}/7de9fad2-4e73-4dbe-afc0-91bddabc5f38.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '18-22' },
-  // Anime — mid (23-25)
+  // Anime
   { url: `${R2A}/f65a5836-622b-4d8a-8eb6-3ebd3e629974.jpg`, hair: 'brunette', skin: 'light', style: 'anime', age: '23-29' },
   { url: `${R2A}/77a06d69-70fc-4fec-9970-0ffda0938e21.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '23-29' },
-  // Anime — mature (26-30)
   { url: `${R2A}/94dfb7b2-0050-4e48-a9b7-8fdf6b3a9628.jpg`, hair: 'red', skin: 'light', style: 'anime', age: '30-39' },
   { url: `${R2A}/6eca50ae-a125-4309-816c-d799794d8843.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '30-39' },
   { url: `${R2A}/e7ab31ca-6cea-4db6-9b2c-af630831a078.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '30-39' },
   { url: `${R2A}/d95f066b-dc4d-443b-99b0-ce614b8839f0.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '30-39' },
-  // Anime — mixed
-  { url: `${R2A}/f3acc5f3-a839-401e-8faf-fdca12f9f93d.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '18-22' },
   { url: `${R2A}/7b46fac6-9872-471d-9b4f-0ee6b6c05c89.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '23-29' },
-  { url: `${R2A}/700b4223-43d0-4c56-b85b-110c859316f8.jpg`, hair: 'blonde', skin: 'light', style: 'anime', age: '18-22' },
   { url: `${R2A}/e33f2af8-6c60-4160-b72e-b81da64c8063.jpg`, hair: 'red', skin: 'light', style: 'anime', age: '30-39' },
   { url: `${R2A}/46365b8f-c41e-4e15-8e6f-03cc452b30fe.jpg`, hair: 'other', skin: 'light', style: 'anime', age: '23-29' },
   // Realistic — mature (40-50)
@@ -179,7 +171,9 @@ function getGradient(name) {
 function TemplateCard({ t, onSelect }) {
   const videoRef = useRef(null);
   const cardRef = useRef(null);
-  const [active, setActive] = useState(false);
+  const [centered, setCentered] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const active = centered || hovered;
 
   useEffect(() => {
     const card = cardRef.current;
@@ -187,7 +181,7 @@ function TemplateCard({ t, onSelect }) {
 
     // Shrink the intersection zone to a narrow band in the center — only 1 row (2 cards) activates
     const observer = new IntersectionObserver(
-      ([entry]) => setActive(entry.isIntersecting),
+      ([entry]) => setCentered(entry.isIntersecting),
       { rootMargin: '-40% 0px -40% 0px', threshold: 0.5 }
     );
     observer.observe(card);
@@ -207,6 +201,7 @@ function TemplateCard({ t, onSelect }) {
 
   return (
     <button ref={cardRef} onClick={() => onSelect(t)}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       className="relative rounded-2xl overflow-hidden aspect-[3/4] group">
       {t.avatar_url && (
         <img src={t.avatar_url} alt={t.name}
@@ -220,6 +215,7 @@ function TemplateCard({ t, onSelect }) {
         <div className="absolute inset-0 bg-brand-card" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white/70 text-xs font-bold group-hover:bg-brand-accent/60 transition-colors">i</div>
       <div className="absolute bottom-0 left-0 right-0 p-3">
         <div className="flex items-baseline gap-1.5">
           <span className="text-white font-bold text-lg leading-tight">{t.name}</span>
@@ -235,6 +231,7 @@ export default function CompanionCreate() {
   const navigate = useNavigate();
   const [step, setStep] = useState('choose'); // choose, templates, custom, confirm
   const [templates, setTemplates] = useState([]);
+  const [templateFilter, setTemplateFilter] = useState('all'); // all, realistic, anime
   const [selected, setSelected] = useState(null);
   const [customName, setCustomName] = useState('');
   const [customPersonality, setCustomPersonality] = useState('');
@@ -250,9 +247,14 @@ export default function CompanionCreate() {
   const [imagining, setImagining] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmTrait, setConfirmTrait] = useState('');
 
   useEffect(() => {
-    api.get('/api/companions/templates').then(({ data }) => setTemplates(data.templates || [])).catch(() => {});
+    api.get('/api/companions/templates').then(({ data }) => {
+      const arr = data.templates || [];
+      for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+      setTemplates(arr);
+    }).catch(() => {});
   }, []);
 
   function selectSurprise() {
@@ -304,7 +306,7 @@ export default function CompanionCreate() {
 
     try {
       const body = selected.isTemplate
-        ? { templateId: selected.id, name: selected.name }
+        ? { templateId: selected.id, name: selected.name, personality: selected.personality, traits: selected.traits, voiceId: selected.voice_id }
         : { name: selected.name, personality: selected.personality, avatarUrl: selected.avatar_url, traits: selected.traits, voiceId: selected.voice_id };
 
       const { data } = await api.post('/api/companions', body);
@@ -368,24 +370,20 @@ export default function CompanionCreate() {
         {/* Step: Template grid — photo cards like dating app */}
         {step === 'templates' && (
           <>
-            {/* Realistic templates */}
-            <div className="text-xs font-semibold uppercase tracking-wider text-brand-text-secondary mb-2">Realistic</div>
+            {/* Style filter tabs */}
+            <div className="flex gap-2 mb-4">
+              {[{ key: 'all', label: 'All' }, { key: 'realistic', label: 'Realistic' }, { key: 'anime', label: 'Anime' }].map(f => (
+                <button key={f.key} onClick={() => setTemplateFilter(f.key)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${templateFilter === f.key ? 'bg-brand-accent text-white' : 'bg-brand-card text-brand-text-secondary hover:text-brand-text'}`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              {templates.filter(t => t.style !== 'anime').map(t => (
+              {templates.filter(t => templateFilter === 'all' || (templateFilter === 'anime' ? t.style === 'anime' : t.style !== 'anime')).map(t => (
                 <TemplateCard key={t.id} t={t} onSelect={selectTemplate} />
               ))}
             </div>
-            {/* Anime templates */}
-            {templates.some(t => t.style === 'anime') && (
-              <>
-                <div className="text-xs font-semibold uppercase tracking-wider text-brand-text-secondary mt-5 mb-2">Anime</div>
-                <div className="grid grid-cols-2 gap-3">
-                  {templates.filter(t => t.style === 'anime').map(t => (
-                    <TemplateCard key={t.id} t={t} onSelect={selectTemplate} />
-                  ))}
-                </div>
-              </>
-            )}
             <button onClick={() => setStep('custom')}
               className="w-full mt-4 p-4 rounded-xl border border-dashed border-brand-accent/40 text-brand-accent hover:bg-brand-accent/10 transition-colors flex items-center justify-center gap-2">
               <span className="text-xl leading-none">✨</span>
@@ -591,22 +589,82 @@ export default function CompanionCreate() {
               </div>
             )}
 
-            {/* Personality preview */}
+            {/* Name */}
+            <div className="bg-brand-card border border-brand-border rounded-xl p-4">
+              <div className="text-sm text-brand-muted mb-1">Name</div>
+              <input type="text" value={selected.name}
+                onChange={e => setSelected({ ...selected, name: e.target.value })}
+                className="w-full bg-transparent text-brand-text font-semibold text-lg focus:outline-none border-b border-transparent focus:border-brand-accent transition-colors"
+                maxLength={30} />
+            </div>
+
+            {/* Personality */}
             <div className="bg-brand-card border border-brand-border rounded-xl p-4">
               <div className="text-sm text-brand-muted mb-1">Personality</div>
-              <p className="text-sm text-brand-text-secondary line-clamp-4">{selected.personality}</p>
+              <textarea value={selected.personality}
+                onChange={e => setSelected({ ...selected, personality: e.target.value })}
+                rows={4}
+                className="w-full bg-transparent text-sm text-brand-text-secondary focus:outline-none focus:text-brand-text resize-none border-b border-transparent focus:border-brand-accent transition-colors"
+                maxLength={2000} />
             </div>
 
             {/* Traits */}
-            {selected.traits && selected.traits.length > 0 && (
-              <div className="flex flex-wrap gap-2">
+            <div className="bg-brand-card border border-brand-border rounded-xl p-4">
+              <div className="text-sm text-brand-muted mb-1">Traits</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
                 {(Array.isArray(selected.traits) ? selected.traits : []).map((t, i) => (
-                  <span key={i} className="px-3 py-1 rounded-full bg-brand-accent/10 text-brand-accent text-xs font-medium">
-                    {t}
-                  </span>
+                  <button key={i} type="button"
+                    onClick={() => setSelected({ ...selected, traits: selected.traits.filter((_, j) => j !== i) })}
+                    className="px-3 py-1 rounded-full bg-brand-accent/10 text-brand-accent text-xs font-medium hover:bg-brand-accent/20 transition-colors flex items-center gap-1">
+                    {t} <span className="text-brand-accent/50">x</span>
+                  </button>
                 ))}
               </div>
-            )}
+              <div className="flex gap-2">
+                <input type="text" value={confirmTrait}
+                  onChange={e => setConfirmTrait(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const t = confirmTrait.trim().toLowerCase();
+                      const traits = Array.isArray(selected.traits) ? selected.traits : [];
+                      if (t && !traits.includes(t) && traits.length < 10) {
+                        setSelected({ ...selected, traits: [...traits, t] });
+                        setConfirmTrait('');
+                      }
+                    }
+                  }}
+                  placeholder="Add trait..."
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-brand-surface border border-brand-border text-brand-text text-xs focus:outline-none focus:border-brand-accent"
+                  maxLength={30} />
+                <button type="button" onClick={() => {
+                  const t = confirmTrait.trim().toLowerCase();
+                  const traits = Array.isArray(selected.traits) ? selected.traits : [];
+                  if (t && !traits.includes(t) && traits.length < 10) {
+                    setSelected({ ...selected, traits: [...traits, t] });
+                    setConfirmTrait('');
+                  }
+                }} disabled={!confirmTrait.trim()}
+                  className="px-3 rounded-lg bg-brand-surface border border-brand-border text-brand-text-secondary text-xs hover:bg-brand-border disabled:opacity-30 transition-colors">
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Voice */}
+            <div className="bg-brand-card border border-brand-border rounded-xl p-4">
+              <div className="text-sm text-brand-muted mb-2">Voice</div>
+              <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
+                {VOICES.map(v => (
+                  <button key={v.id} type="button"
+                    onClick={() => setSelected({ ...selected, voice_id: v.id })}
+                    className={`px-2 py-1.5 rounded-lg border text-left transition-colors ${(selected.voice_id || '') === v.id ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border bg-brand-surface hover:border-brand-accent/40'}`}>
+                    <div className={`text-xs font-medium ${(selected.voice_id || '') === v.id ? 'text-brand-accent' : 'text-brand-text'}`}>{v.label}</div>
+                    <div className="text-[10px] text-brand-muted leading-tight">{v.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {error && (
               <div className="p-3 rounded-lg bg-brand-error/10 border border-brand-error/30 text-brand-error text-sm text-center">
@@ -614,9 +672,9 @@ export default function CompanionCreate() {
               </div>
             )}
 
-            <button onClick={createCompanion} disabled={creating}
-              className="w-full py-3 rounded-xl bg-brand-accent text-white font-semibold disabled:opacity-60 hover:bg-brand-accent-hover transition-colors">
-              {creating ? 'Bringing her to life...' : `Awaken ${selected.name}`}
+            <button onClick={createCompanion} disabled={creating || !selected.name.trim()}
+              className="w-full py-3 rounded-xl bg-brand-accent text-white font-semibold disabled:opacity-40 hover:bg-brand-accent-hover transition-colors">
+              {creating ? 'Bringing her to life...' : `Awaken ${selected.name.trim() || '...'}`}
             </button>
           </div>
         )}
