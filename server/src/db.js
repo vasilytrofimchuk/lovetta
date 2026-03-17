@@ -24,7 +24,7 @@ function getPool() {
   pool = new Pool({
     connectionString: url,
     ssl,
-    max: 20,
+    max: 110,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   });
