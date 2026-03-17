@@ -85,7 +85,7 @@ export default function Pricing() {
               <div className="bg-brand-card border border-brand-border rounded-xl p-5">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-brand-text">Monthly</h3>
-                  <span className="text-brand-accent font-bold text-lg">$20/mo</span>
+                  <span className="text-brand-accent font-bold text-lg">$19.99/mo</span>
                 </div>
                 <p className="text-sm text-brand-muted mb-4">Unlimited conversations, images, girlfriends</p>
                 <button
@@ -104,7 +104,7 @@ export default function Pricing() {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-brand-text">Yearly</h3>
                   <div className="text-right">
-                    <span className="text-brand-accent font-bold text-lg">$100/yr</span>
+                    <span className="text-brand-accent font-bold text-lg">$99.99/yr</span>
                     <span className="text-brand-muted text-sm ml-2">~$8.33/mo</span>
                   </div>
                 </div>

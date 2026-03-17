@@ -66,7 +66,7 @@ const MIGRATIONS = [
         ('image_level_appstore', '0'),
         ('image_level_telegram', '1'),
         ('max_companions', '3'),
-        ('tip_request_threshold_usd', '"2.00"'),
+        ('tip_request_threshold_usd', '"10.00"'),
         ('openrouter_model', '"thedrummer/rocinante-12b"'),
         ('openrouter_fallback_model', '"sao10k/l3.1-euryale-70b"'),
         ('fal_image_model', '"fal-ai/flux/dev"'),
@@ -435,6 +435,18 @@ const MIGRATIONS = [
       UPDATE companion_templates SET avatar_url = '${R2}/avatars/anime/700b4223-43d0-4c56-b85b-110c859316f8.jpg' WHERE name = 'Sakura';
       UPDATE companion_templates SET avatar_url = '${R2}/avatars/anime/f3acc5f3-a839-401e-8faf-fdca12f9f93d.jpg' WHERE name = 'Hana';
     `,
+  },
+  {
+    name: 'v13_tip_threshold_10',
+    sql: `UPDATE app_settings SET value = '"10.00"' WHERE key = 'tip_request_threshold_usd' AND value = '"2.00"';`,
+  },
+  {
+    name: 'v14_message_scene_text',
+    sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS scene_text TEXT;`,
+  },
+  {
+    name: 'v15_user_companion_video_url',
+    sql: `ALTER TABLE user_companions ADD COLUMN IF NOT EXISTS video_url TEXT;`,
   },
 ];
 

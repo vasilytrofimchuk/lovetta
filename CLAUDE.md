@@ -222,6 +222,17 @@ Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
 - **Heroku app**: `lovetta-ai`
 - Auto-deploys from GitHub on push to main
 - Procfile: `web: node server/index.js`
+- Migrations run automatically on server start (`migrate()` in `server/index.js`)
+
+### DB Sync: Dev ↔ Prod
+
+**All DB changes MUST go through migrations** so prod gets them on deploy:
+- Schema changes → add migration in `MIGRATIONS` array in `migrate.js`
+- Template data (avatar_url, video_url, new templates) → add UPDATE/INSERT in a migration
+- App settings fixes → add UPDATE in a migration (settings use `ON CONFLICT DO NOTHING` so seed won't fix bad values)
+- **NEVER** rely on manual DB queries or one-off scripts for prod data — always use migrations
+- Media files (images, videos) are stored in **Cloudflare R2** (public CDN) — same URLs work in dev and prod
+- Custom avatar URLs are hardcoded in `web/src/pages/CompanionCreate.jsx` — no DB dependency
 
 ### Ports
 

@@ -1,7 +1,7 @@
 /**
  * Stripe billing — subscriptions, tips, webhook handling.
- * Plans: monthly ($20), yearly ($100), 3-day free trial.
- * Tips: $10, $20, $50, $100 (one-time payments).
+ * Plans: monthly ($19.99), yearly ($99.99), 3-day free trial.
+ * Tips: $9.99, $19.99, $49.99, $99.99 (one-time payments).
  */
 
 const { getPool } = require('./db');
@@ -23,7 +23,7 @@ const PLANS = {
   yearly: { price: (process.env.STRIPE_YEARLY_PRICE_ID || '').trim() },
 };
 
-const TIP_AMOUNTS = [1000, 2000, 5000, 10000]; // cents
+const TIP_AMOUNTS = [999, 1999, 4999, 9999]; // cents
 
 // -- Checkout sessions ------------------------------------
 
@@ -67,8 +67,8 @@ async function createTipCheckout(userId, amount, email, companionId) {
       },
       quantity: 1,
     }],
-    success_url: `${SITE_URL}/my/?tip=success`,
-    cancel_url: `${SITE_URL}/my/?tip=cancel`,
+    success_url: companionId ? `${SITE_URL}/my/chat/${companionId}?tip=success` : `${SITE_URL}/my/?tip=success`,
+    cancel_url: companionId ? `${SITE_URL}/my/chat/${companionId}?tip=cancel` : `${SITE_URL}/my/?tip=cancel`,
     metadata,
   });
   return session;
@@ -303,8 +303,8 @@ async function getUserSubscription(userId) {
 }
 
 function isSubscriptionActive(sub) {
-  // In development, always allow access for testing
-  if (process.env.NODE_ENV === 'development') return true;
+  // In development/test, always allow access for testing
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') return true;
   if (!sub) return false;
   if (sub.status !== 'active' && sub.status !== 'canceling' && sub.status !== 'trialing') return false;
   if (sub.current_period_end && new Date(sub.current_period_end) <= new Date()) return false;

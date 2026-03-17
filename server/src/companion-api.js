@@ -46,7 +46,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: `Maximum ${maxCompanions} companions allowed` });
     }
 
-    const { templateId, name, personality, backstory, traits, communicationStyle, age, avatarUrl } = req.body || {};
+    const { templateId, name, personality, backstory, traits, communicationStyle, age, avatarUrl, videoUrl, voiceId } = req.body || {};
     let companionData;
 
     if (templateId) {
@@ -64,7 +64,9 @@ router.post('/', authenticate, async (req, res) => {
         avatar_url: t.avatar_url,
         traits: traits || t.traits,
         communication_style: communicationStyle || t.communication_style,
-        age: Math.max(20, age || t.age),
+        age: Math.max(18, age || t.age),
+        style: t.style || 'realistic',
+        voice_id: voiceId || t.voice_id || 'nova',
       };
     } else {
       // Custom companion
@@ -79,18 +81,20 @@ router.post('/', authenticate, async (req, res) => {
         avatar_url: avatarUrl || null,
         traits: traits || [],
         communication_style: communicationStyle || 'playful',
-        age: Math.max(20, age || 22),
+        age: Math.max(18, age || 22),
+        voice_id: voiceId || 'nova',
       };
     }
 
     // Insert companion
     const { rows: [companion] } = await pool.query(
-      `INSERT INTO user_companions (user_id, template_id, name, personality, backstory, avatar_url, traits, communication_style, age)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO user_companions (user_id, template_id, name, personality, backstory, avatar_url, traits, communication_style, age, style, voice_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [req.userId, companionData.template_id, companionData.name, companionData.personality,
        companionData.backstory, companionData.avatar_url, JSON.stringify(companionData.traits),
-       companionData.communication_style, companionData.age]
+       companionData.communication_style, companionData.age, companionData.style || 'realistic',
+       companionData.voice_id || 'nova']
     );
 
     // Create conversation
@@ -113,10 +117,23 @@ router.post('/', authenticate, async (req, res) => {
       const contextText = contextMatch ? contextMatch[1].trim() : null;
       const content = contextMatch ? result.content.slice(contextMatch[0].length).trim() : result.content;
 
+      // Always generate scene for first message
+      let sceneText = null;
+      try {
+        const sceneResult = await chatCompletion(
+          `Write a brief cinematic scene description (max 15 words). Describe setting and mood. Third person, no quotes, no brackets. Just one short sentence.`,
+          [{ role: 'user', content: `Character: ${companion.name}, ${companion.age}. ${companion.personality}\n\nHer first words: ${content}` }],
+          { model: 'thedrummer/rocinante-12b' }
+        );
+        sceneText = sceneResult.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
+      } catch (err) {
+        console.warn('[companions] Scene generation failed:', err.message);
+      }
+
       const { rows: [msg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text)
-         VALUES ($1, 'assistant', $2, $3) RETURNING *`,
-        [conversation.id, content, contextText]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text)
+         VALUES ($1, 'assistant', $2, $3, $4) RETURNING *`,
+        [conversation.id, content, contextText, sceneText]
       );
       firstMessage = msg;
 
@@ -180,7 +197,7 @@ router.patch('/:id', authenticate, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'No database' });
 
   try {
-    const { name, personality, backstory, traits, communicationStyle } = req.body || {};
+    const { name, personality, backstory, traits, communicationStyle, voiceId } = req.body || {};
     const updates = [];
     const values = [];
     let idx = 1;
@@ -190,6 +207,7 @@ router.patch('/:id', authenticate, async (req, res) => {
     if (backstory !== undefined) { updates.push(`backstory = $${idx++}`); values.push(backstory); }
     if (traits) { updates.push(`traits = $${idx++}`); values.push(JSON.stringify(traits)); }
     if (communicationStyle) { updates.push(`communication_style = $${idx++}`); values.push(communicationStyle); }
+    if (voiceId) { updates.push(`voice_id = $${idx++}`); values.push(voiceId); }
 
     if (!updates.length) return res.status(400).json({ error: 'No fields to update' });
 

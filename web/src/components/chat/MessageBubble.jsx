@@ -1,6 +1,6 @@
 import useTTS from '../../hooks/useTTS';
 
-function formatActions(text) {
+export function formatActions(text) {
   // Split on *action* patterns, render them as italic styled spans
   const parts = text.split(/(\*[^*]+\*)/g);
   return parts.map((part, i) => {
@@ -48,20 +48,36 @@ function PlayButton({ messageId }) {
 export default function MessageBubble({ message }) {
   const isUser = message.role === 'user';
 
-  // Parse leading context action from *asterisks*
+  // Parse leading scene and context action
+  let sceneText = message.scene_text || null;
   let contextText = message.context_text;
   let content = message.content;
   if (!contextText && !isUser) {
-    const match = content.match(/^\*([^*]+)\*/);
+    // Fallback: parse [scene: ...] then *action* from content
+    let remaining = content;
+    if (!sceneText) {
+      const sm = remaining.match(/\[scene:\s*([^\]]+)\]\s*/i);
+      if (sm) { sceneText = sm[1].trim(); remaining = remaining.replace(sm[0], '').trim(); }
+    }
+    const match = remaining.match(/^\*([^*]+)\*/);
     if (match) {
       contextText = match[1].trim();
-      content = content.slice(match[0].length).trim();
+      content = remaining.slice(match[0].length).trim();
+    } else {
+      content = remaining;
     }
   }
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
       <div className="max-w-[80%]">
+        {/* Scene description (assistant only) */}
+        {sceneText && !isUser && (
+          <div className="text-[13px] italic text-brand-accent/50 mb-1 px-1">
+            {sceneText}
+          </div>
+        )}
+
         {/* Context text (assistant only) */}
         {contextText && !isUser && (
           <div className="text-xs italic text-brand-muted mb-1 px-1">

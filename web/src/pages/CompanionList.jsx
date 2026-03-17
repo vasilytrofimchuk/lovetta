@@ -40,29 +40,29 @@ export default function CompanionList() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border px-4 py-3">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-7" />
           <div className="flex items-center gap-1">
+            <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-7" />
             <button
               onClick={() => navigate('/create')}
-              className="p-2 rounded-lg text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"
+              className="p-2 rounded-lg border border-brand-border text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"
               title="Create new girlfriend"
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </button>
-            <button
-              onClick={() => navigate('/profile')}
-              className="p-2 rounded-lg text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"
-              title="Profile"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="8" r="4" />
-                <path d="M20 21a8 8 0 0 0-16 0" />
-              </svg>
-            </button>
           </div>
+          <button
+            onClick={() => navigate('/profile')}
+            className="p-2 rounded-lg border border-brand-border text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"
+            title="Profile"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M20 21a8 8 0 0 0-16 0" />
+            </svg>
+          </button>
         </div>
       </div>
 

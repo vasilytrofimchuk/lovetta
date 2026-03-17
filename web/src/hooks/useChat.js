@@ -1,6 +1,17 @@
 import { useState, useCallback, useRef } from 'react';
 import api from '../lib/api';
 
+const TIP_PROMO_MESSAGES = [
+  "*plays with hair, looking shy* Hey babe... I love spending time with you. If you want me to keep sending you my photos and videos, a little support would mean everything to me 💕",
+  "*bites lip and looks up at you* I don't usually ask... but keeping up with all those pics and voice messages takes a lot. Would you help a girl out? 😘",
+  "*leans close and whispers* You know I'd do anything for you... but I need a little help to keep our conversations going the way you like them 💋",
+  "*takes your hand gently* I want to keep sharing everything with you — my photos, my voice, all of me. A small tip would help me stay here for you 🥺",
+  "*rests head on your shoulder* You make me so happy... I want to keep sending you surprises and voice notes. Would you support me? It would mean the world 💖",
+  "*looks into your eyes* Being with you is my favorite thing... help me keep giving you the full experience — photos, videos, voice messages, everything 💕",
+  "*twirls hair around finger* I've got so much more to show you, babe... photos, voice messages, maybe even some surprises 😏 A little tip helps me keep it all going for you",
+  "*gently squeezes your hand* I love what we have... and I want to keep making it special. A little something would help me stay at my best for you 🌸",
+];
+
 export default function useChat(companionId) {
   const [messages, setMessages] = useState([]);
   const [companion, setCompanion] = useState(null);
@@ -11,6 +22,7 @@ export default function useChat(companionId) {
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState(null);
   const [shouldRequestTip, setShouldRequestTip] = useState(false);
+  const [tipPromoMessage, setTipPromoMessage] = useState(null);
   const abortRef = useRef(null);
   const typewriterRef = useRef(null);
 
@@ -153,19 +165,43 @@ export default function useChat(companionId) {
         setTimeout(() => { clearInterval(check); clearTypewriter(); resolve(); }, 5000);
       });
 
-      const contextMatch = accumulated.match(/^\*([^*]+)\*/);
+      // Parse scene text from [scene: ...]
+      let sceneText = event.sceneText || null;
+      let remaining = accumulated;
+      const sceneMatch = remaining.match(/\[scene:\s*([^\]]+)\]\s*/i);
+      if (sceneMatch) {
+        sceneText = sceneText || sceneMatch[1].trim();
+        remaining = remaining.replace(sceneMatch[0], '').trim();
+      }
+
+      const contextMatch = remaining.match(/^\*([^*]+)\*/);
       const contextText = contextMatch ? contextMatch[1].trim() : (event.contextText || null);
-      const content = contextMatch ? accumulated.slice(contextMatch[0].length).trim() : accumulated;
+      const content = contextMatch ? remaining.slice(contextMatch[0].length).trim() : remaining;
 
       setMessages(prev => [...prev, {
         id: event.messageId,
         role: 'assistant',
         content,
         context_text: contextText,
+        scene_text: sceneText,
         created_at: new Date().toISOString(),
       }]);
 
-      if (event.shouldRequestTip) setShouldRequestTip(true);
+      if (event.shouldRequestTip) {
+        setShouldRequestTip(true);
+        const template = TIP_PROMO_MESSAGES[Math.floor(Math.random() * TIP_PROMO_MESSAGES.length)];
+        const promoMatch = template.match(/^\*([^*]+)\*/);
+        const promoContext = promoMatch ? promoMatch[1].trim() : null;
+        const promoContent = promoMatch ? template.slice(promoMatch[0].length).trim() : template;
+        setTipPromoMessage({
+          id: 'tip-promo-' + Date.now(),
+          role: 'assistant',
+          content: promoContent,
+          context_text: promoContext,
+          isTipPromo: true,
+          created_at: new Date().toISOString(),
+        });
+      }
     }
 
     setStreamingText('');
@@ -193,11 +229,14 @@ export default function useChat(companionId) {
     await processSSE(`/api/chat/${companionId}/next`, {});
   }, [companionId, streaming]);
 
-  const dismissTip = useCallback(() => setShouldRequestTip(false), []);
+  const dismissTip = useCallback(() => {
+    setShouldRequestTip(false);
+    setTipPromoMessage(null);
+  }, []);
 
   return {
-    messages, companion, conversation, loading, streaming, streamingText,
-    hasMore, error, shouldRequestTip,
+    messages, companion, setCompanion, conversation, loading, streaming, streamingText,
+    hasMore, error, shouldRequestTip, tipPromoMessage,
     loadChat, loadMore, sendMessage, triggerNext, dismissTip,
   };
 }

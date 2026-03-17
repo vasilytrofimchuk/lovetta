@@ -179,3 +179,17 @@
 - [x] companion-api.js: Propagate `style` field when creating from template
 - [x] CompanionCreate.jsx: Section template grid into "Realistic" and "Anime" groups
 - [x] CompanionCreate.jsx: Remove 6 anime avatar URLs used for templates from CUSTOM_AVATARS
+
+## Tip Promotion: In-Chat Message with Buttons
+- [x] Create shared tipCheckout.js helper (TIP_AMOUNTS + startTipCheckout)
+- [x] Export formatActions from MessageBubble for reuse
+- [x] Add romantic TIP_PROMO_MESSAGES templates in useChat.js
+- [x] Add tipPromoMessage state and generation on threshold hit
+- [x] Create TipPromoMessage component with inline tip buttons
+- [x] Integrate TipPromoMessage into MessageList
+- [x] Remove old tip banner from ChatPage, pass new props
+- [x] Refactor CompanionSheet to use shared tipCheckout helper
+- [x] Migration v13: Change tip threshold default from $2 to $10
+- [x] Move AI settings from Economics tab to Settings tab in admin
+- [x] Change threshold to $10/month across ALL companions (not per-companion)
+- [x] Check monthly cost from api_consumption + tips table (no more user_companion_cost_balance for threshold)

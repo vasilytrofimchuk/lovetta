@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import MessageBubble from './MessageBubble';
 import StreamingMessage from './StreamingMessage';
+import TipPromoMessage from './TipPromoMessage';
 
-export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger }) {
+export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, companionId }) {
   const bottomRef = useRef(null);
   const containerRef = useRef(null);
   const sentinelRef = useRef(null);
@@ -54,6 +55,11 @@ export default function MessageList({ messages, streaming, streamingText, hasMor
         {messages.map(msg => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
+
+        {/* Tip promo message */}
+        {tipPromoMessage && (
+          <TipPromoMessage message={tipPromoMessage} companionId={companionId} onDismiss={onDismissTip} />
+        )}
 
         {/* Streaming indicator */}
         {streaming && <StreamingMessage text={streamingText} />}

@@ -11,13 +11,14 @@ const GRADIENT_COLORS = [
 
 const R2C = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/custom';
 const R2A = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/avatars/anime';
+const R2V = 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/avatars/custom';
 const CUSTOM_AVATARS = [
-  // Realistic — batch 1
-  { url: `${R2C}/03ebd213-a7b8-457b-ab70-bf8dcfd7db7f.jpg`, hair: 'brunette', skin: 'light', style: 'real', age: '18-22' },
-  { url: `${R2C}/ddb5c3c0-7df1-43ca-bd06-6a7c4c9c35a3.jpg`, hair: 'blonde', skin: 'light', style: 'real', age: '18-22' },
-  { url: `${R2C}/d7ede44e-5676-4672-868b-3704ca0399dd.jpg`, hair: 'red', skin: 'light', style: 'real', age: '23-29' },
-  { url: `${R2C}/a4d9024a-129b-4406-bed2-e00564612d4f.jpg`, hair: 'black', skin: 'asian', style: 'real', age: '18-22' },
-  { url: `${R2C}/4d45d803-b90a-4bd4-a311-3028ffce54d0.jpg`, hair: 'blonde', skin: 'light', style: 'real', age: '23-29' },
+  // Realistic — batch 1 (first 5 have videos)
+  { url: `${R2C}/03ebd213-a7b8-457b-ab70-bf8dcfd7db7f.jpg`, video: `${R2V}/fdb330b9-f26d-4b40-a7af-87f2c89d7651.mp4`, hair: 'brunette', skin: 'light', style: 'real', age: '18-22' },
+  { url: `${R2C}/ddb5c3c0-7df1-43ca-bd06-6a7c4c9c35a3.jpg`, video: `${R2V}/99763c1e-dd6b-4725-8cf4-b551b15494de.mp4`, hair: 'blonde', skin: 'light', style: 'real', age: '18-22' },
+  { url: `${R2C}/d7ede44e-5676-4672-868b-3704ca0399dd.jpg`, video: `${R2V}/b7cd29bc-55e9-4962-87af-c4b31184b20b.mp4`, hair: 'red', skin: 'light', style: 'real', age: '23-29' },
+  { url: `${R2C}/a4d9024a-129b-4406-bed2-e00564612d4f.jpg`, video: `${R2V}/97624c9a-5954-449e-afb9-ef59b5d6e74e.mp4`, hair: 'black', skin: 'asian', style: 'real', age: '18-22' },
+  { url: `${R2C}/4d45d803-b90a-4bd4-a311-3028ffce54d0.jpg`, video: `${R2V}/47185f23-6169-4d3f-a79c-b034751618e0.mp4`, hair: 'blonde', skin: 'light', style: 'real', age: '23-29' },
   { url: `${R2C}/91de6f92-5d82-4b1f-b99f-1f4ed51bdc6d.jpg`, hair: 'brunette', skin: 'light', style: 'real', age: '30-39' },
   { url: `${R2C}/d0159b29-ba4e-47cf-abbc-8d213854c915.jpg`, hair: 'brunette', skin: 'medium', style: 'real', age: '18-22' },
   { url: `${R2C}/238e014a-fcb2-4ce7-8eee-7b67cb18e587.jpg`, hair: 'brunette', skin: 'light', style: 'real', age: '30-39' },
@@ -235,7 +236,8 @@ export default function CompanionCreate() {
   const [selected, setSelected] = useState(null);
   const [customName, setCustomName] = useState('');
   const [customPersonality, setCustomPersonality] = useState('');
-  const [customAvatar, setCustomAvatar] = useState(null); // null = initials, string = URL
+  const [customAvatar, setCustomAvatar] = useState(null); // null = initials, { url, video? }
+  const [previewAvatar, setPreviewAvatar] = useState(null); // avatar object for video popup
   const [customTraits, setCustomTraits] = useState([]);
   const [newTrait, setNewTrait] = useState('');
   const [customVoice, setCustomVoice] = useState('cgSgspJ2msm6clMCkdW9');
@@ -285,10 +287,12 @@ export default function CompanionCreate() {
 
   function submitCustom() {
     if (!customName.trim() || !customPersonality.trim()) return;
+    const avatarObj = customAvatar ? CUSTOM_AVATARS.find(a => a.url === customAvatar) : null;
     setSelected({
       name: customName.trim(),
       personality: customPersonality.trim(),
       avatar_url: customAvatar,
+      video_url: avatarObj?.video || null,
       tagline: '',
       traits: customTraits,
       communication_style: 'playful',
@@ -443,9 +447,19 @@ export default function CompanionCreate() {
                       )}
                     </button>
                     {visible.map(a => (
-                      <button key={a.url} type="button" onClick={() => setCustomAvatar(a.url)}
+                      <button key={a.url} type="button" onClick={() => {
+                        setCustomAvatar(a.url);
+                        if (a.video) setPreviewAvatar(a);
+                      }}
                         className={`relative w-full aspect-square rounded-full overflow-hidden border-2 transition-colors ${customAvatar === a.url ? 'border-brand-accent' : 'border-brand-border hover:border-brand-accent/40'}`}>
                         <img src={a.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        {a.video && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full bg-black/50 flex items-center justify-center">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21" /></svg>
+                            </div>
+                          </div>
+                        )}
                       </button>
                     ))}
                     {hasMore && (
@@ -679,6 +693,21 @@ export default function CompanionCreate() {
           </div>
         )}
       </div>
+
+      {/* Video preview popup */}
+      {previewAvatar && previewAvatar.video && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPreviewAvatar(null)}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="relative w-full max-w-sm rounded-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <video src={previewAvatar.video} autoPlay muted loop playsInline
+              className="w-full aspect-[3/4] object-cover" />
+            <button onClick={() => setPreviewAvatar(null)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -74,19 +74,50 @@ ${companion.personality}
 ${companion.backstory ? companion.backstory + '\n' : ''}Communication style: ${companion.communication_style}
 ${traits ? 'Traits: ' + traits : ''}
 
-Response format: Always start with a brief action or emotional context in *asterisks*, then your message.
+Response format: Always start with a brief action or emotional context in *asterisks*, then your message. Use *actions* throughout your message too for expressiveness.
 Example: *leans closer with a playful smile* Hey, I was just thinking about you...
 
 Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.`;
 }
 
 function parseContextText(text) {
-  const match = text.match(/^\*([^*]+)\*/);
-  if (!match) return { contextText: null, content: text };
-  return {
-    contextText: match[1].trim(),
-    content: text.slice(match[0].length).trim(),
-  };
+  let sceneText = null;
+  let remaining = text;
+
+  // Extract [scene: ...] if present (anywhere in text — model may put stray text before it)
+  const sceneMatch = remaining.match(/\[scene:\s*([^\]]+)\]\s*/i);
+  if (sceneMatch) {
+    sceneText = sceneMatch[1].trim();
+    remaining = remaining.replace(sceneMatch[0], '').trim();
+  }
+
+  // Extract leading *action*
+  const match = remaining.match(/^\*([^*]+)\*/);
+  const contextText = match ? match[1].trim() : null;
+  const content = match ? remaining.slice(match[0].length).trim() : remaining;
+
+  return { sceneText, contextText, content };
+}
+
+async function generateScene(companion, messageContent) {
+  try {
+    const { chatCompletion } = require('./ai');
+    const result = await chatCompletion(
+      `Write a brief cinematic scene description (max 15 words). Describe setting and mood. Third person, no quotes, no brackets. Just one short sentence.
+
+Examples:
+- Warm golden light spills across the sheets as she stretches lazily
+- Rain patters against the window, a mug of tea in her hands
+- She leans against the kitchen counter, barefoot on cool tiles`,
+      [{ role: 'user', content: `Character: ${companion.name}, ${companion.age}. ${companion.personality}\n\nHer message: ${messageContent}` }],
+      { model: 'thedrummer/rocinante-12b' }
+    );
+    // Clean up — remove any accidental quotes, brackets, or "Scene:" prefix
+    return result.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
+  } catch (err) {
+    console.warn('[chat] scene generation failed:', err.message);
+    return null;
+  }
 }
 
 async function verifyCompanionOwnership(pool, companionId, userId) {
@@ -122,7 +153,7 @@ router.get('/:companionId', authenticate, async (req, res) => {
     const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
 
     const { rows: messages } = await pool.query(
-      `SELECT id, role, content, context_text, media_url, media_type, created_at
+      `SELECT id, role, content, context_text, scene_text, media_url, media_type, created_at
        FROM messages WHERE conversation_id = $1
        ORDER BY created_at DESC LIMIT 50`,
       [conversation.id]
@@ -224,10 +255,15 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
 
       const parsed = parseContextText(aiResult.content);
 
+      // ~30% chance to generate a scene description
+      if (!parsed.sceneText && Math.random() < 0.3) {
+        parsed.sceneText = await generateScene(companion, parsed.content);
+      }
+
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text)
-         VALUES ($1, 'assistant', $2, $3) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text)
+         VALUES ($1, 'assistant', $2, $3, $4) RETURNING id, created_at`,
+        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText]
       );
 
       await pool.query(
@@ -242,6 +278,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         type: 'done',
         messageId: savedMsg.id,
         contextText: parsed.contextText,
+        sceneText: parsed.sceneText,
         shouldRequestTip: aiResult.shouldRequestTip || false,
       })}\n\n`);
     }
@@ -321,10 +358,16 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
 
     if (!aborted && doneData) {
       const parsed = parseContextText(doneData.fullText);
+
+      // ~30% chance to generate a scene description
+      if (!parsed.sceneText && Math.random() < 0.3) {
+        parsed.sceneText = await generateScene(companion, parsed.content);
+      }
+
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text)
-         VALUES ($1, 'assistant', $2, $3) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text)
+         VALUES ($1, 'assistant', $2, $3, $4) RETURNING id, created_at`,
+        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText]
       );
       await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
 
@@ -335,6 +378,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
         type: 'done',
         messageId: savedMsg.id,
         contextText: parsed.contextText,
+        sceneText: parsed.sceneText,
         shouldRequestTip: doneData.shouldRequestTip || false,
       })}\n\n`);
     }
@@ -362,12 +406,12 @@ router.get('/:companionId/history', authenticate, async (req, res) => {
 
     let query, params;
     if (before) {
-      query = `SELECT id, role, content, context_text, media_url, media_type, created_at
+      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, created_at
                FROM messages WHERE conversation_id = $1 AND created_at < (SELECT created_at FROM messages WHERE id = $2)
                ORDER BY created_at DESC LIMIT 50`;
       params = [conversation.id, before];
     } else {
-      query = `SELECT id, role, content, context_text, media_url, media_type, created_at
+      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, created_at
                FROM messages WHERE conversation_id = $1
                ORDER BY created_at DESC LIMIT 50`;
       params = [conversation.id];

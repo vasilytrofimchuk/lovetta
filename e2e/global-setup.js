@@ -70,6 +70,8 @@ module.exports = async function globalSetup() {
       ADMIN_TOKEN: 'test-admin-token',
       JWT_SECRET: 'test-jwt-secret-000',
       JWT_REFRESH_SECRET: 'test-refresh-secret-000',
+      RESEND_API_KEY: '',
+      RESEND_INBOUND_SECRET: '',
     },
     stdio: 'pipe',
     cwd: process.cwd(),

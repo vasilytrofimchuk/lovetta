@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api, { getErrorMessage } from '../../lib/api';
+import { TIP_AMOUNTS, startTipCheckout } from '../../lib/tipCheckout';
 
 const VOICES = [
   { id: 'cgSgspJ2msm6clMCkdW9', label: 'Sunshine', desc: 'Playful & warm' },
@@ -33,8 +34,6 @@ function getGradient(name) {
   return GRADIENT_COLORS[Math.abs(hash) % GRADIENT_COLORS.length];
 }
 
-const TIP_AMOUNTS = [9.99, 19.99, 49.99, 99.99];
-
 export default function CompanionSheet({ companion, onClose, onReport, onUpdate }) {
   const [from, to] = getGradient(companion?.name || '');
   const [tipLoading, setTipLoading] = useState(null);
@@ -58,11 +57,7 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate 
   const handleTip = async (amount) => {
     setTipLoading(amount);
     try {
-      const { data } = await api.post('/api/billing/tip', {
-        amount: Math.round(amount * 100),
-        companionId: companion.id,
-      });
-      window.location.href = data.url;
+      await startTipCheckout(amount, companion.id);
     } catch (err) {
       alert(getErrorMessage(err));
     } finally {

@@ -10,18 +10,31 @@ function formatActions(text) {
 }
 
 export default function StreamingMessage({ text }) {
-  // Parse leading context
+  // Parse leading scene and context
+  let sceneText = null;
   let contextText = null;
   let content = text;
-  const match = text.match(/^\*([^*]+)\*/);
+
+  const sceneMatch = content.match(/\[scene:\s*([^\]]+)\]\s*/i);
+  if (sceneMatch) {
+    sceneText = sceneMatch[1].trim();
+    content = content.replace(sceneMatch[0], '').trim();
+  }
+
+  const match = content.match(/^\*([^*]+)\*/);
   if (match) {
     contextText = match[1].trim();
-    content = text.slice(match[0].length).trim();
+    content = content.slice(match[0].length).trim();
   }
 
   return (
     <div className="flex justify-start mb-3">
       <div className="max-w-[80%]">
+        {sceneText && (
+          <div className="text-[13px] italic text-brand-accent/50 mb-1 px-1">
+            {sceneText}
+          </div>
+        )}
         {contextText && (
           <div className="text-xs italic text-brand-muted mb-1 px-1">
             *{contextText}*

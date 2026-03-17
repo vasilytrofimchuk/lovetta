@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import useChat from '../hooks/useChat';
 import ChatHeader from '../components/chat/ChatHeader';
 import MessageList from '../components/chat/MessageList';
@@ -10,14 +10,27 @@ import ReportModal from '../components/chat/ReportModal';
 export default function ChatPage() {
   const { companionId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
-    messages, companion, loading, streaming, streamingText,
-    hasMore, error, shouldRequestTip,
+    messages, companion, setCompanion, loading, streaming, streamingText,
+    hasMore, error, tipPromoMessage,
     loadChat, loadMore, sendMessage, triggerNext, dismissTip,
   } = useChat(companionId);
   const [showSheet, setShowSheet] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [scrollTrigger, setScrollTrigger] = useState(0);
+  const [toast, setToast] = useState(null);
+
+  // Handle tip=success/cancel query param
+  useEffect(() => {
+    const tip = searchParams.get('tip');
+    if (tip === 'success') setToast('Thank you for the tip!');
+    if (tip === 'cancel') setToast('Tip canceled');
+    if (tip) {
+      searchParams.delete('tip');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const scrollToBottom = useCallback(() => {
     setScrollTrigger(n => n + 1);
@@ -80,6 +93,14 @@ export default function ChatPage() {
     <div className="h-screen bg-brand-bg flex flex-col max-w-lg mx-auto w-full">
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
 
+      {/* Toast */}
+      {toast && (
+        <div className="px-4 py-2 bg-brand-success/10 border-b border-brand-success/30 text-brand-success text-sm text-center">
+          {toast}
+          <button onClick={() => setToast(null)} className="ml-3 text-brand-success/60 hover:text-brand-success">×</button>
+        </div>
+      )}
+
       <MessageList
         messages={messages}
         streaming={streaming}
@@ -89,25 +110,10 @@ export default function ChatPage() {
         onTriggerNext={handleTriggerNext}
         showNextButton={!streaming}
         scrollTrigger={scrollTrigger}
+        tipPromoMessage={tipPromoMessage}
+        onDismissTip={dismissTip}
+        companionId={companionId}
       />
-
-      {/* Tip banner */}
-      {shouldRequestTip && (
-        <div className="px-4 py-2 bg-brand-accent/10 border-t border-brand-accent/20 flex items-center justify-between">
-          <span className="text-sm text-brand-accent">
-            Enjoying the chat? Send {companion?.name} a tip!
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSheet(true)}
-              className="px-3 py-1 rounded-lg bg-brand-accent text-white text-xs font-medium"
-            >
-              Send Tip
-            </button>
-            <button onClick={dismissTip} className="text-brand-accent/60 hover:text-brand-accent text-lg">×</button>
-          </div>
-        </div>
-      )}
 
       {/* Error banner */}
       {error && error !== 'subscription_required' && (
@@ -126,6 +132,7 @@ export default function ChatPage() {
           companion={companion}
           onClose={() => setShowSheet(false)}
           onReport={() => { setShowSheet(false); setShowReport(true); }}
+          onUpdate={(updated) => setCompanion(updated)}
         />
       )}
 

@@ -23,54 +23,45 @@ async function trackConsumption({ userId, companionId, provider, model, callType
   // If no companion, skip threshold check
   if (!companionId) return { shouldRequestTip: false };
 
-  // Upsert running balance
-  const { rows } = await pool.query(
-    `INSERT INTO user_companion_cost_balance (user_id, companion_id, cumulative_cost_usd)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (user_id, companion_id) DO UPDATE
-       SET cumulative_cost_usd = user_companion_cost_balance.cumulative_cost_usd + $3
-     RETURNING cumulative_cost_usd, last_tip_reset_cost`,
-    [userId, companionId, costUsd]
+  // Check total cost for this user across ALL companions in the current calendar month
+  const { rows: costRows } = await pool.query(
+    `SELECT COALESCE(SUM(cost_usd), 0) AS monthly_cost
+     FROM api_consumption
+     WHERE user_id = $1
+       AND created_at >= date_trunc('month', NOW())`,
+    [userId]
   );
+  const monthlyCost = parseFloat(costRows[0].monthly_cost);
 
-  const balance = rows[0];
-  const costSinceLastTip = parseFloat(balance.cumulative_cost_usd) - parseFloat(balance.last_tip_reset_cost);
+  // Check if user has already tipped this month
+  const { rows: tipRows } = await pool.query(
+    `SELECT 1 FROM tips
+     WHERE user_id = $1
+       AND created_at >= date_trunc('month', NOW())
+     LIMIT 1`,
+    [userId]
+  );
+  const hasTippedThisMonth = tipRows.length > 0;
 
   // Load threshold from settings
   const { rows: settings } = await pool.query(
     `SELECT value FROM app_settings WHERE key = 'tip_request_threshold_usd'`
   );
-  const threshold = parseFloat(settings[0]?.value || '2.00');
+  const threshold = parseFloat(settings[0]?.value || '10.00');
 
   return {
-    shouldRequestTip: costSinceLastTip >= threshold,
-    costSinceLastTip,
+    shouldRequestTip: !hasTippedThisMonth && monthlyCost >= threshold,
+    monthlyCost,
   };
 }
 
 /**
- * Reset the tip counter for a user-companion pair (called when tip is received).
- * If no companionId, resets all balances for the user.
+ * Reset the tip counter for a user (called when tip is received).
+ * Now a no-op — threshold logic checks the tips table directly for current month.
  */
 async function resetTipCounter(userId, companionId) {
-  const pool = getPool();
-  if (!pool) return;
-
-  if (companionId) {
-    await pool.query(
-      `UPDATE user_companion_cost_balance
-       SET last_tip_at = NOW(), last_tip_reset_cost = cumulative_cost_usd
-       WHERE user_id = $1 AND companion_id = $2`,
-      [userId, companionId]
-    );
-  } else {
-    await pool.query(
-      `UPDATE user_companion_cost_balance
-       SET last_tip_at = NOW(), last_tip_reset_cost = cumulative_cost_usd
-       WHERE user_id = $1`,
-      [userId]
-    );
-  }
+  // No-op: tip insertion into `tips` table is sufficient.
+  // trackConsumption checks tips table for current month.
 }
 
 /**
