@@ -1,7 +1,10 @@
 import axios from 'axios'
 
+const isNative = !!(window.Capacitor?.isNativePlatform?.())
+const API_BASE = isNative ? 'https://lovetta.ai' : ''
+
 const api = axios.create({
-  baseURL: '',
+  baseURL: API_BASE,
   withCredentials: true,
 })
 
@@ -52,7 +55,7 @@ api.interceptors.response.use(
         refreshPromise = null
         localStorage.removeItem('lovetta-token')
         localStorage.removeItem('lovetta-refresh-token')
-        window.location.href = '/my/login' // full path, not basename-relative
+        window.location.href = isNative ? '/my/login' : '/my/login'
         return Promise.reject(error)
       }
     }
