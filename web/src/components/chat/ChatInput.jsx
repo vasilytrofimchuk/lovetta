@@ -67,9 +67,9 @@ export default function ChatInput({ onSend, disabled }) {
           });
           if (resp.ok) {
             const data = await resp.json();
-            const transcript = data.text || '';
-            if (transcript.trim()) {
-              setText(prev => prev ? prev + ' ' + transcript.trim() : transcript.trim());
+            const transcript = (data.text || '').trim();
+            if (transcript) {
+              onSend(transcript);
             }
           }
         } catch (err) {
