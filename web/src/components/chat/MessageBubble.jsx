@@ -1,5 +1,16 @@
 import useTTS from '../../hooks/useTTS';
 
+function truncateNatural(text, maxWords) {
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) return text;
+  for (let i = maxWords - 1; i >= Math.floor(maxWords / 2); i--) {
+    if (/[,;.\-–—]$/.test(words[i])) {
+      return words.slice(0, i + 1).join(' ').replace(/[,;.\-–—]+$/, '');
+    }
+  }
+  return words.slice(0, maxWords).join(' ');
+}
+
 export function formatActions(text) {
   // Split on *action* patterns, render them as italic styled spans
   const parts = text.split(/(\*[^*]+\*)/g);
@@ -63,9 +74,7 @@ export default function MessageBubble({ message }) {
     if (match) {
       contextText = match[1].trim();
       remaining = remaining.slice(match[0].length).trim();
-      // Truncate context to max 8 words
-      const words = contextText.split(/\s+/);
-      if (words.length > 8) contextText = words.slice(0, 8).join(' ');
+      contextText = truncateNatural(contextText, 8);
     }
     content = remaining;
   }

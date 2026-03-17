@@ -8,6 +8,17 @@ const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
 const { chatCompletion } = require('./ai');
 
+function truncateNatural(text, maxWords) {
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) return text;
+  for (let i = maxWords - 1; i >= Math.floor(maxWords / 2); i--) {
+    if (/[,;.\-–—]$/.test(words[i])) {
+      return words.slice(0, i + 1).join(' ').replace(/[,;.\-–—]+$/, '');
+    }
+  }
+  return words.slice(0, maxWords).join(' ');
+}
+
 const router = Router();
 
 // -- GET /api/companions/avatars — custom avatars with filters --
@@ -177,11 +188,7 @@ router.post('/', authenticate, async (req, res) => {
       const contextMatch = result.content.match(/^\*([^*]+)\*/);
       let contextText = contextMatch ? contextMatch[1].trim() : null;
       const content = contextMatch ? result.content.slice(contextMatch[0].length).trim() : result.content;
-      // Truncate context to 8 words
-      if (contextText) {
-        const cw = contextText.split(/\s+/);
-        if (cw.length > 8) contextText = cw.slice(0, 8).join(' ');
-      }
+      if (contextText) contextText = truncateNatural(contextText, 8);
 
       // Always generate scene for first message
       let sceneText = null;
@@ -198,10 +205,7 @@ Examples:
           { model: 'thedrummer/rocinante-12b' }
         );
         let scene = sceneResult.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
-        // Hard truncate to 10 words
-        const sw = scene.split(/\s+/);
-        if (sw.length > 10) scene = sw.slice(0, 10).join(' ');
-        sceneText = scene;
+        sceneText = truncateNatural(scene, 10);
       } catch (err) {
         console.warn('[companions] Scene generation failed:', err.message);
       }

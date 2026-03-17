@@ -1,3 +1,14 @@
+function truncateNatural(text, maxWords) {
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) return text;
+  for (let i = maxWords - 1; i >= Math.floor(maxWords / 2); i--) {
+    if (/[,;.\-–—]$/.test(words[i])) {
+      return words.slice(0, i + 1).join(' ').replace(/[,;.\-–—]+$/, '');
+    }
+  }
+  return words.slice(0, maxWords).join(' ');
+}
+
 function formatActions(text) {
   const parts = text.split(/(\*[^*]+\*)/g);
   return parts.map((part, i) => {
@@ -25,9 +36,7 @@ export default function StreamingMessage({ text, mediaLoading, mediaLoadingType,
   if (match) {
     contextText = match[1].trim();
     content = content.slice(match[0].length).trim();
-    // Truncate context to 8 words
-    const words = contextText.split(/\s+/);
-    if (words.length > 8) contextText = words.slice(0, 8).join(' ');
+    contextText = truncateNatural(contextText, 8);
   }
 
   return (

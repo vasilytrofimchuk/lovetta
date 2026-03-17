@@ -567,6 +567,17 @@ const MIGRATIONS = [
       console.log(`[migrate] Seeded ${avatars.length} custom avatars`);
     },
   },
+  {
+    name: 'v23_anime_template_videos',
+    sql: `
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/37/07d46a08-f69b-4c06-b7c6-95861d325197.mp4' WHERE name = 'Sakura' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/38/add15ce1-b9c1-4289-bafc-89afbbff9dbc.mp4' WHERE name = 'Yuki' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/39/a70ab942-c287-4cea-a25f-c24992c3e1e1.mp4' WHERE name = 'Hana' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/40/eb2ff94f-865d-4334-8d7b-81b6b41b6fc5.mp4' WHERE name = 'Rei' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/41/86e556b1-7db7-4608-aebf-2803c5e61bad.mp4' WHERE name = 'Aiko' AND video_url IS NULL;
+      UPDATE companion_templates SET video_url = '${R2}/videos/templates/42/4488dca4-ddc5-44f1-a07f-f52b544df717.mp4' WHERE name = 'Mei' AND video_url IS NULL;
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

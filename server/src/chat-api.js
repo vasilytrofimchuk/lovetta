@@ -95,6 +95,23 @@ You can send photos and short videos of yourself.
 [SEND_IMAGE: sitting on bed in a lace nightgown, soft bedroom lighting, looking at camera with a playful smile]`;
 }
 
+/**
+ * Truncate text to maxWords, cutting at a natural break (comma, dash, period)
+ * if possible. Falls back to hard cut at maxWords.
+ */
+function truncateNatural(text, maxWords) {
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) return text;
+
+  // Look for a natural break (,  —  –  -  ;  .) within the first maxWords
+  for (let i = maxWords - 1; i >= Math.floor(maxWords / 2); i--) {
+    if (/[,;.\-–—]$/.test(words[i])) {
+      return words.slice(0, i + 1).join(' ').replace(/[,;.\-–—]+$/, '');
+    }
+  }
+  return words.slice(0, maxWords).join(' ');
+}
+
 function parseContextText(text) {
   let sceneText = null;
   let remaining = text;
@@ -113,11 +130,7 @@ function parseContextText(text) {
     remaining = remaining.slice(match[0].length).trim();
   }
 
-  // Truncate context to max 8 words
-  if (contextText) {
-    const words = contextText.split(/\s+/);
-    if (words.length > 8) contextText = words.slice(0, 8).join(' ');
-  }
+  if (contextText) contextText = truncateNatural(contextText, 8);
 
   // Mid-text *actions* stay in content — frontend renders them as styled text
   return { sceneText, contextText, content: remaining };
@@ -140,10 +153,7 @@ Examples:
     );
     // Clean up — remove any accidental quotes, brackets, or "Scene:" prefix
     let scene = result.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
-    // Hard truncate to 10 words max
-    const words = scene.split(/\s+/);
-    if (words.length > 10) scene = words.slice(0, 10).join(' ');
-    return scene;
+    return truncateNatural(scene, 10);
   } catch (err) {
     console.warn('[chat] scene generation failed:', err.message);
     return null;
