@@ -290,3 +290,10 @@
 - [x] Update form JS validation to not require email
 - [x] Remove email from localStorage landing data
 - [x] Clean up Signup.jsx pre-fill (no more email from landing data)
+
+### Landing Page: Apple-compliant Trial Section
+- [x] Prominent pricing: $19.99/mo and $99.99/yr displayed large with "save 58%" badge
+- [x] Trial timeline: Today → Day 3 (trial ends) → Day 4 (first charge) visual
+- [x] Subscription features list: unlimited messages, personality & memory, voice & photos
+- [x] Auto-renewal disclosure: "3-day free trial, then auto-renews. Cancel anytime"
+- [x] Terms & Privacy links already present in form checkboxes

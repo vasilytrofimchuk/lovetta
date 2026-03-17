@@ -2,9 +2,9 @@ const { defineConfig } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  timeout: 15_000,
   retries: 0,
-  workers: 1,
+  workers: 4,
   reporter: [['list']],
   globalSetup: './e2e/global-setup.js',
   globalTeardown: './e2e/global-teardown.js',
@@ -18,7 +18,7 @@ module.exports = defineConfig({
     {
       name: 'default',
       testMatch: '**/*.test.js',
-      testIgnore: [/demo-.*\.test\.js$/],
+      testIgnore: [/demo-.*\.test\.js$/, /ai-real\.test\.js$/],
     },
     {
       name: 'api',

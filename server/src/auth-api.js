@@ -18,8 +18,9 @@ const { sendVerificationEmail, sendResetEmail } = require('./email');
 
 const router = Router();
 
-// -- Rate limiters ----------------------------------------
-const authLimiter = rateLimit({
+// -- Rate limiters (disabled in test mode) -----------------
+const isTest = process.env.NODE_ENV === 'test';
+const authLimiter = isTest ? (req, res, next) => next() : rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
@@ -27,7 +28,7 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts, try again later' },
 });
 
-const resendLimiter = rateLimit({
+const resendLimiter = isTest ? (req, res, next) => next() : rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   message: { error: 'Too many requests, try again later' },

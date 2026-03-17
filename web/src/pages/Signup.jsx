@@ -37,6 +37,9 @@ export default function Signup() {
               aiConsentAccepted: true,
             }
           }
+          if (data.selectedPlan) {
+            localStorage.setItem('lovetta-selected-plan', data.selectedPlan)
+          }
           localStorage.removeItem('lovetta-landing-data')
         }
       } catch {}

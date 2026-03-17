@@ -67,7 +67,7 @@ test.describe('Wizard back button navigation', () => {
   test('custom form → back → choose screen', async ({ page }) => {
     await signupViaUI(page);
     await page.click('text=Get Started');
-    await page.click('text=Create from Scratch');
+    await page.click('text=Be the Creator');
     await page.waitForSelector('textarea', { timeout: 5000 });
 
     // Back from custom → choose
@@ -78,7 +78,7 @@ test.describe('Wizard back button navigation', () => {
   test('confirm screen (from custom) → back → custom form', async ({ page }) => {
     await signupViaUI(page);
     await page.click('text=Get Started');
-    await page.click('text=Create from Scratch');
+    await page.click('text=Be the Creator');
     await page.fill('input[placeholder*="name"]', 'TestGirl');
     await page.fill('textarea', 'She is amazing');
     await page.click('text=Continue');
@@ -87,7 +87,7 @@ test.describe('Wizard back button navigation', () => {
     // Back from confirm → should see custom form
     await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
     await page.waitForSelector('textarea', { timeout: 5000 });
-    await expect(page.locator('text=Create from Scratch')).toBeVisible();
+    await expect(page.locator('text=Be the Creator')).toBeVisible();
   });
 
   test('confirm screen (from Surprise Me) → back → choose screen', async ({ page }) => {

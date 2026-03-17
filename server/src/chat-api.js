@@ -123,17 +123,23 @@ async function generateScene(companion, messageContent) {
   try {
     const { chatCompletion } = require('./ai');
     const result = await chatCompletion(
-      `Write a brief cinematic scene description (max 15 words). Describe setting and mood. Third person, no quotes, no brackets. Just one short sentence.
+      `Write a scene description in 5-8 words. Setting + mood only. No character names, no quotes, no brackets, no full sentences.
 
 Examples:
-- Warm golden light spills across the sheets as she stretches lazily
-- Rain patters against the window, a mug of tea in her hands
-- She leans against the kitchen counter, barefoot on cool tiles`,
+- Warm golden light across tangled sheets
+- Rain on the window, tea in hand
+- Kitchen counter, barefoot on cool tiles
+- Dim bedroom, phone glow on her face
+- Sunset balcony, wind in her hair`,
       [{ role: 'user', content: `Character: ${companion.name}, ${companion.age}. ${companion.personality}\n\nHer message: ${messageContent}` }],
-      { model: 'sao10k/l3.3-euryale-70b' }
+      { model: 'thedrummer/rocinante-12b' }
     );
     // Clean up — remove any accidental quotes, brackets, or "Scene:" prefix
-    return result.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
+    let scene = result.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
+    // Hard truncate to 10 words max
+    const words = scene.split(/\s+/);
+    if (words.length > 10) scene = words.slice(0, 10).join(' ');
+    return scene;
   } catch (err) {
     console.warn('[chat] scene generation failed:', err.message);
     return null;

@@ -12,7 +12,19 @@ export default function Pricing() {
 
   useEffect(() => {
     api.get('/api/billing/status')
-      .then(({ data }) => setSubscription(data))
+      .then(({ data }) => {
+        setSubscription(data)
+        // Auto-trigger checkout if plan was pre-selected on landing page
+        if (!data?.hasSubscription) {
+          const plan = localStorage.getItem('lovetta-selected-plan')
+          if (plan === 'monthly' || plan === 'yearly') {
+            localStorage.removeItem('lovetta-selected-plan')
+            handleSubscribe(plan)
+          }
+        } else {
+          localStorage.removeItem('lovetta-selected-plan')
+        }
+      })
       .catch(() => {})
       .finally(() => setSubLoading(false))
   }, [])

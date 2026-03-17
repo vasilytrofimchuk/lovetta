@@ -568,7 +568,7 @@ test.describe('Billing — tip with companionId', () => {
     // the endpoint accepts the companionId parameter without a 400 error
     const res = await request.post(`${BASE}/api/billing/tip`, {
       headers: user.authHeaders,
-      data: { amount: 1000, companionId: '00000000-0000-4000-8000-000000000001' },
+      data: { amount: 999, companionId: '00000000-0000-4000-8000-000000000001' },
     });
 
     // 500 expected (Stripe not configured), NOT 400 (bad request)
@@ -581,7 +581,7 @@ test.describe('Billing — tip with companionId', () => {
 
     const res = await request.post(`${BASE}/api/billing/tip`, {
       headers: user.authHeaders,
-      data: { amount: 2000 },
+      data: { amount: 1999 },
     });
 
     // 500 expected (Stripe not configured), NOT 400
@@ -593,7 +593,7 @@ test.describe('Billing — tip with companionId', () => {
 
     const res = await request.post(`${BASE}/api/billing/tip`, {
       headers: user.authHeaders,
-      data: { amount: 9999, companionId: '00000000-0000-4000-8000-000000000001' },
+      data: { amount: 1234, companionId: '00000000-0000-4000-8000-000000000001' },
     });
 
     expect(res.status()).toBe(400);

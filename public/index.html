@@ -63,9 +63,50 @@
         <p class="subtitle">Verify your age and meet your girlfriend in minutes.</p>
 
         <div class="trial-info">
-          <div class="trial-badge">3 days free</div>
-          <p>Then $19.99/mo or $99.99/yr <span class="save-tag">save 58%</span></p>
-          <p class="trial-note">Cancel anytime during trial — no charge.</p>
+          <div class="plan-cards">
+            <div class="plan-card" data-plan="monthly" onclick="selectPlan('monthly')">
+              <div class="plan-check"></div>
+              <div class="plan-label">Monthly</div>
+              <div class="plan-price">$19.99</div>
+              <div class="plan-period">per month</div>
+            </div>
+            <div class="plan-card plan-card-best selected" data-plan="yearly" onclick="selectPlan('yearly')">
+              <div class="plan-card-badge">Best value</div>
+              <div class="plan-check"></div>
+              <div class="plan-label">Yearly</div>
+              <div class="plan-price">$99.99</div>
+              <div class="plan-period">per year</div>
+              <div class="plan-save">$8.33/mo — save 58%</div>
+            </div>
+          </div>
+
+          <div class="trial-timeline">
+            <div class="trial-step">
+              <div class="trial-dot active"></div>
+              <div class="trial-step-label">Today</div>
+              <div class="trial-step-desc">Full access, free</div>
+            </div>
+            <div class="trial-line"></div>
+            <div class="trial-step">
+              <div class="trial-dot"></div>
+              <div class="trial-step-label">Day 3</div>
+              <div class="trial-step-desc">Trial ends</div>
+            </div>
+            <div class="trial-line"></div>
+            <div class="trial-step">
+              <div class="trial-dot charge"></div>
+              <div class="trial-step-label">Day 4</div>
+              <div class="trial-step-desc">First charge</div>
+            </div>
+          </div>
+
+          <ul class="plan-features">
+            <li>Unlimited messages with your girlfriend</li>
+            <li>Unique personality &amp; memory</li>
+            <li>Voice messages &amp; photos</li>
+          </ul>
+
+          <p class="trial-note">3-day free trial, then auto-renews. Cancel anytime — no charge during trial.</p>
         </div>
 
         <form id="signup-form">
@@ -164,6 +205,16 @@
         yearSelect.appendChild(opt);
       }
     })();
+
+    // Plan selection
+    var selectedPlan = 'yearly';
+    function selectPlan(plan) {
+      selectedPlan = plan;
+      var cards = document.querySelectorAll('.plan-card');
+      cards.forEach(function(c) {
+        c.classList.toggle('selected', c.getAttribute('data-plan') === plan);
+      });
+    }
 
     // Template carousel — dating-app style cards with video
     (function() {
@@ -337,6 +388,7 @@
       var landingData = {
         birthMonth: parseInt(birthMonth, 10),
         birthYear: parseInt(birthYear, 10),
+        selectedPlan: selectedPlan,
         termsAccepted: true,
         privacyAccepted: true,
         aiConsentAccepted: true

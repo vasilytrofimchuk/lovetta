@@ -90,7 +90,7 @@ test.describe('Companion Create Wizard', () => {
 
     await expect(page.locator('text=Surprise Me')).toBeVisible();
     await expect(page.locator('text=Choose a Soul')).toBeVisible();
-    await expect(page.locator('text=Create from Scratch')).toBeVisible();
+    await expect(page.locator('text=Be the Creator')).toBeVisible();
   });
 
   test('Browse Templates shows template grid', async ({ page }) => {
@@ -117,7 +117,7 @@ test.describe('Companion Create Wizard', () => {
   test('Custom path shows name and personality form', async ({ page }) => {
     await signupViaUI(page);
     await page.click('text=Get Started');
-    await page.click('text=Create from Scratch');
+    await page.click('text=Be the Creator');
 
     await expect(page.locator('input[placeholder*="name"]')).toBeVisible();
     await expect(page.locator('textarea')).toBeVisible();
@@ -126,7 +126,7 @@ test.describe('Companion Create Wizard', () => {
   test('Custom form Continue button disabled without both fields', async ({ page }) => {
     await signupViaUI(page);
     await page.click('text=Get Started');
-    await page.click('text=Create from Scratch');
+    await page.click('text=Be the Creator');
 
     const continueBtn = page.locator('button:has-text("Continue")');
     await expect(continueBtn).toBeDisabled();
@@ -199,7 +199,7 @@ test.describe('Companion Creation — real API', () => {
   test('custom companion creation works', async ({ page }) => {
     await signupViaUI(page);
     await page.click('text=Get Started');
-    await page.click('text=Create from Scratch');
+    await page.click('text=Be the Creator');
 
     await page.fill('input[placeholder*="name"]', 'Aurora');
     await page.fill('textarea', 'Aurora is a mysterious astronomer who loves stargazing.');
