@@ -526,6 +526,10 @@ const MIGRATIONS = [
       UPDATE app_settings SET value = '"thedrummer/rocinante-12b"' WHERE key = 'openrouter_fallback_model';
     `,
   },
+  {
+    name: 'v20_trial_tip_threshold',
+    sql: `INSERT INTO app_settings (key, value) VALUES ('tip_request_threshold_trial_usd', '"0.30"') ON CONFLICT (key) DO NOTHING;`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

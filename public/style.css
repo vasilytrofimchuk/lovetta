@@ -124,7 +124,6 @@ header {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   padding: 0 24px;
   scrollbar-width: none;
@@ -141,7 +140,6 @@ header {
   border-radius: 16px;
   overflow: hidden;
   position: relative;
-  scroll-snap-align: center;
   background: var(--bg-card);
   border: 2px solid transparent;
   transition: border-color 0.3s, transform 0.3s;
@@ -257,6 +255,13 @@ header {
   font-size: 0.8rem !important;
   color: var(--text-muted) !important;
   margin-top: 4px !important;
+}
+
+.age-notice {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 12px;
 }
 
 /* Features */

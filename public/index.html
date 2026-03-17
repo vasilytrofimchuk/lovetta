@@ -57,29 +57,6 @@
       <div class="carousel-viewport" id="carousel-viewport"></div>
     </section>
 
-    <section class="features">
-      <div class="feature">
-        <div class="feature-icon">💬</div>
-        <h3>Natural Conversations</h3>
-        <p>Deep, meaningful chats that feel real. She remembers your stories and preferences.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🎭</div>
-        <h3>Unique Personality</h3>
-        <p>Choose from diverse personalities or create your own. Each girlfriend is one of a kind.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">📸</div>
-        <h3>Photos & Videos</h3>
-        <p>She can send you photos and videos. AI-generated and consistent with her character.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🔔</div>
-        <h3>Always Connected</h3>
-        <p>She reaches out to you. Get notifications across all your devices.</p>
-      </div>
-    </section>
-
     <section class="signup-section">
       <div class="signup-card">
         <h2>Start Free Trial</h2>
@@ -140,9 +117,33 @@
           </div>
 
           <button type="submit" class="btn-primary" id="submit-btn">Start Free Trial</button>
+          <p class="age-notice">18+ only. Age verification required.</p>
         </form>
 
         <div id="form-error" class="form-message error"></div>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="feature">
+        <div class="feature-icon">💬</div>
+        <h3>Natural Conversations</h3>
+        <p>Deep, meaningful chats that feel real. She remembers your stories and preferences.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🎭</div>
+        <h3>Unique Personality</h3>
+        <p>Choose from diverse personalities or create your own. Each girlfriend is one of a kind.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📸</div>
+        <h3>Photos & Videos</h3>
+        <p>She can send you photos and videos. AI-generated and consistent with her character.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔔</div>
+        <h3>Always Connected</h3>
+        <p>She reaches out to you. Get notifications across all your devices.</p>
       </div>
     </section>
 
@@ -177,6 +178,12 @@
           var templates = data.templates || [];
           if (!templates.length) return;
 
+          // Shuffle to mix anime and realistic
+          for (var i = templates.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = templates[i]; templates[i] = templates[j]; templates[j] = tmp;
+          }
+
           var viewport = document.getElementById('carousel-viewport');
 
           // Build cards
@@ -198,6 +205,10 @@
                 '</div>' +
                 '<p class="tpl-tagline">' + t.tagline + '</p>' +
               '</div>';
+
+            card.addEventListener('click', function() {
+              document.querySelector('.signup-card').scrollIntoView({ behavior: 'smooth' });
+            });
 
             viewport.appendChild(card);
           });
@@ -245,20 +256,20 @@
 
           viewport.addEventListener('scroll', updateActive, { passive: true });
 
-          // Auto-scroll
-          var autoScrollInterval;
+          // Slow continuous auto-scroll
           var scrollPaused = false;
           var pauseTimeout;
+          var speed = 0.4; // pixels per frame (~24px/sec at 60fps)
 
-          function startAutoScroll() {
-            autoScrollInterval = setInterval(function() {
-              if (scrollPaused) return;
-              var cardWidth = cards[0].offsetWidth + 12; // gap
+          function autoScroll() {
+            if (!scrollPaused) {
               var maxScroll = viewport.scrollWidth - viewport.clientWidth;
-              var next = viewport.scrollLeft + cardWidth;
-              if (next >= maxScroll - 10) next = 0;
-              viewport.scrollTo({ left: next, behavior: 'smooth' });
-            }, 3500);
+              viewport.scrollLeft += speed;
+              if (viewport.scrollLeft >= maxScroll - 1) {
+                viewport.scrollLeft = 0;
+              }
+            }
+            requestAnimationFrame(autoScroll);
           }
 
           // Pause auto-scroll on user interaction
@@ -274,10 +285,10 @@
             pauseTimeout = setTimeout(function() { scrollPaused = false; }, 5000);
           });
 
-          // Initial activation + auto-scroll
+          // Initial activation + start
           setTimeout(function() {
             updateActive();
-            startAutoScroll();
+            requestAnimationFrame(autoScroll);
           }, 300);
         })
         .catch(function() {});

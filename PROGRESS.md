@@ -266,3 +266,14 @@
 
 ### Demo Test Update
 - [x] Update demo-landing.test.js for 3 checkboxes
+
+### Trial Tip Threshold + Media Blocking
+- [x] Migration v20: seed `tip_request_threshold_trial_usd` setting (default $0.30)
+- [x] consumption.js: cumulative tips formula `netCost = monthlyCost - monthlyTips`, trial vs paid threshold
+- [x] consumption.js: `checkMediaBlocked()` helper for early request-media blocking
+- [x] ai.js: thread `subscription` object through all 7 trackConsumption calls
+- [x] chat-api.js `/message`: block media generation when threshold exceeded, send `mediaBlocked` in done event
+- [x] chat-api.js `/next`: same media blocking logic
+- [x] chat-api.js `/request-media`: early exit with `media_blocked` SSE event before LLM call
+- [x] useChat.js: handle `media_blocked` SSE event type → show tip promo
+- [x] admin.html: add Trial Tip Threshold setting in AI Settings section
