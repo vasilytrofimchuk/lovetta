@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { getErrorMessage } from '../lib/api'
 import GoogleSignIn from '../components/GoogleSignIn'
 import TelegramSignIn from '../components/TelegramSignIn'
+import AppleSignIn from '../components/AppleSignIn'
+import { isCapacitor } from '../lib/platform'
 
 export default function Login() {
   const { login, refreshUser } = useAuth()
@@ -103,10 +105,13 @@ export default function Login() {
           </button>
         </form>
 
+        <AppleSignIn onError={setError} />
         <GoogleSignIn />
-        <div className="mt-3">
-          <TelegramSignIn />
-        </div>
+        {!isCapacitor() && (
+          <div className="mt-3">
+            <TelegramSignIn />
+          </div>
+        )}
 
         <div className="mt-4 text-center">
           <Link to="/forgot-password" className="text-sm text-brand-accent hover:underline">

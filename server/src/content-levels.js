@@ -75,7 +75,7 @@ async function getContentLevels() {
   }
   const pool = getPool();
   if (!pool) {
-    return { text_level_web: 2, text_level_appstore: 0, text_level_telegram: 1, image_level_web: 2, image_level_appstore: 0, image_level_telegram: 1 };
+    return { text_level_web: 0, text_level_appstore: 0, text_level_telegram: 0, image_level_web: 0, image_level_appstore: 0, image_level_telegram: 0 };
   }
 
   const { rows } = await pool.query(
@@ -118,7 +118,7 @@ async function getUserExplicitPref(userId) {
  */
 async function getTextLevel(platform) {
   const levels = await getContentLevels();
-  return levels[`text_level_${platform}`] ?? 2;
+  return levels[`text_level_${platform}`] ?? 0;
 }
 
 /**
@@ -128,7 +128,7 @@ async function getTextLevel(platform) {
  */
 async function getImageLevel(platform) {
   const levels = await getContentLevels();
-  return levels[`image_level_${platform}`] ?? 2;
+  return levels[`image_level_${platform}`] ?? 0;
 }
 
 /**
@@ -193,6 +193,61 @@ async function buildImagePrompt(platform, userId) {
   return await getImageRules(platform, userId);
 }
 
+// -- Feature toggle settings (cached with content levels) -----
+
+let toggleCache = null;
+let toggleCacheTime = 0;
+const TOGGLE_TTL = 60000; // 60s
+
+function invalidateSettingsCache() {
+  levelsCache = null;
+  levelsCacheTime = 0;
+  toggleCache = null;
+  toggleCacheTime = 0;
+}
+
+async function getToggleSettings() {
+  if (toggleCache && Date.now() - toggleCacheTime < TOGGLE_TTL) {
+    return toggleCache;
+  }
+  const pool = getPool();
+  const defaults = { enable_image_generation: true, enable_video_generation: false, enable_avatar_age_filter: false, enable_avatar_skin_filter: false };
+  if (!pool) return defaults;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT key, value FROM app_settings WHERE key IN ('enable_image_generation', 'enable_video_generation', 'enable_avatar_age_filter', 'enable_avatar_skin_filter')`
+    );
+    const settings = { ...defaults };
+    for (const row of rows) {
+      settings[row.key] = row.value === true || row.value === 'true';
+    }
+    toggleCache = settings;
+    toggleCacheTime = Date.now();
+    return settings;
+  } catch {
+    return defaults;
+  }
+}
+
+async function getMediaEnabled() {
+  const settings = await getToggleSettings();
+  return settings.enable_image_generation;
+}
+
+async function getVideoEnabled() {
+  const settings = await getToggleSettings();
+  return settings.enable_video_generation;
+}
+
+async function getAvatarFilterSettings() {
+  const settings = await getToggleSettings();
+  return {
+    ageFilter: settings.enable_avatar_age_filter,
+    skinFilter: settings.enable_avatar_skin_filter,
+  };
+}
+
 module.exports = {
   detectPlatform,
   getTextLevel,
@@ -203,6 +258,11 @@ module.exports = {
   getImageRules,
   buildContentPrompt,
   buildImagePrompt,
+  getMediaEnabled,
+  getVideoEnabled,
+  getAvatarFilterSettings,
+  getToggleSettings,
+  invalidateSettingsCache,
   TEXT_LEVEL_RULES,
   IMAGE_LEVEL_RULES,
 };

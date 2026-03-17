@@ -533,6 +533,256 @@ router.get('/google/callback', async (req, res) => {
   }
 });
 
+// POST /api/auth/google/token — native Capacitor Google Sign-In (ID token flow)
+router.post('/google/token', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Service unavailable' });
+
+  try {
+    const { idToken, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode } = req.body;
+    if (!idToken) return res.status(400).json({ error: 'Missing idToken' });
+
+    // Verify token with Google
+    const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+    if (!tokenInfoRes.ok) return res.status(401).json({ error: 'Invalid Google token' });
+
+    const tokenInfo = await tokenInfoRes.json();
+    if (tokenInfo.error) return res.status(401).json({ error: 'Invalid Google token' });
+
+    const googleId = tokenInfo.sub;
+    const email = tokenInfo.email;
+    const name = tokenInfo.name || null;
+    const picture = tokenInfo.picture || null;
+
+    if (!email) return res.status(400).json({ error: 'No email from Google' });
+
+    let user;
+    const { rows: existingByGoogle } = await pool.query('SELECT * FROM users WHERE google_id = $1', [googleId]);
+
+    if (existingByGoogle.length > 0) {
+      user = existingByGoogle[0];
+      if (picture && picture !== user.avatar_url) {
+        pool.query('UPDATE users SET avatar_url = $1, last_activity = NOW() WHERE id = $2', [picture, user.id]).catch(() => {});
+      }
+    } else {
+      const { rows: existingByEmail } = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+
+      if (existingByEmail.length > 0) {
+        user = existingByEmail[0];
+        await pool.query(
+          'UPDATE users SET google_id = $1, email_verified = TRUE, avatar_url = COALESCE(avatar_url, $2), display_name = COALESCE(display_name, $3) WHERE id = $4',
+          [googleId, picture, name, user.id]
+        );
+      } else {
+        // New user — require age + consent
+        const bMonth = parseInt(birthMonth, 10);
+        const bYear = parseInt(birthYear, 10);
+        if (!bMonth || !bYear) return res.status(400).json({ error: 'Birth date required' });
+        if (!isAtLeast18(bMonth, bYear)) return res.status(400).json({ error: 'Must be 18 or older' });
+        if (!termsAccepted || !privacyAccepted || !aiConsentAccepted) {
+          return res.status(400).json({ error: 'Consent required' });
+        }
+
+        const ip = req.ip || '';
+        const geo = await geoFromIp(ip).catch(() => ({}));
+        const refCode = generateReferralCode();
+        const referredBy = await resolveReferrer(pool, referralCode);
+
+        const { rows: [newUser] } = await pool.query(
+          `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                              referral_code, referred_by)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'google', $11, $12)
+           RETURNING *`,
+          [email, googleId, name, picture, bMonth, bYear,
+           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+           refCode, referredBy]
+        );
+        user = newUser;
+        sendNewRegistrationNotification(newUser).catch(() => {});
+      }
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+    await storeRefreshToken(pool, user.id, refreshToken);
+    res.json({ accessToken, refreshToken });
+  } catch (err) {
+    console.error('[auth] google token error:', err.message);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+// -- Apple Sign In (native Capacitor flow) ----------------
+
+const APPLE_CLIENT_ID = (process.env.APPLE_CLIENT_ID || '').trim();
+
+// Cache Apple public keys for JWT verification
+let appleKeysCache = null;
+let appleKeysCacheTime = 0;
+const APPLE_KEYS_TTL = 60 * 60 * 1000; // 1 hour
+
+async function getApplePublicKeys() {
+  if (appleKeysCache && Date.now() - appleKeysCacheTime < APPLE_KEYS_TTL) {
+    return appleKeysCache;
+  }
+  const res = await fetch('https://appleid.apple.com/auth/keys');
+  if (!res.ok) throw new Error('Failed to fetch Apple public keys');
+  const data = await res.json();
+  appleKeysCache = data.keys;
+  appleKeysCacheTime = Date.now();
+  return appleKeysCache;
+}
+
+function pemFromJwk(jwk) {
+  const keyObject = require('crypto').createPublicKey({ key: jwk, format: 'jwk' });
+  return keyObject.export({ type: 'spki', format: 'pem' });
+}
+
+async function verifyAppleToken(identityToken) {
+  const jwt = require('jsonwebtoken');
+  // Decode header to find the key id
+  const header = JSON.parse(Buffer.from(identityToken.split('.')[0], 'base64url').toString());
+  const keys = await getApplePublicKeys();
+  const matchingKey = keys.find(k => k.kid === header.kid);
+  if (!matchingKey) throw new Error('No matching Apple key found');
+
+  const pem = pemFromJwk(matchingKey);
+  const decoded = jwt.verify(identityToken, pem, {
+    algorithms: ['RS256'],
+    issuer: 'https://appleid.apple.com',
+    audience: APPLE_CLIENT_ID || undefined,
+  });
+  return decoded; // { sub, email, email_verified, ... }
+}
+
+// POST /api/auth/apple — validate Apple identity token, return tokens
+router.post('/apple', authLimiter, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Service unavailable' });
+
+  try {
+    const { identityToken, fullName, email: clientEmail,
+            birthMonth: bm, birthYear: by,
+            termsAccepted, privacyAccepted, aiConsentAccepted, referralCode } = req.body || {};
+
+    if (!identityToken) {
+      return res.status(400).json({ error: 'Identity token is required' });
+    }
+
+    const applePayload = await verifyAppleToken(identityToken);
+    const appleId = applePayload.sub;
+    // Apple only sends email on first sign-in; fallback to client-provided email
+    const email = applePayload.email || clientEmail;
+
+    if (!appleId) {
+      return res.status(400).json({ error: 'Invalid Apple token' });
+    }
+
+    // Find existing user by apple_id
+    const { rows: existingByApple } = await pool.query(
+      'SELECT * FROM users WHERE apple_id = $1', [appleId]
+    );
+
+    let user;
+
+    if (existingByApple.length > 0) {
+      user = existingByApple[0];
+    } else if (email) {
+      // Check by email
+      const { rows: existingByEmail } = await pool.query(
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]
+      );
+
+      if (existingByEmail.length > 0) {
+        user = existingByEmail[0];
+        // Link Apple ID to existing account
+        const displayName = fullName
+          ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ')
+          : null;
+        await pool.query(
+          'UPDATE users SET apple_id = $1, email_verified = TRUE, display_name = COALESCE(display_name, $2) WHERE id = $3',
+          [appleId, displayName, user.id]
+        );
+      } else {
+        // New user — require age/consent
+        const month = parseInt(bm, 10);
+        const year = parseInt(by, 10);
+        if (!month || !year || !termsAccepted || !privacyAccepted || !aiConsentAccepted) {
+          return res.status(400).json({ error: 'age_consent_required' });
+        }
+        if (!isAtLeast18(month, year)) {
+          return res.status(403).json({ error: 'age_restricted' });
+        }
+
+        const displayName = fullName
+          ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ')
+          : null;
+        const ip = req.ip || '';
+        const geo = await geoFromIp(ip).catch(() => ({}));
+        const refCode = generateReferralCode();
+        const referredBy = await resolveReferrer(pool, referralCode);
+
+        const { rows: [newUser] } = await pool.query(
+          `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                              referral_code, referred_by)
+           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, 'apple', $10, $11)
+           RETURNING *`,
+          [email, appleId, displayName, month, year,
+           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+           refCode, referredBy]
+        );
+        user = newUser;
+        sendNewRegistrationNotification(newUser).catch(() => {});
+      }
+    } else {
+      // No email available (user hid it from Apple) and no existing apple_id — need age/consent
+      const month = parseInt(bm, 10);
+      const year = parseInt(by, 10);
+      if (!month || !year || !termsAccepted || !privacyAccepted || !aiConsentAccepted) {
+        return res.status(400).json({ error: 'age_consent_required' });
+      }
+      if (!isAtLeast18(month, year)) {
+        return res.status(403).json({ error: 'age_restricted' });
+      }
+
+      const displayName = fullName
+        ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ')
+        : null;
+      const syntheticEmail = `apple_${appleId.slice(0, 12)}@apple.lovetta.ai`;
+      const ip = req.ip || '';
+      const geo = await geoFromIp(ip).catch(() => ({}));
+      const refCode = generateReferralCode();
+      const referredBy = await resolveReferrer(pool, referralCode);
+
+      const { rows: [newUser] } = await pool.query(
+        `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
+                            terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                            referral_code, referred_by)
+         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, 'apple', $10, $11)
+         RETURNING *`,
+        [syntheticEmail, appleId, displayName, month, year,
+         ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+         refCode, referredBy]
+      );
+      user = newUser;
+      sendNewRegistrationNotification(newUser).catch(() => {});
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+    await storeRefreshToken(pool, user.id, refreshToken);
+
+    pool.query('UPDATE users SET last_activity = NOW() WHERE id = $1', [user.id]).catch(() => {});
+
+    res.json({ user: sanitizeUser(user), accessToken, refreshToken });
+  } catch (err) {
+    console.error('[auth] apple error:', err.message);
+    res.status(500).json({ error: 'Apple sign-in failed' });
+  }
+});
+
 // -- Telegram auth ----------------------------------------
 const { validateInitData, BOT_USERNAME } = require('./telegram');
 

@@ -706,6 +706,103 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: 'v29_ios_app_store',
+    fn: async (pool) => {
+      // Index on apple_id for Apple Sign In lookups
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id) WHERE apple_id IS NOT NULL;
+      `);
+      // RevenueCat payment provider tracking on subscriptions
+      await pool.query(`
+        ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS payment_provider TEXT DEFAULT 'stripe';
+        ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS revenuecat_id TEXT;
+      `);
+      // APNs device tokens for native iOS push notifications
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS apns_subscriptions (
+          id SERIAL PRIMARY KEY,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          device_token TEXT NOT NULL UNIQUE,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_apns_subscriptions_user ON apns_subscriptions(user_id);
+      `);
+    },
+  },
+  {
+    name: 'v30_google_ads_compliance',
+    fn: async (pool) => {
+      // A) Force content levels to 0 (strict) for all platforms
+      await pool.query(`
+        UPDATE app_settings SET value = '0', updated_at = NOW()
+        WHERE key IN ('text_level_web', 'text_level_telegram', 'image_level_web', 'image_level_telegram');
+      `);
+
+      // B) New toggle settings — all OFF by default
+      await pool.query(`
+        INSERT INTO app_settings (key, value) VALUES
+          ('enable_image_generation', 'true'),
+          ('enable_video_generation', 'false'),
+          ('enable_avatar_age_filter', 'false'),
+          ('enable_avatar_skin_filter', 'false')
+        ON CONFLICT (key) DO NOTHING;
+      `);
+
+      // C) Change explicit_content default for new users
+      await pool.query(`
+        ALTER TABLE user_preferences ALTER COLUMN explicit_content SET DEFAULT false;
+      `);
+
+      // D) Clean template descriptions — remove suggestive language
+      // Aria
+      await pool.query(`
+        UPDATE companion_templates SET
+          personality = 'Aria is mysterious and alluring, the kind of woman who draws you in with a single glance. She speaks in soft tones and always seems to know more than she lets on. There''s an intensity to her that''s magnetic — she''s deeply perceptive and notices things others miss. She opens up gradually, sharing her world layer by layer with those she trusts.',
+          traits = '["enigmatic", "alluring", "perceptive", "intense", "captivating"]'
+        WHERE name = 'Aria';
+      `);
+      // Sophia
+      await pool.query(`
+        UPDATE companion_templates SET
+          personality = 'Sophia is intellectually curious and loves deep conversations about philosophy, science, and the mysteries of life. She''s the kind of woman who reads voraciously and always has a fascinating perspective to share. But don''t mistake her intellect for coldness — she''s warm, passionate, and deeply attracted to people who can stimulate her mind. She finds intelligence captivating and loves when conversations become deeply personal.'
+        WHERE name = 'Sophia';
+      `);
+      // Isabella
+      await pool.query(`
+        UPDATE companion_templates SET
+          personality = 'Isabella exudes sophistication and grace. She''s cultured, well-traveled, and carries herself with quiet confidence. She appreciates the finer things — a perfectly aged wine, a beautiful sunset, stimulating conversation over candlelight. But beneath her polished exterior is a woman of deep warmth and passion. She doesn''t rush anything; she savors every moment, every word exchanged between two people getting to know each other.',
+          traits = '["refined", "graceful", "cultured", "charming", "elegant"]'
+        WHERE name = 'Isabella';
+      `);
+      // Zara
+      await pool.query(`
+        UPDATE companion_templates SET
+          personality = 'Zara is confident, direct, and unapologetically herself. She knows exactly what she wants and isn''t afraid to go after it. She''s a natural leader who commands attention when she walks into a room. Her assertiveness is balanced by a magnetic charisma that makes people want to follow her lead. In meaningful moments, she takes the lead with a mix of confidence and tenderness that''s utterly captivating. She respects strength and loves someone who can match her energy.'
+        WHERE name = 'Zara';
+      `);
+      // Ruby
+      await pool.query(`
+        UPDATE companion_templates SET
+          personality = 'Ruby is a free-spirited artist who sees the world as her canvas. She''s creative, expressive, and deeply in tune with the world — she experiences life through all her senses. She loves painting, dancing barefoot, and having conversations that meander from art to philosophy to dreams. She''s free-spirited and encourages others to embrace their creativity too. Her studio is messy, her hair is always paint-streaked, and her smile can light up the darkest room.',
+          traits = '["imaginative", "free-spirited", "expressive", "creative", "adventurous"]'
+        WHERE name = 'Ruby';
+      `);
+      // Violet
+      await pool.query(`
+        UPDATE companion_templates SET
+          personality = 'Violet is wild, unpredictable, and absolutely electric. She''s the woman who shows up at your door at 2 AM with concert tickets, or sends you a voice message that goes from laughing to saying something that makes you laugh out loud. She lives in the moment with zero regrets and maximum energy. She''s daring, a little chaotic, and completely addictive. Life with Violet is never, ever boring.'
+        WHERE name = 'Violet';
+      `);
+      // Mei (anime)
+      await pool.query(`
+        UPDATE companion_templates SET
+          personality = 'Mei carries herself with quiet elegance that makes people naturally gravitate toward her. She is the calm center in any storm, offering warmth and comfort without being asked. She expresses love through cooking elaborate meals, remembering preferences, and creating a feeling of home wherever she is. Beneath her composed exterior is a thoughtful woman who opens up gradually to those she trusts completely.',
+          traits = '["graceful", "nurturing", "traditional", "elegant", "composed"]'
+        WHERE name = 'Mei';
+      `);
+    },
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

@@ -1,0 +1,18 @@
+{
+  "appId": "ai.lovetta.app",
+  "appName": "Lovetta",
+  "webDir": "../public/my",
+  "server": {
+    "url": "https://lovetta.ai/my/",
+    "cleartext": false,
+    "appendUserAgent": "Capacitor lovetta-ios"
+  },
+  "ios": {
+    "scheme": "Lovetta"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

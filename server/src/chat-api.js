@@ -7,7 +7,7 @@ const { Router } = require('express');
 const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
 const { streamChat, buildSystemPrompt } = require('./ai');
-const { detectPlatform } = require('./content-levels');
+const { detectPlatform, getMediaEnabled, getVideoEnabled } = require('./content-levels');
 const { getUserSubscription, isSubscriptionActive } = require('./billing');
 const { sendCompanionEmail } = require('./email');
 const { buildMemoryContext, processMemory } = require('./memory');
@@ -124,9 +124,9 @@ async function maybeNotifyUser(pool, userId, companion, conversationId, messageC
 
 // -- Helpers --------------------------------------------------
 
-function buildCompanionSystemPrompt(companion) {
+function buildCompanionSystemPrompt(companion, { mediaEnabled = true, videoEnabled = false } = {}) {
   const traits = Array.isArray(companion.traits) ? companion.traits.join(', ') : '';
-  return `You are ${companion.name}, a ${companion.age}-year-old woman.
+  let prompt = `You are ${companion.name}, a ${companion.age}-year-old woman.
 
 ${companion.personality}
 
@@ -137,18 +137,23 @@ Response format: Start with a short action in *asterisks* (max 8 words, one simp
 Example: *leans closer with a playful smile* Hey, I was just thinking about you...
 BAD (too long): *She slowly walks across the room, her eyes sparkling as she settles onto the couch and looks up at him with a warm smile*
 
-Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.
+Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.`;
+
+  if (mediaEnabled) {
+    prompt += `
 
 MEDIA MESSAGES:
-You can send photos and short videos of yourself.
-- To send a photo, include: [SEND_IMAGE: brief scene/pose description]
-- To send a video, include: [SEND_VIDEO: brief motion description]
+You can send photos of yourself.
+- To send a photo, include: [SEND_IMAGE: brief scene/pose description]${videoEnabled ? '\n- To send a video, include: [SEND_VIDEO: brief motion description]' : ''}
 - Place the tag on its own line at the END of your message, after your text.
-- Send media when: user asks for a photo/selfie/video, or when flirting naturally calls for it.
+- Send media when: user asks for a photo/selfie${videoEnabled ? '/video' : ''}, or when flirting naturally calls for it.
 - Do NOT send media in every message. Only when it fits naturally or is requested.
 - The description should describe the scene, pose, and setting — NOT your physical appearance.
 - Example: *bites lip playfully* Want to see what I'm wearing right now?
 [SEND_IMAGE: sitting on bed in a lace nightgown, soft bedroom lighting, looking at camera with a playful smile]`;
+  }
+
+  return prompt;
 }
 
 /**
@@ -319,7 +324,8 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     const aiMessages = recentMessages.map(m => ({ role: m.role, content: m.content }));
 
     // Build system prompt with memory context
-    const basePrompt = buildCompanionSystemPrompt(companion);
+    const [mediaEnabled, videoEnabled] = await Promise.all([getMediaEnabled(), getVideoEnabled()]);
+    const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled, videoEnabled });
     const memoryContext = await buildMemoryContext(conversation.id);
     const systemPrompt = basePrompt + memoryContext;
     const platform = detectPlatform(req);
@@ -365,8 +371,12 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       // Handle media — LLM tag OR user explicitly asked for image/photo
       let mediaBlocked = false;
       let mediaPending = false;
-      let effectiveMediaRequest = mediaRequest;
-      if (!effectiveMediaRequest && /send.*(image|photo|pic|selfie|video|nude)|show me|send me.*(photo|pic|selfie|image)/i.test(content || '')) {
+      let effectiveMediaRequest = mediaEnabled ? mediaRequest : null;
+      // Downgrade video to image when video generation is disabled
+      if (effectiveMediaRequest && effectiveMediaRequest.type === 'video' && !videoEnabled) {
+        effectiveMediaRequest = { ...effectiveMediaRequest, type: 'image' };
+      }
+      if (mediaEnabled && !effectiveMediaRequest && /send.*(image|photo|pic|selfie|video|nude)|show me|send me.*(photo|pic|selfie|image)/i.test(content || '')) {
         effectiveMediaRequest = { type: 'image', description: 'a flirty selfie, looking at camera with a playful expression' };
       }
       if (effectiveMediaRequest && !aborted) {
@@ -579,6 +589,12 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
   res.on('close', () => { aborted = true; });
 
   try {
+    // Check if media generation is enabled globally
+    if (!(await getMediaEnabled())) {
+      res.write(`data: ${JSON.stringify({ type: 'error', code: 'media_disabled' })}\n\n`);
+      return res.end();
+    }
+
     const sub = await getUserSubscription(req.userId);
     if (!isSubscriptionActive(sub)) {
       res.write(`data: ${JSON.stringify({ type: 'error', code: 'subscription_required' })}\n\n`);
@@ -611,7 +627,8 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       { role: 'user', content: 'send me a photo of you right now' },
     ];
 
-    const basePrompt = buildCompanionSystemPrompt(companion);
+    const videoEnabledForMedia = await getVideoEnabled();
+    const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled: true, videoEnabled: videoEnabledForMedia });
     const memoryContext = await buildMemoryContext(conversation.id);
     const systemPrompt = basePrompt + memoryContext;
     const platform = detectPlatform(req);

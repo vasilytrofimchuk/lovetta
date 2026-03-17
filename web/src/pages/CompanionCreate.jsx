@@ -134,6 +134,11 @@ export default function CompanionCreate() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
   const [confirmTrait, setConfirmTrait] = useState('');
+  const [appConfig, setAppConfig] = useState({ avatarAgeFilter: false, avatarSkinFilter: false });
+
+  useEffect(() => {
+    api.get('/api/app-config').then(({ data }) => setAppConfig(data)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api.get('/api/companions/templates').then(({ data }) => {
@@ -303,8 +308,8 @@ export default function CompanionCreate() {
               {[
                 { filters: STYLE_FILTERS, value: styleFilter, set: setStyleFilter, label: 'Style' },
                 { filters: HAIR_FILTERS, value: hairFilter, set: setHairFilter, label: 'Hair' },
-                { filters: SKIN_FILTERS, value: skinFilter, set: setSkinFilter, label: 'Skin' },
-                { filters: AGE_FILTERS, value: ageFilter, set: setAgeFilter, label: 'Age' },
+                ...(appConfig.avatarSkinFilter ? [{ filters: SKIN_FILTERS, value: skinFilter, set: setSkinFilter, label: 'Skin' }] : []),
+                ...(appConfig.avatarAgeFilter ? [{ filters: AGE_FILTERS, value: ageFilter, set: setAgeFilter, label: 'Age' }] : []),
               ].map(row => (
                 <div key={row.label} className="flex gap-1.5 mb-1.5 flex-wrap items-center">
                   <span className="text-xs text-brand-muted py-1 w-8">{row.label}</span>

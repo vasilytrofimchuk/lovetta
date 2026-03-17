@@ -1,13 +1,50 @@
 import { useState } from 'react'
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
+import { useAuth } from '../contexts/AuthContext'
+import api, { getErrorMessage } from '../lib/api'
+import { isCapacitor } from '../lib/platform'
+
+const GOOGLE_WEB_CLIENT_ID = '1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com'
 
 export default function GoogleSignIn({ birthData }) {
+  const { refreshUser } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleClick = () => {
+  const handleNative = async () => {
     setLoading(true)
-    // Try to pass age/consent data via state param
+    setError('')
+    try {
+      GoogleAuth.initialize({ clientId: GOOGLE_WEB_CLIENT_ID, scopes: ['email', 'profile'], grantOfflineAccess: false })
+      const googleUser = await GoogleAuth.signIn()
+      const idToken = googleUser.authentication?.idToken
+      if (!idToken) throw new Error('No ID token from Google')
+
+      const referralCode = localStorage.getItem('lovetta-ref') || undefined
+      const { data } = await api.post('/api/auth/google/token', {
+        idToken,
+        birthMonth: birthData?.birthMonth,
+        birthYear: birthData?.birthYear,
+        termsAccepted: birthData?.termsAccepted,
+        privacyAccepted: birthData?.privacyAccepted,
+        aiConsentAccepted: birthData?.aiConsentAccepted,
+        referralCode,
+      })
+      localStorage.setItem('lovetta-token', data.accessToken)
+      localStorage.setItem('lovetta-refresh-token', data.refreshToken)
+      await refreshUser()
+    } catch (err) {
+      if (err?.message?.includes('cancel') || err?.message?.includes('Cancel')) return
+      setError(err?.response?.data?.error || getErrorMessage(err) || 'Google sign-in failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleWeb = () => {
+    setLoading(true)
     let stateData = null
-    if (birthData && birthData.birthMonth && birthData.birthYear) {
+    if (birthData?.birthMonth && birthData?.birthYear) {
       stateData = birthData
     } else {
       try {
@@ -15,17 +52,12 @@ export default function GoogleSignIn({ birthData }) {
         if (raw) stateData = JSON.parse(raw)
       } catch {}
     }
-
-    // Include referral code in state
     const ref = localStorage.getItem('lovetta-ref')
     if (ref && stateData) stateData.referralCode = ref
     else if (ref) stateData = { referralCode: ref }
 
     let url = '/api/auth/google'
-    if (stateData) {
-      const state = btoa(JSON.stringify(stateData))
-      url += '?state=' + encodeURIComponent(state)
-    }
+    if (stateData) url += '?state=' + encodeURIComponent(btoa(JSON.stringify(stateData)))
     window.location.href = url
   }
 
@@ -40,9 +72,15 @@ export default function GoogleSignIn({ birthData }) {
         </div>
       </div>
 
+      {error && (
+        <div className="text-brand-error text-sm bg-brand-error/10 border border-brand-error/30 rounded-lg p-2 mb-2">
+          {error}
+        </div>
+      )}
+
       <button
         type="button"
-        onClick={handleClick}
+        onClick={isCapacitor() ? handleNative : handleWeb}
         disabled={loading}
         className="w-full py-3 rounded-lg border border-brand-border bg-brand-surface text-brand-text font-medium hover:bg-brand-card transition-colors disabled:opacity-50 flex items-center justify-center gap-3"
       >
@@ -52,7 +90,7 @@ export default function GoogleSignIn({ birthData }) {
           <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
           <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 2.58 9 3.58z" fill="#EA4335"/>
         </svg>
-        {loading ? 'Redirecting...' : 'Continue with Google'}
+        {loading ? 'Signing in...' : 'Continue with Google'}
       </button>
     </div>
   )

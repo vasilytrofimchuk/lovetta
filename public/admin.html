@@ -676,6 +676,12 @@
     var NUMBER_SETTING_DEFS = [
       { key: 'max_companions', label: 'Max Companions per User', desc: 'Maximum number of companions a user can create', min: 1, max: 10 },
     ];
+    var TOGGLE_SETTING_DEFS = [
+      { key: 'enable_image_generation', label: 'Image Generation', desc: 'Allow AI to generate and send photos in chat' },
+      { key: 'enable_video_generation', label: 'Video Generation', desc: 'Allow AI to generate and send short videos in chat' },
+      { key: 'enable_avatar_age_filter', label: 'Avatar Age Filter', desc: 'Show age filter in companion creation wizard' },
+      { key: 'enable_avatar_skin_filter', label: 'Avatar Skin Filter', desc: 'Show skin tone filter in companion creation wizard' },
+    ];
 
     function loadSettings() {
       fetch('/api/admin/settings', { headers: headers() }).then(function(r) { return r.json(); }).then(function(data) {
@@ -729,6 +735,24 @@
             '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
         });
 
+        // Feature toggles
+        html += '<h3 style="margin: 24px 0 16px; color: var(--text2);">Feature Toggles</h3>';
+        TOGGLE_SETTING_DEFS.forEach(function(def) {
+          var val = settings[def.key];
+          var isOn = val === true || val === 'true';
+          html += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
+            '<div style="display:flex;align-items:center;">' +
+            '<label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">' +
+            '<input type="checkbox" id="toggle-' + def.key + '" ' + (isOn ? 'checked' : '') +
+            ' onchange="saveToggleSetting(\'' + def.key + '\', this.checked, this)" ' +
+            'style="opacity:0;width:0;height:0;">' +
+            '<span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (isOn ? 'var(--accent)' : 'var(--bg2)') +
+            ';border:1px solid var(--border);border-radius:13px;transition:0.3s;">' +
+            '<span style="position:absolute;content:\'\';height:20px;width:20px;left:' + (isOn ? '24px' : '3px') +
+            ';bottom:2px;background:white;border-radius:50%;transition:0.3s;"></span></span></label>' +
+            '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
+        });
+
         document.getElementById('settings-list').innerHTML = html;
 
         // AI Settings
@@ -763,6 +787,26 @@
         body: JSON.stringify({ key: key, value: parseInt(value, 10) })
       }).then(function(r) {
         if (r.ok) {
+          var msg = document.getElementById('msg-' + key);
+          msg.classList.add('show');
+          setTimeout(function() { msg.classList.remove('show'); }, 2000);
+        }
+      });
+    }
+
+    function saveToggleSetting(key, checked, el) {
+      fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({ key: key, value: checked })
+      }).then(function(r) {
+        if (r.ok) {
+          // Update toggle visual state
+          var label = el.parentElement;
+          var track = label.querySelector('span');
+          var knob = track.querySelector('span');
+          track.style.background = checked ? 'var(--accent)' : 'var(--bg2)';
+          knob.style.left = checked ? '24px' : '3px';
           var msg = document.getElementById('msg-' + key);
           msg.classList.add('show');
           setTimeout(function() { msg.classList.remove('show'); }, 2000);

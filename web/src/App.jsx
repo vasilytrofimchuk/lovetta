@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import usePwaInstall from './hooks/usePwaInstall'
+import { isCapacitor } from './lib/platform'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
@@ -31,7 +32,7 @@ function PublicRoute({ children }) {
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <Loading />
-  if (!user) return <Navigate to="/login" replace />
+  if (!user) return <Navigate to={isCapacitor() ? '/signup' : '/login'} replace />
   return children
 }
 
@@ -40,7 +41,7 @@ function PwaInstallBanner() {
   const { showPrompt, install, dismiss } = usePwaInstall()
   const isTelegram = !!window.Telegram?.WebApp?.initData
 
-  if (!user || !showPrompt || isTelegram) return null
+  if (!user || !showPrompt || isTelegram || isCapacitor()) return null
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 bg-brand-card border border-brand-border rounded-2xl p-4 shadow-lg flex items-center gap-3">

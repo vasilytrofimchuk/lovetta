@@ -6,6 +6,8 @@ import AgeGate from '../components/AgeGate'
 import LegalPopup from '../components/LegalPopup'
 import GoogleSignIn from '../components/GoogleSignIn'
 import TelegramSignIn from '../components/TelegramSignIn'
+import AppleSignIn from '../components/AppleSignIn'
+import { isCapacitor } from '../lib/platform'
 
 export default function Signup() {
   const { signup } = useAuth()
@@ -16,9 +18,13 @@ export default function Signup() {
   const [birthMonth, setBirthMonth] = useState('')
   const [birthYear, setBirthYear] = useState('')
   const [showLegal, setShowLegal] = useState(false)
+  const [termsChecked, setTermsChecked] = useState(false)
+  const [privacyChecked, setPrivacyChecked] = useState(false)
+  const [aiConsentChecked, setAiConsentChecked] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const landingConsents = useRef(null)
+  const nativeApp = isCapacitor()
 
   // Pre-fill from landing page data
   useEffect(() => {
@@ -64,6 +70,16 @@ export default function Signup() {
     const age = now.getFullYear() - parseInt(birthYear) - (now.getMonth() + 1 < parseInt(birthMonth) ? 1 : 0)
     if (age < 18) {
       setError('You must be 18 or older to use Lovetta')
+      return
+    }
+
+    // In native app, consents are inline checkboxes — validate then proceed directly
+    if (nativeApp) {
+      if (!termsChecked || !privacyChecked || !aiConsentChecked) {
+        setError('Please accept all agreements to continue')
+        return
+      }
+      handleAccept({ termsAccepted: true, privacyAccepted: true, aiConsentAccepted: true })
       return
     }
 
@@ -149,6 +165,34 @@ export default function Signup() {
             onChange={({ birthMonth: m, birthYear: y }) => { setBirthMonth(m); setBirthYear(y) }}
           />
 
+          {nativeApp && (
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-brand-accent flex-shrink-0" />
+                <span className="text-sm text-brand-text-secondary">
+                  I agree to the{' '}
+                  <a href="https://lovetta.ai/terms.html" target="_blank" className="text-brand-accent hover:underline">Terms of Service</a>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={privacyChecked} onChange={e => setPrivacyChecked(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-brand-accent flex-shrink-0" />
+                <span className="text-sm text-brand-text-secondary">
+                  I agree to the{' '}
+                  <a href="https://lovetta.ai/privacy.html" target="_blank" className="text-brand-accent hover:underline">Privacy Policy</a>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={aiConsentChecked} onChange={e => setAiConsentChecked(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-brand-accent flex-shrink-0" />
+                <span className="text-sm text-brand-text-secondary">
+                  I understand my messages are processed by third-party AI services
+                </span>
+              </label>
+            </div>
+          )}
+
           {error && (
             <div className="text-brand-error text-sm bg-brand-error/10 border border-brand-error/30 rounded-lg p-3">
               {error}
@@ -164,16 +208,25 @@ export default function Signup() {
           </button>
         </form>
 
+        <AppleSignIn onError={setError} ageData={birthMonth && birthYear ? {
+          birthMonth: parseInt(birthMonth),
+          birthYear: parseInt(birthYear),
+          termsAccepted: nativeApp ? termsChecked : (landingConsents.current?.termsAccepted || false),
+          privacyAccepted: nativeApp ? privacyChecked : (landingConsents.current?.privacyAccepted || false),
+          aiConsentAccepted: nativeApp ? aiConsentChecked : (landingConsents.current?.aiConsentAccepted || false),
+        } : null} />
         <GoogleSignIn birthData={birthMonth && birthYear ? {
           birthMonth: parseInt(birthMonth),
           birthYear: parseInt(birthYear),
-          termsAccepted: landingConsents.current?.termsAccepted || false,
-          privacyAccepted: landingConsents.current?.privacyAccepted || false,
-          aiConsentAccepted: landingConsents.current?.aiConsentAccepted || false,
+          termsAccepted: nativeApp ? termsChecked : (landingConsents.current?.termsAccepted || false),
+          privacyAccepted: nativeApp ? privacyChecked : (landingConsents.current?.privacyAccepted || false),
+          aiConsentAccepted: nativeApp ? aiConsentChecked : (landingConsents.current?.aiConsentAccepted || false),
         } : null} />
-        <div className="mt-3">
-          <TelegramSignIn />
-        </div>
+        {!nativeApp && (
+          <div className="mt-3">
+            <TelegramSignIn />
+          </div>
+        )}
 
         <div className="mt-6 text-center text-sm text-brand-text-secondary">
           Already have an account?{' '}

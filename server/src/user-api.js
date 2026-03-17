@@ -5,7 +5,7 @@
 const { Router } = require('express');
 const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
-const { detectPlatform } = require('./content-levels');
+// content-levels import removed — explicit default is now false for all platforms
 const { getVapidPublicKey } = require('./push');
 
 const router = Router();
@@ -26,9 +26,8 @@ router.get('/preferences', authenticate, async (req, res) => {
       [req.userId]
     );
 
-    // Default explicit_content based on platform: ON for web, OFF for appstore/telegram
-    const platform = detectPlatform(req);
-    const defaultExplicit = platform === 'web';
+    // Default explicit_content OFF for all platforms (Google Ads compliance)
+    const defaultExplicit = false;
 
     res.json({
       notify_new_messages: rows[0]?.notify_new_messages ?? false,
@@ -117,6 +116,44 @@ router.delete('/push/unsubscribe', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[user] push unsubscribe error:', err.message);
     res.status(500).json({ error: 'Failed to remove push subscription' });
+  }
+});
+
+// -- POST /api/user/push/subscribe-apns (iOS native push) ----
+router.post('/push/subscribe-apns', authenticate, async (req, res) => {
+  try {
+    const { token } = req.body || {};
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Missing device token' });
+    }
+
+    const pool = getPool();
+    await pool.query(
+      `INSERT INTO apns_subscriptions (user_id, device_token)
+       VALUES ($1, $2)
+       ON CONFLICT (device_token) DO UPDATE SET user_id = $1`,
+      [req.userId, token]
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[user] apns subscribe error:', err.message);
+    res.status(500).json({ error: 'Failed to save device token' });
+  }
+});
+
+// -- DELETE /api/user/push/unsubscribe-apns -------------------
+router.delete('/push/unsubscribe-apns', authenticate, async (req, res) => {
+  try {
+    const pool = getPool();
+    await pool.query(
+      'DELETE FROM apns_subscriptions WHERE user_id = $1',
+      [req.userId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[user] apns unsubscribe error:', err.message);
+    res.status(500).json({ error: 'Failed to remove device token' });
   }
 });
 

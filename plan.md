@@ -166,9 +166,11 @@ Text and image levels are independent, configurable per platform in admin settin
 - Level 2 — Erotic: Partial nudity, sensual poses
 - Level 3 — Unrestricted: Maximum erotic content (still no porn per model limits)
 
-**Platform defaults:** Web: text 2, image 2 | App Store: text 0, image 0 | Telegram: text 1, image 1
+**Platform defaults:** All platforms default to 0 (strict). Configurable via admin settings.
 
-**User override:** Users can disable explicit content in Profile → "Content Preferences" toggle. When OFF, forces level 0 for both text and image regardless of admin platform setting (most restrictive wins). Defaults: ON for web, OFF for appstore/telegram. Stored in `user_preferences.explicit_content`.
+**User override:** Users can enable explicit content in Profile → "Content Preferences" toggle. When OFF (default for all platforms), forces level 0 for both text and image regardless of admin platform setting. Stored in `user_preferences.explicit_content`.
+
+**Feature toggles (admin):** Media generation, avatar age filter, avatar skin filter — all OFF by default for Google Ads compliance.
 
 **Detection:** Platform detected from request: Telegram (initData or bot user-agent), iOS app (Capacitor user-agent), Web (default)
 
@@ -361,6 +363,27 @@ Users earn configurable commission (default 30%) from payments made by people th
 - ~~Referral program~~ — DONE
 - ~~Async scalability~~ — DONE
 - ~~Automated emails~~ — DONE
+- iOS App Store app (Capacitor) — IN PROGRESS
+
+## iOS App Store App (Capacitor) — IN PROGRESS
+
+**Status:** Code complete. Needs external setup (Apple Developer, RevenueCat, APNs creds) and Xcode configuration.
+
+**What's done:**
+- Capacitor project scaffolded (ai.lovetta.app), iOS 16.0 target
+- Platform detection utility (isCapacitor/isAppStore) throughout React app
+- Sign in with Apple (server JWT verification + native Capacitor plugin)
+- RevenueCat in-app purchases (subscriptions + tips, webhook sync)
+- Native APNs push notifications (server + client)
+- UI adjustments: referral hidden, explicit content hidden, Telegram login hidden, PWA banner hidden
+- Content filtering already wired server-side (appstore = level 0)
+
+**Manual TODOs:**
+- Create RevenueCat project + App Store Connect products (lovetta_monthly, lovetta_yearly, tip consumables)
+- Add credentials to .env/Heroku: APPLE_CLIENT_ID, APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY, APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY, REVENUECAT_API_KEY, REVENUECAT_WEBHOOK_SECRET
+- Replace REVENUECAT_API_KEY placeholder in web/src/lib/revenuecat.js
+- Enable Xcode capabilities (Sign in with Apple, Push Notifications)
+- Provisioning profiles, App Store screenshots, metadata
 
 ## Automated Emails — DONE
 - [x] Admin notification on new registration (email/Google/Telegram) → vasilytrofimchuk@gmail.com

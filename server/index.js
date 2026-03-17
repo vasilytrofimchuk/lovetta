@@ -71,6 +71,19 @@ app.post('/api/webhooks/telegram', express.json(), async (req, res) => {
   }
 });
 
+// RevenueCat webhook for iOS in-app purchases
+app.post('/api/webhooks/revenuecat', express.json(), async (req, res) => {
+  try {
+    const { handleRevenueCatWebhook } = require('./src/billing');
+    const authHeader = req.headers['authorization'];
+    await handleRevenueCatWebhook(req.body, authHeader);
+    res.json({ received: true });
+  } catch (err) {
+    console.error('[revenuecat-webhook]', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // STT needs raw body — mount before express.json()
 app.post('/api/chat/stt',
   express.raw({ type: ['audio/*', 'application/octet-stream'], limit: '10mb' }),
@@ -110,6 +123,22 @@ app.use('/api/chat', chatApi);
 app.use('/api/chat', ttsApi);
 app.use('/api/user', userApi);
 app.use('/api/referral', referralApi);
+
+// -- Public app config (feature flags for frontend) --
+const { getMediaEnabled, getVideoEnabled, getAvatarFilterSettings } = require('./src/content-levels');
+app.get('/api/app-config', async (_req, res) => {
+  try {
+    const [mediaEnabled, videoEnabled, avatarFilters] = await Promise.all([
+      getMediaEnabled(),
+      getVideoEnabled(),
+      getAvatarFilterSettings(),
+    ]);
+    res.json({ mediaEnabled, videoEnabled, avatarAgeFilter: avatarFilters.ageFilter, avatarSkinFilter: avatarFilters.skinFilter });
+  } catch (err) {
+    console.error('[app-config] error:', err.message);
+    res.json({ mediaEnabled: true, videoEnabled: false, avatarAgeFilter: false, avatarSkinFilter: false });
+  }
+});
 
 // -- Resend inbound webhook --
 const RESEND_INBOUND_SECRET = (process.env.RESEND_INBOUND_SECRET || '').trim();

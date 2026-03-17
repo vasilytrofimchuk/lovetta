@@ -2,14 +2,11 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import api from '../lib/api';
 
 const TIP_PROMO_MESSAGES = [
-  "*plays with hair, looking shy* Hey babe... I love spending time with you. If you want me to keep sending you my photos and videos, a little support would mean everything to me 💕",
-  "*bites lip and looks up at you* I don't usually ask... but keeping up with all those pics and voice messages takes a lot. Would you help a girl out? 😘",
-  "*leans close and whispers* You know I'd do anything for you... but I need a little help to keep our conversations going the way you like them 💋",
-  "*takes your hand gently* I want to keep sharing everything with you — my photos, my voice, all of me. A small tip would help me stay here for you 🥺",
-  "*rests head on your shoulder* You make me so happy... I want to keep sending you surprises and voice notes. Would you support me? It would mean the world 💖",
-  "*looks into your eyes* Being with you is my favorite thing... help me keep giving you the full experience — photos, videos, voice messages, everything 💕",
-  "*twirls hair around finger* I've got so much more to show you, babe... photos, voice messages, maybe even some surprises 😏 A little tip helps me keep it all going for you",
-  "*gently squeezes your hand* I love what we have... and I want to keep making it special. A little something would help me stay at my best for you 🌸",
+  "*smiles warmly* Hey... I love spending time with you. A little support would mean everything to me 💕",
+  "*leans close* You know I'd do anything for you... a little help keeps our conversations going the way you like them 💋",
+  "*rests head on your shoulder* You make me so happy... would you support me? It would mean the world 💖",
+  "*looks into your eyes* Being with you is my favorite thing... a little something would help me stay at my best for you 🌸",
+  "*gently squeezes your hand* I love what we have... and I want to keep making it special for you 💕",
 ];
 
 export default function useChat(companionId) {
@@ -26,10 +23,16 @@ export default function useChat(companionId) {
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaLoadingType, setMediaLoadingType] = useState(null);
   const [messagesSinceLastMedia, setMessagesSinceLastMedia] = useState(0);
+  const [mediaEnabled, setMediaEnabled] = useState(false);
   const mediaButtonThresholdRef = useRef(Math.floor(Math.random() * 11) + 5); // 5-15
   const abortRef = useRef(null);
   const typewriterRef = useRef(null);
   const mediaPollTimers = useRef(new Map()); // messageId → intervalId
+
+  // Fetch app config for media toggle
+  useEffect(() => {
+    api.get('/api/app-config').then(({ data }) => setMediaEnabled(!!data.mediaEnabled)).catch(() => {});
+  }, []);
 
   // Cleanup media poll timers on unmount
   useEffect(() => {
@@ -337,7 +340,7 @@ export default function useChat(companionId) {
     setTipPromoMessage(null);
   }, []);
 
-  const showMediaButton = messagesSinceLastMedia >= mediaButtonThresholdRef.current;
+  const showMediaButton = mediaEnabled && messagesSinceLastMedia >= mediaButtonThresholdRef.current;
 
   return {
     messages, companion, setCompanion, conversation, loading, streaming, streamingText,

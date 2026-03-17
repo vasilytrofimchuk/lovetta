@@ -377,3 +377,72 @@
 - [x] Metrics: TTFB, total response time, p50/p95/max, error breakdown
 - [x] CLI flags: --url, --users, --skip-media, --rounds
 - [x] Added npm run test:load script
+
+## iOS App Store App (Capacitor)
+
+### Phase 1: Capacitor Setup + Platform Detection
+- [x] Created `web/src/lib/platform.js` — isCapacitor(), isIOS(), isAppStore() utilities
+- [x] Created `web/capacitor.config.json` — appId ai.lovetta.app, remote server URL, Capacitor lovetta-ios user-agent
+- [x] Installed @capacitor/core, @capacitor/ios, @capacitor/cli in web workspace
+- [x] Installed @capacitor/push-notifications, @revenuecat/purchases-capacitor, @capacitor-community/apple-sign-in
+- [x] Installed @parse/node-apn for server-side APNs push
+- [x] Added build:ios and open:ios npm scripts to root package.json
+- [x] Updated main.jsx — skip service worker registration in Capacitor
+- [x] Scaffolded ios/ Xcode project via `npx cap add ios`, synced with `npx cap sync ios`
+- [x] Updated Podfile deployment target to iOS 16.0
+
+### Phase 2: Sign in with Apple
+- [x] Server: POST /api/auth/apple in auth-api.js — verifies Apple identity token JWT against Apple public keys, find/create user by apple_id or email, supports age/consent flow
+- [x] Migration v29: apple_id index, RevenueCat columns on subscriptions, apns_subscriptions table
+- [x] Client: web/src/components/AppleSignIn.jsx — native Sign in with Apple via @capacitor-community/apple-sign-in, only renders in Capacitor
+- [x] Wired AppleSignIn into Login.jsx and Signup.jsx (shown in Capacitor, Telegram login hidden)
+
+### Phase 3: RevenueCat In-App Purchases
+- [x] Created web/src/lib/revenuecat.js — initRevenueCat, getOfferings, purchasePackage, purchaseProduct, restorePurchases, getCustomerInfo
+- [x] Server: handleRevenueCatWebhook() in billing.js — handles INITIAL_PURCHASE, RENEWAL, CANCELLATION, EXPIRATION, NON_RENEWING_PURCHASE events
+- [x] Added POST /api/webhooks/revenuecat endpoint in server/index.js
+- [x] Updated Pricing.jsx — uses RevenueCat native purchase in Capacitor, Stripe checkout on web, Restore Purchases button
+- [x] Updated tipCheckout.js — uses RevenueCat purchaseProduct for tips in Capacitor
+- [x] AuthContext.jsx — initializes RevenueCat after user auth when in Capacitor
+
+### Phase 4: Native Push Notifications (APNs)
+- [x] Created web/src/lib/push-native.js — registerNativePush, unregisterNativePush, setupPushListeners
+- [x] Created server/src/push-apns.js — APNs HTTP/2 via @parse/node-apn, sendApnsPush, sendApnsPushToUser
+- [x] Added POST /api/user/push/subscribe-apns and DELETE /api/user/push/unsubscribe-apns endpoints in user-api.js
+- [x] Extended push.js sendPushNotification() — sends both web push and APNs to all user devices
+
+### Phase 5: UI Adjustments for App Store
+- [x] Profile.jsx: hide referral section when isAppStore()
+- [x] Profile.jsx: hide explicit content toggle when isAppStore() (server enforces level 0)
+- [x] Profile.jsx: push notification toggle uses native Capacitor flow when isCapacitor()
+- [x] Profile.jsx: Manage Subscription links to iOS Settings in Capacitor
+- [x] App.jsx: PWA install banner hidden when isCapacitor()
+- [x] Login.jsx / Signup.jsx: Telegram login hidden, Apple Sign In shown when isCapacitor()
+
+### Phase 6: Build Pipeline
+- [x] Verified web build succeeds with all new imports
+- [x] iOS project synced with all 3 Capacitor plugins (apple-sign-in, push-notifications, purchases-capacitor)
+- [x] Added ios build artifacts to .gitignore (Pods/, public/, DerivedData/)
+- [ ] TODO (manual): Create RevenueCat project + App Store Connect products
+- [ ] TODO (manual): Add Apple Developer credentials (APPLE_CLIENT_ID, APPLE_TEAM_ID, etc.) to .env and Heroku
+- [ ] TODO (manual): Add APNs credentials (APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY) to .env and Heroku
+- [ ] TODO (manual): Add RevenueCat API key + webhook secret to .env and Heroku
+- [ ] TODO (manual): Enable Sign in with Apple + Push Notifications capabilities in Xcode
+- [ ] TODO (manual): Configure provisioning profiles and signing
+- [ ] TODO (manual): Generate App Store screenshots and metadata
+- [ ] TODO (manual): Replace REVENUECAT_API_KEY placeholder in web/src/lib/revenuecat.js
+
+## Google Ads Compliance — Safe-by-Default
+- [x] Migration v30: force all content levels to 0 (strict), new toggle settings, template cleanup, explicit_content default false
+- [x] content-levels.js: change hardcoded fallbacks from 2 to 0, add getMediaEnabled() and getAvatarFilterSettings()
+- [x] New GET /api/app-config public endpoint for frontend feature flags
+- [x] chat-api.js: conditional MEDIA MESSAGES in system prompt, guard media detection regex, guard request-media endpoint
+- [x] user-api.js: explicit_content default changed to false for all platforms
+- [x] admin.html: add Feature Toggles section with 3 toggle switches (media generation, avatar age filter, avatar skin filter)
+- [x] CompanionCreate.jsx: conditionally show age/skin filters based on admin settings
+- [x] useChat.js: check mediaEnabled from app-config, hide photo button when disabled
+- [x] Clean up tip promo messages — remove references to photos/videos/pics
+- [x] Simplify tip cards — remove labels, remove "Tips unlock images & videos" footer
+- [x] email.js: neutralize "photos and videos" in welcome email
+- [x] Profile.jsx: change toggle description to "Allow mature content"
+- [x] Template descriptions cleaned: Aria, Sophia, Isabella, Zara, Ruby, Violet, Mei — removed suggestive language and traits

@@ -6,6 +6,7 @@
 const { Router } = require('express');
 const { getPool } = require('./db');
 const { getConsumptionSummary } = require('./consumption');
+const { invalidateSettingsCache } = require('./content-levels');
 
 const router = Router();
 
@@ -221,6 +222,9 @@ router.put('/settings', async (req, res) => {
        ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
       [key.trim(), JSON.stringify(value)]
     );
+
+    // Invalidate content-levels caches so changes take effect immediately
+    invalidateSettingsCache();
 
     res.json({ ok: true });
   } catch (err) {

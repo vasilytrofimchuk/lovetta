@@ -429,7 +429,7 @@ async function sendWelcomeDay0(email, displayName) {
         <ul style="color: #666; line-height: 1.8; padding-left: 20px;">
           <li>Chat naturally \u2014 she remembers everything you share</li>
           <li>Try voice messages \u2014 tap the mic to talk</li>
-          <li>She can send you photos and videos too</li>
+          <li>She remembers everything and adapts to you over time</li>
         </ul>
         <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
           Start Chatting
