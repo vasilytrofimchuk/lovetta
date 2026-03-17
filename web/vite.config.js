@@ -4,9 +4,11 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/my/',
+  base: process.env.CAPACITOR_BUILD ? './' : '/my/',
   build: {
-    outDir: path.resolve(__dirname, '..', 'public', 'my'),
+    outDir: process.env.CAPACITOR_BUILD
+      ? path.resolve(__dirname, 'ios-dist')
+      : path.resolve(__dirname, '..', 'public', 'my'),
     emptyOutDir: true,
     sourcemap: 'hidden',
   },

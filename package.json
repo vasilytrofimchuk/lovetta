@@ -21,11 +21,14 @@
     "test:e2e:ui": "npx playwright test --project=ui",
     "test:e2e:ai-real": "npx playwright test --project=ai-real",
     "test:e2e:demo": "npx playwright test --project=demo",
-    "test:load": "node e2e/load-test.js"
+    "test:load": "node e2e/load-test.js",
+    "build:ios": "cd web && CAPACITOR_BUILD=1 npx vite build && npx cap sync ios",
+    "open:ios": "cd web && npx cap open ios"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1009.0",
     "@keyid/sdk": "^0.2.10",
+    "@parse/node-apn": "^7.1.0",
     "@sentry/node": "^10.43.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",

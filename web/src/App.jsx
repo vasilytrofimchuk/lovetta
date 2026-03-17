@@ -89,7 +89,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter basename="/my">
+    <BrowserRouter basename={isCapacitor() ? '/' : '/my'}>
       <AuthProvider>
         <DesktopShell>
           <AppRoutes />
