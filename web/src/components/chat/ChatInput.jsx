@@ -32,7 +32,6 @@ export default function ChatInput({ onSend, disabled }) {
   }
 
   const toggleMic = useCallback(async () => {
-    // Stop recording
     if (listening && mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
       return;
@@ -54,10 +53,9 @@ export default function ChatInput({ onSend, disabled }) {
         setListening(false);
 
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
-        if (blob.size < 100) return; // too short
+        if (blob.size < 100) return;
 
         try {
-          // Send to server for ElevenLabs STT
           const arrayBuf = await blob.arrayBuffer();
           const res = await api.post('/api/chat/stt', arrayBuf, {
             headers: { 'Content-Type': mediaRecorder.mimeType },
@@ -79,12 +77,32 @@ export default function ChatInput({ onSend, disabled }) {
     }
   }, [listening]);
 
-  const hasText = text.trim().length > 0;
   const hasMic = typeof navigator !== 'undefined' && navigator.mediaDevices;
 
   return (
     <div className="border-t border-brand-border bg-brand-bg px-4 py-3">
       <div className="max-w-md mx-auto flex items-end gap-2">
+        {/* Mic button — left side, small */}
+        {hasMic && !disabled && (
+          <button
+            onClick={toggleMic}
+            className={`flex-shrink-0 p-2 rounded-full transition-colors ${
+              listening
+                ? 'bg-red-500 text-white animate-pulse'
+                : 'text-brand-muted hover:text-brand-accent'
+            }`}
+            title={listening ? 'Stop recording' : 'Voice input'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+          </button>
+        )}
+
+        {/* Text input */}
         <textarea
           ref={textareaRef}
           value={text}
@@ -97,35 +115,16 @@ export default function ChatInput({ onSend, disabled }) {
           style={{ maxHeight: '120px' }}
         />
 
-        {/* Mic button (no text) or Send button (has text) */}
-        {!hasText && hasMic && !disabled ? (
-          <button
-            onClick={toggleMic}
-            className={`flex-shrink-0 p-2.5 rounded-full transition-colors ${
-              listening
-                ? 'bg-red-500 text-white animate-pulse'
-                : 'bg-brand-surface border border-brand-border text-brand-muted hover:text-brand-accent hover:border-brand-accent'
-            }`}
-            title={listening ? 'Stop recording' : 'Voice input'}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          </button>
-        ) : (
-          <button
-            onClick={handleSend}
-            disabled={!hasText || disabled}
-            className="flex-shrink-0 p-2.5 rounded-full bg-brand-accent text-white disabled:opacity-30 hover:bg-brand-accent-hover transition-colors"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
-        )}
+        {/* Send button — always visible */}
+        <button
+          onClick={handleSend}
+          disabled={!text.trim() || disabled}
+          className="flex-shrink-0 p-2.5 rounded-full bg-brand-accent text-white disabled:opacity-30 hover:bg-brand-accent-hover transition-colors"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </button>
       </div>
     </div>
   );
