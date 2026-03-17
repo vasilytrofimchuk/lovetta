@@ -35,7 +35,12 @@ export default function GoogleSignIn({ birthData }) {
       await refreshUser()
     } catch (err) {
       if (err?.message?.includes('cancel') || err?.message?.includes('Cancel')) return
-      setError(err?.response?.data?.error || getErrorMessage(err) || 'Google sign-in failed')
+      const serverErr = err?.response?.data?.error || ''
+      if (serverErr === 'age_consent_required' || serverErr.includes('Birth date') || serverErr.includes('Consent required')) {
+        window.location.href = '/signup'
+        return
+      }
+      setError(serverErr || getErrorMessage(err) || 'Google sign-in failed')
     } finally {
       setLoading(false)
     }

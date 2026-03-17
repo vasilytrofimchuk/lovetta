@@ -577,11 +577,10 @@ router.post('/google/token', async (req, res) => {
         // New user — require age + consent
         const bMonth = parseInt(birthMonth, 10);
         const bYear = parseInt(birthYear, 10);
-        if (!bMonth || !bYear) return res.status(400).json({ error: 'Birth date required' });
-        if (!isAtLeast18(bMonth, bYear)) return res.status(400).json({ error: 'Must be 18 or older' });
-        if (!termsAccepted || !privacyAccepted || !aiConsentAccepted) {
-          return res.status(400).json({ error: 'Consent required' });
+        if (!bMonth || !bYear || !termsAccepted || !privacyAccepted || !aiConsentAccepted) {
+          return res.status(400).json({ error: 'age_consent_required' });
         }
+        if (!isAtLeast18(bMonth, bYear)) return res.status(400).json({ error: 'Must be 18 or older' });
 
         const ip = req.ip || '';
         const geo = await geoFromIp(ip).catch(() => ({}));

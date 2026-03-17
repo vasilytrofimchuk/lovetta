@@ -6,6 +6,7 @@ import GoogleSignIn from '../components/GoogleSignIn'
 import TelegramSignIn from '../components/TelegramSignIn'
 import AppleSignIn from '../components/AppleSignIn'
 import { isCapacitor } from '../lib/platform'
+import logoSrc from '../../../public/assets/brand/logo_text.png'
 
 export default function Login() {
   const { login, refreshUser } = useAuth()
@@ -49,7 +50,7 @@ export default function Login() {
     <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-12 mx-auto mb-4" />
+          <img src={logoSrc} alt="Lovetta" className="h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="text-brand-text-secondary mt-1">Sign in to continue</p>
         </div>

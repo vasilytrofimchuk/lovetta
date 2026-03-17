@@ -44,7 +44,12 @@ export default function AppleSignIn({ onError, ageData }) {
     } catch (err) {
       // User cancelled = no error
       if (err?.code === 'ERR_CANCELED' || err?.message?.includes('cancel')) return
-      const msg = err?.response?.data?.error || getErrorMessage(err) || 'Apple sign-in failed'
+      const serverErr = err?.response?.data?.error || ''
+      if (serverErr === 'age_consent_required' || serverErr.includes('Birth date') || serverErr.includes('Consent required')) {
+        window.location.href = '/signup'
+        return
+      }
+      const msg = serverErr || getErrorMessage(err) || 'Apple sign-in failed'
       onError?.(msg)
     } finally {
       setLoading(false)
