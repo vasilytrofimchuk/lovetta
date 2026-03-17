@@ -34,6 +34,7 @@ const companionApi = require('./src/companion-api');
 const chatApi = require('./src/chat-api');
 const ttsApi = require('./src/tts-api');
 const userApi = require('./src/user-api');
+const referralApi = require('./src/referral-api');
 
 const app = express();
 const PORT = process.env.PORT || 3900;
@@ -108,6 +109,7 @@ app.use('/api/companions', companionApi);
 app.use('/api/chat', chatApi);
 app.use('/api/chat', ttsApi);
 app.use('/api/user', userApi);
+app.use('/api/referral', referralApi);
 
 // -- Resend inbound webhook --
 const RESEND_INBOUND_SECRET = (process.env.RESEND_INBOUND_SECRET || '').trim();

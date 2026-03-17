@@ -340,6 +340,15 @@
         .catch(function() {});
     })();
 
+    // Capture referral code from URL
+    (function() {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var ref = params.get('ref');
+        if (ref) localStorage.setItem('lovetta-ref', ref.trim());
+      } catch(ex) {}
+    })();
+
     // Form submission
     document.getElementById('signup-form').addEventListener('submit', function(e) {
       e.preventDefault();

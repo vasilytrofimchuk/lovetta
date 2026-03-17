@@ -100,8 +100,8 @@ router.post('/tts', authenticate, async (req, res) => {
         'SELECT voice_id FROM user_companions WHERE id = $1',
         [msg.companion_id]
       );
-      let voiceId = companion?.voice_id || 'cgSgspJ2msm6clMCkdW9';
-      if (voiceId.length < 20) voiceId = 'cgSgspJ2msm6clMCkdW9';
+      let voiceId = companion?.voice_id || 'hA4zGnmTwX2NQiTRMt7o';
+      if (voiceId.length < 20) voiceId = 'hA4zGnmTwX2NQiTRMt7o';
 
       const ttsText = actionsToAudioTags(msg.content);
       if (!ttsText) throw new Error('No speakable text');

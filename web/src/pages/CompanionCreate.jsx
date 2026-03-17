@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { VOICES } from '../lib/voices';
+import useVoicePreview from '../hooks/useVoicePreview';
 
 const GRADIENT_COLORS = [
   ['#ec4899', '#8040e0'], ['#f06060', '#ec4899'], ['#6060f0', '#40a0e0'],
@@ -39,27 +41,6 @@ const AGE_FILTERS = [
   { key: '23-29', label: '23-29' },
   { key: '30-39', label: '30-39' },
   { key: '40-50', label: '40-50' },
-];
-
-const VOICES = [
-  { id: 'cgSgspJ2msm6clMCkdW9', label: 'Sunshine', desc: 'Playful & warm' },
-  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'Velvet', desc: 'Confident & reassuring' },
-  { id: 'FGY2WhTYpPnrIDTdsKH5', label: 'Spark', desc: 'Quirky & enthusiastic' },
-  { id: 'Xb7hH8MSUJpSbSDYk0k2', label: 'Crystal', desc: 'Clear & engaging' },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', label: 'Silk', desc: 'Velvety & expressive' },
-  { id: 'hpp4J3VqNfWAUOO0d1Us', label: 'Pearl', desc: 'Bright & polished' },
-  { id: 'XrExE9yKIg1WjnnlVkGX', label: 'Storm', desc: 'Confident & commanding' },
-  { id: 'KF337ZXYjoHdNuYUrufC', label: 'Ember', desc: 'Calm & sultry' },
-  { id: 'AyCt0WmAXUcPJR11zeeP', label: 'Breeze', desc: 'Vibrant & light' },
-  { id: 'lhgliD0TncfFOY1Nc93M', label: 'Dusk', desc: 'Effortless & modern' },
-  { id: 'rBUHN6YO9PJUwGXk13Jt', label: 'Aurora', desc: 'Captivating & versatile' },
-  { id: 'jpICOesdLlRSc39O1UB5', label: 'Honey', desc: 'Fun & feminine' },
-  { id: '6tHWtWy43FFxMeA73K4c', label: 'Moon', desc: 'Soft & soothing' },
-  { id: 's50zV0dPjgaPRdN9zm48', label: 'Coral', desc: 'Natural & conversational' },
-  { id: 'z12gfZvqqjJ9oHFbB5i6', label: 'Fairy', desc: 'Magical & bright' },
-  { id: 'ytfkKJNB1AXxIr8dKm5H', label: 'Willow', desc: 'Warm & storytelling' },
-  { id: 'OHY6EjdeHKeQymoihwfz', label: 'Blossom', desc: 'Cute & cheerful' },
-  { id: 'nPpkc230TdYdntJKFNby', label: 'Echo', desc: 'Clear & emotive' },
 ];
 
 const INITIAL_AVATAR_COUNT = 13;
@@ -131,6 +112,7 @@ function TemplateCard({ t, onSelect }) {
 
 export default function CompanionCreate() {
   const navigate = useNavigate();
+  const { playingId, play: playVoice } = useVoicePreview();
   const [step, setStep] = useState('choose'); // choose, templates, custom, confirm
   const [templates, setTemplates] = useState([]);
   const [templateFilter, setTemplateFilter] = useState('all'); // all, realistic, anime
@@ -142,7 +124,7 @@ export default function CompanionCreate() {
   const [avatars, setAvatars] = useState([]);
   const [customTraits, setCustomTraits] = useState([]);
   const [newTrait, setNewTrait] = useState('');
-  const [customVoice, setCustomVoice] = useState('cgSgspJ2msm6clMCkdW9');
+  const [customVoice, setCustomVoice] = useState('hA4zGnmTwX2NQiTRMt7o');
   const [styleFilter, setStyleFilter] = useState('all');
   const [hairFilter, setHairFilter] = useState('all');
   const [skinFilter, setSkinFilter] = useState('all');
@@ -454,8 +436,13 @@ export default function CompanionCreate() {
               <label className="block text-sm text-brand-text-secondary mb-1">Voice</label>
               <div className="grid grid-cols-3 gap-2">
                 {VOICES.map(v => (
-                  <button key={v.id} type="button" onClick={() => setCustomVoice(v.id)}
-                    className={`p-2 rounded-lg border text-left transition-colors ${customVoice === v.id ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border bg-brand-surface hover:border-brand-accent/40'}`}>
+                  <button key={v.id} type="button" onClick={() => { setCustomVoice(v.id); playVoice(v.id); }}
+                    className={`p-2 rounded-lg border text-left transition-colors relative ${customVoice === v.id ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border bg-brand-surface hover:border-brand-accent/40'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className={`absolute top-1.5 right-1.5 ${playingId === v.id ? 'text-brand-accent animate-pulse' : 'text-brand-muted'}`}>
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      {playingId === v.id && <path d="M19.07 4.93a10 10 0 0 1 0 14.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>}
+                    </svg>
                     <div className={`text-sm font-medium ${customVoice === v.id ? 'text-brand-accent' : 'text-brand-text'}`}>{v.label}</div>
                     <div className="text-xs text-brand-muted">{v.desc}</div>
                   </button>
@@ -581,8 +568,13 @@ export default function CompanionCreate() {
               <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
                 {VOICES.map(v => (
                   <button key={v.id} type="button"
-                    onClick={() => setSelected({ ...selected, voice_id: v.id })}
-                    className={`px-2 py-1.5 rounded-lg border text-left transition-colors ${(selected.voice_id || '') === v.id ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border bg-brand-surface hover:border-brand-accent/40'}`}>
+                    onClick={() => { setSelected({ ...selected, voice_id: v.id }); playVoice(v.id); }}
+                    className={`px-2 py-1.5 rounded-lg border text-left transition-colors relative ${(selected.voice_id || '') === v.id ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border bg-brand-surface hover:border-brand-accent/40'}`}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className={`absolute top-1 right-1 ${playingId === v.id ? 'text-brand-accent animate-pulse' : 'text-brand-muted'}`}>
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      {playingId === v.id && <path d="M19.07 4.93a10 10 0 0 1 0 14.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>}
+                    </svg>
                     <div className={`text-xs font-medium ${(selected.voice_id || '') === v.id ? 'text-brand-accent' : 'text-brand-text'}`}>{v.label}</div>
                     <div className="text-[10px] text-brand-muted leading-tight">{v.desc}</div>
                   </button>

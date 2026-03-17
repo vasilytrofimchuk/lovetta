@@ -154,11 +154,18 @@ router.get('/users', async (req, res) => {
     const dataQuery = `
       SELECT u.id, u.email, u.display_name, u.auth_provider, u.country, u.city,
              u.device_type, u.user_agent, u.created_at, u.last_activity,
-             s.plan AS sub_plan, s.status AS sub_status
+             s.plan AS sub_plan, s.status AS sub_status,
+             rc.referral_count, re.referral_earnings
       FROM users u
       LEFT JOIN LATERAL (
         SELECT plan, status FROM subscriptions WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
       ) s ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS referral_count FROM users ref WHERE ref.referred_by = u.id
+      ) rc ON true
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(commission_amount), 0)::int AS referral_earnings FROM referral_commissions WHERE referrer_id = u.id
+      ) re ON true
       ${where}
       ORDER BY u.created_at DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -541,6 +548,80 @@ router.get('/companion-emails', async (req, res) => {
   } catch (err) {
     console.error('[admin] companion-emails error:', err.message);
     res.status(500).json({ error: 'Failed to load companion emails' });
+  }
+});
+
+// -- GET /api/admin/cashouts (paginated) ------------------
+router.get('/cashouts', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ rows: [], total: 0, pendingCount: 0 });
+
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+    const status = (req.query.status || '').trim();
+
+    const params = [];
+    let where = '';
+    if (status) {
+      params.push(status);
+      where = 'WHERE rp.status = $1';
+    }
+
+    const countQuery = `SELECT COUNT(*) AS total FROM referral_payouts rp ${where}`;
+    const pendingQuery = `SELECT COUNT(*) AS cnt FROM referral_payouts WHERE status = 'pending'`;
+    const dataQuery = `
+      SELECT rp.id, rp.amount, rp.method, rp.method_detail, rp.status, rp.admin_note,
+             rp.created_at, rp.processed_at,
+             u.email AS user_email, u.display_name AS user_name
+      FROM referral_payouts rp
+      JOIN users u ON u.id = rp.user_id
+      ${where}
+      ORDER BY rp.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+
+    const [countResult, pendingResult, dataResult] = await Promise.all([
+      pool.query(countQuery, params),
+      pool.query(pendingQuery),
+      pool.query(dataQuery, [...params, limit, offset]),
+    ]);
+
+    res.json({
+      rows: dataResult.rows,
+      total: parseInt(countResult.rows[0].total, 10),
+      pendingCount: parseInt(pendingResult.rows[0].cnt, 10),
+      page,
+      limit,
+    });
+  } catch (err) {
+    console.error('[admin] cashouts error:', err.message);
+    res.status(500).json({ error: 'Failed to load cashouts' });
+  }
+});
+
+// -- PATCH /api/admin/cashouts/:id ------------------------
+router.patch('/cashouts/:id', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Service unavailable' });
+
+  try {
+    const { status, admin_note } = req.body || {};
+    const validStatuses = ['approved', 'paid', 'rejected'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const processedAt = (status === 'paid' || status === 'rejected') ? 'NOW()' : 'NULL';
+    await pool.query(
+      `UPDATE referral_payouts SET status = $1, admin_note = $2, processed_at = ${processedAt} WHERE id = $3`,
+      [status, admin_note || null, req.params.id]
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[admin] cashout update error:', err.message);
+    res.status(500).json({ error: 'Failed to update cashout' });
   }
 });
 

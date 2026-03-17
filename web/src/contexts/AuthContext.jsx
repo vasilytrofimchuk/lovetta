@@ -60,11 +60,16 @@ export function AuthProvider({ children }) {
         }
       } catch {}
 
+      // Include referral code if present
+      const ref = localStorage.getItem('lovetta-ref')
+      if (ref) payload.referralCode = ref
+
       api.post('/api/auth/telegram', payload)
         .then(({ data }) => {
           localStorage.setItem('lovetta-token', data.accessToken)
           localStorage.setItem('lovetta-refresh-token', data.refreshToken)
           localStorage.removeItem('lovetta-landing-data')
+          localStorage.removeItem('lovetta-ref')
           setUser(data.user)
           tgWebApp.ready?.()
           tgWebApp.expand?.()
@@ -93,12 +98,13 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  const signup = async ({ email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted }) => {
+  const signup = async ({ email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode }) => {
     const { data } = await api.post('/api/auth/signup', {
-      email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted,
+      email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode,
     })
     localStorage.setItem('lovetta-token', data.accessToken)
     localStorage.setItem('lovetta-refresh-token', data.refreshToken)
+    localStorage.removeItem('lovetta-ref')
     setUser(data.user)
     return data
   }

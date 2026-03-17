@@ -230,6 +230,7 @@
       <button class="tab" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
       <button class="tab" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
       <button class="tab" onclick="switchTab('companion-emails')">Girl Emails</button>
+      <button class="tab" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
     </div>
 
     <!-- Overview Tab -->
@@ -264,7 +265,7 @@
       <table>
         <thead><tr>
           <th>ID</th><th>Email</th><th>Name</th><th>Auth</th><th>Country</th><th>City</th>
-          <th>Device</th><th>Subscription</th><th>Created</th><th>Last Active</th>
+          <th>Device</th><th>Subscription</th><th>Refs</th><th>Ref $</th><th>Created</th><th>Last Active</th>
         </tr></thead>
         <tbody id="user-rows"></tbody>
       </table>
@@ -381,6 +382,26 @@
       </table>
       <div class="pagination" id="companion-email-pagination"></div>
     </div>
+
+    <!-- Cashouts Tab -->
+    <div id="tab-cashouts" class="tab-content">
+      <div class="search-bar" style="display:flex;gap:8px;align-items:center;">
+        <select id="cashout-status-filter" onchange="cashoutPage=1;loadCashouts();" style="padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
+          <option value="">All statuses</option>
+          <option value="pending" selected>Pending</option>
+          <option value="approved">Approved</option>
+          <option value="paid">Paid</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <table>
+        <thead><tr>
+          <th>ID</th><th>User</th><th>Amount</th><th>Method</th><th>Detail</th><th>Status</th><th>Created</th><th>Processed</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="cashout-rows"></tbody>
+      </table>
+      <div class="pagination" id="cashout-pagination"></div>
+    </div>
   </div>
 
   <script>
@@ -394,6 +415,7 @@
     var selectedFromAddr = '';
     var adminAddressesLoaded = false;
     var companionEmailPage = 1;
+    var cashoutPage = 1;
 
     // Auth
     function headers() {
@@ -448,6 +470,7 @@
       else if (name === 'economics') loadEconomics('7d');
       else if (name === 'email') loadEmails();
       else if (name === 'companion-emails') loadCompanionEmails();
+      else if (name === 'cashouts') loadCashouts();
     }
 
     // --- Helper functions (ported from KeyID) ---
@@ -617,6 +640,8 @@
           var os = parseOS(r.user_agent);
           var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '');
           var sub = r.sub_status ? esc(r.sub_plan) + ' (' + esc(r.sub_status) + ')' : 'Free';
+          var refCount = r.referral_count || 0;
+          var refEarn = r.referral_earnings ? '$' + (r.referral_earnings / 100).toFixed(2) : '-';
           return '<tr>' +
             '<td class="mono" title="' + esc(r.id || '') + '">' + esc((r.id || '').slice(0, 8)) + '</td>' +
             '<td class="mono">' + esc(r.email || '-') + '</td>' +
@@ -626,12 +651,14 @@
             '<td>' + esc(r.city || '-') + '</td>' +
             '<td title="' + esc((r.device_type || '') + (os ? ' ' + os : '')) + '">' + dev + '</td>' +
             '<td>' + sub + '</td>' +
+            '<td>' + refCount + '</td>' +
+            '<td>' + refEarn + '</td>' +
             '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
             '<td class="mono">' + timeAgo(r.last_activity) + '</td>' +
           '</tr>';
         }).join('');
         document.getElementById('user-rows').innerHTML = rows ||
-          '<tr><td colspan="10" class="empty-row">No users yet</td></tr>';
+          '<tr><td colspan="12" class="empty-row">No users yet</td></tr>';
         renderPagination('user-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadUsers');
       });
     }
@@ -708,6 +735,7 @@
         var AI_SETTINGS = [
           { key: 'tip_request_threshold_usd', label: 'Tip Request Threshold (USD)', desc: 'API cost before companion asks for a tip (paid users)', type: 'number' },
           { key: 'tip_request_threshold_trial_usd', label: 'Trial Tip Threshold (USD)', desc: 'API cost before trial user is asked for a tip (media blocked)', type: 'number' },
+          { key: 'referral_commission_pct', label: 'Referral Commission %', desc: 'Percentage of payments credited to referrers (default 30)', type: 'number' },
           { key: 'fal_image_model', label: 'fal.ai Image Model', desc: 'Default image generation model', type: 'text' },
           { key: 'fal_video_model', label: 'fal.ai Video Model', desc: 'Default video generation model', type: 'text' },
         ];
@@ -1219,6 +1247,70 @@
         el.innerHTML = '<span style="color:var(--error);">' + esc(err.message) + '</span>';
       });
     }
+
+    // -- Cashouts tab --
+    function loadCashouts(page) {
+      cashoutPage = page || cashoutPage;
+      var status = (document.getElementById('cashout-status-filter') || {}).value || '';
+      var url = '/api/admin/cashouts?page=' + cashoutPage + '&limit=50';
+      if (status) url += '&status=' + encodeURIComponent(status);
+
+      apiFetch(url).then(function(data) {
+        // Update badge
+        var badge = document.getElementById('cashouts-badge');
+        if (data.pendingCount > 0) {
+          badge.textContent = data.pendingCount;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+
+        var statusColors = { pending: '#f59e0b', approved: '#3b82f6', paid: '#22c55e', rejected: '#ef4444' };
+        var rows = (data.rows || []).map(function(r) {
+          var color = statusColors[r.status] || 'var(--muted)';
+          var actions = '';
+          if (r.status === 'pending') {
+            actions = '<button onclick="updateCashout(' + r.id + ', \'approved\')" style="padding:3px 8px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-right:4px;">Approve</button>' +
+              '<button onclick="updateCashout(' + r.id + ', \'rejected\')" style="padding:3px 8px;background:var(--bg3);color:var(--error);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:12px;">Reject</button>';
+          } else if (r.status === 'approved') {
+            actions = '<button onclick="updateCashout(' + r.id + ', \'paid\')" style="padding:3px 8px;background:#22c55e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Mark Paid</button>';
+          }
+          return '<tr>' +
+            '<td class="mono">' + r.id + '</td>' +
+            '<td class="mono">' + esc(r.user_email || '-') + '</td>' +
+            '<td>$' + (r.amount / 100).toFixed(2) + '</td>' +
+            '<td>' + esc(r.method || '-') + '</td>' +
+            '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + esc(r.method_detail || '-') + '</td>' +
+            '<td><span style="color:' + color + ';font-weight:600;">' + esc(r.status) + '</span></td>' +
+            '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
+            '<td class="mono">' + (r.processed_at ? fmtDate(r.processed_at) : '-') + '</td>' +
+            '<td>' + actions + '</td>' +
+          '</tr>';
+        }).join('');
+        document.getElementById('cashout-rows').innerHTML = rows ||
+          '<tr><td colspan="9" class="empty-row">No cashout requests</td></tr>';
+        renderPagination('cashout-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadCashouts');
+      });
+    }
+
+    function updateCashout(id, status) {
+      fetch('/api/admin/cashouts/' + id, {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({ status: status })
+      }).then(function(r) {
+        if (r.ok) loadCashouts();
+      });
+    }
+
+    // Load cashout badge on dashboard init
+    apiFetch('/api/admin/cashouts?limit=1&status=pending').then(function(data) {
+      var badge = document.getElementById('cashouts-badge');
+      if (data && data.pendingCount > 0) {
+        badge.textContent = data.pendingCount;
+        badge.style.display = 'inline-block';
+      }
+    }).catch(function() {});
 
     // Load email stats on dashboard init
     setTimeout(loadEmailStats, 500);

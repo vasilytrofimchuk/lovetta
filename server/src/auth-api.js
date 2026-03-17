@@ -16,6 +16,8 @@ const {
 const { authenticate } = require('./auth-middleware');
 const { sendVerificationEmail, sendResetEmail } = require('./email');
 
+const crypto = require('crypto');
+
 const router = Router();
 
 // -- Rate limiters (disabled in test mode) -----------------
@@ -36,6 +38,18 @@ const resendLimiter = isTest ? (req, res, next) => next() : rateLimit({
 
 // -- Helpers ----------------------------------------------
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function generateReferralCode() {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+async function resolveReferrer(pool, referralCode) {
+  if (!referralCode || typeof referralCode !== 'string') return null;
+  const code = referralCode.trim().toUpperCase();
+  if (!code) return null;
+  const { rows } = await pool.query('SELECT id FROM users WHERE referral_code = $1', [code]);
+  return rows[0]?.id || null;
+}
 
 function isAtLeast18(birthMonth, birthYear) {
   const now = new Date();
@@ -70,7 +84,7 @@ router.post('/signup', authLimiter, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'Service unavailable' });
 
   try {
-    const { email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted } = req.body || {};
+    const { email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode } = req.body || {};
 
     // Validate
     if (!email || !EMAIL_RE.test(email)) {
@@ -107,14 +121,18 @@ router.post('/signup', authLimiter, async (req, res) => {
     const verifyToken = generateVerifyToken(email.trim().toLowerCase());
     const ip = req.ip || '';
     const geo = await geoFromIp(ip).catch(() => ({}));
+    const refCode = generateReferralCode();
+    const referredBy = await resolveReferrer(pool, referralCode);
 
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (email, password_hash, birth_month, birth_year, terms_accepted, privacy_accepted,
-                          ai_consent_at, verify_token, ip_address, country, city, user_agent, auth_provider)
-       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, 'email')
+                          ai_consent_at, verify_token, ip_address, country, city, user_agent, auth_provider,
+                          referral_code, referred_by)
+       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, 'email', $12, $13)
        RETURNING *`,
       [email.trim(), passwordHash, month, year, true, true,
-       verifyToken, ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
+       verifyToken, ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+       refCode, referredBy]
     );
 
     // Generate tokens
@@ -455,6 +473,7 @@ router.get('/google/callback', async (req, res) => {
       } else {
         // New Google user — try to use age/consent data from state param
         let birthMonth = null, birthYear = null, hasConsent = false;
+        let stateRefCode = null;
 
         if (oauthState) {
           try {
@@ -467,6 +486,7 @@ router.get('/google/callback', async (req, res) => {
               }
               hasConsent = !!(stateData.termsAccepted && stateData.privacyAccepted && stateData.aiConsentAccepted);
             }
+            if (stateData.referralCode) stateRefCode = stateData.referralCode;
           } catch {}
         }
 
@@ -477,14 +497,18 @@ router.get('/google/callback', async (req, res) => {
 
         const ip = req.ip || '';
         const geo = await geoFromIp(ip).catch(() => ({}));
+        const refCode = generateReferralCode();
+        const referredBy = await resolveReferrer(pool, stateRefCode);
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'google')
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                              referral_code, referred_by)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'google', $11, $12)
            RETURNING *`,
           [email, googleId, name, picture, birthMonth, birthYear,
-           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
+           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+           refCode, referredBy]
         );
         user = newUser;
       }
@@ -517,7 +541,7 @@ router.post('/telegram', authLimiter, async (req, res) => {
 
   try {
     const { initData, birthMonth: bm, birthYear: by,
-            termsAccepted, privacyAccepted, aiConsentAccepted } = req.body || {};
+            termsAccepted, privacyAccepted, aiConsentAccepted, referralCode: tgRefCode } = req.body || {};
     if (!initData) {
       return res.status(400).json({ error: 'initData is required' });
     }
@@ -574,14 +598,18 @@ router.post('/telegram', authLimiter, async (req, res) => {
         const syntheticEmail = `tg_${tgUser.id}@telegram.lovetta.ai`;
         const ip = req.ip || '';
         const geo = await geoFromIp(ip).catch(() => ({}));
+        const refCode = generateReferralCode();
+        const referredBy = await resolveReferrer(pool, tgRefCode);
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider)
-           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'telegram')
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                              referral_code, referred_by)
+           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'telegram', $11, $12)
            RETURNING *`,
           [syntheticEmail, telegramId, displayName, tgUser.photoUrl, month, year,
-           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null]
+           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+           refCode, referredBy]
         );
         user = newUser;
 

@@ -308,3 +308,15 @@
 - [x] Subscription features list: unlimited messages, personality & memory, voice & photos
 - [x] Auto-renewal disclosure: "3-day free trial, then auto-renews. Cancel anytime"
 - [x] Terms & Privacy links already present in form checkboxes
+
+### Referral Program
+- [x] Database migration v25: referral_code + referred_by columns on users, referral_commissions table, referral_payouts table, payout_method/payout_detail on user_preferences, referral_commission_pct app setting, backfill existing users with codes
+- [x] Auth: generate referral_code on signup (email, Google OAuth, Telegram), resolve referred_by from referral code
+- [x] Landing page: capture ?ref= param to localStorage
+- [x] Signup flow: pass referralCode from localStorage through all signup paths
+- [x] Billing: credit referral commission (configurable %) on subscription, tip, and renewal payments
+- [x] Referral API: GET /api/referral/stats, PUT /api/referral/payout-method, POST /api/referral/cashout
+- [x] Profile page: referral link + copy, invited count, earned balance, payout method selector, cash out button ($100 min)
+- [x] Admin Users tab: added Refs and Ref $ columns
+- [x] Admin Settings: added referral_commission_pct to AI Settings section
+- [x] Admin Cashouts tab: paginated cashout requests with status filter, approve/mark paid/reject actions, pending count badge

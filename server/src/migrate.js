@@ -584,6 +584,90 @@ const MIGRATIONS = [
       ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_pending BOOLEAN DEFAULT FALSE;
     `,
   },
+  {
+    name: 'v25_referral_program',
+    fn: async (pool) => {
+      // Add referral columns to users
+      await pool.query(`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by UUID REFERENCES users(id);
+        CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code) WHERE referral_code IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by) WHERE referred_by IS NOT NULL;
+      `);
+
+      // Referral commissions table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS referral_commissions (
+          id              SERIAL PRIMARY KEY,
+          referrer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          referred_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          source_type     TEXT NOT NULL CHECK (source_type IN ('subscription', 'tip')),
+          source_id       TEXT NOT NULL,
+          payment_amount  INTEGER NOT NULL,
+          commission_amount INTEGER NOT NULL,
+          created_at      TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_referral_commissions_referrer ON referral_commissions(referrer_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_commissions_source ON referral_commissions(source_type, source_id);
+      `);
+
+      // Referral payouts table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS referral_payouts (
+          id              SERIAL PRIMARY KEY,
+          user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          amount          INTEGER NOT NULL,
+          method          TEXT NOT NULL CHECK (method IN ('paypal', 'venmo', 'zelle', 'credit')),
+          method_detail   TEXT,
+          status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'paid', 'rejected')),
+          admin_note      TEXT,
+          created_at      TIMESTAMPTZ DEFAULT NOW(),
+          processed_at    TIMESTAMPTZ
+        );
+        CREATE INDEX IF NOT EXISTS idx_referral_payouts_user ON referral_payouts(user_id);
+        CREATE INDEX IF NOT EXISTS idx_referral_payouts_status ON referral_payouts(status);
+      `);
+
+      // Add payout method columns to user_preferences
+      await pool.query(`
+        ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS payout_method TEXT;
+        ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS payout_detail TEXT;
+      `);
+
+      // Add referral_commission_pct to app_settings
+      await pool.query(`
+        INSERT INTO app_settings (key, value) VALUES ('referral_commission_pct', '30')
+        ON CONFLICT (key) DO NOTHING;
+      `);
+
+      // Backfill referral codes for existing users
+      await pool.query(`
+        UPDATE users SET referral_code = UPPER(SUBSTR(MD5(id::text || created_at::text), 1, 8))
+        WHERE referral_code IS NULL;
+      `);
+    },
+  },
+  {
+    name: 'v26_replace_masculine_voices',
+    fn: async (pool) => {
+      // Replace 5 voices that sounded too masculine or had unwanted accents
+      // Sunshine → Riley, Velvet → Hope, Storm → Allison, Dusk → Ivy, Coral → Clara
+      await pool.query(`
+        UPDATE companion_templates SET voice_id = 'hA4zGnmTwX2NQiTRMt7o' WHERE voice_id = 'cgSgspJ2msm6clMCkdW9';
+        UPDATE companion_templates SET voice_id = 'iCrDUkL56s3C8sCRl7wb' WHERE voice_id = 'EXAVITQu4vr4xnSDxMaL';
+        UPDATE companion_templates SET voice_id = 'xctasy8XvGp2cVO9HL9k' WHERE voice_id = 'XrExE9yKIg1WjnnlVkGX';
+        UPDATE companion_templates SET voice_id = 'i4CzbCVWoqvD0P1QJCUL' WHERE voice_id = 'lhgliD0TncfFOY1Nc93M';
+        UPDATE companion_templates SET voice_id = 'wNvqdMNs9MLd1PG6uWuY' WHERE voice_id = 's50zV0dPjgaPRdN9zm48';
+        UPDATE user_companions SET voice_id = 'hA4zGnmTwX2NQiTRMt7o' WHERE voice_id = 'cgSgspJ2msm6clMCkdW9';
+        UPDATE user_companions SET voice_id = 'iCrDUkL56s3C8sCRl7wb' WHERE voice_id = 'EXAVITQu4vr4xnSDxMaL';
+        UPDATE user_companions SET voice_id = 'xctasy8XvGp2cVO9HL9k' WHERE voice_id = 'XrExE9yKIg1WjnnlVkGX';
+        UPDATE user_companions SET voice_id = 'i4CzbCVWoqvD0P1QJCUL' WHERE voice_id = 'lhgliD0TncfFOY1Nc93M';
+        UPDATE user_companions SET voice_id = 'wNvqdMNs9MLd1PG6uWuY' WHERE voice_id = 's50zV0dPjgaPRdN9zm48';
+        ALTER TABLE companion_templates ALTER COLUMN voice_id SET DEFAULT 'hA4zGnmTwX2NQiTRMt7o';
+        ALTER TABLE user_companions ALTER COLUMN voice_id SET DEFAULT 'hA4zGnmTwX2NQiTRMt7o';
+      `);
+    },
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

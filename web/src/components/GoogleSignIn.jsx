@@ -16,6 +16,11 @@ export default function GoogleSignIn({ birthData }) {
       } catch {}
     }
 
+    // Include referral code in state
+    const ref = localStorage.getItem('lovetta-ref')
+    if (ref && stateData) stateData.referralCode = ref
+    else if (ref) stateData = { referralCode: ref }
+
     let url = '/api/auth/google'
     if (stateData) {
       const state = btoa(JSON.stringify(stateData))

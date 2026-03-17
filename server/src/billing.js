@@ -147,6 +147,31 @@ Response format: Always start with a brief action or emotional context in *aster
   );
 }
 
+// -- Referral commission tracking --------------------------
+
+async function creditReferralCommission(pool, userId, sourceType, sourceId, paymentAmountCents) {
+  if (!paymentAmountCents || paymentAmountCents <= 0) return;
+  // Check if user was referred
+  const { rows } = await pool.query('SELECT referred_by FROM users WHERE id = $1', [userId]);
+  const referrerId = rows[0]?.referred_by;
+  if (!referrerId) return;
+
+  // Get commission percentage from settings
+  const { rows: settingsRows } = await pool.query(
+    "SELECT value FROM app_settings WHERE key = 'referral_commission_pct'"
+  );
+  const pct = parseInt(settingsRows[0]?.value, 10) || 30;
+  const commissionAmount = Math.floor(paymentAmountCents * pct / 100);
+  if (commissionAmount <= 0) return;
+
+  await pool.query(
+    `INSERT INTO referral_commissions (referrer_id, referred_id, source_type, source_id, payment_amount, commission_amount)
+     VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (source_type, source_id) DO NOTHING`,
+    [referrerId, userId, sourceType, sourceId, paymentAmountCents, commissionAmount]
+  );
+  console.log(`[billing] Referral commission: referrer=${referrerId} from=${userId} type=${sourceType} amount=${commissionAmount}c`);
+}
+
 // -- Webhook handler --------------------------------------
 
 function extractPeriodEnd(sub) {
@@ -206,6 +231,9 @@ async function handleWebhook(rawBody, signature) {
           [userId, plan, subId, customerId, periodEnd, trialEnd]
         );
         console.log(`[billing] Subscription created: user=${userId} plan=${plan}`);
+        // Credit referral commission
+        const subAmount = plan === 'yearly' ? 9999 : 1999;
+        try { await creditReferralCommission(pool, userId, 'subscription', subId, subAmount); } catch (e) { console.warn('[billing] referral commission error:', e.message); }
       }
 
       if (session.mode === 'payment' && session.metadata?.type === 'tip') {
@@ -224,6 +252,8 @@ async function handleWebhook(rawBody, signature) {
           try { await insertTipThankYou(pool, userId, tipCompanionId); } catch (e) { console.warn('[billing] thank-you error:', e.message); }
         }
         console.log(`[billing] Tip received: user=${userId} amount=${amount} companion=${tipCompanionId || 'all'}`);
+        // Credit referral commission
+        try { await creditReferralCommission(pool, userId, 'tip', paymentIntent, amount); } catch (e) { console.warn('[billing] referral commission error:', e.message); }
       }
       break;
     }
@@ -262,6 +292,9 @@ async function handleWebhook(rawBody, signature) {
         );
         if (rows.length > 0) {
           console.log(`[billing] Renewal paid: user=${rows[0].user_id} plan=${rows[0].plan}`);
+          // Credit referral commission on renewal
+          const renewalAmount = rows[0].plan === 'yearly' ? 9999 : 1999;
+          try { await creditReferralCommission(pool, rows[0].user_id, 'subscription', `renewal_${event.id}`, renewalAmount); } catch (e) { console.warn('[billing] referral commission error:', e.message); }
         }
       }
       break;

@@ -648,7 +648,7 @@ const TTS_COST_PER_CHAR = 0.00024; // ~$0.24 per 1K chars (Creator tier)
  * @param {string} voiceId - ElevenLabs voice ID
  * @returns {{ buffer: Buffer, costUsd: number }}
  */
-async function generateSpeech(text, voiceId = 'cgSgspJ2msm6clMCkdW9') {
+async function generateSpeech(text, voiceId = 'hA4zGnmTwX2NQiTRMt7o') {
   if (!ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not configured');
   if (!text || !text.trim()) throw new Error('Empty text for TTS');
 

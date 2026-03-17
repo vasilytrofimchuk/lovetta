@@ -335,6 +335,14 @@ Audit + fix all AI generation (text, image, video, audio) to work at scale for m
 
 ---
 
+## Referral Program — DONE
+
+Users earn configurable commission (default 30%) from payments made by people they invite. Unique referral link on Profile page, payout via PayPal/Venmo/Zelle/account credit, $100 min cashout. Admin can view referral stats in Users tab and process cashouts in dedicated Cashouts tab. Commission rate configurable in Settings.
+
+**Files:** migrate.js (v25), auth-api.js, billing.js, referral-api.js (new), index.js, index.html, Signup.jsx, AuthContext.jsx, GoogleSignIn.jsx, Profile.jsx, admin.html, admin-api.js
+
+---
+
 ## Priority Order (remaining)
 1. **Companion system** — templates + creation + management
 2. **Chat UI + OpenRouter AI** — streaming, message format, roleplay

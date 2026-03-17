@@ -80,6 +80,7 @@ export default function Signup() {
     setShowLegal(false)
     setLoading(true)
     try {
+      const referralCode = localStorage.getItem('lovetta-ref') || undefined
       await signup({
         email,
         password,
@@ -88,6 +89,7 @@ export default function Signup() {
         termsAccepted,
         privacyAccepted,
         aiConsentAccepted,
+        referralCode,
       })
     } catch (err) {
       setError(getErrorMessage(err))
