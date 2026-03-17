@@ -9,6 +9,15 @@ import TelegramSignIn from '../components/TelegramSignIn'
 import AppleSignIn from '../components/AppleSignIn'
 import { isCapacitor } from '../lib/platform'
 import logoSrc from '../../../public/assets/brand/logo_text.png'
+import { Browser } from '@capacitor/browser'
+
+function openLink(url) {
+  if (isCapacitor()) {
+    Browser.open({ url, presentationStyle: 'popover' })
+  } else {
+    window.open(url, '_blank')
+  }
+}
 
 export default function Signup() {
   const { signup } = useAuth()
@@ -118,7 +127,7 @@ export default function Signup() {
                 className="mt-0.5 w-5 h-5 accent-brand-accent flex-shrink-0" />
               <span className="text-sm text-brand-text-secondary leading-relaxed">
                 I agree to the{' '}
-                <a href="https://lovetta.ai/terms.html" target="_blank" className="text-brand-accent">Terms of Service</a>
+                <button type="button" onClick={() => openLink('https://lovetta.ai/terms.html')} className="text-brand-accent underline">Terms of Service</button>
               </span>
             </label>
             <label className="flex items-start gap-3 cursor-pointer">
@@ -126,7 +135,7 @@ export default function Signup() {
                 className="mt-0.5 w-5 h-5 accent-brand-accent flex-shrink-0" />
               <span className="text-sm text-brand-text-secondary leading-relaxed">
                 I agree to the{' '}
-                <a href="https://lovetta.ai/privacy.html" target="_blank" className="text-brand-accent">Privacy Policy</a>
+                <button type="button" onClick={() => openLink('https://lovetta.ai/privacy.html')} className="text-brand-accent underline">Privacy Policy</button>
               </span>
             </label>
             <label className="flex items-start gap-3 cursor-pointer">
@@ -212,8 +221,12 @@ export default function Signup() {
           </button>
         </form>
 
+        <div className="relative my-5">
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brand-border" /></div>
+          <div className="relative flex justify-center text-sm"><span className="bg-brand-bg px-3 text-brand-muted">or</span></div>
+        </div>
         <AppleSignIn onError={setError} ageData={consentData} />
-        <GoogleSignIn birthData={consentData} />
+        <GoogleSignIn birthData={consentData} hideSeparator />
         {!nativeApp && <div className="mt-3"><TelegramSignIn /></div>}
 
         <div className="mt-6 text-center text-sm text-brand-text-secondary">

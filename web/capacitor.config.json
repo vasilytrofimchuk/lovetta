@@ -11,6 +11,12 @@
   "plugins": {
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "GoogleAuth": {
+      "scopes": ["email", "profile"],
+      "iosClientId": "1007256282722-jhi7vl1mj4jv12638fv5vh8ao9ribr3a.apps.googleusercontent.com",
+      "serverClientId": "1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": false
     }
   }
 }

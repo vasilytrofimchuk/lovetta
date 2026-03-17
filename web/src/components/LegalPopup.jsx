@@ -1,4 +1,11 @@
 import { useState } from 'react'
+import { Browser } from '@capacitor/browser'
+import { isCapacitor } from '../lib/platform'
+
+function openLink(url) {
+  if (isCapacitor()) Browser.open({ url: `https://lovetta.ai${url}`, presentationStyle: 'popover' })
+  else window.open(url, '_blank')
+}
 
 export default function LegalPopup({ onAccept, onClose }) {
   const [terms, setTerms] = useState(false)
@@ -22,9 +29,7 @@ export default function LegalPopup({ onAccept, onClose }) {
           />
           <span className="text-sm text-brand-text-secondary">
             I agree to the{' '}
-            <a href="/terms.html" target="_blank" className="text-brand-accent hover:underline">
-              Terms of Service
-            </a>
+            <button type="button" onClick={() => openLink('/terms.html')} className="text-brand-accent hover:underline">Terms of Service</button>
           </span>
         </label>
 
@@ -37,9 +42,7 @@ export default function LegalPopup({ onAccept, onClose }) {
           />
           <span className="text-sm text-brand-text-secondary">
             I agree to the{' '}
-            <a href="/privacy.html" target="_blank" className="text-brand-accent hover:underline">
-              Privacy Policy
-            </a>
+            <button type="button" onClick={() => openLink('/privacy.html')} className="text-brand-accent hover:underline">Privacy Policy</button>
           </span>
         </label>
 

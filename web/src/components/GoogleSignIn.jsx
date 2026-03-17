@@ -6,7 +6,7 @@ import { isCapacitor } from '../lib/platform'
 
 const GOOGLE_WEB_CLIENT_ID = '1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com'
 
-export default function GoogleSignIn({ birthData }) {
+export default function GoogleSignIn({ birthData, hideSeparator = false }) {
   const { refreshUser } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -15,7 +15,6 @@ export default function GoogleSignIn({ birthData }) {
     setLoading(true)
     setError('')
     try {
-      GoogleAuth.initialize({ clientId: GOOGLE_WEB_CLIENT_ID, scopes: ['email', 'profile'], grantOfflineAccess: false })
       const googleUser = await GoogleAuth.signIn()
       const idToken = googleUser.authentication?.idToken
       if (!idToken) throw new Error('No ID token from Google')
@@ -68,14 +67,17 @@ export default function GoogleSignIn({ birthData }) {
 
   return (
     <div>
-      <div className="relative my-5">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-brand-border" />
+      <div className={hideSeparator ? 'mt-3' : ''} />
+      {!hideSeparator && (
+        <div className="relative my-5">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-brand-border" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-brand-bg px-3 text-brand-muted">or</span>
+          </div>
         </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="bg-brand-bg px-3 text-brand-muted">or</span>
-        </div>
-      </div>
+      )}
 
       {error && (
         <div className="text-brand-error text-sm bg-brand-error/10 border border-brand-error/30 rounded-lg p-2 mb-2">
