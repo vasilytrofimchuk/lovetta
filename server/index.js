@@ -77,6 +77,9 @@ app.post('/api/chat/stt',
     try {
       const { authenticate } = require('./src/auth-middleware');
       await new Promise((resolve, reject) => authenticate(req, res, (err) => err ? reject(err) : resolve()));
+      if (!req.body || req.body.length < 1000) {
+        return res.status(400).json({ error: 'Recording too short' });
+      }
       const { transcribeSpeech } = require('./src/ai');
       const ct = req.headers['content-type'] || 'audio/webm';
       const ext = ct.includes('wav') ? 'wav' : ct.includes('mp4') ? 'mp4' : 'webm';
@@ -84,7 +87,7 @@ app.post('/api/chat/stt',
       res.json({ text });
     } catch (err) {
       console.error('[stt] error:', err.message);
-      if (!res.headersSent) res.status(500).json({ error: 'Failed to transcribe' });
+      if (!res.headersSent) res.status(400).json({ error: 'Could not transcribe audio' });
     }
   }
 );
