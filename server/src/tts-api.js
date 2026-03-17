@@ -13,6 +13,10 @@ const { trackConsumption } = require('./consumption');
 
 const router = Router();
 
+// In-flight TTS requests: messageId → Promise<audioUrl>
+// Prevents duplicate concurrent ElevenLabs calls for the same message
+const ttsInFlight = new Map();
+
 // Convert *actions* to ElevenLabs [audio tags]
 // Vocal actions become real sounds, visual actions get stripped
 function actionsToAudioTags(content) {
@@ -79,41 +83,57 @@ router.post('/tts', authenticate, async (req, res) => {
       if (headRes.ok) return res.json({ audioUrl: cachedUrl });
     } catch {}
 
-    // Get companion voice
-    const { rows: [companion] } = await pool.query(
-      'SELECT voice_id FROM user_companions WHERE id = $1',
-      [msg.companion_id]
-    );
-    // Use ElevenLabs voice ID; fallback if old OpenAI voice name is stored
-    let voiceId = companion?.voice_id || 'cgSgspJ2msm6clMCkdW9';
-    if (voiceId.length < 20) voiceId = 'cgSgspJ2msm6clMCkdW9'; // old OpenAI name → default Jessica
+    // Dedup: if same messageId is already being generated, wait for it
+    if (ttsInFlight.has(messageId)) {
+      try {
+        const audioUrl = await ttsInFlight.get(messageId);
+        return res.json({ audioUrl });
+      } catch (err) {
+        return res.status(500).json({ error: 'TTS generation failed' });
+      }
+    }
 
-    // Convert *actions* to [audio tags] for ElevenLabs
-    const ttsText = actionsToAudioTags(msg.content);
-    if (!ttsText) return res.status(400).json({ error: 'No speakable text' });
+    // Start generation and register the promise for dedup
+    const generatePromise = (async () => {
+      // Get companion voice
+      const { rows: [companion] } = await pool.query(
+        'SELECT voice_id FROM user_companions WHERE id = $1',
+        [msg.companion_id]
+      );
+      let voiceId = companion?.voice_id || 'cgSgspJ2msm6clMCkdW9';
+      if (voiceId.length < 20) voiceId = 'cgSgspJ2msm6clMCkdW9';
 
-    // Generate speech via ElevenLabs
-    const { buffer, costUsd } = await generateSpeech(ttsText, voiceId);
+      const ttsText = actionsToAudioTags(msg.content);
+      if (!ttsText) throw new Error('No speakable text');
 
-    // Upload to R2
-    const { url: audioUrl } = await uploadBuffer(buffer, 'audio', {
-      filename: messageId,
-      extension: '.mp3',
-      contentType: 'audio/mpeg',
-    });
+      const { buffer, costUsd } = await generateSpeech(ttsText, voiceId);
 
-    // Track consumption
-    await trackConsumption({
-      userId: req.userId,
-      companionId: msg.companion_id,
-      provider: 'elevenlabs',
-      model: 'eleven_v3',
-      callType: 'tts',
-      costUsd,
-      metadata: { messageId, chars: ttsText.length, voice: voiceId },
-    });
+      const { url: audioUrl } = await uploadBuffer(buffer, 'audio', {
+        filename: messageId,
+        extension: '.mp3',
+        contentType: 'audio/mpeg',
+      });
 
-    res.json({ audioUrl: audioUrl || cachedUrl });
+      await trackConsumption({
+        userId: req.userId,
+        companionId: msg.companion_id,
+        provider: 'elevenlabs',
+        model: 'eleven_v3',
+        callType: 'tts',
+        costUsd,
+        metadata: { messageId, chars: ttsText.length, voice: voiceId },
+      });
+
+      return audioUrl || cachedUrl;
+    })();
+
+    ttsInFlight.set(messageId, generatePromise);
+    try {
+      const audioUrl = await generatePromise;
+      res.json({ audioUrl });
+    } finally {
+      ttsInFlight.delete(messageId);
+    }
   } catch (err) {
     console.error('[tts] error:', err.message);
     res.status(500).json({ error: 'Failed to generate audio' });

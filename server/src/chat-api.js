@@ -13,8 +13,56 @@ const { sendCompanionEmail } = require('./email');
 const { buildMemoryContext, processMemory } = require('./memory');
 const { parseMediaTags, generateOrReuseMedia } = require('./media-chat');
 const { checkMediaBlocked } = require('./consumption');
+const { getRedis } = require('./redis');
 
 const router = Router();
+
+// -- Per-user rate limiting via Redis --------------------------
+const RATE_LIMIT_MAX = 20;       // max requests
+const RATE_LIMIT_WINDOW = 60;    // seconds
+
+async function checkRateLimit(userId) {
+  const redis = getRedis();
+  if (!redis) return true; // no Redis = no rate limiting
+
+  const key = `ratelimit:chat:${userId}`;
+  try {
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, RATE_LIMIT_WINDOW);
+    return count <= RATE_LIMIT_MAX;
+  } catch {
+    return true; // fail open
+  }
+}
+
+// -- Background media generation (non-blocking) ---------------
+
+function generateMediaInBackground(pool, messageId, companion, mediaRequest, opts) {
+  generateOrReuseMedia(companion, mediaRequest, opts)
+    .then(async (mediaResult) => {
+      if (mediaResult) {
+        await pool.query(
+          `UPDATE messages SET media_url = $1, media_type = $2, media_pending = FALSE WHERE id = $3`,
+          [mediaResult.url, mediaResult.type, messageId]
+        );
+        console.log(`[media-bg] ${mediaResult.type} ready for message ${messageId}: ${mediaResult.url}`);
+      } else {
+        await pool.query(
+          `UPDATE messages SET media_pending = FALSE WHERE id = $1`,
+          [messageId]
+        );
+      }
+    })
+    .catch(async (err) => {
+      console.error(`[media-bg] generation failed for message ${messageId}:`, err.message);
+      try {
+        await pool.query(
+          `UPDATE messages SET media_pending = FALSE WHERE id = $1`,
+          [messageId]
+        );
+      } catch {}
+    });
+}
 
 // -- Email notification (fire-and-forget) ---------------------
 
@@ -209,6 +257,7 @@ router.get('/:companionId', authenticate, async (req, res) => {
 
 // -- POST /api/chat/:companionId/message ---------------------
 router.post('/:companionId/message', authenticate, async (req, res) => {
+  if (!(await checkRateLimit(req.userId))) return res.status(429).json({ error: 'Too many messages, please slow down' });
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'No database' });
 
@@ -306,46 +355,24 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       }
 
       // Handle media — LLM tag OR user explicitly asked for image/photo
-      let mediaUrl = null;
-      let mediaType = null;
       let mediaBlocked = false;
+      let mediaPending = false;
       let effectiveMediaRequest = mediaRequest;
       if (!effectiveMediaRequest && /send.*(image|photo|pic|selfie|video|nude)|show me|send me.*(photo|pic|selfie|image)/i.test(content || '')) {
         effectiveMediaRequest = { type: 'image', description: 'a flirty selfie, looking at camera with a playful expression' };
       }
       if (effectiveMediaRequest && !aborted) {
         if (aiResult.mediaBlocked) {
-          // Threshold exceeded — block media, will show tip promo
           mediaBlocked = true;
         } else {
-          res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: effectiveMediaRequest.type })}\n\n`);
-
-          const mediaHeartbeat = setInterval(() => {
-            if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
-          }, 3000);
-
-          try {
-            const mediaResult = await generateOrReuseMedia(companion, effectiveMediaRequest, {
-              userId: req.userId,
-              companionId: companion.id,
-              platform,
-            });
-            if (mediaResult) {
-              mediaUrl = mediaResult.url;
-              mediaType = mediaResult.type;
-            }
-          } catch (err) {
-            console.error('[chat] media generation failed:', err.message);
-          } finally {
-            clearInterval(mediaHeartbeat);
-          }
+          mediaPending = true;
         }
       }
 
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type)
-         VALUES ($1, 'assistant', $2, $3, $4, $5, $6) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText, mediaUrl, mediaType]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type, media_pending)
+         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, $6) RETURNING id, created_at`,
+        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText, mediaPending ? effectiveMediaRequest.type : null, mediaPending]
       );
 
       await pool.query(
@@ -366,11 +393,21 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         messageId: savedMsg.id,
         contextText: parsed.contextText,
         sceneText: parsed.sceneText,
-        mediaUrl,
-        mediaType,
+        mediaUrl: null,
+        mediaType: mediaPending ? effectiveMediaRequest.type : null,
+        mediaPending,
         shouldRequestTip: aiResult.shouldRequestTip || false,
         mediaBlocked,
       })}\n\n`);
+
+      // Start media generation in background (non-blocking)
+      if (mediaPending) {
+        generateMediaInBackground(pool, savedMsg.id, companion, effectiveMediaRequest, {
+          userId: req.userId,
+          companionId: companion.id,
+          platform,
+        });
+      }
     }
   } catch (err) {
     console.error('[chat] message error:', err.message);
@@ -384,6 +421,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
 
 // -- POST /api/chat/:companionId/next ------------------------
 router.post('/:companionId/next', authenticate, async (req, res) => {
+  if (!(await checkRateLimit(req.userId))) return res.status(429).json({ error: 'Too many messages, please slow down' });
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'No database' });
 
@@ -460,42 +498,20 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       }
 
       // Handle media generation if LLM requested it
-      let mediaUrl = null;
-      let mediaType = null;
       let mediaBlocked = false;
+      let mediaPending = false;
       if (mediaRequest && !aborted) {
         if (doneData.mediaBlocked) {
-          // Threshold exceeded — block media, will show tip promo
           mediaBlocked = true;
         } else {
-          res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: mediaRequest.type })}\n\n`);
-
-          const mediaHeartbeat = setInterval(() => {
-            if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
-          }, 3000);
-
-          try {
-            const mediaResult = await generateOrReuseMedia(companion, mediaRequest, {
-              userId: req.userId,
-              companionId: companion.id,
-              platform,
-            });
-            if (mediaResult) {
-              mediaUrl = mediaResult.url;
-              mediaType = mediaResult.type;
-            }
-          } catch (err) {
-            console.error('[chat] media generation failed:', err.message);
-          } finally {
-            clearInterval(mediaHeartbeat);
-          }
+          mediaPending = true;
         }
       }
 
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type)
-         VALUES ($1, 'assistant', $2, $3, $4, $5, $6) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText, mediaUrl, mediaType]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type, media_pending)
+         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, $6) RETURNING id, created_at`,
+        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText, mediaPending ? mediaRequest.type : null, mediaPending]
       );
       await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
 
@@ -512,11 +528,21 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
         messageId: savedMsg.id,
         contextText: parsed.contextText,
         sceneText: parsed.sceneText,
-        mediaUrl,
-        mediaType,
+        mediaUrl: null,
+        mediaType: mediaPending ? mediaRequest.type : null,
+        mediaPending,
         shouldRequestTip: doneData.shouldRequestTip || false,
         mediaBlocked,
       })}\n\n`);
+
+      // Start media generation in background (non-blocking)
+      if (mediaPending) {
+        generateMediaInBackground(pool, savedMsg.id, companion, mediaRequest, {
+          userId: req.userId,
+          companionId: companion.id,
+          platform,
+        });
+      }
     }
   } catch (err) {
     console.error('[chat] next error:', err.message);
@@ -530,6 +556,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
 
 // -- POST /api/chat/:companionId/request-media ----------------
 router.post('/:companionId/request-media', authenticate, async (req, res) => {
+  if (!(await checkRateLimit(req.userId))) return res.status(429).json({ error: 'Too many messages, please slow down' });
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'No database' });
 
@@ -606,14 +633,10 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
 
       const parsed = parseContextText(cleanText);
 
-      let mediaUrl = null;
-      let mediaType = null;
-
       // Force image generation even if LLM didn't include the tag
       // Build a contextual description from the AI's response text
       let fallbackDescription = 'a flirty selfie, looking at camera with a playful smile, casual setting';
       if (parsed.content) {
-        // Use the AI's text to inform the image — look for scene hints
         const text = parsed.content.toLowerCase();
         if (text.includes('bed') || text.includes('bedroom') || text.includes('pillow')) fallbackDescription = 'lying on bed, soft lighting, flirty pose, looking at camera';
         else if (text.includes('shower') || text.includes('bath') || text.includes('towel')) fallbackDescription = 'in bathroom, wrapped in towel, wet hair, playful expression';
@@ -623,34 +646,10 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       }
       const effectiveMediaRequest = mediaRequest || { type: 'image', description: fallbackDescription };
 
-      if (!aborted) {
-        res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: effectiveMediaRequest.type })}\n\n`);
-
-        const mediaHeartbeat = setInterval(() => {
-          if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
-        }, 3000);
-
-        try {
-          const mediaResult = await generateOrReuseMedia(companion, effectiveMediaRequest, {
-            userId: req.userId,
-            companionId: companion.id,
-            platform,
-          });
-          if (mediaResult) {
-            mediaUrl = mediaResult.url;
-            mediaType = mediaResult.type;
-          }
-        } catch (err) {
-          console.error('[chat] media generation failed:', err.message);
-        } finally {
-          clearInterval(mediaHeartbeat);
-        }
-      }
-
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type)
-         VALUES ($1, 'assistant', $2, $3, $4, $5, $6) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText || null, mediaUrl, mediaType]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type, media_pending)
+         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, TRUE) RETURNING id, created_at`,
+        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText || null, effectiveMediaRequest.type]
       );
       await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
 
@@ -659,10 +658,20 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
         messageId: savedMsg.id,
         contextText: parsed.contextText,
         sceneText: parsed.sceneText || null,
-        mediaUrl,
-        mediaType,
+        mediaUrl: null,
+        mediaType: effectiveMediaRequest.type,
+        mediaPending: true,
         shouldRequestTip: aiResult.shouldRequestTip || false,
       })}\n\n`);
+
+      // Start media generation in background (non-blocking)
+      if (!aborted) {
+        generateMediaInBackground(pool, savedMsg.id, companion, effectiveMediaRequest, {
+          userId: req.userId,
+          companionId: companion.id,
+          platform,
+        });
+      }
     }
   } catch (err) {
     console.error('[chat] request-media error:', err.message);
@@ -717,6 +726,34 @@ router.get('/:companionId/history', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[chat] history error:', err.message);
     res.status(500).json({ error: 'Failed to load history' });
+  }
+});
+
+// -- GET /api/chat/message/:messageId/media -------------------
+router.get('/message/:messageId/media', authenticate, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'No database' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.media_url, m.media_type, m.media_pending
+       FROM messages m
+       JOIN conversations c ON c.id = m.conversation_id
+       WHERE m.id = $1 AND c.user_id = $2`,
+      [req.params.messageId, req.userId]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'Message not found' });
+
+    const msg = rows[0];
+    res.json({
+      mediaUrl: msg.media_url,
+      mediaType: msg.media_type,
+      pending: msg.media_pending || false,
+    });
+  } catch (err) {
+    console.error('[chat] media poll error:', err.message);
+    res.status(500).json({ error: 'Failed to check media status' });
   }
 });
 

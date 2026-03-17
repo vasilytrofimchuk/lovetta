@@ -34,17 +34,19 @@ export default function TipPromoMessage({ message, companionId, onDismiss }) {
 
         {/* Tip buttons */}
         <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {TIP_AMOUNTS.map((amount) => (
+          {TIP_AMOUNTS.map(({ amount, label }) => (
             <button
               key={amount}
               onClick={() => handleTip(amount)}
               disabled={tipLoading !== null}
-              className="py-2 rounded-lg border border-brand-accent/30 bg-brand-card text-brand-text hover:bg-brand-accent/15 hover:border-brand-accent/50 transition-colors disabled:opacity-50 text-sm font-medium"
+              className="py-2 px-1 rounded-lg border border-brand-accent/30 bg-brand-card text-brand-text hover:bg-brand-accent/15 hover:border-brand-accent/50 transition-colors disabled:opacity-50 font-medium"
             >
-              {tipLoading === amount ? '...' : `$${amount}`}
+              <span className="block text-sm">{tipLoading === amount ? '...' : `$${amount}`}</span>
+              <span className="block text-[10px] text-brand-muted mt-0.5 font-normal">{label}</span>
             </button>
           ))}
         </div>
+        <p className="text-[10px] text-brand-muted mt-1.5">Tips unlock more images & videos in your chats</p>
 
         {/* Dismiss */}
         <button

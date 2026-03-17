@@ -578,6 +578,12 @@ const MIGRATIONS = [
       UPDATE companion_templates SET video_url = '${R2}/videos/templates/42/4488dca4-ddc5-44f1-a07f-f52b544df717.mp4' WHERE name = 'Mei' AND video_url IS NULL;
     `,
   },
+  {
+    name: 'v24_media_pending',
+    sql: `
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_pending BOOLEAN DEFAULT FALSE;
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

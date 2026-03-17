@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import api from '../lib/api';
 
 const TIP_PROMO_MESSAGES = [
@@ -29,6 +29,15 @@ export default function useChat(companionId) {
   const mediaButtonThresholdRef = useRef(Math.floor(Math.random() * 11) + 5); // 5-15
   const abortRef = useRef(null);
   const typewriterRef = useRef(null);
+  const mediaPollTimers = useRef(new Map()); // messageId → intervalId
+
+  // Cleanup media poll timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const timer of mediaPollTimers.current.values()) clearInterval(timer);
+      mediaPollTimers.current.clear();
+    };
+  }, []);
 
   const loadChat = useCallback(async () => {
     try {
@@ -62,6 +71,45 @@ export default function useChat(companionId) {
       setHasMore(data.hasMore);
     } catch {}
   }, [companionId, messages, hasMore]);
+
+  function startMediaPoll(messageId, mediaType) {
+    if (mediaPollTimers.current.has(messageId)) return;
+
+    setMediaLoading(true);
+    setMediaLoadingType(mediaType || 'image');
+
+    const startTime = Date.now();
+    const maxWait = 5 * 60 * 1000; // 5 min
+
+    const timer = setInterval(async () => {
+      if (Date.now() - startTime > maxWait) {
+        clearInterval(timer);
+        mediaPollTimers.current.delete(messageId);
+        setMediaLoading(false);
+        setMediaLoadingType(null);
+        return;
+      }
+
+      try {
+        const { data } = await api.get(`/api/chat/message/${messageId}/media`);
+        if (data.mediaUrl && !data.pending) {
+          clearInterval(timer);
+          mediaPollTimers.current.delete(messageId);
+          setMessages(prev => prev.map(m =>
+            m.id === messageId
+              ? { ...m, media_url: data.mediaUrl, media_type: data.mediaType, media_pending: false }
+              : m
+          ));
+          setMediaLoading(false);
+          setMediaLoadingType(null);
+          setMessagesSinceLastMedia(0);
+          mediaButtonThresholdRef.current = Math.floor(Math.random() * 11) + 5;
+        }
+      } catch {}
+    }, 3000);
+
+    mediaPollTimers.current.set(messageId, timer);
+  }
 
   function clearTypewriter() {
     if (typewriterRef.current) {
@@ -216,6 +264,7 @@ export default function useChat(companionId) {
         scene_text: sceneText,
         media_url: event.mediaUrl || null,
         media_type: event.mediaType || null,
+        media_pending: event.mediaPending || false,
         created_at: new Date().toISOString(),
       };
       setMessages(prev => [...prev, newMsg]);
@@ -224,8 +273,13 @@ export default function useChat(companionId) {
       if (event.mediaUrl) {
         setMessagesSinceLastMedia(0);
         mediaButtonThresholdRef.current = Math.floor(Math.random() * 11) + 5;
-      } else {
+      } else if (!event.mediaPending) {
         setMessagesSinceLastMedia(prev => prev + 1);
+      }
+
+      // Start polling for media if generation is pending
+      if (event.mediaPending && event.messageId) {
+        startMediaPoll(event.messageId, event.mediaType);
       }
 
       if (event.shouldRequestTip) {

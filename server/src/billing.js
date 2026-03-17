@@ -5,7 +5,7 @@
  */
 
 const { getPool } = require('./db');
-const { resetTipCounter } = require('./consumption');
+const { resetTipCounter, invalidateThresholdCache } = require('./consumption');
 
 let stripe = null;
 function getStripe() {
@@ -216,8 +216,9 @@ async function handleWebhook(rawBody, signature) {
           'INSERT INTO tips (user_id, amount, stripe_payment_id, companion_id) VALUES ($1, $2, $3, $4) ON CONFLICT (stripe_payment_id) DO NOTHING',
           [userId, amount, paymentIntent, tipCompanionId]
         );
-        // Reset tip cost counter so companion stops asking
+        // Reset tip cost counter so companion stops asking + invalidate Redis cache
         try { await resetTipCounter(userId, tipCompanionId); } catch (e) { console.warn('[billing] resetTipCounter error:', e.message); }
+        try { await invalidateThresholdCache(userId); } catch (e) { console.warn('[billing] cache invalidation error:', e.message); }
         // Insert thank-you message from companion
         if (tipCompanionId) {
           try { await insertTipThankYou(pool, userId, tipCompanionId); } catch (e) { console.warn('[billing] thank-you error:', e.message); }

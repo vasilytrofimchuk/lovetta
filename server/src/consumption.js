@@ -4,6 +4,9 @@
  */
 
 const { getPool } = require('./db');
+const { getRedis } = require('./redis');
+
+const THRESHOLD_CACHE_TTL = 60; // seconds
 
 /**
  * Record an API call and update running cost balance.
@@ -43,6 +46,16 @@ async function checkMediaBlocked(userId, subscription) {
  * Picks trial vs paid threshold based on subscription state.
  */
 async function _checkThreshold(pool, userId, subscription) {
+  // Try Redis cache first
+  const redis = getRedis();
+  const cacheKey = `threshold:${userId}`;
+  if (redis) {
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+  }
+
   // Check total cost for this user across ALL companions in the current calendar month
   const { rows: costRows } = await pool.query(
     `SELECT COALESCE(SUM(cost_usd), 0) AS monthly_cost
@@ -80,12 +93,29 @@ async function _checkThreshold(pool, userId, subscription) {
   const netCost = monthlyCost - monthlyTips;
   const exceeded = netCost >= threshold;
 
-  return {
+  const result = {
     shouldRequestTip: exceeded,
     mediaBlocked: exceeded,
     monthlyCost,
     monthlyTips,
   };
+
+  // Cache in Redis
+  if (redis) {
+    try { await redis.setex(cacheKey, THRESHOLD_CACHE_TTL, JSON.stringify(result)); } catch {}
+  }
+
+  return result;
+}
+
+/**
+ * Invalidate threshold cache for a user (call after tip payment).
+ */
+async function invalidateThresholdCache(userId) {
+  const redis = getRedis();
+  if (redis) {
+    try { await redis.del(`threshold:${userId}`); } catch {}
+  }
 }
 
 /**
@@ -222,5 +252,6 @@ module.exports = {
   trackConsumption,
   resetTipCounter,
   checkMediaBlocked,
+  invalidateThresholdCache,
   getConsumptionSummary,
 };

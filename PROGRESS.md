@@ -291,6 +291,17 @@
 - [x] Remove email from localStorage landing data
 - [x] Clean up Signup.jsx pre-fill (no more email from landing data)
 
+### Scalability: Async Generation for Concurrent Users
+- [x] Install ioredis + create Redis client singleton (server/src/redis.js)
+- [x] Increase DB pool size 5 → 20 with connectionTimeoutMillis
+- [x] Add v24_media_pending migration (media_pending column on messages)
+- [x] Decouple media generation from chat response (background generation in /message, /next, /request-media)
+- [x] Add media polling endpoint GET /api/chat/message/:messageId/media
+- [x] Frontend: poll for pending media in useChat + shimmer placeholder in MessageBubble
+- [x] Cache consumption threshold in Redis (60s TTL) with invalidation on tip payment
+- [x] TTS request deduplication via in-flight Map (prevents duplicate ElevenLabs calls)
+- [x] Redis-based per-user chat rate limiting (20 msg/min)
+
 ### Landing Page: Apple-compliant Trial Section
 - [x] Prominent pricing: $19.99/mo and $99.99/yr displayed large with "save 58%" badge
 - [x] Trial timeline: Today → Day 3 (trial ends) → Day 4 (first charge) visual

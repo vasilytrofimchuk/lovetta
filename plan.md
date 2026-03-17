@@ -310,6 +310,31 @@ Separate tip thresholds for trial ($0.30) vs paid ($10) users. When threshold is
 
 ---
 
+## Scalability: Async Generation for Concurrent Users — DONE
+
+### What
+Audit + fix all AI generation (text, image, video, audio) to work at scale for many concurrent users. Key changes:
+- DB pool 5 → 20 (new Heroku Postgres with 120 connections)
+- Heroku Key-Value Store (Redis) for caching + rate limiting + dedup
+- Media generation (image/video) decoupled from chat response — async background generation with client polling
+- Consumption threshold cached in Redis (60s TTL) — eliminates 3 DB queries per API call
+- TTS request deduplication via in-flight Map
+- Per-user chat rate limiting (20 msg/min via Redis)
+
+### Files Changed
+- `server/src/db.js` — pool size 20, connection timeout
+- `server/src/redis.js` — new Redis client singleton
+- `server/src/chat-api.js` — async media, polling endpoint, rate limiting
+- `server/src/migrate.js` — v24_media_pending migration
+- `server/src/consumption.js` — Redis threshold cache + invalidation
+- `server/src/tts-api.js` — TTS dedup
+- `server/src/billing.js` — threshold cache invalidation on tip
+- `web/src/hooks/useChat.js` — media polling
+- `web/src/components/chat/MessageBubble.jsx` — shimmer placeholder
+- `web/tailwind.config.js` — shimmer animation
+
+---
+
 ## Priority Order (remaining)
 1. **Companion system** — templates + creation + management
 2. **Chat UI + OpenRouter AI** — streaming, message format, roleplay
