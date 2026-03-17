@@ -28,7 +28,6 @@ export default function Signup() {
         const raw = localStorage.getItem('lovetta-landing-data')
         if (raw) {
           const data = JSON.parse(raw)
-          if (data.email) setEmail(data.email)
           if (data.birthMonth) setBirthMonth(String(data.birthMonth))
           if (data.birthYear) setBirthYear(String(data.birthYear))
           if (data.termsAccepted && data.privacyAccepted && data.aiConsentAccepted) {

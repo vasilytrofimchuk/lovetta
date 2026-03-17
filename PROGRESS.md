@@ -284,3 +284,9 @@
 - [x] content-levels.js: add `getUserExplicitPref()`, `getEffectiveTextLevel()`, `getEffectiveImageLevel()` — user toggle overrides admin level to 0 when disabled
 - [x] ai.js: pass `userId` through `buildSystemPrompt()`, `chatCompletion()`, `streamChat()`, `generateImage()` to content level functions
 - [x] Profile.jsx: add "Content Preferences" card with "Explicit content" toggle
+
+### Landing Page: Remove Email from Trial Form
+- [x] Remove email field from landing page signup form (users pick auth method on signup page)
+- [x] Update form JS validation to not require email
+- [x] Remove email from localStorage landing data
+- [x] Clean up Signup.jsx pre-fill (no more email from landing data)

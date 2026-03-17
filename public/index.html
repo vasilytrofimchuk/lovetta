@@ -60,7 +60,7 @@
     <section class="signup-section">
       <div class="signup-card">
         <h2>Start Free Trial</h2>
-        <p class="subtitle">Create your account and meet your girlfriend in minutes.</p>
+        <p class="subtitle">Verify your age and meet your girlfriend in minutes.</p>
 
         <div class="trial-info">
           <div class="trial-badge">3 days free</div>
@@ -69,11 +69,6 @@
         </div>
 
         <form id="signup-form">
-          <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" placeholder="your@email.com" required autocomplete="email">
-          </div>
-
           <div class="form-row">
             <div class="form-group">
               <label for="birth-month">Birth Month</label>
@@ -302,11 +297,10 @@
       var errorEl = document.getElementById('form-error');
       errorEl.style.display = 'none';
 
-      var email = document.getElementById('email').value.trim();
       var birthMonth = document.getElementById('birth-month').value;
       var birthYear = document.getElementById('birth-year').value;
 
-      if (!email || !birthMonth || !birthYear) {
+      if (!birthMonth || !birthYear) {
         errorEl.textContent = 'Please fill in all fields.';
         errorEl.style.display = 'block';
         return;
@@ -341,7 +335,6 @@
 
       // Save data to localStorage for signup page
       var landingData = {
-        email: email,
         birthMonth: parseInt(birthMonth, 10),
         birthYear: parseInt(birthYear, 10),
         termsAccepted: true,

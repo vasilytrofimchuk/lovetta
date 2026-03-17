@@ -20,7 +20,6 @@ test.describe('Landing page', () => {
     await page.goto(BASE);
 
     await expect(page.locator('#signup-form')).toBeVisible();
-    await expect(page.locator('#email')).toBeVisible();
     await expect(page.locator('#birth-month')).toBeVisible();
     await expect(page.locator('#birth-year')).toBeVisible();
     await expect(page.locator('#agree-terms')).toBeVisible();
