@@ -175,18 +175,33 @@ router.post('/', authenticate, async (req, res) => {
 
       // Parse context text from *asterisks*
       const contextMatch = result.content.match(/^\*([^*]+)\*/);
-      const contextText = contextMatch ? contextMatch[1].trim() : null;
+      let contextText = contextMatch ? contextMatch[1].trim() : null;
       const content = contextMatch ? result.content.slice(contextMatch[0].length).trim() : result.content;
+      // Truncate context to 8 words
+      if (contextText) {
+        const cw = contextText.split(/\s+/);
+        if (cw.length > 8) contextText = cw.slice(0, 8).join(' ');
+      }
 
       // Always generate scene for first message
       let sceneText = null;
       try {
         const sceneResult = await chatCompletion(
-          `Write a brief cinematic scene description (max 15 words). Describe setting and mood. Third person, no quotes, no brackets. Just one short sentence.`,
+          `Write a scene description in 5-8 words. Setting + mood only. No character names, no quotes, no brackets, no full sentences.
+
+Examples:
+- Warm golden light across tangled sheets
+- Rain on the window, tea in hand
+- Kitchen counter, barefoot on cool tiles
+- Dim bedroom, phone glow on her face`,
           [{ role: 'user', content: `Character: ${companion.name}, ${companion.age}. ${companion.personality}\n\nHer first words: ${content}` }],
-          { model: 'sao10k/l3.3-euryale-70b' }
+          { model: 'thedrummer/rocinante-12b' }
         );
-        sceneText = sceneResult.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
+        let scene = sceneResult.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
+        // Hard truncate to 10 words
+        const sw = scene.split(/\s+/);
+        if (sw.length > 10) scene = sw.slice(0, 10).join(' ');
+        sceneText = scene;
       } catch (err) {
         console.warn('[companions] Scene generation failed:', err.message);
       }

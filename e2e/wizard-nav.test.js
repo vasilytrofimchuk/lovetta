@@ -23,7 +23,7 @@ async function signupViaUI(page) {
   const count = await checkboxes.count();
   for (let i = 0; i < count; i++) await checkboxes.nth(i).check();
   await page.locator('button:has-text("Continue")').last().click();
-  await page.waitForSelector('text=Sign out', { timeout: 15000 });
+  await page.waitForSelector('button[title="Profile"]', { timeout: 15000 });
 }
 
 test.describe('Wizard back button navigation', () => {

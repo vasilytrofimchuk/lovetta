@@ -62,10 +62,12 @@ export default function MessageBubble({ message }) {
     const match = remaining.match(/^\*([^*]+)\*/);
     if (match) {
       contextText = match[1].trim();
-      content = remaining.slice(match[0].length).trim();
-    } else {
-      content = remaining;
+      remaining = remaining.slice(match[0].length).trim();
+      // Truncate context to max 8 words
+      const words = contextText.split(/\s+/);
+      if (words.length > 8) contextText = words.slice(0, 8).join(' ');
     }
+    content = remaining;
   }
 
   return (

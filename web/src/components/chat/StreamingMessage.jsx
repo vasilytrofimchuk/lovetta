@@ -25,6 +25,9 @@ export default function StreamingMessage({ text, mediaLoading, mediaLoadingType,
   if (match) {
     contextText = match[1].trim();
     content = content.slice(match[0].length).trim();
+    // Truncate context to 8 words
+    const words = contextText.split(/\s+/);
+    if (words.length > 8) contextText = words.slice(0, 8).join(' ');
   }
 
   return (

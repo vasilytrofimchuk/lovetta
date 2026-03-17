@@ -36,7 +36,7 @@ test.describe('Admin Email Tab', () => {
   test('email tab loads and shows elements', async ({ page }) => {
     await loginAdmin(page);
 
-    const emailTab = page.locator('.tab', { hasText: /^Email$/ });
+    const emailTab = page.locator('.tab[onclick="switchTab(\'email\')"]');
     await expect(emailTab).toBeVisible();
     await emailTab.click();
 
@@ -52,7 +52,7 @@ test.describe('Admin Email Tab', () => {
 
   test('compose form opens and has from addresses', async ({ page }) => {
     await loginAdmin(page);
-    await page.locator('.tab', { hasText: /^Email$/ }).click();
+    await page.locator('.tab[onclick="switchTab(\'email\')"]').click();
     await expect(page.locator('#tab-email')).toBeVisible();
 
     await page.locator('#tab-email button', { hasText: 'Compose' }).click();
@@ -73,7 +73,7 @@ test.describe('Admin Email Tab', () => {
 
   test('filter buttons switch views', async ({ page }) => {
     await loginAdmin(page);
-    await page.locator('.tab', { hasText: /^Email$/ }).click();
+    await page.locator('.tab[onclick="switchTab(\'email\')"]').click();
     await expect(page.locator('#tab-email')).toBeVisible();
 
     // Default: Inbox active
@@ -96,7 +96,7 @@ test.describe('Admin Email Tab', () => {
     await seedEmail(page);
 
     // Navigate to email tab
-    await page.locator('.tab', { hasText: /^Email$/ }).click();
+    await page.locator('.tab[onclick="switchTab(\'email\')"]').click();
     await expect(page.locator('#tab-email')).toBeVisible();
 
     // Wait for email list to load
@@ -115,7 +115,7 @@ test.describe('Admin Email Tab', () => {
     await loginAdmin(page);
     await seedEmail(page);
 
-    await page.locator('.tab', { hasText: /^Email$/ }).click();
+    await page.locator('.tab[onclick="switchTab(\'email\')"]').click();
     await expect(page.locator('#tab-email')).toBeVisible();
     await page.waitForTimeout(500);
 
@@ -149,7 +149,7 @@ test.describe('Admin Email Tab', () => {
 
   test('send email and verify in sent tab', async ({ page }) => {
     await loginAdmin(page);
-    await page.locator('.tab', { hasText: /^Email$/ }).click();
+    await page.locator('.tab[onclick="switchTab(\'email\')"]').click();
     await expect(page.locator('#tab-email')).toBeVisible();
 
     // Compose

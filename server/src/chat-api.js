@@ -106,17 +106,21 @@ function parseContextText(text) {
     remaining = remaining.replace(sceneMatch[0], '').trim();
   }
 
-  // Extract leading *action*
+  // Extract leading *action* as contextText (shown above bubble)
   const match = remaining.match(/^\*([^*]+)\*/);
   let contextText = match ? match[1].trim() : null;
-  // Truncate context to max 12 words — LLMs sometimes ignore the prompt limit
+  if (match) {
+    remaining = remaining.slice(match[0].length).trim();
+  }
+
+  // Truncate context to max 8 words
   if (contextText) {
     const words = contextText.split(/\s+/);
-    if (words.length > 12) contextText = words.slice(0, 12).join(' ');
+    if (words.length > 8) contextText = words.slice(0, 8).join(' ');
   }
-  const content = match ? remaining.slice(match[0].length).trim() : remaining;
 
-  return { sceneText, contextText, content };
+  // Mid-text *actions* stay in content — frontend renders them as styled text
+  return { sceneText, contextText, content: remaining };
 }
 
 async function generateScene(companion, messageContent) {

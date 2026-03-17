@@ -124,7 +124,7 @@ Response format: Always start with a brief action or emotional context in *aster
   let msg;
   try {
     const result = await chatCompletion(systemPrompt, [
-      { role: 'user', content: `[The user just sent you a generous gift to support you. React in your own unique way. Be ${mood}. Write 2-3 sentences max. Thank him warmly in YOUR voice and style — but don't just say "thanks", make it personal and heartfelt. Do NOT mention specific money amounts. Stay fully in character.]` },
+      { role: 'user', content: `[The user just sent you a generous gift to support you. React in your own unique way. Be ${mood}. You MUST start with a brief action in *asterisks* like *throws arms around you* then your message. Write 2-3 sentences max. Thank him warmly in YOUR voice and style. Do NOT mention specific money amounts. Stay fully in character.]` },
     ], { model: 'thedrummer/rocinante-12b' });
     msg = result.content;
   } catch (err) {
