@@ -56,13 +56,21 @@ export default function ChatInput({ onSend, disabled }) {
         if (blob.size < 100) return;
 
         try {
-          const arrayBuf = await blob.arrayBuffer();
-          const res = await api.post('/api/chat/stt', arrayBuf, {
-            headers: { 'Content-Type': mediaRecorder.mimeType },
+          const token = localStorage.getItem('lovetta-token') || '';
+          const resp = await fetch('/api/chat/stt', {
+            method: 'POST',
+            headers: {
+              'Content-Type': mediaRecorder.mimeType,
+              'Authorization': `Bearer ${token}`,
+            },
+            body: blob,
           });
-          const transcript = res.data?.text || '';
-          if (transcript.trim()) {
-            setText(prev => prev ? prev + ' ' + transcript.trim() : transcript.trim());
+          if (resp.ok) {
+            const data = await resp.json();
+            const transcript = data.text || '';
+            if (transcript.trim()) {
+              setText(prev => prev ? prev + ' ' + transcript.trim() : transcript.trim());
+            }
           }
         } catch (err) {
           console.error('[stt]', err);
