@@ -8,6 +8,7 @@ dist/
 
 # E2E test artifacts
 e2e/.test-port
+scripts/.dev-agent-port
 e2e/videos/
 e2e/results/
 e2e/report/

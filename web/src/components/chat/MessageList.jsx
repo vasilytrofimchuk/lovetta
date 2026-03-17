@@ -3,7 +3,7 @@ import MessageBubble from './MessageBubble';
 import StreamingMessage from './StreamingMessage';
 import TipPromoMessage from './TipPromoMessage';
 
-export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, companionId }) {
+export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, companionId, mediaLoading, mediaLoadingType, showMediaButton, onRequestMedia }) {
   const bottomRef = useRef(null);
   const containerRef = useRef(null);
   const sentinelRef = useRef(null);
@@ -62,10 +62,25 @@ export default function MessageList({ messages, streaming, streamingText, hasMor
         )}
 
         {/* Streaming indicator */}
-        {streaming && <StreamingMessage text={streamingText} />}
+        {streaming && <StreamingMessage text={streamingText} mediaLoading={mediaLoading} mediaLoadingType={mediaLoadingType} />}
 
         <div ref={bottomRef} />
       </div>
+
+      {/* Floating "ask for photo" button — above the bolt button */}
+      {showMediaButton && !streaming && (
+        <button
+          onClick={onRequestMedia}
+          className="absolute bottom-16 right-4 p-2.5 rounded-full bg-brand-surface border border-brand-border text-brand-muted hover:text-brand-accent hover:border-brand-accent shadow-lg transition-colors z-10"
+          title="Ask for a photo"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+        </button>
+      )}
 
       {/* Floating "let her message" button — sticky over scroll area */}
       {showNextButton && !streaming && (

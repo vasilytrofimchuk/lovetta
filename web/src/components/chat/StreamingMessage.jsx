@@ -9,7 +9,7 @@ function formatActions(text) {
   });
 }
 
-export default function StreamingMessage({ text }) {
+export default function StreamingMessage({ text, mediaLoading, mediaLoadingType }) {
   // Parse leading scene and context
   let sceneText = null;
   let contextText = null;
@@ -44,7 +44,7 @@ export default function StreamingMessage({ text }) {
           {content ? (
             <>
               {formatActions(content)}
-              <span className="inline-block w-0.5 h-4 bg-brand-accent ml-0.5 animate-pulse" />
+              {!mediaLoading && <span className="inline-block w-0.5 h-4 bg-brand-accent ml-0.5 animate-pulse" />}
             </>
           ) : (
             <span className="inline-flex gap-1 text-brand-muted">
@@ -54,6 +54,14 @@ export default function StreamingMessage({ text }) {
             </span>
           )}
         </div>
+        {mediaLoading && (
+          <div className="mt-2 flex items-center gap-1.5 text-brand-muted text-xs px-1">
+            <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+            </svg>
+            <span>Sending {mediaLoadingType === 'video' ? 'video' : 'photo'}...</span>
+          </div>
+        )}
       </div>
     </div>
   );

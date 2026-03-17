@@ -62,6 +62,7 @@ router.post('/', authenticate, async (req, res) => {
         personality: personality || t.personality,
         backstory: backstory || t.backstory,
         avatar_url: t.avatar_url,
+        video_url: t.video_url || null,
         traits: traits || t.traits,
         communication_style: communicationStyle || t.communication_style,
         age: Math.max(18, age || t.age),
@@ -79,6 +80,7 @@ router.post('/', authenticate, async (req, res) => {
         personality,
         backstory: backstory || '',
         avatar_url: avatarUrl || null,
+        video_url: videoUrl || null,
         traits: traits || [],
         communication_style: communicationStyle || 'playful',
         age: Math.max(18, age || 22),
@@ -88,13 +90,13 @@ router.post('/', authenticate, async (req, res) => {
 
     // Insert companion
     const { rows: [companion] } = await pool.query(
-      `INSERT INTO user_companions (user_id, template_id, name, personality, backstory, avatar_url, traits, communication_style, age, style, voice_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO user_companions (user_id, template_id, name, personality, backstory, avatar_url, video_url, traits, communication_style, age, style, voice_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [req.userId, companionData.template_id, companionData.name, companionData.personality,
-       companionData.backstory, companionData.avatar_url, JSON.stringify(companionData.traits),
-       companionData.communication_style, companionData.age, companionData.style || 'realistic',
-       companionData.voice_id || 'nova']
+       companionData.backstory, companionData.avatar_url, companionData.video_url,
+       JSON.stringify(companionData.traits), companionData.communication_style, companionData.age,
+       companionData.style || 'realistic', companionData.voice_id || 'nova']
     );
 
     // Create conversation

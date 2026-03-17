@@ -546,4 +546,52 @@ router.post('/emails/send', async (req, res) => {
   }
 });
 
+// -- Companion Emails (girl ↔ user email exchanges) --------
+
+router.get('/companion-emails', async (req, res) => {
+  try {
+    const pool = getPool();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const search = (req.query.search || '').trim();
+
+    let whereClause = '';
+    const params = [limit, offset];
+    if (search) {
+      whereClause = `WHERE u.email ILIKE $3 OR uc.name ILIKE $3 OR ce.body_text ILIKE $3`;
+      params.push(`%${search}%`);
+    }
+
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM companion_emails ce
+      LEFT JOIN users u ON u.id = ce.user_id
+      LEFT JOIN user_companions uc ON uc.id = ce.companion_id
+      ${whereClause}
+    `;
+    const dataQuery = `
+      SELECT ce.id, ce.direction, ce.from_address, ce.to_address, ce.subject,
+             ce.body_text, ce.created_at,
+             uc.name AS companion_name, u.email AS user_email
+      FROM companion_emails ce
+      LEFT JOIN user_companions uc ON uc.id = ce.companion_id
+      LEFT JOIN users u ON u.id = ce.user_id
+      ${whereClause}
+      ORDER BY ce.created_at DESC
+      LIMIT $1 OFFSET $2
+    `;
+
+    const [{ rows: [{ total }] }, { rows }] = await Promise.all([
+      pool.query(countQuery, search ? [params[2]] : []),
+      pool.query(dataQuery, params),
+    ]);
+
+    res.json({ rows, total: parseInt(total), page, limit });
+  } catch (err) {
+    console.error('[admin] companion-emails error:', err.message);
+    res.status(500).json({ error: 'Failed to load companion emails' });
+  }
+});
+
 module.exports = router;

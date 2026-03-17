@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node scripts/run-dev.js",
+    "dev:agent": "node scripts/run-dev-agent.js",
     "build": "npm -w web run build",
     "heroku-postbuild": "npm run build",
     "migrate": "node server/src/migrate.js",
@@ -15,6 +16,10 @@
     "kill:ports": "node scripts/kill-ports.js",
     "kill:runtime": "node scripts/kill-lovetta-runtime.js",
     "test:e2e": "npx playwright test --project=default",
+    "test:e2e:api": "npx playwright test --project=api",
+    "test:e2e:ai": "npx playwright test --project=ai",
+    "test:e2e:ui": "npx playwright test --project=ui",
+    "test:e2e:ai-real": "npx playwright test --project=ai-real",
     "test:e2e:demo": "npx playwright test --project=demo"
   },
   "dependencies": {

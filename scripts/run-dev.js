@@ -77,6 +77,18 @@ async function runSync(command, args) {
 async function main() {
   console.log('[dev] Cleaning up existing processes...')
   await runSync('node', [resolve(__dirname, 'kill-lovetta-runtime.js')])
+
+  // Kill dev:agent server if running (reads port from its port file)
+  const agentPortFile = resolve(__dirname, '.dev-agent-port')
+  try {
+    const agentPort = require('fs').readFileSync(agentPortFile, 'utf8').trim()
+    if (agentPort) {
+      await runSync('node', [resolve(__dirname, 'kill-ports.js'), agentPort]).catch(() => {})
+      try { require('fs').unlinkSync(agentPortFile) } catch {}
+      console.log(`[dev] Cleaned up dev:agent on port ${agentPort}`)
+    }
+  } catch {}
+
   await runSync('node', [resolve(__dirname, 'kill-ports.js'), '3900', '5173'])
 
   console.log('[dev] Building React app...')

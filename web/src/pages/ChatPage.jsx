@@ -14,7 +14,8 @@ export default function ChatPage() {
   const {
     messages, companion, setCompanion, loading, streaming, streamingText,
     hasMore, error, tipPromoMessage,
-    loadChat, loadMore, sendMessage, triggerNext, dismissTip,
+    mediaLoading, mediaLoadingType, showMediaButton,
+    loadChat, loadMore, sendMessage, triggerNext, requestMedia, dismissTip,
   } = useChat(companionId);
   const [showSheet, setShowSheet] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -45,6 +46,11 @@ export default function ChatPage() {
     triggerNext();
     setTimeout(scrollToBottom, 50);
   }, [triggerNext, scrollToBottom]);
+
+  const handleRequestMedia = useCallback(() => {
+    requestMedia();
+    setTimeout(scrollToBottom, 50);
+  }, [requestMedia, scrollToBottom]);
 
   // Auto-scroll when new message added
   useEffect(() => {
@@ -113,6 +119,10 @@ export default function ChatPage() {
         tipPromoMessage={tipPromoMessage}
         onDismissTip={dismissTip}
         companionId={companionId}
+        mediaLoading={mediaLoading}
+        mediaLoadingType={mediaLoadingType}
+        showMediaButton={showMediaButton}
+        onRequestMedia={handleRequestMedia}
       />
 
       {/* Error banner */}

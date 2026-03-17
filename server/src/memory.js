@@ -1,0 +1,370 @@
+/**
+ * Multi-level companion memory system.
+ *
+ * Level 1: Recent messages (last 10) — handled in chat-api.js
+ * Level 2: Conversation summaries — generated every ~20 messages
+ * Level 3: Long-term facts — extracted every ~10 messages
+ *
+ * Memory processing runs fire-and-forget after each assistant message.
+ */
+
+const { getPool } = require('./db');
+const { trackConsumption } = require('./consumption');
+
+const EXTRACTION_THRESHOLD = 10;
+const SUMMARY_THRESHOLD = 20;
+const MAX_MEMORY_CHARS = 2000; // ~500 tokens hard cap
+
+// -- Build memory context for system prompt ----------------------
+
+/**
+ * Build the memory section to inject into the companion's system prompt.
+ * Returns formatted text with facts + summaries, capped at ~500 tokens.
+ */
+async function buildMemoryContext(conversationId) {
+  const pool = getPool();
+  if (!pool) return '';
+
+  const [factsResult, summariesResult] = await Promise.all([
+    pool.query(
+      `SELECT category, fact FROM companion_memories
+       WHERE conversation_id = $1 ORDER BY category, updated_at DESC`,
+      [conversationId]
+    ),
+    pool.query(
+      `SELECT summary, created_at FROM conversation_summaries
+       WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 3`,
+      [conversationId]
+    ),
+  ]);
+
+  const facts = factsResult.rows;
+  const summaries = summariesResult.rows.reverse(); // chronological
+
+  if (facts.length === 0 && summaries.length === 0) return '';
+
+  let memoryPrompt = '';
+
+  if (facts.length > 0) {
+    memoryPrompt += '\nWHAT YOU REMEMBER ABOUT THE USER:\n';
+    memoryPrompt += facts.map(f => `- ${f.fact}`).join('\n');
+    memoryPrompt += '\n';
+  }
+
+  if (summaries.length > 0) {
+    memoryPrompt += '\nRECENT CONVERSATION HISTORY:\n';
+    for (const s of summaries) {
+      const ago = timeAgo(s.created_at);
+      memoryPrompt += `[${ago}] ${s.summary}\n`;
+    }
+  }
+
+  // Hard cap to prevent token overflow
+  if (memoryPrompt.length > MAX_MEMORY_CHARS) {
+    // Drop oldest summaries first, then trim facts
+    if (summaries.length > 1) {
+      // Rebuild with fewer summaries
+      memoryPrompt = '';
+      if (facts.length > 0) {
+        memoryPrompt += '\nWHAT YOU REMEMBER ABOUT THE USER:\n';
+        memoryPrompt += facts.map(f => `- ${f.fact}`).join('\n');
+        memoryPrompt += '\n';
+      }
+      // Keep only last summary
+      const last = summaries[summaries.length - 1];
+      memoryPrompt += `\nRECENT CONVERSATION HISTORY:\n[${timeAgo(last.created_at)}] ${last.summary}\n`;
+    }
+    // Final hard truncation if still over
+    if (memoryPrompt.length > MAX_MEMORY_CHARS) {
+      memoryPrompt = memoryPrompt.slice(0, MAX_MEMORY_CHARS);
+    }
+  }
+
+  return memoryPrompt;
+}
+
+// -- Post-message memory processing (fire-and-forget) -----------
+
+/**
+ * Process memory after an assistant message. Increments counters
+ * and triggers extraction/summarization when thresholds are hit.
+ */
+async function processMemory(pool, conversationId, companionId, userId) {
+  // Increment counters
+  const { rows } = await pool.query(
+    `UPDATE conversations
+     SET messages_since_summary = COALESCE(messages_since_summary, 0) + 1,
+         messages_since_extraction = COALESCE(messages_since_extraction, 0) + 1
+     WHERE id = $1
+     RETURNING messages_since_summary, messages_since_extraction`,
+    [conversationId]
+  );
+
+  if (!rows[0]) return;
+  const { messages_since_summary, messages_since_extraction } = rows[0];
+
+  // Fact extraction (every 10 messages)
+  if (messages_since_extraction >= EXTRACTION_THRESHOLD) {
+    try {
+      await extractFacts(pool, conversationId, companionId, userId);
+      await pool.query(
+        'UPDATE conversations SET messages_since_extraction = 0 WHERE id = $1',
+        [conversationId]
+      );
+    } catch (err) {
+      console.warn('[memory] fact extraction failed:', err.message);
+    }
+  }
+
+  // Summary generation (every 20 messages)
+  if (messages_since_summary >= SUMMARY_THRESHOLD) {
+    try {
+      await generateSummary(pool, conversationId, companionId, userId);
+      await pool.query(
+        'UPDATE conversations SET messages_since_summary = 0 WHERE id = $1',
+        [conversationId]
+      );
+    } catch (err) {
+      console.warn('[memory] summary generation failed:', err.message);
+    }
+  }
+}
+
+// -- Fact extraction ---------------------------------------------
+
+async function extractFacts(pool, conversationId, companionId, userId) {
+  // Load existing facts
+  const { rows: existingFacts } = await pool.query(
+    'SELECT category, fact FROM companion_memories WHERE conversation_id = $1',
+    [conversationId]
+  );
+
+  // Load last 15 messages
+  const { rows: messages } = await pool.query(
+    `SELECT id, role, content FROM messages
+     WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 15`,
+    [conversationId]
+  );
+  messages.reverse();
+
+  if (messages.length < 3) return; // not enough context
+
+  const existingText = existingFacts.length > 0
+    ? `\nExisting known facts:\n${existingFacts.map(f => `- [${f.category}] ${f.fact}`).join('\n')}`
+    : '';
+
+  // Strip roleplay formatting to reduce model's urge to roleplay
+  const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
+  const messagesText = messages.map(m => `${m.role}: ${cleanMsg(m.content)}`).join('\n');
+
+  const systemPrompt = `You are a data extraction assistant. You are NOT a character — do NOT roleplay. Your ONLY job is to extract facts about the human user from the chat log below.
+
+OUTPUT FORMAT: Return a raw JSON array. No explanation, no commentary, no markdown. Just the JSON.
+
+CATEGORIES: identity, preferences, life, relationship, emotional
+
+EXAMPLE OUTPUT:
+[{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User works as a teacher"},{"category":"preferences","fact":"User's favorite food is pizza"}]
+
+RULES:
+- Extract facts about the USER only (the "user:" messages), not the assistant
+- Keep each fact to one short sentence
+- If no facts found, return: []
+- Max 10 facts
+${existingText}`;
+
+  const { plainChatCompletion } = require('./ai');
+  const result = await plainChatCompletion(systemPrompt, [
+    { role: 'user', content: messagesText },
+  ]);
+
+  if (!result || !result.content) return;
+
+  // Parse JSON from response (handle markdown code blocks, prose wrapping)
+  let factsJson;
+  try {
+    let text = result.content.trim();
+    // Strip markdown code fence if present
+    const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) text = fenceMatch[1].trim();
+    // Try to find JSON array in the response (model may wrap in prose)
+    const arrayMatch = text.match(/\[[\s\S]*\]/);
+    if (arrayMatch) text = arrayMatch[0];
+    factsJson = JSON.parse(text);
+  } catch {
+    console.warn('[memory] failed to parse facts JSON:', result.content.slice(0, 200));
+    return;
+  }
+
+  if (!Array.isArray(factsJson) || factsJson.length === 0) return;
+
+  // Track consumption
+  await trackConsumption({
+    userId,
+    companionId,
+    provider: 'openrouter',
+    model: 'memory',
+    callType: 'memory',
+    inputTokens: result.inputTokens || 0,
+    outputTokens: result.outputTokens || 0,
+    costUsd: result.costUsd || 0,
+    metadata: { type: 'fact_extraction', factsCount: factsJson.length },
+  });
+
+  // Upsert facts — for each category+fact pair, replace if similar exists
+  const lastMessageId = messages[messages.length - 1]?.id;
+
+  const VALID_CATEGORIES = new Set(['identity', 'preferences', 'life', 'relationship', 'emotional']);
+
+  for (const item of factsJson.slice(0, 10)) {
+    if (!item.category || !item.fact) continue;
+    const category = String(item.category).toLowerCase().trim();
+    const fact = String(item.fact).trim();
+    if (!VALID_CATEGORIES.has(category)) continue; // skip garbage categories
+    if (!fact || fact.length > 500) continue;
+
+    // Check for existing fact in same category with similar content
+    const { rows: existing } = await pool.query(
+      `SELECT id, fact FROM companion_memories
+       WHERE conversation_id = $1 AND category = $2`,
+      [conversationId, category]
+    );
+
+    // Simple dedup: if any existing fact starts with the same key phrase, update it
+    const keyPhrase = fact.split(/\s+(is|are|has|likes|works|prefers|lives|named)\s+/i)[0]?.toLowerCase();
+    const match = existing.find(e => {
+      const eKey = e.fact.split(/\s+(is|are|has|likes|works|prefers|lives|named)\s+/i)[0]?.toLowerCase();
+      return eKey && keyPhrase && eKey === keyPhrase;
+    });
+
+    if (match) {
+      await pool.query(
+        `UPDATE companion_memories SET fact = $1, updated_at = NOW(), source_message_id = $2
+         WHERE id = $3`,
+        [fact, lastMessageId, match.id]
+      );
+    } else {
+      // Cap facts per conversation to prevent unbounded growth
+      if (existing.length >= 5) {
+        // Remove oldest fact in this category to make room
+        await pool.query(
+          `DELETE FROM companion_memories WHERE id = (
+            SELECT id FROM companion_memories
+            WHERE conversation_id = $1 AND category = $2
+            ORDER BY updated_at ASC LIMIT 1
+          )`,
+          [conversationId, category]
+        );
+      }
+      await pool.query(
+        `INSERT INTO companion_memories (conversation_id, category, fact, source_message_id)
+         VALUES ($1, $2, $3, $4)`,
+        [conversationId, category, fact, lastMessageId]
+      );
+    }
+  }
+
+  console.log(`[memory] extracted ${factsJson.length} facts for conversation ${conversationId}`);
+}
+
+// -- Summary generation ------------------------------------------
+
+async function generateSummary(pool, conversationId, companionId, userId) {
+  // Find where last summary ended
+  const { rows: lastSummary } = await pool.query(
+    `SELECT message_range_end FROM conversation_summaries
+     WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [conversationId]
+  );
+
+  let messagesQuery;
+  let params;
+
+  if (lastSummary.length > 0) {
+    // Get messages after last summary
+    messagesQuery = `SELECT id, role, content FROM messages
+      WHERE conversation_id = $1 AND created_at > (SELECT created_at FROM messages WHERE id = $2)
+      ORDER BY created_at ASC LIMIT 30`;
+    params = [conversationId, lastSummary[0].message_range_end];
+  } else {
+    // Get oldest unsummarized messages (skip most recent 10 — those are in L1 context)
+    messagesQuery = `SELECT id, role, content FROM messages
+      WHERE conversation_id = $1
+      ORDER BY created_at ASC LIMIT 30`;
+    params = [conversationId];
+  }
+
+  const { rows: messages } = await pool.query(messagesQuery, params);
+  if (messages.length < 5) return; // not enough to summarize
+
+  // Strip roleplay formatting (*actions*, quotes) to reduce model's urge to roleplay
+  const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
+  const messagesText = messages.map(m => `${m.role}: ${cleanMsg(m.content)}`).join('\n');
+
+  const systemPrompt = `TASK: Write a 2-3 sentence summary of the conversation below.
+RULES: Use third person ("The user", "the companion"). No roleplay. No quotes. No asterisks. Just plain factual sentences.
+FORMAT: Return ONLY the summary text, nothing else.`;
+
+  const { plainChatCompletion } = require('./ai');
+  const result = await plainChatCompletion(systemPrompt, [
+    { role: 'user', content: `CONVERSATION LOG:\n${messagesText}\n\nSUMMARY:` },
+  ]);
+
+  if (!result || !result.content) return;
+
+  // Clean up the summary — strip any roleplay that leaked through, take first 2-3 sentences
+  let summary = result.content
+    .replace(/\*[^*]+\*/g, '')   // remove *actions*
+    .replace(/^["']|["']$/g, '') // remove wrapping quotes
+    .trim();
+  // Take only first 3 sentences to keep it concise
+  const sentences = summary.match(/[^.!?]+[.!?]+/g);
+  if (sentences && sentences.length > 3) {
+    summary = sentences.slice(0, 3).join('').trim();
+  }
+  if (summary.length < 10 || summary.length > 1500) return;
+
+  // Track consumption
+  await trackConsumption({
+    userId,
+    companionId,
+    provider: 'openrouter',
+    model: 'memory',
+    callType: 'memory',
+    inputTokens: result.inputTokens || 0,
+    outputTokens: result.outputTokens || 0,
+    costUsd: result.costUsd || 0,
+    metadata: { type: 'summary', messageCount: messages.length },
+  });
+
+  await pool.query(
+    `INSERT INTO conversation_summaries (conversation_id, summary, message_range_start, message_range_end, message_count)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [conversationId, summary, messages[0].id, messages[messages.length - 1].id, messages.length]
+  );
+
+  console.log(`[memory] generated summary (${messages.length} msgs) for conversation ${conversationId}`);
+}
+
+// -- Helpers -----------------------------------------------------
+
+function timeAgo(date) {
+  const now = new Date();
+  const d = new Date(date);
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) return 'just now';
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+module.exports = {
+  buildMemoryContext,
+  processMemory,
+};

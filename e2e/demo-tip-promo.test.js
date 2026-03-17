@@ -31,108 +31,124 @@ async function signupViaUI(page) {
   return email;
 }
 
+const ADMIN_HEADERS = { 'Authorization': 'Bearer test-admin-token', 'Content-Type': 'application/json' };
+
 test('demo: tip promo → Stripe checkout → return to chat', async ({ page, request }) => {
   test.setTimeout(180000);
 
   // Set threshold very low so first AI response triggers tip promo
   await request.put(`${BASE}/api/admin/settings`, {
-    headers: { 'Authorization': 'Bearer test-admin-token', 'Content-Type': 'application/json' },
+    headers: ADMIN_HEADERS,
     data: { key: 'tip_request_threshold_usd', value: '0.0001' },
   });
 
-  // Block Google GSI
-  await page.route('**/accounts.google.com/**', route => route.abort());
+  try {
+    // Block Google GSI
+    await page.route('**/accounts.google.com/**', route => route.abort());
 
-  await signupViaUI(page);
-  await page.waitForTimeout(1000);
+    await signupViaUI(page);
+    await page.waitForTimeout(1000);
 
-  // Create companion from template
-  await page.click('text=Get Started');
-  await page.waitForTimeout(500);
-  await page.click('text=Choose a Soul');
-  await page.waitForTimeout(500);
-  await page.locator('button:has-text("Luna")').click();
-  await page.click('button:has-text("Awaken Luna")');
+    // Create companion from template
+    await page.click('text=Get Started');
+    await page.waitForTimeout(500);
+    await page.click('text=Choose a Soul');
+    await page.waitForTimeout(500);
+    await page.locator('button:has-text("Luna")').click();
+    await page.click('button:has-text("Awaken Luna")');
 
-  // Wait for chat to load
-  await page.waitForURL('**/my/chat/**', { timeout: 30000 });
-  await expect(page.locator('.font-semibold:has-text("Luna")')).toBeVisible();
+    // Wait for chat to load
+    await page.waitForURL('**/my/chat/**', { timeout: 30000 });
+    await expect(page.locator('.font-semibold:has-text("Luna")')).toBeVisible();
+    await page.waitForTimeout(2000);
 
-  // Capture the chat URL to verify we return to it
-  const chatUrl = page.url();
-  await page.waitForTimeout(2000);
+    // Send a message — this will trigger AI response + consumption tracking
+    const input = page.locator('textarea[placeholder="Type a message..."]');
+    await input.click();
+    await page.waitForTimeout(300);
+    await page.keyboard.type('Hey Luna! Tell me about yourself', { delay: 30 });
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(1000);
 
-  // Send a message — this will trigger AI response + consumption tracking
-  const input = page.locator('textarea[placeholder="Type a message..."]');
-  await input.click();
-  await page.waitForTimeout(300);
-  await page.keyboard.type('Hey Luna! Tell me about yourself', { delay: 30 });
-  await page.waitForTimeout(500);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(1000);
+    // Wait for the tip promo to appear after AI response
+    await page.waitForSelector('text=Maybe later', { timeout: 60000 });
+    await page.waitForTimeout(2000);
 
-  // Wait for the tip promo to appear after AI response
-  await page.waitForSelector('text=Maybe later', { timeout: 60000 });
-  await page.waitForTimeout(2000);
+    // Verify tip buttons are visible
+    await expect(page.locator('button:has-text("$9.99")')).toBeVisible();
+    await page.waitForTimeout(1000);
 
-  // Verify tip buttons are visible
-  await expect(page.locator('button:has-text("$9.99")')).toBeVisible();
-  await page.waitForTimeout(1000);
+    // Click the $9.99 tip button — this redirects to Stripe Checkout
+    await page.click('button:has-text("$9.99")');
 
-  // Click the $9.99 tip button — this redirects to Stripe Checkout
-  await page.click('button:has-text("$9.99")');
+    // Wait for Stripe Checkout page to load
+    await page.waitForURL('**/checkout.stripe.com/**', { timeout: 30000 });
+    await page.waitForTimeout(2000);
 
-  // Wait for Stripe Checkout page to load
-  await page.waitForURL('**/checkout.stripe.com/**', { timeout: 30000 });
-  await page.waitForTimeout(2000);
+    // Scroll to payment methods and select Card
+    await page.evaluate(() => window.scrollTo(0, 300));
+    await page.waitForTimeout(500);
+    await page.locator('#payment-method-label-card, label:has-text("Card")').first().click({ force: true });
+    await page.waitForTimeout(2000);
 
-  // Fill in Stripe test card details
-  // Email field
-  const emailInput = page.locator('#email');
-  if (await emailInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await emailInput.fill('test@example.com');
+    // Fill card number
+    await page.locator('#cardNumber').waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('#cardNumber').fill('4242424242424242');
+    await page.waitForTimeout(300);
+
+    // Fill expiry
+    await page.locator('#cardExpiry').fill('1230');
+    await page.waitForTimeout(300);
+
+    // Fill CVC
+    await page.locator('#cardCvc').fill('123');
+    await page.waitForTimeout(300);
+
+    // Cardholder name
+    const nameInput = page.locator('#billingName');
+    if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await nameInput.fill('Test User');
+    }
+
+    // ZIP code
+    const zipInput = page.locator('#billingPostalCode');
+    if (await zipInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await zipInput.fill('10001');
+    }
+
+    // Uncheck "Save my information" to avoid Link/phone validation
+    const saveCheckbox = page.locator('#enableStripePass');
+    if (await saveCheckbox.isChecked({ timeout: 1000 }).catch(() => false)) {
+      await saveCheckbox.click({ force: true });
+      await page.waitForTimeout(500);
+    }
+
+    await page.waitForTimeout(1000);
+
+    // Submit payment
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(500);
+    await page.locator('.SubmitButton').click();
+    await page.waitForTimeout(5000);
+
+    // Wait for redirect back to the chat page
+    await page.waitForURL('**/my/chat/**', { timeout: 30000 });
+    await page.waitForTimeout(2000);
+
+    // Verify we're back in the chat with Luna
+    await expect(page.locator('.font-semibold:has-text("Luna")')).toBeVisible({ timeout: 10000 });
+
+    // The tip promo should be gone now (tipped this month)
+    await expect(page.locator('text=Maybe later')).not.toBeVisible();
+    await page.waitForTimeout(2000);
+  } finally {
+    // Always restore threshold, even if test fails
+    await request.put(`${BASE}/api/admin/settings`, {
+      headers: ADMIN_HEADERS,
+      data: { key: 'tip_request_threshold_usd', value: '10.00' },
+    }).catch(() => {});
   }
-
-  // Card number — Stripe uses iframes for card fields
-  const cardFrame = page.frameLocator('iframe[title*="card number"]').first();
-  await cardFrame.locator('[name="cardnumber"], [placeholder*="card number" i]').fill('4242424242424242');
-
-  // Expiry
-  const expiryFrame = page.frameLocator('iframe[title*="expir"]').first();
-  await expiryFrame.locator('[name="exp-date"], [placeholder*="MM" i]').fill('1230');
-
-  // CVC
-  const cvcFrame = page.frameLocator('iframe[title*="CVC"]').first();
-  await cvcFrame.locator('[name="cvc"], [placeholder*="CVC" i]').fill('123');
-
-  // Cardholder name (if present)
-  const nameInput = page.locator('#billingName');
-  if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await nameInput.fill('Test User');
-  }
-
-  await page.waitForTimeout(1000);
-
-  // Submit payment
-  await page.locator('button[type="submit"], .SubmitButton').click();
-  await page.waitForTimeout(3000);
-
-  // Wait for redirect back to the chat page
-  await page.waitForURL('**/my/chat/**', { timeout: 30000 });
-  await page.waitForTimeout(2000);
-
-  // Verify we're back in the chat with Luna
-  await expect(page.locator('.font-semibold:has-text("Luna")')).toBeVisible({ timeout: 10000 });
-
-  // The tip promo should be gone now (tipped this month)
-  await expect(page.locator('text=Maybe later')).not.toBeVisible();
-  await page.waitForTimeout(2000);
-
-  // Restore threshold
-  await request.put(`${BASE}/api/admin/settings`, {
-    headers: { 'Authorization': 'Bearer test-admin-token', 'Content-Type': 'application/json' },
-    data: { key: 'tip_request_threshold_usd', value: '10.00' },
-  });
 
   const videoPath = await saveNamedDemoVideo(page, 'demo-tip-promo.webm');
   console.log(`[demo] saved video: ${videoPath}`);

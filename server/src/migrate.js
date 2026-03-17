@@ -448,6 +448,73 @@ const MIGRATIONS = [
     name: 'v15_user_companion_video_url',
     sql: `ALTER TABLE user_companions ADD COLUMN IF NOT EXISTS video_url TEXT;`,
   },
+  {
+    name: 'v16_companion_memory',
+    sql: `
+      CREATE TABLE IF NOT EXISTS conversation_summaries (
+        id              SERIAL PRIMARY KEY,
+        conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        summary         TEXT NOT NULL,
+        message_range_start UUID NOT NULL,
+        message_range_end   UUID NOT NULL,
+        message_count   INTEGER NOT NULL DEFAULT 0,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_conv_summaries_conversation
+        ON conversation_summaries(conversation_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS companion_memories (
+        id              SERIAL PRIMARY KEY,
+        conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        category        TEXT NOT NULL,
+        fact            TEXT NOT NULL,
+        source_message_id UUID,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_companion_memories_conversation
+        ON companion_memories(conversation_id, category);
+
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS messages_since_summary INTEGER DEFAULT 0;
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS messages_since_extraction INTEGER DEFAULT 0;
+    `,
+  },
+  {
+    name: 'v18_companion_media_catalog',
+    sql: `
+      CREATE TABLE IF NOT EXISTS companion_media (
+        id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        companion_id    UUID NOT NULL REFERENCES user_companions(id) ON DELETE CASCADE,
+        media_url       TEXT NOT NULL,
+        media_type      TEXT NOT NULL CHECK (media_type IN ('image', 'video')),
+        prompt          TEXT NOT NULL,
+        tags            TEXT[] NOT NULL DEFAULT '{}',
+        source_image_id UUID REFERENCES companion_media(id),
+        cost_usd        NUMERIC(10,6) NOT NULL DEFAULT 0,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_companion_media_companion ON companion_media(companion_id);
+      CREATE INDEX IF NOT EXISTS idx_companion_media_tags ON companion_media USING GIN(tags);
+    `,
+  },
+  {
+    name: 'v17_companion_emails',
+    sql: `
+      CREATE TABLE IF NOT EXISTS companion_emails (
+        id              SERIAL PRIMARY KEY,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        companion_id    UUID NOT NULL REFERENCES user_companions(id) ON DELETE CASCADE,
+        direction       TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+        from_address    TEXT NOT NULL,
+        to_address      TEXT NOT NULL,
+        subject         TEXT,
+        body_text       TEXT,
+        message_id      TEXT,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_companion_emails_created ON companion_emails(created_at DESC);
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

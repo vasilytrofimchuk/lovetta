@@ -311,7 +311,7 @@ export default function CompanionCreate() {
     try {
       const body = selected.isTemplate
         ? { templateId: selected.id, name: selected.name, personality: selected.personality, traits: selected.traits, voiceId: selected.voice_id }
-        : { name: selected.name, personality: selected.personality, avatarUrl: selected.avatar_url, traits: selected.traits, voiceId: selected.voice_id };
+        : { name: selected.name, personality: selected.personality, avatarUrl: selected.avatar_url, videoUrl: selected.video_url, traits: selected.traits, voiceId: selected.voice_id };
 
       const { data } = await api.post('/api/companions', body);
       navigate(`/chat/${data.companion.id}`, { replace: true });
@@ -694,17 +694,14 @@ export default function CompanionCreate() {
         )}
       </div>
 
-      {/* Video preview popup */}
+      {/* Video preview popup — plays once then auto-closes */}
       {previewAvatar && previewAvatar.video && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPreviewAvatar(null)}>
           <div className="absolute inset-0 bg-black/70" />
-          <div className="relative w-full max-w-sm rounded-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <video src={previewAvatar.video} autoPlay muted loop playsInline
+          <div className="relative w-full max-w-sm rounded-2xl overflow-hidden" onClick={() => setPreviewAvatar(null)}>
+            <video src={previewAvatar.video} autoPlay muted playsInline
+              onEnded={() => setPreviewAvatar(null)}
               className="w-full aspect-[3/4] object-cover" />
-            <button onClick={() => setPreviewAvatar(null)}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
-            </button>
           </div>
         </div>
       )}

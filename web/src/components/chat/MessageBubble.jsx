@@ -85,6 +85,18 @@ export default function MessageBubble({ message }) {
           </div>
         )}
 
+        {/* Media content (assistant only) */}
+        {!isUser && message.media_url && message.media_type === 'image' && (
+          <div className="mb-2 rounded-xl overflow-hidden">
+            <img src={message.media_url} alt="" className="w-full max-w-[280px] rounded-xl" loading="lazy" />
+          </div>
+        )}
+        {!isUser && message.media_url && message.media_type === 'video' && (
+          <div className="mb-2 rounded-xl overflow-hidden">
+            <video src={message.media_url} autoPlay loop muted playsInline className="w-full max-w-[280px] rounded-xl" />
+          </div>
+        )}
+
         {/* Message bubble */}
         <div className={`px-4 py-2.5 rounded-2xl whitespace-pre-wrap break-words text-[15px] leading-relaxed ${
           isUser

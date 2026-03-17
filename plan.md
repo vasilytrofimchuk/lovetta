@@ -126,21 +126,23 @@ Real-time chat with AI companions using OpenRouter API (uncensored models). Mess
 
 ---
 
-## Phase 2d: Memory + Content Moderation
+## Phase 2d: Memory + Content Moderation — MEMORY DONE
 
-### Memory System
-Persistent companion memory that never forgets. Multi-tier approach to save tokens:
+### Memory System — IMPLEMENTED
+3-level persistent memory system (server/src/memory.js):
 
-**DB Tables:**
-- **conversation_summaries**: id, conversation_id, summary, message_range (int4range), created_at
-- **user_facts**: id, user_id, companion_id, fact_key, fact_value, source (extracted/stated), created_at, updated_at
+**DB Tables (migration v16):**
+- **conversation_summaries**: id, conversation_id, summary, message_range_start/end, message_count, created_at
+- **companion_memories**: id, conversation_id, category, fact, source_message_id, created_at, updated_at
+- **conversations** columns: messages_since_summary, messages_since_extraction
 
 **How it works:**
-1. **Recent messages** (Tier 1): last 20 messages sent as full context to OpenRouter
-2. **Session summaries** (Tier 2): every 50 messages, older messages summarized via OpenRouter and stored
-3. **Long-term facts** (Tier 3): key-value facts extracted from conversations (user's name, preferences, important events, relationship milestones)
-4. **System prompt assembly**: personality + recent messages + relevant summaries + all facts
-5. **Background job**: cron runs summarization for conversations with >50 unsummarized messages
+1. **Recent messages** (Level 1): last 10 messages sent as full context (reduced from 20)
+2. **Conversation summaries** (Level 2): every 20 messages, AI generates 2-3 sentence summary; last 3 included in prompt
+3. **Long-term facts** (Level 3): every 10 messages, AI extracts key facts (name, job, preferences, milestones); always in prompt
+4. **System prompt assembly**: personality + facts + summaries + content rules + last 10 messages
+5. **Fire-and-forget**: memory processing runs async after each assistant message, no added latency
+6. **Token budget**: ~500 tokens for memory context, fits within 4K model window
 
 ### Age Guard Service (server/src/age-guard.js)
 - Separate module that post-processes every AI response before delivery to user

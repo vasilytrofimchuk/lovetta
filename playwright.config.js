@@ -21,6 +21,22 @@ module.exports = defineConfig({
       testIgnore: [/demo-.*\.test\.js$/],
     },
     {
+      name: 'api',
+      testMatch: ['tracking.test.js', 'leads.test.js', 'admin.test.js', 'auth.test.js'],
+    },
+    {
+      name: 'ai',
+      testMatch: 'ai.test.js',
+    },
+    {
+      name: 'ui',
+      testMatch: ['landing.test.js', 'admin-email.test.js', 'companion-chat.test.js', 'wizard-nav.test.js'],
+    },
+    {
+      name: 'ai-real',
+      testMatch: 'ai-real.test.js',
+    },
+    {
       name: 'demo',
       testMatch: /demo-.*\.test\.js$/,
       use: {

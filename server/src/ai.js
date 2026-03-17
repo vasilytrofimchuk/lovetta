@@ -30,6 +30,7 @@ const FAL_PRICING = {
   'fal-ai/wan-2.6': 0.25,
   'fal-ai/wan/v2.6/image-to-video': 0.25,
   'wan/v2.6/image-to-video': 0.25,
+  'fal-ai/instant-character': 0.04,
 };
 
 // -- Settings cache -------------------------------------------
@@ -334,6 +335,26 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   }
 }
 
+/**
+ * Lightweight chat completion for internal tasks (memory extraction, summarization).
+ * No age guard, no content rules — just a plain AI call with cost tracking.
+ */
+async function plainChatCompletion(systemPrompt, messages, opts = {}) {
+  if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
+
+  const settings = await getAISettings();
+  // Use fallback model by default — larger models follow structured instructions better
+  const model = opts.model || settings.openrouter_fallback_model || 'sao10k/l3.1-euryale-70b';
+
+  const result = await _chatRequest(systemPrompt, messages, model);
+  return {
+    content: result.fullText,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costUsd: result.costUsd,
+  };
+}
+
 function estimateChatCost(inputTokens, outputTokens, usageCost) {
   // Prefer cost from OpenRouter usage object if available
   if (usageCost && usageCost > 0) return usageCost;
@@ -402,6 +423,73 @@ async function generateImage(prompt, opts = {}) {
       callType: 'image',
       costUsd,
       metadata: { prompt: prompt.slice(0, 200) },
+    });
+  }
+
+  return { url: imageUrl, cost: costUsd, ...consumptionResult };
+}
+
+// -- fal.ai (character-consistent image generation) -----------
+
+/**
+ * Generate an image of a character using a full body reference image.
+ * Uses fal.ai Instant Character to preserve the character's appearance.
+ * @param {string} referenceImageUrl - Full body avatar URL of the companion
+ * @param {string} prompt - Scene/pose description
+ * @param {object} opts - { userId, companionId, platform? }
+ */
+async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
+  if (!FAL_KEY) throw new Error('FAL_KEY not configured');
+
+  const model = 'fal-ai/instant-character';
+  const platform = opts.platform || 'web';
+
+  const imageRules = await buildImagePrompt(platform);
+  const constrainedPrompt = `${prompt}\n\n${imageRules}\n\nMANDATORY: The subject must be a clearly adult woman, 20+ years old. Never generate images of minors or anyone appearing underage.`;
+
+  const response = await fetch(`${FAL_BASE}/${model}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${FAL_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      image_url: referenceImageUrl,
+      prompt: constrainedPrompt,
+      image_size: 'portrait_4_3',
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`fal.ai instant-character ${response.status}: ${err}`);
+  }
+
+  const result = await response.json();
+  const falUrl = result.images?.[0]?.url || null;
+  const costUsd = FAL_PRICING[model] || 0.04;
+
+  let imageUrl = falUrl;
+  if (falUrl) {
+    try {
+      const folder = opts.companionId ? `images/${opts.companionId}` : 'images/misc';
+      const { url } = await uploadFromUrl(falUrl, folder);
+      imageUrl = url;
+    } catch (e) {
+      console.error('[r2] Character image upload failed, using fal.ai URL:', e.message);
+    }
+  }
+
+  let consumptionResult = { shouldRequestTip: false };
+  if (opts.userId) {
+    consumptionResult = await trackConsumption({
+      userId: opts.userId,
+      companionId: opts.companionId || null,
+      provider: 'fal',
+      model,
+      callType: 'image',
+      costUsd,
+      metadata: { prompt: prompt.slice(0, 200), type: 'character' },
     });
   }
 
@@ -585,7 +673,9 @@ async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
 module.exports = {
   streamChat,
   chatCompletion,
+  plainChatCompletion,
   generateImage,
+  generateCharacterImage,
   generateVideo,
   generateSpeech,
   transcribeSpeech,

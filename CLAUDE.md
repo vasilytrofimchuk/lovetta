@@ -62,15 +62,25 @@ Never mention infrastructure vendor names (Heroku, Sentry, etc.) in public-facin
 
 ### Testing
 
-Run E2E tests **only when changes could break functionality**:
-- Server code, routes, API, auth, database → **always test**
-- HTML structure changes → **test**
-- CSS changes → **test**
-- **Text/copy-only changes** → **skip tests**
+Run E2E tests **only when changes could break functionality**. **Text/copy-only changes** → skip tests.
 
-When tests are needed:
-1. Run relevant Playwright tests (`npm run test:e2e`)
-2. All tests must pass before marking task complete
+**Test buckets — run only the relevant bucket, NOT the full suite:**
+
+| Bucket | Command | What it covers | When to run |
+|--------|---------|----------------|-------------|
+| **api** | `npm run test:e2e:api` | tracking, leads, admin, auth API | Server routes, DB, auth, middleware |
+| **ai** | `npm run test:e2e:ai` | Age guard, content levels, prompts (unit) | AI module, content rules, billing logic |
+| **ui** | `npm run test:e2e:ui` | Landing, admin email, companion chat, wizard | React app, HTML, CSS, frontend |
+| **ai-real** | `npm run test:e2e:ai-real` | Real OpenRouter/fal.ai calls (slow, costs $$) | AI integration, streaming, consumption |
+| **all** | `npm run test:e2e` | Everything except demo | Major changes, pre-deploy |
+| **demo** | `npm run test:e2e:demo` | Video recordings | On request only |
+
+**Rules for agents:**
+- Pick the **smallest bucket** that covers your changes
+- Multiple buckets needed? Run them separately: `npm run test:e2e:api && npm run test:e2e:ai`
+- **NEVER** run `test:e2e:ai-real` unless you changed AI integration/streaming code — it costs real money
+- **NEVER** run `test:e2e` (full suite) for routine changes — pick the right bucket
+- All tests in the chosen bucket must pass before marking task complete
 
 **Demo Tests (Video Recording)**:
 - `npm run test:e2e:demo` — runs demo tests with video recording enabled
@@ -175,10 +185,17 @@ lovetta/
 | Command | What it does |
 |---------|-------------|
 | `npm run dev` | Kill existing processes, free port 3900, start fresh server |
+| `npm run dev:agent` | Start server on random free port (no kill, no interference) |
 | `npm run kill:dev` | Kill port 3900 + all lovetta runtime processes |
 | `npm run kill:ports -- 3900` | Free a specific port |
-| `npm run test:e2e` | Run E2E tests (no video) |
-| `npm run test:e2e:demo` | Run demo tests with video recording |
+| `npm run test:e2e` | Run ALL E2E tests except demo |
+| `npm run test:e2e:api` | API tests only (tracking, leads, admin, auth) |
+| `npm run test:e2e:ai` | AI unit tests (age guard, content levels) |
+| `npm run test:e2e:ui` | UI browser tests (landing, chat, wizard) |
+| `npm run test:e2e:ai-real` | Real AI API tests (slow, costs $$) |
+| `npm run test:e2e:demo` | Demo tests with video recording |
+
+**Agents: ALWAYS use `npm run dev:agent`** instead of `npm run dev`. It picks a random free port, never kills existing processes, and never touches port 3900. The assigned port is printed to stdout and saved to `scripts/.dev-agent-port`.
 
 ### Admin Dashboard
 

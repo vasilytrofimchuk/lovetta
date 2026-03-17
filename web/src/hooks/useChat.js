@@ -23,6 +23,10 @@ export default function useChat(companionId) {
   const [error, setError] = useState(null);
   const [shouldRequestTip, setShouldRequestTip] = useState(false);
   const [tipPromoMessage, setTipPromoMessage] = useState(null);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaLoadingType, setMediaLoadingType] = useState(null);
+  const [messagesSinceLastMedia, setMessagesSinceLastMedia] = useState(0);
+  const mediaButtonThresholdRef = useRef(Math.floor(Math.random() * 11) + 5); // 5-15
   const abortRef = useRef(null);
   const typewriterRef = useRef(null);
 
@@ -34,6 +38,14 @@ export default function useChat(companionId) {
       setConversation(data.conversation);
       setMessages(data.messages || []);
       setHasMore((data.messages || []).length >= 50);
+      // Count messages since last media for button visibility
+      const msgs = data.messages || [];
+      let count = 0;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].media_url) break;
+        count++;
+      }
+      setMessagesSinceLastMedia(count);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load chat');
     } finally {
@@ -104,6 +116,9 @@ export default function useChat(companionId) {
 
             if (event.type === 'typing') {
               // Server is thinking
+            } else if (event.type === 'media_loading') {
+              setMediaLoading(true);
+              setMediaLoadingType(event.mediaType || 'image');
             } else if (event.type === 'chunk') {
               accumulated += event.text;
 
@@ -178,14 +193,25 @@ export default function useChat(companionId) {
       const contextText = contextMatch ? contextMatch[1].trim() : (event.contextText || null);
       const content = contextMatch ? remaining.slice(contextMatch[0].length).trim() : remaining;
 
-      setMessages(prev => [...prev, {
+      const newMsg = {
         id: event.messageId,
         role: 'assistant',
         content,
         context_text: contextText,
         scene_text: sceneText,
+        media_url: event.mediaUrl || null,
+        media_type: event.mediaType || null,
         created_at: new Date().toISOString(),
-      }]);
+      };
+      setMessages(prev => [...prev, newMsg]);
+
+      // Track messages since last media for button visibility
+      if (event.mediaUrl) {
+        setMessagesSinceLastMedia(0);
+        mediaButtonThresholdRef.current = Math.floor(Math.random() * 11) + 5;
+      } else {
+        setMessagesSinceLastMedia(prev => prev + 1);
+      }
 
       if (event.shouldRequestTip) {
         setShouldRequestTip(true);
@@ -206,6 +232,8 @@ export default function useChat(companionId) {
 
     setStreamingText('');
     setStreaming(false);
+    setMediaLoading(false);
+    setMediaLoadingType(null);
     abortRef.current = null;
   }
 
@@ -220,6 +248,7 @@ export default function useChat(companionId) {
       created_at: new Date().toISOString(),
     };
     setMessages(prev => [...prev, userMsg]);
+    setMessagesSinceLastMedia(prev => prev + 1);
 
     await processSSE(`/api/chat/${companionId}/message`, { content: content.trim() });
   }, [companionId, streaming]);
@@ -229,14 +258,22 @@ export default function useChat(companionId) {
     await processSSE(`/api/chat/${companionId}/next`, {});
   }, [companionId, streaming]);
 
+  const requestMedia = useCallback(async () => {
+    if (streaming) return;
+    await processSSE(`/api/chat/${companionId}/request-media`, {});
+  }, [companionId, streaming]);
+
   const dismissTip = useCallback(() => {
     setShouldRequestTip(false);
     setTipPromoMessage(null);
   }, []);
 
+  const showMediaButton = messagesSinceLastMedia >= mediaButtonThresholdRef.current;
+
   return {
     messages, companion, setCompanion, conversation, loading, streaming, streamingText,
     hasMore, error, shouldRequestTip, tipPromoMessage,
-    loadChat, loadMore, sendMessage, triggerNext, dismissTip,
+    mediaLoading, mediaLoadingType, showMediaButton,
+    loadChat, loadMore, sendMessage, triggerNext, requestMedia, dismissTip,
   };
 }

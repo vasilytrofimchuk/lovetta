@@ -193,3 +193,35 @@
 - [x] Move AI settings from Economics tab to Settings tab in admin
 - [x] Change threshold to $10/month across ALL companions (not per-companion)
 - [x] Check monthly cost from api_consumption + tips table (no more user_companion_cost_balance for threshold)
+
+## Multi-Level Companion Memory System
+- [x] Migration v16: conversation_summaries + companion_memories tables + conversation counters
+- [x] New server/src/memory.js: buildMemoryContext(), processMemory(), extractFacts(), generateSummary()
+- [x] ai.js: plainChatCompletion() — lightweight AI call without age guard/content rules for memory tasks
+- [x] chat-api.js: inject memory context into system prompt (both /message and /next)
+- [x] chat-api.js: fire-and-forget processMemory() after each assistant message
+- [x] chat-api.js: reduce recent message window from 20 to 10 (room for memory context)
+- [x] Fix: missing WHERE clause in processMemory counter UPDATE
+- [x] Fix: use 70B fallback model for memory tasks (12B roleplay model can't do structured extraction)
+- [x] Fix: strip roleplay formatting (*actions*) from messages before sending to memory AI
+- [x] Fix: better JSON parsing with regex fallback for prose-wrapped JSON
+- [x] Fix: validate fact categories against whitelist (identity/preferences/life/relationship/emotional)
+- [x] Fix: summary sentence truncation (take first 3 sentences, ignore roleplay leakage)
+- [x] Verified: 11 facts extracted correctly (name, birthday, job, dog, hobbies, food, pet name)
+- [x] Verified: summary generated — clean 3-sentence recap of 30 messages
+- [x] Verified: full memory context ~227 tokens, well within 500-token budget
+
+## Media Messages in Chat (Images & Videos)
+- [x] Migration v18: companion_media table for reuse catalog
+- [x] ai.js: generateCharacterImage() using fal.ai Instant Character (full body reference)
+- [x] New server/src/media-chat.js: parseMediaTags(), extractTags(), findReusableMedia(), generateOrReuseMedia()
+- [x] chat-api.js: system prompt with MEDIA MESSAGES instructions
+- [x] chat-api.js: media detection + generation in /message and /next handlers
+- [x] chat-api.js: new /request-media endpoint for camera button
+- [x] useChat.js: media_loading SSE event, mediaLoading state, messagesSinceLastMedia counter, showMediaButton, requestMedia()
+- [x] MessageBubble.jsx: render images and videos above text in chat bubbles
+- [x] StreamingMessage.jsx: media loading indicator with spinner
+- [x] MessageList.jsx: camera button (image icon) above bolt button, hidden after media for 5-15 messages
+- [x] ChatPage.jsx: wire up media props from useChat to MessageList
+- [ ] Verify media generation + reuse in dev
+- [ ] Verify video generation flow

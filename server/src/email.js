@@ -252,6 +252,16 @@ async function processCompanionReply({ from, to, subject, text, html, headers })
 
   console.log(`[email] Companion reply: user=${userId} companion=${companion.name} text="${replyText.slice(0, 80)}"`);
 
+  // Log inbound companion email
+  const companionAddr = companionEmailAddress(companion.name, companion.id);
+  try {
+    await pool.query(
+      `INSERT INTO companion_emails (user_id, companion_id, direction, from_address, to_address, subject, body_text, message_id)
+       VALUES ($1, $2, 'inbound', $3, $4, $5, $6, $7)`,
+      [userId, companion.id, userEmail, companionAddr, subject || null, replyText, (headers || {})['message-id'] || null]
+    );
+  } catch (e) { console.warn('[email] Failed to log inbound companion email:', e.message); }
+
   // Insert user message
   await pool.query(
     `INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
@@ -277,10 +287,14 @@ Example: *leans closer with a playful smile* Hey, I was just thinking about you.
 Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.
 This conversation is happening via email. Keep responses natural but don't mention email explicitly.`;
 
-  // Load recent messages for context
+  // Load memory context + recent messages
+  const { buildMemoryContext, processMemory } = require('./memory');
+  const memoryContext = await buildMemoryContext(conversation.id);
+  const fullSystemPrompt = systemPrompt + memoryContext;
+
   const { rows: recentMessages } = await pool.query(
     `SELECT role, content FROM messages WHERE conversation_id = $1
-     ORDER BY created_at DESC LIMIT 20`,
+     ORDER BY created_at DESC LIMIT 10`,
     [conversation.id]
   );
   recentMessages.reverse();
@@ -288,7 +302,7 @@ This conversation is happening via email. Keep responses natural but don't menti
 
   let aiResult;
   try {
-    aiResult = await chatCompletion(systemPrompt, aiMessages, {
+    aiResult = await chatCompletion(fullSystemPrompt, aiMessages, {
       userId,
       companionId: companion.id,
       platform: 'web',
@@ -311,6 +325,11 @@ This conversation is happening via email. Keep responses natural but don't menti
   );
   await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
 
+  // Fire-and-forget memory processing
+  processMemory(pool, conversation.id, companion.id, userId).catch(err => {
+    console.warn('[memory] email processing error:', err.message);
+  });
+
   // Send AI response back as email
   const hdrs = headers || {};
   const userMsgId = hdrs['message-id'] || hdrs['Message-ID'] || hdrs['Message-Id'] || null;
@@ -323,6 +342,15 @@ This conversation is happening via email. Keep responses natural but don't menti
     conversationId: conversation.id,
     inReplyTo: userMsgId,
   });
+
+  // Log outbound companion email
+  try {
+    await pool.query(
+      `INSERT INTO companion_emails (user_id, companion_id, direction, from_address, to_address, subject, body_text, message_id)
+       VALUES ($1, $2, 'outbound', $3, $4, $5, $6, $7)`,
+      [userId, companion.id, companionAddr, userEmail, companion.name, (aiResult.content || '').replace(/^\*[^*]+\*\s*/, ''), sentMsgId]
+    );
+  } catch (e) { console.warn('[email] Failed to log outbound companion email:', e.message); }
 
   // Store message ID for future threading
   await pool.query(

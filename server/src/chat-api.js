@@ -10,6 +10,8 @@ const { streamChat, buildSystemPrompt } = require('./ai');
 const { detectPlatform } = require('./content-levels');
 const { getUserSubscription, isSubscriptionActive } = require('./billing');
 const { sendCompanionEmail } = require('./email');
+const { buildMemoryContext, processMemory } = require('./memory');
+const { parseMediaTags, generateOrReuseMedia } = require('./media-chat');
 
 const router = Router();
 
@@ -77,7 +79,18 @@ ${traits ? 'Traits: ' + traits : ''}
 Response format: Always start with a brief action or emotional context in *asterisks*, then your message. Use *actions* throughout your message too for expressiveness.
 Example: *leans closer with a playful smile* Hey, I was just thinking about you...
 
-Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.`;
+Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.
+
+MEDIA MESSAGES:
+You can send photos and short videos of yourself.
+- To send a photo, include: [SEND_IMAGE: brief scene/pose description]
+- To send a video, include: [SEND_VIDEO: brief motion description]
+- Place the tag on its own line at the END of your message, after your text.
+- Send media when: user asks for a photo/selfie/video, or when flirting naturally calls for it.
+- Do NOT send media in every message. Only when it fits naturally or is requested.
+- The description should describe the scene, pose, and setting — NOT your physical appearance.
+- Example: *bites lip playfully* Want to see what I'm wearing right now?
+[SEND_IMAGE: sitting on bed in a lace nightgown, soft bedroom lighting, looking at camera with a playful smile]`;
 }
 
 function parseContextText(text) {
@@ -212,17 +225,19 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       [conversation.id, content.trim()]
     );
 
-    // Load recent messages for context (last 20)
+    // Load recent messages for context (last 10 — room for memory context)
     const { rows: recentMessages } = await pool.query(
       `SELECT role, content FROM messages WHERE conversation_id = $1
-       ORDER BY created_at DESC LIMIT 20`,
+       ORDER BY created_at DESC LIMIT 10`,
       [conversation.id]
     );
     recentMessages.reverse();
     const aiMessages = recentMessages.map(m => ({ role: m.role, content: m.content }));
 
-    // Build system prompt and stream
-    const systemPrompt = buildCompanionSystemPrompt(companion);
+    // Build system prompt with memory context
+    const basePrompt = buildCompanionSystemPrompt(companion);
+    const memoryContext = await buildMemoryContext(conversation.id);
+    const systemPrompt = basePrompt + memoryContext;
     const platform = detectPlatform(req);
 
     let fullText = '';
@@ -250,20 +265,49 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     }
 
     if (!aborted && aiResult) {
-      fullText = aiResult.content;
-      res.write(`data: ${JSON.stringify({ type: 'chunk', text: aiResult.content })}\n\n`);
+      // Parse media tags before sending text to client
+      const { cleanText, mediaRequest } = parseMediaTags(aiResult.content);
+      fullText = cleanText;
+      res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
 
-      const parsed = parseContextText(aiResult.content);
+      const parsed = parseContextText(cleanText);
 
       // ~30% chance to generate a scene description
       if (!parsed.sceneText && Math.random() < 0.3) {
         parsed.sceneText = await generateScene(companion, parsed.content);
       }
 
+      // Handle media generation if LLM requested it
+      let mediaUrl = null;
+      let mediaType = null;
+      if (mediaRequest && !aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: mediaRequest.type })}\n\n`);
+
+        const mediaHeartbeat = setInterval(() => {
+          if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
+        }, 3000);
+
+        try {
+          const mediaResult = await generateOrReuseMedia(companion, mediaRequest, {
+            userId: req.userId,
+            companionId: companion.id,
+            platform,
+          });
+          if (mediaResult) {
+            mediaUrl = mediaResult.url;
+            mediaType = mediaResult.type;
+          }
+        } catch (err) {
+          console.error('[chat] media generation failed:', err.message);
+        } finally {
+          clearInterval(mediaHeartbeat);
+        }
+      }
+
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text)
-         VALUES ($1, 'assistant', $2, $3, $4) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type)
+         VALUES ($1, 'assistant', $2, $3, $4, $5, $6) RETURNING id, created_at`,
+        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText, mediaUrl, mediaType]
       );
 
       await pool.query(
@@ -272,13 +316,20 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       );
 
       // Fire-and-forget email notification
-      maybeNotifyUser(pool, req.userId, companion, conversation.id, aiResult.content);
+      maybeNotifyUser(pool, req.userId, companion, conversation.id, cleanText);
+
+      // Fire-and-forget memory processing (fact extraction + summarization)
+      processMemory(pool, conversation.id, companion.id, req.userId).catch(err => {
+        console.warn('[memory] processing error:', err.message);
+      });
 
       res.write(`data: ${JSON.stringify({
         type: 'done',
         messageId: savedMsg.id,
         contextText: parsed.contextText,
         sceneText: parsed.sceneText,
+        mediaUrl,
+        mediaType,
         shouldRequestTip: aiResult.shouldRequestTip || false,
       })}\n\n`);
     }
@@ -324,7 +375,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
 
     const { rows: recentMessages } = await pool.query(
       `SELECT role, content FROM messages WHERE conversation_id = $1
-       ORDER BY created_at DESC LIMIT 20`,
+       ORDER BY created_at DESC LIMIT 10`,
       [conversation.id]
     );
     recentMessages.reverse();
@@ -333,7 +384,9 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       { role: 'user', content: '[The user hasn\'t said anything yet. Reach out naturally — share something on your mind, ask how their day is going, or flirt playfully.]' },
     ];
 
-    const systemPrompt = buildCompanionSystemPrompt(companion);
+    const basePrompt = buildCompanionSystemPrompt(companion);
+    const memoryContext = await buildMemoryContext(conversation.id);
+    const systemPrompt = basePrompt + memoryContext;
     const platform = detectPlatform(req);
 
     let fullText = '';
@@ -357,33 +410,196 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
     }
 
     if (!aborted && doneData) {
-      const parsed = parseContextText(doneData.fullText);
+      // Parse media tags from the full assembled text
+      const { cleanText, mediaRequest } = parseMediaTags(doneData.fullText);
+      const parsed = parseContextText(cleanText);
 
       // ~30% chance to generate a scene description
       if (!parsed.sceneText && Math.random() < 0.3) {
         parsed.sceneText = await generateScene(companion, parsed.content);
       }
 
+      // Handle media generation if LLM requested it
+      let mediaUrl = null;
+      let mediaType = null;
+      if (mediaRequest && !aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: mediaRequest.type })}\n\n`);
+
+        const mediaHeartbeat = setInterval(() => {
+          if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
+        }, 3000);
+
+        try {
+          const mediaResult = await generateOrReuseMedia(companion, mediaRequest, {
+            userId: req.userId,
+            companionId: companion.id,
+            platform,
+          });
+          if (mediaResult) {
+            mediaUrl = mediaResult.url;
+            mediaType = mediaResult.type;
+          }
+        } catch (err) {
+          console.error('[chat] media generation failed:', err.message);
+        } finally {
+          clearInterval(mediaHeartbeat);
+        }
+      }
+
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text)
-         VALUES ($1, 'assistant', $2, $3, $4) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type)
+         VALUES ($1, 'assistant', $2, $3, $4, $5, $6) RETURNING id, created_at`,
+        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText, mediaUrl, mediaType]
       );
       await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
 
       // Fire-and-forget email notification
-      maybeNotifyUser(pool, req.userId, companion, conversation.id, doneData.fullText);
+      maybeNotifyUser(pool, req.userId, companion, conversation.id, cleanText);
+
+      // Fire-and-forget memory processing
+      processMemory(pool, conversation.id, companion.id, req.userId).catch(err => {
+        console.warn('[memory] processing error:', err.message);
+      });
 
       res.write(`data: ${JSON.stringify({
         type: 'done',
         messageId: savedMsg.id,
         contextText: parsed.contextText,
         sceneText: parsed.sceneText,
+        mediaUrl,
+        mediaType,
         shouldRequestTip: doneData.shouldRequestTip || false,
       })}\n\n`);
     }
   } catch (err) {
     console.error('[chat] next error:', err.message);
+    if (!aborted) {
+      res.write(`data: ${JSON.stringify({ type: 'error', code: 'server_error', message: err.message })}\n\n`);
+    }
+  }
+
+  if (!aborted) res.end();
+});
+
+// -- POST /api/chat/:companionId/request-media ----------------
+router.post('/:companionId/request-media', authenticate, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'No database' });
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+  res.write(': heartbeat\n\n');
+
+  let aborted = false;
+  res.on('close', () => { aborted = true; });
+
+  try {
+    const sub = await getUserSubscription(req.userId);
+    if (!isSubscriptionActive(sub)) {
+      res.write(`data: ${JSON.stringify({ type: 'error', code: 'subscription_required' })}\n\n`);
+      return res.end();
+    }
+
+    const companion = await verifyCompanionOwnership(pool, req.params.companionId, req.userId);
+    if (!companion) {
+      res.write(`data: ${JSON.stringify({ type: 'error', code: 'not_found' })}\n\n`);
+      return res.end();
+    }
+
+    const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
+
+    const { rows: recentMessages } = await pool.query(
+      `SELECT role, content FROM messages WHERE conversation_id = $1
+       ORDER BY created_at DESC LIMIT 10`,
+      [conversation.id]
+    );
+    recentMessages.reverse();
+    const aiMessages = [
+      ...recentMessages.map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: '[The user tapped the photo button. Send them a flirty photo with a playful message. You MUST include a [SEND_IMAGE: ...] tag.]' },
+    ];
+
+    const basePrompt = buildCompanionSystemPrompt(companion);
+    const memoryContext = await buildMemoryContext(conversation.id);
+    const systemPrompt = basePrompt + memoryContext;
+    const platform = detectPlatform(req);
+
+    res.write(`data: ${JSON.stringify({ type: 'typing' })}\n\n`);
+
+    const heartbeat = setInterval(() => {
+      if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
+    }, 3000);
+
+    const { chatCompletion } = require('./ai');
+    let aiResult;
+    try {
+      aiResult = await chatCompletion(systemPrompt, aiMessages, {
+        userId: req.userId,
+        companionId: companion.id,
+        platform,
+      });
+    } finally {
+      clearInterval(heartbeat);
+    }
+
+    if (!aborted && aiResult) {
+      const { cleanText, mediaRequest } = parseMediaTags(aiResult.content);
+      res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
+
+      const parsed = parseContextText(cleanText);
+
+      let mediaUrl = null;
+      let mediaType = null;
+
+      // Force image generation even if LLM didn't include the tag
+      const effectiveMediaRequest = mediaRequest || { type: 'image', description: 'a casual selfie, looking at camera with a warm smile' };
+
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: effectiveMediaRequest.type })}\n\n`);
+
+        const mediaHeartbeat = setInterval(() => {
+          if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
+        }, 3000);
+
+        try {
+          const mediaResult = await generateOrReuseMedia(companion, effectiveMediaRequest, {
+            userId: req.userId,
+            companionId: companion.id,
+            platform,
+          });
+          if (mediaResult) {
+            mediaUrl = mediaResult.url;
+            mediaType = mediaResult.type;
+          }
+        } catch (err) {
+          console.error('[chat] media generation failed:', err.message);
+        } finally {
+          clearInterval(mediaHeartbeat);
+        }
+      }
+
+      const { rows: [savedMsg] } = await pool.query(
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type)
+         VALUES ($1, 'assistant', $2, $3, $4, $5, $6) RETURNING id, created_at`,
+        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText || null, mediaUrl, mediaType]
+      );
+      await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
+
+      res.write(`data: ${JSON.stringify({
+        type: 'done',
+        messageId: savedMsg.id,
+        contextText: parsed.contextText,
+        sceneText: parsed.sceneText || null,
+        mediaUrl,
+        mediaType,
+        shouldRequestTip: aiResult.shouldRequestTip || false,
+      })}\n\n`);
+    }
+  } catch (err) {
+    console.error('[chat] request-media error:', err.message);
     if (!aborted) {
       res.write(`data: ${JSON.stringify({ type: 'error', code: 'server_error', message: err.message })}\n\n`);
     }

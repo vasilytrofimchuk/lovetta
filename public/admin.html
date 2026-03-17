@@ -230,6 +230,7 @@
       <button class="tab" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
       <button class="tab" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
       <button class="tab" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" onclick="switchTab('companion-emails')">Girl Emails</button>
     </div>
 
     <!-- Overview Tab -->
@@ -379,6 +380,20 @@
       </tr></thead><tbody id="email-rows"></tbody></table>
       <div class="pagination" id="email-pagination"></div>
     </div>
+
+    <!-- Girl Emails Tab -->
+    <div id="tab-companion-emails" class="tab-content">
+      <div class="search-bar">
+        <input type="text" id="companion-email-search" placeholder="Search by user email, girl name, or content..." onkeydown="if(event.key==='Enter'){companionEmailPage=1;loadCompanionEmails();}">
+      </div>
+      <table>
+        <thead><tr>
+          <th></th><th>Girl</th><th>User</th><th>Subject</th><th>Preview</th><th>Date</th>
+        </tr></thead>
+        <tbody id="companion-email-rows"></tbody>
+      </table>
+      <div class="pagination" id="companion-email-pagination"></div>
+    </div>
   </div>
 
   <script>
@@ -393,6 +408,7 @@
     var selectedEmail = null;
     var selectedFromAddr = '';
     var adminAddressesLoaded = false;
+    var companionEmailPage = 1;
 
     // Auth
     function headers() {
@@ -447,6 +463,7 @@
       else if (name === 'sentry') loadSentry();
       else if (name === 'economics') loadEconomics('7d');
       else if (name === 'email') loadEmails();
+      else if (name === 'companion-emails') loadCompanionEmails();
     }
 
     // --- Helper functions (ported from KeyID) ---
@@ -1055,6 +1072,32 @@
           document.getElementById('econ-daily-table').innerHTML = '<p style="color:var(--muted);padding:16px;">No data yet</p>';
         }
 
+      });
+    }
+
+    // -- Girl Emails tab --
+    function loadCompanionEmails(page) {
+      companionEmailPage = page || companionEmailPage;
+      var search = (document.getElementById('companion-email-search') || {}).value || '';
+      var url = '/api/admin/companion-emails?page=' + companionEmailPage + '&limit=50';
+      if (search) url += '&search=' + encodeURIComponent(search);
+      apiFetch(url).then(function(data) {
+        var rows = (data.rows || []).map(function(r) {
+          var dir = r.direction === 'inbound' ? '📩' : '📤';
+          var preview = (r.body_text || '').slice(0, 80);
+          if ((r.body_text || '').length > 80) preview += '…';
+          return '<tr>' +
+            '<td title="' + r.direction + '">' + dir + '</td>' +
+            '<td>' + esc(r.companion_name || 'N/A') + '</td>' +
+            '<td>' + esc(r.user_email || r.from_address || 'N/A') + '</td>' +
+            '<td>' + esc(r.subject || '—') + '</td>' +
+            '<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);font-size:13px;">' + esc(preview) + '</td>' +
+            '<td class="mono" style="white-space:nowrap;">' + timeAgo(r.created_at) + '</td>' +
+          '</tr>';
+        }).join('');
+        document.getElementById('companion-email-rows').innerHTML = rows ||
+          '<tr><td colspan="6" class="empty-row">No companion emails yet</td></tr>';
+        renderPagination('companion-email-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadCompanionEmails');
       });
     }
 
