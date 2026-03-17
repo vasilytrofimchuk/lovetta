@@ -9,6 +9,7 @@ export default function Profile() {
   const [subscription, setSubscription] = useState(null);
   const [subLoading, setSubLoading] = useState(true);
   const [notifyMessages, setNotifyMessages] = useState(false);
+  const [explicitContent, setExplicitContent] = useState(false);
   const [prefLoading, setPrefLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -19,7 +20,10 @@ export default function Profile() {
       .finally(() => setSubLoading(false));
 
     api.get('/api/user/preferences')
-      .then(({ data }) => setNotifyMessages(data.notify_new_messages))
+      .then(({ data }) => {
+        setNotifyMessages(data.notify_new_messages);
+        setExplicitContent(data.explicit_content);
+      })
       .catch(() => {})
       .finally(() => setPrefLoading(false));
   }, []);
@@ -31,7 +35,20 @@ export default function Profile() {
     try {
       await api.put('/api/user/preferences', { notify_new_messages: newVal });
     } catch {
-      setNotifyMessages(!newVal); // revert on error
+      setNotifyMessages(!newVal);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleExplicit = async () => {
+    const newVal = !explicitContent;
+    setExplicitContent(newVal);
+    setSaving(true);
+    try {
+      await api.put('/api/user/preferences', { explicit_content: newVal });
+    } catch {
+      setExplicitContent(!newVal);
     } finally {
       setSaving(false);
     }
@@ -132,6 +149,33 @@ export default function Profile() {
                   notifyMessages ? 'translate-x-5.5 left-0.5' : 'left-0.5'
                 }`}
                 style={{ transform: notifyMessages ? 'translateX(20px)' : 'translateX(0)' }}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Content Preferences */}
+        <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
+          <h3 className="text-sm font-semibold text-brand-text mb-3">Content Preferences</h3>
+          <div className="flex items-center justify-between">
+            <div className="pr-4">
+              <p className="text-sm text-brand-text">Explicit content</p>
+              <p className="text-xs text-brand-muted mt-0.5">
+                Allow intimate and adult conversations and images
+              </p>
+            </div>
+            <button
+              onClick={toggleExplicit}
+              disabled={prefLoading || saving}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                explicitContent ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  explicitContent ? 'translate-x-5.5 left-0.5' : 'left-0.5'
+                }`}
+                style={{ transform: explicitContent ? 'translateX(20px)' : 'translateX(0)' }}
               />
             </button>
           </div>

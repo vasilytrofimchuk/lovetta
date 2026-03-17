@@ -277,3 +277,10 @@
 - [x] chat-api.js `/request-media`: early exit with `media_blocked` SSE event before LLM call
 - [x] useChat.js: handle `media_blocked` SSE event type → show tip promo
 - [x] admin.html: add Trial Tip Threshold setting in AI Settings section
+
+### User Explicit Content Toggle
+- [x] Migration v21: add `explicit_content` BOOLEAN column to `user_preferences` (default true)
+- [x] user-api.js: extend GET/PUT `/api/user/preferences` with `explicit_content` field + platform-aware defaults (web=ON, appstore/telegram=OFF)
+- [x] content-levels.js: add `getUserExplicitPref()`, `getEffectiveTextLevel()`, `getEffectiveImageLevel()` — user toggle overrides admin level to 0 when disabled
+- [x] ai.js: pass `userId` through `buildSystemPrompt()`, `chatCompletion()`, `streamChat()`, `generateImage()` to content level functions
+- [x] Profile.jsx: add "Content Preferences" card with "Explicit content" toggle

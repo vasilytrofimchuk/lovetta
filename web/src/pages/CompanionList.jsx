@@ -31,8 +31,7 @@ export default function CompanionList() {
       api.get('/api/billing/status').then(({ data }) => setSubscription(data)).catch(() => {});
     }
     if (checkout === 'cancel') setToast('Checkout canceled');
-    if (tip === 'success') setToast('Thank you for the tip!');
-    if (tip === 'cancel') setToast('Tip canceled');
+    // Tip success/cancel handled in ChatPage via server-inserted thank-you message
   }, [searchParams]);
 
   return (

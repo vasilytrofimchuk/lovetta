@@ -9,9 +9,9 @@ const { getPool } = require('./db');
  * Record an API call and update running cost balance.
  * Returns { shouldRequestTip } indicating if the companion should ask for a tip.
  */
-async function trackConsumption({ userId, companionId, provider, model, callType, inputTokens = 0, outputTokens = 0, costUsd, metadata = {} }) {
+async function trackConsumption({ userId, companionId, provider, model, callType, inputTokens = 0, outputTokens = 0, costUsd, metadata = {}, subscription }) {
   const pool = getPool();
-  if (!pool) return { shouldRequestTip: false };
+  if (!pool) return { shouldRequestTip: false, mediaBlocked: false };
 
   // Insert consumption record
   await pool.query(
@@ -21,8 +21,28 @@ async function trackConsumption({ userId, companionId, provider, model, callType
   );
 
   // If no companion, skip threshold check
-  if (!companionId) return { shouldRequestTip: false };
+  if (!companionId) return { shouldRequestTip: false, mediaBlocked: false };
 
+  return _checkThreshold(pool, userId, subscription);
+}
+
+/**
+ * Check if media should be blocked (threshold exceeded).
+ * Used by request-media endpoint to bail early before calling LLM.
+ */
+async function checkMediaBlocked(userId, subscription) {
+  const pool = getPool();
+  if (!pool) return false;
+  const result = await _checkThreshold(pool, userId, subscription);
+  return result.mediaBlocked;
+}
+
+/**
+ * Shared threshold check logic.
+ * Uses cumulative formula: netCost = monthlyCost - monthlyTips.
+ * Picks trial vs paid threshold based on subscription state.
+ */
+async function _checkThreshold(pool, userId, subscription) {
   // Check total cost for this user across ALL companions in the current calendar month
   const { rows: costRows } = await pool.query(
     `SELECT COALESCE(SUM(cost_usd), 0) AS monthly_cost
@@ -33,25 +53,38 @@ async function trackConsumption({ userId, companionId, provider, model, callType
   );
   const monthlyCost = parseFloat(costRows[0].monthly_cost);
 
-  // Check if user has already tipped this month
+  // Sum all tips this month (amount is in cents → divide by 100)
   const { rows: tipRows } = await pool.query(
-    `SELECT 1 FROM tips
+    `SELECT COALESCE(SUM(amount), 0) / 100.0 AS monthly_tips
+     FROM tips
      WHERE user_id = $1
-       AND created_at >= date_trunc('month', NOW())
-     LIMIT 1`,
+       AND created_at >= date_trunc('month', NOW())`,
     [userId]
   );
-  const hasTippedThisMonth = tipRows.length > 0;
+  const monthlyTips = parseFloat(tipRows[0].monthly_tips);
 
-  // Load threshold from settings
+  // Determine if user is on trial
+  const isTrial = subscription?.trial_ends_at && new Date(subscription.trial_ends_at) > new Date();
+
+  // Load both thresholds in one query
   const { rows: settings } = await pool.query(
-    `SELECT value FROM app_settings WHERE key = 'tip_request_threshold_usd'`
+    `SELECT key, value FROM app_settings WHERE key IN ('tip_request_threshold_usd', 'tip_request_threshold_trial_usd')`
   );
-  const threshold = parseFloat(settings[0]?.value || '10.00');
+  const settingsMap = {};
+  for (const s of settings) settingsMap[s.key] = s.value;
+
+  const threshold = isTrial
+    ? parseFloat(settingsMap['tip_request_threshold_trial_usd'] || '0.30')
+    : parseFloat(settingsMap['tip_request_threshold_usd'] || '10.00');
+
+  const netCost = monthlyCost - monthlyTips;
+  const exceeded = netCost >= threshold;
 
   return {
-    shouldRequestTip: !hasTippedThisMonth && monthlyCost >= threshold,
+    shouldRequestTip: exceeded,
+    mediaBlocked: exceeded,
     monthlyCost,
+    monthlyTips,
   };
 }
 
@@ -188,5 +221,6 @@ async function getConsumptionSummary(period = '30d') {
 module.exports = {
   trackConsumption,
   resetTipCounter,
+  checkMediaBlocked,
   getConsumptionSummary,
 };

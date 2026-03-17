@@ -168,6 +168,8 @@ Text and image levels are independent, configurable per platform in admin settin
 
 **Platform defaults:** Web: text 2, image 2 | App Store: text 0, image 0 | Telegram: text 1, image 1
 
+**User override:** Users can disable explicit content in Profile → "Content Preferences" toggle. When OFF, forces level 0 for both text and image regardless of admin platform setting (most restrictive wins). Defaults: ON for web, OFF for appstore/telegram. Stored in `user_preferences.explicit_content`.
+
 **Detection:** Platform detected from request: Telegram (initData or bot user-agent), iOS app (Capacitor user-agent), Web (default)
 
 ---
@@ -290,6 +292,21 @@ visitors, leads, app_settings, users, refresh_tokens, subscriptions, billing_eve
 
 ### Environment Variables
 DATABASE_URL, TEST_DATABASE_URL, PORT, NODE_ENV, ADMIN_TOKEN, SITE_URL, JWT_SECRET, JWT_REFRESH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OPENROUTER_API_KEY, FAL_KEY, RESEND_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, TELEGRAM_WEBHOOK_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_MONTHLY_PRICE_ID, STRIPE_YEARLY_PRICE_ID, SENTRY_DSN, SENTRY_AUTH_TOKEN, SENTRY_ORG_SLUG, SENTRY_PROJECT_SLUG, GOOGLE_ANALYTICS_ID
+
+---
+
+## Trial Tip Threshold + Media Blocking — DONE
+
+### What
+Separate tip thresholds for trial ($0.30) vs paid ($10) users. When threshold is exceeded, media generation is blocked and tip promo is shown. Cumulative formula: `netCost = monthlyCost - monthlyTips`. Tipping reduces netCost, unblocking media.
+
+### Implementation
+- `consumption.js`: `_checkThreshold()` with cumulative tips formula, trial detection via subscription.trial_ends_at
+- `checkMediaBlocked()` exported for early blocking in request-media endpoint
+- `ai.js`: subscription threaded through all trackConsumption calls
+- `chat-api.js`: media blocked in /message, /next (after AI), /request-media (before AI)
+- `useChat.js`: handles `media_blocked` SSE event + `mediaBlocked` flag in done event
+- Admin: both thresholds configurable in AI Settings
 
 ---
 

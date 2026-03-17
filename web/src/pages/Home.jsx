@@ -20,8 +20,7 @@ export default function Home() {
     const tip = searchParams.get('tip')
     if (checkout === 'success') setToast('Subscription activated!')
     if (checkout === 'cancel') setToast('Checkout canceled')
-    if (tip === 'success') setToast('Thank you for the tip!')
-    if (tip === 'cancel') setToast('Tip canceled')
+    // Tip success/cancel handled in ChatPage via server-inserted thank-you message
   }, [searchParams])
 
   if (showPricing) {

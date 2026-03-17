@@ -69,8 +69,8 @@ async function getAISettings() {
  * @param {string} platform - 'web', 'appstore', 'telegram'
  * @returns {string} Full system prompt with content rules
  */
-async function buildSystemPrompt(basePrompt, platform = 'web') {
-  const contentRules = await buildContentPrompt(platform);
+async function buildSystemPrompt(basePrompt, platform = 'web', userId = null) {
+  const contentRules = await buildContentPrompt(platform, userId);
   return `${basePrompt}\n\n${contentRules}`;
 }
 
@@ -162,7 +162,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   let model = primaryModel;
   const platform = opts.platform || 'web';
 
-  const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform);
+  const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform, opts.userId);
 
   // Pre-screen user's last message for underage solicitation
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
@@ -214,6 +214,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
       if (opts.userId) {
         consumptionResult = await trackConsumption({
           userId: opts.userId,
+          subscription: opts.subscription,
           companionId: opts.companionId || null,
           provider: 'openrouter',
           model,
@@ -238,6 +239,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
       if (opts.userId) {
         await trackConsumption({
           userId: opts.userId,
+          subscription: opts.subscription,
           companionId: opts.companionId || null,
           provider: 'openrouter',
           model,
@@ -274,7 +276,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   const model = opts.model || settings.openrouter_model || 'sao10k/l3.3-euryale-70b';
   const platform = opts.platform || 'web';
 
-  const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform);
+  const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform, opts.userId);
 
   let attempt = 0;
   let currentPrompt = fullSystemPrompt;
@@ -300,6 +302,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
       if (opts.userId) {
         consumptionResult = await trackConsumption({
           userId: opts.userId,
+          subscription: opts.subscription,
           companionId: opts.companionId || null,
           provider: 'openrouter',
           model,
@@ -319,6 +322,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
       if (opts.userId) {
         await trackConsumption({
           userId: opts.userId,
+          subscription: opts.subscription,
           companionId: opts.companionId || null,
           provider: 'openrouter',
           model,
@@ -378,7 +382,7 @@ async function generateImage(prompt, opts = {}) {
   const platform = opts.platform || 'web';
 
   // Append image level rules to the prompt
-  const imageRules = await buildImagePrompt(platform);
+  const imageRules = await buildImagePrompt(platform, opts.userId);
   const constrainedPrompt = `${prompt}\n\n${imageRules}\n\nMANDATORY: The subject must be a clearly adult woman, 20+ years old. Never generate images of minors or anyone appearing underage.`;
 
   const response = await fetch(`${FAL_BASE}/${model}`, {
@@ -419,6 +423,7 @@ async function generateImage(prompt, opts = {}) {
   if (opts.userId) {
     consumptionResult = await trackConsumption({
       userId: opts.userId,
+      subscription: opts.subscription,
       companionId: opts.companionId || null,
       provider: 'fal',
       model,
@@ -521,6 +526,7 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   if (opts.userId) {
     consumptionResult = await trackConsumption({
       userId: opts.userId,
+      subscription: opts.subscription,
       companionId: opts.companionId || null,
       provider: 'fal',
       model: usedModel,
@@ -618,6 +624,7 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
   if (opts.userId) {
     consumptionResult = await trackConsumption({
       userId: opts.userId,
+      subscription: opts.subscription,
       companionId: opts.companionId || null,
       provider: 'fal',
       model,

@@ -10,6 +10,49 @@ const { chatCompletion } = require('./ai');
 
 const router = Router();
 
+// -- GET /api/companions/avatars — custom avatars with filters --
+router.get('/avatars', authenticate, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ avatars: [] });
+
+  try {
+    const { style, hair, skin, age, limit = 100, offset = 0 } = req.query;
+    const conditions = ['is_active = TRUE'];
+    const params = [];
+    let idx = 1;
+
+    if (style && style !== 'all') { conditions.push(`style = $${idx++}`); params.push(style); }
+    if (hair && hair !== 'all') { conditions.push(`hair = $${idx++}`); params.push(hair); }
+    if (skin && skin !== 'all') { conditions.push(`skin = $${idx++}`); params.push(skin); }
+    if (age && age !== 'all') { conditions.push(`age = $${idx++}`); params.push(age); }
+
+    params.push(Math.min(parseInt(limit) || 100, 200));
+    params.push(parseInt(offset) || 0);
+
+    const { rows } = await pool.query(
+      `SELECT id, image_url, video_url, hair, skin, style, age FROM custom_avatars
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY sort_order, id
+       LIMIT $${idx++} OFFSET $${idx}`,
+      params
+    );
+    res.json({ avatars: rows });
+  } catch (err) {
+    console.error('[companions] avatars error:', err.message);
+    res.json({ avatars: [] });
+  }
+});
+
+// -- POST /api/companions/avatars/:id/pick — track avatar selection --
+router.post('/avatars/:id/pick', authenticate, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ ok: true });
+  try {
+    await pool.query('UPDATE custom_avatars SET pick_count = pick_count + 1 WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch { res.json({ ok: true }); }
+});
+
 // -- GET /api/companions/templates/preview (public, no auth) --
 router.get('/templates/preview', async (req, res) => {
   const pool = getPool();

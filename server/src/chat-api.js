@@ -12,6 +12,7 @@ const { getUserSubscription, isSubscriptionActive } = require('./billing');
 const { sendCompanionEmail } = require('./email');
 const { buildMemoryContext, processMemory } = require('./memory');
 const { parseMediaTags, generateOrReuseMedia } = require('./media-chat');
+const { checkMediaBlocked } = require('./consumption');
 
 const router = Router();
 
@@ -265,6 +266,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         userId: req.userId,
         companionId: companion.id,
         platform,
+        subscription: sub,
       });
     } finally {
       clearInterval(heartbeat);
@@ -286,31 +288,37 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       // Handle media — LLM tag OR user explicitly asked for image/photo
       let mediaUrl = null;
       let mediaType = null;
+      let mediaBlocked = false;
       let effectiveMediaRequest = mediaRequest;
       if (!effectiveMediaRequest && /send.*(image|photo|pic|selfie|video|nude)|show me|send me.*(photo|pic|selfie|image)/i.test(content || '')) {
         effectiveMediaRequest = { type: 'image', description: 'a flirty selfie, looking at camera with a playful expression' };
       }
       if (effectiveMediaRequest && !aborted) {
-        res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: effectiveMediaRequest.type })}\n\n`);
+        if (aiResult.mediaBlocked) {
+          // Threshold exceeded — block media, will show tip promo
+          mediaBlocked = true;
+        } else {
+          res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: effectiveMediaRequest.type })}\n\n`);
 
-        const mediaHeartbeat = setInterval(() => {
-          if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
-        }, 3000);
+          const mediaHeartbeat = setInterval(() => {
+            if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
+          }, 3000);
 
-        try {
-          const mediaResult = await generateOrReuseMedia(companion, effectiveMediaRequest, {
-            userId: req.userId,
-            companionId: companion.id,
-            platform,
-          });
-          if (mediaResult) {
-            mediaUrl = mediaResult.url;
-            mediaType = mediaResult.type;
+          try {
+            const mediaResult = await generateOrReuseMedia(companion, effectiveMediaRequest, {
+              userId: req.userId,
+              companionId: companion.id,
+              platform,
+            });
+            if (mediaResult) {
+              mediaUrl = mediaResult.url;
+              mediaType = mediaResult.type;
+            }
+          } catch (err) {
+            console.error('[chat] media generation failed:', err.message);
+          } finally {
+            clearInterval(mediaHeartbeat);
           }
-        } catch (err) {
-          console.error('[chat] media generation failed:', err.message);
-        } finally {
-          clearInterval(mediaHeartbeat);
         }
       }
 
@@ -341,6 +349,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         mediaUrl,
         mediaType,
         shouldRequestTip: aiResult.shouldRequestTip || false,
+        mediaBlocked,
       })}\n\n`);
     }
   } catch (err) {
@@ -406,6 +415,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       userId: req.userId,
       companionId: companion.id,
       platform,
+      subscription: sub,
     })) {
       if (aborted) break;
       if (event.type === 'chunk') {
@@ -432,27 +442,33 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       // Handle media generation if LLM requested it
       let mediaUrl = null;
       let mediaType = null;
+      let mediaBlocked = false;
       if (mediaRequest && !aborted) {
-        res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: mediaRequest.type })}\n\n`);
+        if (doneData.mediaBlocked) {
+          // Threshold exceeded — block media, will show tip promo
+          mediaBlocked = true;
+        } else {
+          res.write(`data: ${JSON.stringify({ type: 'media_loading', mediaType: mediaRequest.type })}\n\n`);
 
-        const mediaHeartbeat = setInterval(() => {
-          if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
-        }, 3000);
+          const mediaHeartbeat = setInterval(() => {
+            if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
+          }, 3000);
 
-        try {
-          const mediaResult = await generateOrReuseMedia(companion, mediaRequest, {
-            userId: req.userId,
-            companionId: companion.id,
-            platform,
-          });
-          if (mediaResult) {
-            mediaUrl = mediaResult.url;
-            mediaType = mediaResult.type;
+          try {
+            const mediaResult = await generateOrReuseMedia(companion, mediaRequest, {
+              userId: req.userId,
+              companionId: companion.id,
+              platform,
+            });
+            if (mediaResult) {
+              mediaUrl = mediaResult.url;
+              mediaType = mediaResult.type;
+            }
+          } catch (err) {
+            console.error('[chat] media generation failed:', err.message);
+          } finally {
+            clearInterval(mediaHeartbeat);
           }
-        } catch (err) {
-          console.error('[chat] media generation failed:', err.message);
-        } finally {
-          clearInterval(mediaHeartbeat);
         }
       }
 
@@ -479,6 +495,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
         mediaUrl,
         mediaType,
         shouldRequestTip: doneData.shouldRequestTip || false,
+        mediaBlocked,
       })}\n\n`);
     }
   } catch (err) {
@@ -519,6 +536,13 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       return res.end();
     }
 
+    // Check media block BEFORE calling LLM — no point generating text if media will be blocked
+    const blocked = await checkMediaBlocked(req.userId, sub);
+    if (blocked) {
+      res.write(`data: ${JSON.stringify({ type: 'media_blocked', shouldRequestTip: true })}\n\n`);
+      return res.end();
+    }
+
     const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
 
     const { rows: recentMessages } = await pool.query(
@@ -550,6 +574,7 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
         userId: req.userId,
         companionId: companion.id,
         platform,
+        subscription: sub,
       });
     } finally {
       clearInterval(heartbeat);

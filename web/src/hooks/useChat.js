@@ -149,6 +149,21 @@ export default function useChat(companionId) {
             } else if (event.type === 'done') {
               // Store done event — finalize after typewriter completes
               pendingDone = { event, accumulated };
+            } else if (event.type === 'media_blocked') {
+              // Threshold exceeded on request-media — show tip promo immediately
+              setShouldRequestTip(true);
+              const template = TIP_PROMO_MESSAGES[Math.floor(Math.random() * TIP_PROMO_MESSAGES.length)];
+              const promoMatch = template.match(/^\*([^*]+)\*/);
+              const promoContext = promoMatch ? promoMatch[1].trim() : null;
+              const promoContent = promoMatch ? template.slice(promoMatch[0].length).trim() : template;
+              setTipPromoMessage({
+                id: 'tip-promo-' + Date.now(),
+                role: 'assistant',
+                content: promoContent,
+                context_text: promoContext,
+                isTipPromo: true,
+                created_at: new Date().toISOString(),
+              });
             } else if (event.type === 'error') {
               if (event.code === 'subscription_required') {
                 setError('subscription_required');

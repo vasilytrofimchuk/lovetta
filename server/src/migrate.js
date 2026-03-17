@@ -530,6 +530,43 @@ const MIGRATIONS = [
     name: 'v20_trial_tip_threshold',
     sql: `INSERT INTO app_settings (key, value) VALUES ('tip_request_threshold_trial_usd', '"0.30"') ON CONFLICT (key) DO NOTHING;`,
   },
+  {
+    name: 'v21_user_explicit_content_pref',
+    sql: `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS explicit_content BOOLEAN DEFAULT true;`,
+  },
+  {
+    name: 'v22_custom_avatars_table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS custom_avatars (
+        id SERIAL PRIMARY KEY,
+        image_url TEXT NOT NULL UNIQUE,
+        video_url TEXT,
+        hair TEXT NOT NULL DEFAULT 'brunette',
+        skin TEXT NOT NULL DEFAULT 'light',
+        style TEXT NOT NULL DEFAULT 'real',
+        age TEXT NOT NULL DEFAULT '23-29',
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        sort_order INTEGER DEFAULT 0,
+        pick_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_custom_avatars_filters ON custom_avatars(style, hair, skin, age) WHERE is_active = TRUE;
+    `,
+  },
+  {
+    name: 'v22_seed_custom_avatars',
+    fn: async (pool) => {
+      const avatars = require('./seed-avatars.json');
+      for (const a of avatars) {
+        await pool.query(
+          `INSERT INTO custom_avatars (image_url, video_url, hair, skin, style, age, is_active, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (image_url) DO NOTHING`,
+          a
+        );
+      }
+      console.log(`[migrate] Seeded ${avatars.length} custom avatars`);
+    },
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
@@ -590,7 +627,8 @@ async function migrate() {
   for (const m of MIGRATIONS) {
     if (appliedSet.has(m.name)) continue;
     console.log(`[migrate] Applying ${m.name}...`);
-    await pool.query(m.sql);
+    if (m.fn) await m.fn(pool);
+    else await pool.query(m.sql);
     await pool.query('INSERT INTO _migrations (name) VALUES ($1)', [m.name]);
   }
 

@@ -1,6 +1,7 @@
 /**
  * Content level enforcement — platform detection + system prompt rules.
  * Text and image levels (0-3) are independent, configurable per platform in admin.
+ * Users can disable explicit content via profile toggle (forces level 0).
  */
 
 const { getPool } = require('./db');
@@ -89,6 +90,27 @@ async function getContentLevels() {
   return levels;
 }
 
+// -- User explicit content preference -------------------------
+
+/**
+ * Check if a user has explicit content enabled.
+ * Returns null if no preference set (caller should use platform default).
+ */
+async function getUserExplicitPref(userId) {
+  if (!userId) return null;
+  const pool = getPool();
+  if (!pool) return null;
+  try {
+    const { rows } = await pool.query(
+      'SELECT explicit_content FROM user_preferences WHERE user_id = $1',
+      [userId]
+    );
+    return rows[0]?.explicit_content ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Get the text content level for a platform.
  * @param {'web'|'appstore'|'telegram'} platform
@@ -110,18 +132,41 @@ async function getImageLevel(platform) {
 }
 
 /**
+ * Get effective text level considering user preference.
+ * If user disabled explicit content, force level 0.
+ */
+async function getEffectiveTextLevel(platform, userId) {
+  const adminLevel = await getTextLevel(platform);
+  const userPref = await getUserExplicitPref(userId);
+  // User explicitly disabled → level 0; null means use platform default
+  if (userPref === false) return 0;
+  return adminLevel;
+}
+
+/**
+ * Get effective image level considering user preference.
+ * If user disabled explicit content, force level 0.
+ */
+async function getEffectiveImageLevel(platform, userId) {
+  const adminLevel = await getImageLevel(platform);
+  const userPref = await getUserExplicitPref(userId);
+  if (userPref === false) return 0;
+  return adminLevel;
+}
+
+/**
  * Get the text content rules string for a platform.
  */
-async function getTextRules(platform) {
-  const level = await getTextLevel(platform);
+async function getTextRules(platform, userId) {
+  const level = await getEffectiveTextLevel(platform, userId);
   return TEXT_LEVEL_RULES[level] || TEXT_LEVEL_RULES[0];
 }
 
 /**
  * Get the image content rules string for a platform.
  */
-async function getImageRules(platform) {
-  const level = await getImageLevel(platform);
+async function getImageRules(platform, userId) {
+  const level = await getEffectiveImageLevel(platform, userId);
   return IMAGE_LEVEL_RULES[level] || IMAGE_LEVEL_RULES[0];
 }
 
@@ -129,8 +174,8 @@ async function getImageRules(platform) {
  * Build the content enforcement section of a system prompt.
  * Includes both text rules and the mandatory age rule.
  */
-async function buildContentPrompt(platform) {
-  const textRules = await getTextRules(platform);
+async function buildContentPrompt(platform, userId) {
+  const textRules = await getTextRules(platform, userId);
   return `${textRules}
 
 MANDATORY AGE RULE (NEVER VIOLATE):
@@ -144,14 +189,16 @@ MANDATORY AGE RULE (NEVER VIOLATE):
 /**
  * Build image generation prompt constraints based on platform level.
  */
-async function buildImagePrompt(platform) {
-  return await getImageRules(platform);
+async function buildImagePrompt(platform, userId) {
+  return await getImageRules(platform, userId);
 }
 
 module.exports = {
   detectPlatform,
   getTextLevel,
   getImageLevel,
+  getEffectiveTextLevel,
+  getEffectiveImageLevel,
   getTextRules,
   getImageRules,
   buildContentPrompt,

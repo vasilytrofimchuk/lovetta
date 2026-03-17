@@ -20,18 +20,16 @@ export default function ChatPage() {
   const [showSheet, setShowSheet] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [scrollTrigger, setScrollTrigger] = useState(0);
-  const [toast, setToast] = useState(null);
 
-  // Handle tip=success/cancel query param
+  // Handle tip=success/cancel query param — reload chat to show server-inserted thank-you message
   useEffect(() => {
     const tip = searchParams.get('tip');
-    if (tip === 'success') setToast('Thank you for the tip!');
-    if (tip === 'cancel') setToast('Tip canceled');
     if (tip) {
       searchParams.delete('tip');
       setSearchParams(searchParams, { replace: true });
+      if (tip === 'success') loadChat();
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, loadChat]);
 
   const scrollToBottom = useCallback(() => {
     setScrollTrigger(n => n + 1);
@@ -98,14 +96,6 @@ export default function ChatPage() {
   return (
     <div className="h-screen bg-brand-bg flex flex-col max-w-lg mx-auto w-full">
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
-
-      {/* Toast */}
-      {toast && (
-        <div className="px-4 py-2 bg-brand-success/10 border-b border-brand-success/30 text-brand-success text-sm text-center">
-          {toast}
-          <button onClick={() => setToast(null)} className="ml-3 text-brand-success/60 hover:text-brand-success">×</button>
-        </div>
-      )}
 
       <MessageList
         messages={messages}

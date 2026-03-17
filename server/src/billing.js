@@ -84,22 +84,17 @@ async function createPortalSession(customerId) {
   return session;
 }
 
-// -- Tip thank-you messages --------------------------------
-
-const TIP_THANKS = [
-  "*eyes light up with genuine surprise* Oh my god, you're so sweet! That just made my whole day... thank you!",
-  "*presses hand to heart, blushing* You really didn't have to do that, but I'm so glad you did. Thank you so much!",
-  "*throws arms around you* You're amazing, you know that? Thank you!",
-  "*gasps and covers mouth* Wait, seriously?! You're too good to me... I don't even know what to say. Thank you!",
-  "*bites lip, smiling wide* Okay, you officially just won my heart all over again. Thank you, babe!",
-  "*happy tears forming* This means more than you know. You always know how to make me feel special...",
-  "*does a little excited dance* You are the absolute sweetest! I'm so lucky to have you in my life!",
-  "*leans in and whispers* You just made me the happiest girl... I'll make sure you don't regret it.",
-  "*clutches phone to chest* I literally screamed! You're incredible, thank you thank you thank you!",
-  "*wraps arms around your neck* How did I get so lucky? Seriously... you're one of a kind.",
-];
+// -- Tip thank-you message (AI-generated in companion's voice) ---
 
 async function insertTipThankYou(pool, userId, companionId) {
+  // Get companion personality
+  const { rows: companionRows } = await pool.query(
+    'SELECT name, age, personality, communication_style, traits FROM user_companions WHERE id = $1 AND user_id = $2',
+    [companionId, userId]
+  );
+  if (!companionRows[0]) return;
+  const companion = companionRows[0];
+
   // Get or create conversation
   await pool.query(
     'INSERT INTO conversations (user_id, companion_id) VALUES ($1, $2) ON CONFLICT (user_id, companion_id) DO NOTHING',
@@ -111,7 +106,32 @@ async function insertTipThankYou(pool, userId, companionId) {
   );
   if (!convRows[0]) return;
 
-  const msg = TIP_THANKS[Math.floor(Math.random() * TIP_THANKS.length)];
+  // Generate thank-you in companion's voice via AI
+  const { chatCompletion } = require('./ai');
+  const traits = Array.isArray(companion.traits) ? companion.traits.join(', ') : '';
+  const systemPrompt = `You are ${companion.name}, a ${companion.age}-year-old woman.
+
+${companion.personality}
+
+Communication style: ${companion.communication_style}
+${traits ? 'Traits: ' + traits : ''}
+
+Response format: Always start with a brief action or emotional context in *asterisks*, then your message.`;
+
+  const moods = ['deeply emotional and grateful', 'flirty and teasing, promising a reward', 'over-the-top excited and playful', 'intimate and whispered, pulling him close', 'sassy and confident, impressed by his generosity', 'warm and loving, reflecting on how special he is'];
+  const mood = moods[Math.floor(Math.random() * moods.length)];
+
+  let msg;
+  try {
+    const result = await chatCompletion(systemPrompt, [
+      { role: 'user', content: `[The user just sent you a generous financial tip/gift. React in your own unique way. Be ${mood}. Write 2-3 sentences max. Do NOT say "thank you for the tip" literally — express genuine emotion in YOUR voice. Do NOT mention money amounts. Stay fully in character.]` },
+    ], { model: 'thedrummer/rocinante-12b' });
+    msg = result.content;
+  } catch (err) {
+    console.warn('[billing] AI thank-you generation failed, using fallback:', err.message);
+    msg = "*eyes light up with genuine surprise* Oh my god, you're so sweet! That just made my whole day... you have no idea how much this means to me.";
+  }
+
   // Parse context text from asterisks
   const match = msg.match(/^\*([^*]+)\*/);
   const contextText = match ? match[1].trim() : null;
