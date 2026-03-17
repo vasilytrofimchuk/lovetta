@@ -40,6 +40,19 @@ const app = express();
 const PORT = process.env.PORT || 3900;
 app.set('trust proxy', 1);
 
+// Allow Capacitor native app origin
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '';
+  if (origin === 'capacitor://localhost' || origin === 'http://localhost') {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
+  next();
+});
+
 // Stripe webhook MUST come before express.json() — raw body needed for signature
 app.post('/api/webhooks/stripe',
   express.raw({ type: 'application/json' }),
