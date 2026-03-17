@@ -1,0 +1,226 @@
+/**
+ * Background scheduler — runs periodic tasks via setInterval.
+ */
+
+const { getPool } = require('./db');
+const { getRedis } = require('./redis');
+const {
+  sendAbandonedPaymentReminder,
+  sendWelcomeDay0, sendWelcomeDay1, sendWelcomeDay3,
+  sendRenewalReminder,
+} = require('./email');
+const { runProactiveMessages } = require('./proactive');
+
+const ONE_HOUR = 60 * 60 * 1000;
+const THIRTY_MINUTES = 30 * 60 * 1000;
+
+// -- Email frequency cap (max 2 notification emails per user per day) --
+
+async function checkEmailFrequencyCap(pool, userId, maxPerDay = 2) {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const key = `email_freq:${userId}`;
+      const count = await redis.incr(key);
+      if (count === 1) await redis.expire(key, 86400);
+      return count <= maxPerDay;
+    } catch {}
+  }
+  // Fallback: check email_reminders table
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM email_reminders
+     WHERE user_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'`,
+    [userId]
+  );
+  return (rows[0]?.count || 0) < maxPerDay;
+}
+
+// -- Abandoned payment reminders (existing) -----------------------
+
+async function runAbandonedPaymentReminders() {
+  const pool = getPool();
+  if (!pool) return;
+
+  try {
+    // Users created 24-48h ago with no subscription and no reminder sent yet
+    const { rows } = await pool.query(`
+      SELECT u.id, u.email, u.display_name
+      FROM users u
+      LEFT JOIN subscriptions s ON s.user_id = u.id
+      LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'abandoned_payment'
+      WHERE u.created_at BETWEEN NOW() - INTERVAL '48 hours' AND NOW() - INTERVAL '24 hours'
+        AND s.id IS NULL
+        AND r.id IS NULL
+        AND u.email NOT LIKE '%@telegram.lovetta.ai'
+    `);
+
+    for (const user of rows) {
+      try {
+        if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
+        await sendAbandonedPaymentReminder(user.email, user.display_name);
+        await pool.query(
+          `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'abandoned_payment') ON CONFLICT DO NOTHING`,
+          [user.id]
+        );
+        console.log(`[scheduler] Sent abandoned payment reminder to ${user.email}`);
+      } catch (err) {
+        console.error(`[scheduler] Failed to send reminder to ${user.email}:`, err.message);
+      }
+    }
+
+    if (rows.length > 0) {
+      console.log(`[scheduler] Sent ${rows.length} abandoned payment reminder(s)`);
+    }
+  } catch (err) {
+    console.error('[scheduler] runAbandonedPaymentReminders error:', err.message);
+  }
+}
+
+// -- Welcome email series -----------------------------------------
+
+async function runWelcomeEmailSeries() {
+  const pool = getPool();
+  if (!pool) return;
+
+  try {
+    // Day 0: users created in the last hour, no welcome_day0 yet
+    const { rows: day0 } = await pool.query(`
+      SELECT u.id, u.email, u.display_name
+      FROM users u
+      LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day0'
+      WHERE u.created_at > NOW() - INTERVAL '1 hour'
+        AND r.id IS NULL
+        AND u.email NOT LIKE '%@telegram.lovetta.ai'
+    `);
+
+    for (const user of day0) {
+      try {
+        if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
+        await sendWelcomeDay0(user.email, user.display_name);
+        await pool.query(
+          `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'welcome_day0') ON CONFLICT DO NOTHING`,
+          [user.id]
+        );
+        console.log(`[scheduler] Sent welcome day 0 to ${user.email}`);
+      } catch (err) {
+        console.error(`[scheduler] welcome_day0 failed for ${user.email}:`, err.message);
+      }
+    }
+
+    // Day 1: users created 23-25h ago, no welcome_day1, no user messages sent
+    const { rows: day1 } = await pool.query(`
+      SELECT u.id, u.email, u.display_name
+      FROM users u
+      LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day1'
+      LEFT JOIN conversations c ON c.user_id = u.id
+      LEFT JOIN messages m ON m.conversation_id = c.id AND m.role = 'user'
+      WHERE u.created_at BETWEEN NOW() - INTERVAL '25 hours' AND NOW() - INTERVAL '23 hours'
+        AND r.id IS NULL
+        AND m.id IS NULL
+        AND u.email NOT LIKE '%@telegram.lovetta.ai'
+    `);
+
+    for (const user of day1) {
+      try {
+        if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
+        await sendWelcomeDay1(user.email, user.display_name);
+        await pool.query(
+          `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'welcome_day1') ON CONFLICT DO NOTHING`,
+          [user.id]
+        );
+        console.log(`[scheduler] Sent welcome day 1 to ${user.email}`);
+      } catch (err) {
+        console.error(`[scheduler] welcome_day1 failed for ${user.email}:`, err.message);
+      }
+    }
+
+    // Day 3: users created 71-73h ago, still on trial, no welcome_day3
+    const { rows: day3 } = await pool.query(`
+      SELECT u.id, u.email, u.display_name
+      FROM users u
+      JOIN subscriptions s ON s.user_id = u.id AND s.status = 'trialing'
+      LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day3'
+      WHERE u.created_at BETWEEN NOW() - INTERVAL '73 hours' AND NOW() - INTERVAL '71 hours'
+        AND r.id IS NULL
+        AND u.email NOT LIKE '%@telegram.lovetta.ai'
+    `);
+
+    for (const user of day3) {
+      try {
+        if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
+        await sendWelcomeDay3(user.email, user.display_name);
+        await pool.query(
+          `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'welcome_day3') ON CONFLICT DO NOTHING`,
+          [user.id]
+        );
+        console.log(`[scheduler] Sent welcome day 3 to ${user.email}`);
+      } catch (err) {
+        console.error(`[scheduler] welcome_day3 failed for ${user.email}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('[scheduler] runWelcomeEmailSeries error:', err.message);
+  }
+}
+
+// -- Subscription renewal reminders --------------------------------
+
+async function runRenewalReminders() {
+  const pool = getPool();
+  if (!pool) return;
+
+  try {
+    // Active subscriptions renewing in ~3 days (71-73h window)
+    const { rows } = await pool.query(`
+      SELECT u.id, u.email, u.display_name, s.current_period_end
+      FROM users u
+      JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
+      LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'renewal_reminder'
+      WHERE s.current_period_end BETWEEN NOW() + INTERVAL '71 hours' AND NOW() + INTERVAL '73 hours'
+        AND r.id IS NULL
+        AND u.email NOT LIKE '%@telegram.lovetta.ai'
+    `);
+
+    for (const user of rows) {
+      try {
+        if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
+        await sendRenewalReminder(user.email, user.display_name, user.current_period_end);
+        await pool.query(
+          `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'renewal_reminder') ON CONFLICT DO NOTHING`,
+          [user.id]
+        );
+        console.log(`[scheduler] Sent renewal reminder to ${user.email}`);
+      } catch (err) {
+        console.error(`[scheduler] renewal_reminder failed for ${user.email}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('[scheduler] runRenewalReminders error:', err.message);
+  }
+}
+
+// -- Scheduler startup --------------------------------------------
+
+function startScheduler() {
+  if (process.env.NODE_ENV === 'test') return;
+
+  console.log('[scheduler] Starting background scheduler');
+
+  // Abandoned payment reminders — hourly
+  setInterval(runAbandonedPaymentReminders, ONE_HOUR);
+  setTimeout(runAbandonedPaymentReminders, 60 * 1000);
+
+  // Welcome email series — hourly
+  setInterval(runWelcomeEmailSeries, ONE_HOUR);
+  setTimeout(runWelcomeEmailSeries, 90 * 1000);
+
+  // Subscription renewal reminders — hourly
+  setInterval(runRenewalReminders, ONE_HOUR);
+  setTimeout(runRenewalReminders, 120 * 1000);
+
+  // Proactive companion messages — every 30 min
+  setInterval(runProactiveMessages, THIRTY_MINUTES);
+  setTimeout(runProactiveMessages, 2 * 60 * 1000);
+}
+
+module.exports = { startScheduler };

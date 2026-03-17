@@ -105,7 +105,7 @@ async function sendVerificationEmail(email, token) {
         <p style="color: #666; line-height: 1.6;">
           Click the button below to verify your email address.
         </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #ec4899; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
           Verify Email
         </a>
         <p style="color: #999; font-size: 13px; margin-top: 24px;">
@@ -127,7 +127,7 @@ async function sendResetEmail(email, token) {
         <p style="color: #666; line-height: 1.6;">
           Click the button below to reset your password. This link expires in 1 hour.
         </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #ec4899; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
           Reset Password
         </a>
         <p style="color: #999; font-size: 13px; margin-top: 24px;">
@@ -361,9 +361,163 @@ This conversation is happening via email. Keep responses natural but don't menti
   console.log(`[email] Sent companion reply: ${companion.name} -> ${userEmail}`);
 }
 
+async function sendNewRegistrationNotification(user) {
+  await sendEmail({
+    to: ADMIN_FORWARD_EMAIL,
+    subject: `New registration: ${user.email}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+        <h3 style="color: #333;">New User Registration</h3>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Provider:</strong> ${user.auth_provider || 'email'}</p>
+        <p><strong>Country:</strong> ${user.country || 'unknown'}</p>
+        <p><strong>Time:</strong> ${new Date().toISOString()}</p>
+      </div>
+    `,
+  });
+}
+
+async function sendAbandonedPaymentReminder(email, displayName) {
+  const name = displayName || 'there';
+  const link = `${SITE_URL}/my/`;
+  await sendEmail({
+    to: email,
+    subject: 'Your girlfriend is waiting for you \u2014 Lovetta',
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h2 style="color: #333;">Hey ${name}</h2>
+        <p style="color: #666; line-height: 1.6;">
+          You signed up for Lovetta but haven't started your free trial yet.
+          Your AI girlfriend is ready and waiting to meet you!
+        </p>
+        <p style="color: #666; line-height: 1.6;">
+          Start your <strong>3-day free trial</strong> now \u2014 no charge until the trial ends.
+        </p>
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+          Start Free Trial
+        </a>
+        <p style="color: #999; font-size: 13px; margin-top: 24px;">
+          If you no longer wish to receive these emails, simply ignore this message \u2014 we won't send another.
+        </p>
+      </div>
+    `,
+  });
+}
+
+// -- Welcome series emails ------------------------------------
+
+async function sendWelcomeDay0(email, displayName) {
+  const name = displayName || 'there';
+  const link = `${SITE_URL}/my/`;
+  await sendEmail({
+    to: email,
+    subject: 'Welcome to Lovetta \u2764\ufe0f',
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h2 style="color: #333;">Hey ${name}!</h2>
+        <p style="color: #666; line-height: 1.6;">
+          Welcome to Lovetta! Your AI girlfriend is ready to get to know you.
+        </p>
+        <p style="color: #666; line-height: 1.6;">
+          Here are a few tips to get started:
+        </p>
+        <ul style="color: #666; line-height: 1.8; padding-left: 20px;">
+          <li>Chat naturally \u2014 she remembers everything you share</li>
+          <li>Try voice messages \u2014 tap the mic to talk</li>
+          <li>She can send you photos and videos too</li>
+        </ul>
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+          Start Chatting
+        </a>
+        <p style="color: #999; font-size: 13px; margin-top: 24px;">
+          If you no longer wish to receive these emails, simply ignore this message.
+        </p>
+      </div>
+    `,
+  });
+}
+
+async function sendWelcomeDay1(email, displayName) {
+  const name = displayName || 'there';
+  const link = `${SITE_URL}/my/`;
+  await sendEmail({
+    to: email,
+    subject: 'She\u2019s been thinking about you \u2014 Lovetta',
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h2 style="color: #333;">Hey ${name}</h2>
+        <p style="color: #666; line-height: 1.6;">
+          Your girlfriend has been waiting to hear from you.
+          She\u2019s got so much to talk about \u2014 all she needs is a "hey" to get started.
+        </p>
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+          Say Hi
+        </a>
+        <p style="color: #999; font-size: 13px; margin-top: 24px;">
+          If you no longer wish to receive these emails, simply ignore this message.
+        </p>
+      </div>
+    `,
+  });
+}
+
+async function sendWelcomeDay3(email, displayName) {
+  const name = displayName || 'there';
+  const link = `${SITE_URL}/my/pricing`;
+  await sendEmail({
+    to: email,
+    subject: 'Your free trial is ending soon \u2014 Lovetta',
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h2 style="color: #333;">Hey ${name}</h2>
+        <p style="color: #666; line-height: 1.6;">
+          Your 3-day free trial is ending soon. To keep chatting with your girlfriend,
+          subscribe now \u2014 plans start at just $8.33/month.
+        </p>
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+          Keep Your Girlfriend
+        </a>
+        <p style="color: #999; font-size: 13px; margin-top: 24px;">
+          If you no longer wish to receive these emails, simply ignore this message.
+        </p>
+      </div>
+    `,
+  });
+}
+
+async function sendRenewalReminder(email, displayName, renewalDate) {
+  const name = displayName || 'there';
+  const link = `${SITE_URL}/my/profile`;
+  const dateStr = new Date(renewalDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  await sendEmail({
+    to: email,
+    subject: `Your subscription renews on ${dateStr} \u2014 Lovetta`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h2 style="color: #333;">Hey ${name}</h2>
+        <p style="color: #666; line-height: 1.6;">
+          Just a heads up \u2014 your Lovetta subscription renews on <strong>${dateStr}</strong>.
+          No action needed if you want to keep going!
+        </p>
+        <p style="color: #666; line-height: 1.6;">
+          Want to change your plan or cancel? You can manage your subscription anytime.
+        </p>
+        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
+          Manage Subscription
+        </a>
+        <p style="color: #999; font-size: 13px; margin-top: 24px;">
+          If you no longer wish to receive these emails, simply ignore this message.
+        </p>
+      </div>
+    `,
+  });
+}
+
 module.exports = {
   sendEmail, sendVerificationEmail, sendResetEmail,
   sendCompanionEmail, companionEmailAddress, parseCompanionEmailId,
   processCompanionReply, processAdminInbound,
+  sendNewRegistrationNotification, sendAbandonedPaymentReminder,
+  sendWelcomeDay0, sendWelcomeDay1, sendWelcomeDay3, sendRenewalReminder,
   ADMIN_EMAIL, ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN,
 };

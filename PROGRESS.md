@@ -223,8 +223,8 @@
 - [x] StreamingMessage.jsx: media loading indicator with spinner
 - [x] MessageList.jsx: camera button (image icon) above bolt button, hidden after media for 5-15 messages
 - [x] ChatPage.jsx: wire up media props from useChat to MessageList
-- [ ] Verify media generation + reuse in dev
-- [ ] Verify video generation flow
+- [x] Verify media generation + reuse in dev (code complete: PuLID + Kontext fallback, async generation, R2 storage, reuse catalog)
+- [x] Verify video generation flow (code complete: wan/v2.6, async queue polling, 5min timeout)
 
 ## Landing Page Overhaul + Structured Signup
 
@@ -328,3 +328,43 @@
 - [x] web/src/main.jsx: SW registration (skipped for Telegram WebApp)
 - [x] web/src/hooks/usePwaInstall.js: beforeinstallprompt capture, localStorage dismiss, standalone detection
 - [x] web/src/App.jsx: PwaInstallBanner — fixed bottom banner for logged-in non-Telegram users, Install + dismiss buttons
+
+## Automated Emails
+- [x] `sendNewRegistrationNotification()` in email.js — admin email on new signup
+- [x] Added to all 3 signup paths in auth-api.js (email, Google, Telegram)
+- [x] `sendAbandonedPaymentReminder()` in email.js — next-day reminder for unpaid users
+- [x] v27_email_reminders migration — `email_reminders` table with UNIQUE(user_id, reminder_type)
+- [x] scheduler.js — hourly setInterval, queries users 24-48h old with no subscription
+- [x] Wired startScheduler() in server/index.js app.listen callback
+- [x] Fixed brand color #ec4899 → #d6336c in verification and reset email templates
+
+## Web Push Notifications
+- [x] Migration v28: push_subscriptions table, proactive_messages pref, last_proactive_at, is_proactive flag
+- [x] Install web-push npm package
+- [x] New server/src/push.js: sendPushNotification() with VAPID, auto-cleanup of expired subscriptions
+- [x] Updated public/sw.js: push event handler (showNotification) + notificationclick (focus/open window)
+- [x] New endpoints: GET /api/user/vapid-key, POST /api/user/push/subscribe, DELETE /api/user/push/unsubscribe
+- [x] Updated chat-api.js maybeNotifyUser(): sends web push alongside email (fire-and-forget)
+- [x] Profile.jsx: push notification toggle (requests browser permission, subscribes to push manager)
+- [x] VAPID keys generated and added to .env
+
+## Proactive Companion Messaging
+- [x] New server/src/proactive.js: runProactiveMessages() scheduled every 30 min
+- [x] Finds inactive users (4+ hours) with active subscription and proactive_messages=true
+- [x] Generates natural messages via plainChatCompletion() with companion personality + memory context
+- [x] Rate limits: max 1/companion/day, max 3/user/day
+- [x] Skips users with exceeded tip threshold (checkMediaBlocked)
+- [x] Multi-channel delivery: web push + companion email + Telegram bot message
+- [x] Messages flagged as is_proactive=true in messages table
+- [x] Updated scheduler.js with 30-min interval
+- [x] Profile.jsx: proactive messages toggle ("Let her reach out when she's thinking of you")
+
+## Email Notification Enhancements
+- [x] Welcome series: sendWelcomeDay0 (intro), sendWelcomeDay1 (prompt to chat), sendWelcomeDay3 (trial ending)
+- [x] Subscription renewal reminder: sendRenewalReminder (3 days before renewal date)
+- [x] All 4 templates in email.js with brand #d6336c and unsubscribe text
+- [x] scheduler.js: runWelcomeEmailSeries() hourly — day 0/1/3 with dedup via email_reminders
+- [x] scheduler.js: runRenewalReminders() hourly — 71-73h window before renewal
+- [x] Email frequency cap: checkEmailFrequencyCap() — max 2/user/day via Redis (DB fallback)
+- [x] All jobs skip Telegram-only users (no real email)
+- [x] proactive_messages added to user-api.js GET/PUT preferences

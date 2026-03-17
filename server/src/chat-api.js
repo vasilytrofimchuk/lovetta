@@ -14,6 +14,7 @@ const { buildMemoryContext, processMemory } = require('./memory');
 const { parseMediaTags, generateOrReuseMedia } = require('./media-chat');
 const { checkMediaBlocked } = require('./consumption');
 const { getRedis } = require('./redis');
+const { sendPushNotification } = require('./push');
 
 const router = Router();
 
@@ -109,6 +110,13 @@ async function maybeNotifyUser(pool, userId, companion, conversationId, messageC
       'UPDATE user_preferences SET last_notification_at = NOW() WHERE user_id = $1',
       [userId]
     );
+
+    // Also send web push notification (fire-and-forget)
+    sendPushNotification(userId, {
+      title: companion.name,
+      body: messageContent.replace(/^\*[^*]+\*\s*/, '').slice(0, 100),
+      url: `/my/chat/${companion.id}`,
+    }).catch(err => console.warn('[push] notification error:', err.message));
   } catch (err) {
     console.warn('[chat] notification error:', err.message);
   }

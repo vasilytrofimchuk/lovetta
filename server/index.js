@@ -227,6 +227,7 @@ async function start() {
 
   app.listen(PORT, () => {
     console.log(`[lovetta] Server running on port ${PORT}`);
+    require('./src/scheduler').startScheduler();
   });
 }
 

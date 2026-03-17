@@ -9,6 +9,8 @@ export default function Profile() {
   const [subscription, setSubscription] = useState(null);
   const [subLoading, setSubLoading] = useState(true);
   const [notifyMessages, setNotifyMessages] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [proactiveMessages, setProactiveMessages] = useState(true);
   const [explicitContent, setExplicitContent] = useState(false);
   const [prefLoading, setPrefLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,9 +43,19 @@ export default function Profile() {
       .then(({ data }) => {
         setNotifyMessages(data.notify_new_messages);
         setExplicitContent(data.explicit_content);
+        setProactiveMessages(data.proactive_messages ?? true);
       })
       .catch(() => {})
       .finally(() => setPrefLoading(false));
+
+    // Check existing push subscription
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          setPushEnabled(!!sub);
+        });
+      }).catch(() => {});
+    }
 
     api.get('/api/referral/stats')
       .then(({ data }) => {
@@ -63,6 +75,58 @@ export default function Profile() {
       await api.put('/api/user/preferences', { notify_new_messages: newVal });
     } catch {
       setNotifyMessages(!newVal);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const togglePush = async () => {
+    setSaving(true);
+    try {
+      if (pushEnabled) {
+        // Unsubscribe
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await sub.unsubscribe();
+          await api.delete('/api/user/push/unsubscribe', { data: { endpoint: sub.endpoint } });
+        }
+        setPushEnabled(false);
+      } else {
+        // Subscribe
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          setSaving(false);
+          return;
+        }
+        const { data: vapid } = await api.get('/api/user/vapid-key');
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: vapid.publicKey,
+        });
+        const subJson = sub.toJSON();
+        await api.post('/api/user/push/subscribe', {
+          endpoint: subJson.endpoint,
+          keys: subJson.keys,
+        });
+        setPushEnabled(true);
+      }
+    } catch (err) {
+      console.error('Push toggle error:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleProactive = async () => {
+    const newVal = !proactiveMessages;
+    setProactiveMessages(newVal);
+    setSaving(true);
+    try {
+      await api.put('/api/user/preferences', { proactive_messages: newVal });
+    } catch {
+      setProactiveMessages(!newVal);
     } finally {
       setSaving(false);
     }
@@ -157,27 +221,80 @@ export default function Profile() {
         {/* Notifications */}
         <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
           <h3 className="text-sm font-semibold text-brand-text mb-3">Notifications</h3>
-          <div className="flex items-center justify-between">
-            <div className="pr-4">
-              <p className="text-sm text-brand-text">New message notifications</p>
-              <p className="text-xs text-brand-muted mt-0.5">
-                Get notified by email when she sends you a message
-              </p>
-            </div>
-            <button
-              onClick={toggleNotify}
-              disabled={prefLoading || saving}
-              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                notifyMessages ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                  notifyMessages ? 'translate-x-5.5 left-0.5' : 'left-0.5'
+          <div className="space-y-4">
+            {/* Email notifications */}
+            <div className="flex items-center justify-between">
+              <div className="pr-4">
+                <p className="text-sm text-brand-text">Email notifications</p>
+                <p className="text-xs text-brand-muted mt-0.5">
+                  Get notified by email when she sends you a message
+                </p>
+              </div>
+              <button
+                onClick={toggleNotify}
+                disabled={prefLoading || saving}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                  notifyMessages ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
                 }`}
-                style={{ transform: notifyMessages ? 'translateX(20px)' : 'translateX(0)' }}
-              />
-            </button>
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                    notifyMessages ? 'translate-x-5.5 left-0.5' : 'left-0.5'
+                  }`}
+                  style={{ transform: notifyMessages ? 'translateX(20px)' : 'translateX(0)' }}
+                />
+              </button>
+            </div>
+
+            {/* Push notifications */}
+            {'PushManager' in window && (
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-sm text-brand-text">Push notifications</p>
+                  <p className="text-xs text-brand-muted mt-0.5">
+                    Browser notifications when she messages you
+                  </p>
+                </div>
+                <button
+                  onClick={togglePush}
+                  disabled={prefLoading || saving}
+                  className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                    pushEnabled ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      pushEnabled ? 'translate-x-5.5 left-0.5' : 'left-0.5'
+                    }`}
+                    style={{ transform: pushEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+                  />
+                </button>
+              </div>
+            )}
+
+            {/* Proactive messages */}
+            <div className="flex items-center justify-between">
+              <div className="pr-4">
+                <p className="text-sm text-brand-text">Proactive messages</p>
+                <p className="text-xs text-brand-muted mt-0.5">
+                  Let her reach out when she's thinking of you
+                </p>
+              </div>
+              <button
+                onClick={toggleProactive}
+                disabled={prefLoading || saving}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                  proactiveMessages ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                    proactiveMessages ? 'translate-x-5.5 left-0.5' : 'left-0.5'
+                  }`}
+                  style={{ transform: proactiveMessages ? 'translateX(20px)' : 'translateX(0)' }}
+                />
+              </button>
+            </div>
           </div>
         </div>
 

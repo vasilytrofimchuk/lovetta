@@ -14,7 +14,7 @@ const {
   hashToken,
 } = require('./jwt');
 const { authenticate } = require('./auth-middleware');
-const { sendVerificationEmail, sendResetEmail } = require('./email');
+const { sendVerificationEmail, sendResetEmail, sendNewRegistrationNotification } = require('./email');
 
 const crypto = require('crypto');
 
@@ -142,6 +142,7 @@ router.post('/signup', authLimiter, async (req, res) => {
 
     // Send verification email (non-blocking)
     sendVerificationEmail(user.email, verifyToken).catch(() => {});
+    sendNewRegistrationNotification(user).catch(() => {});
 
     res.json({ user: sanitizeUser(user), accessToken, refreshToken });
   } catch (err) {
@@ -511,6 +512,7 @@ router.get('/google/callback', async (req, res) => {
            refCode, referredBy]
         );
         user = newUser;
+        sendNewRegistrationNotification(newUser).catch(() => {});
       }
     }
 
@@ -612,6 +614,7 @@ router.post('/telegram', authLimiter, async (req, res) => {
            refCode, referredBy]
         );
         user = newUser;
+        sendNewRegistrationNotification(newUser).catch(() => {});
 
         // Create telegram_users record
         await pool.query(

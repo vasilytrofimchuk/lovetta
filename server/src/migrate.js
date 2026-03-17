@@ -668,6 +668,44 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: 'v27_email_reminders',
+    fn: async (pool) => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS email_reminders (
+          id SERIAL PRIMARY KEY,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          reminder_type TEXT NOT NULL,
+          sent_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(user_id, reminder_type)
+        );
+        CREATE INDEX IF NOT EXISTS idx_email_reminders_user ON email_reminders(user_id);
+      `);
+    },
+  },
+  {
+    name: 'v28_push_proactive_email',
+    fn: async (pool) => {
+      // Push subscriptions for web push notifications
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id SERIAL PRIMARY KEY,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint TEXT NOT NULL UNIQUE,
+          keys_p256dh TEXT NOT NULL,
+          keys_auth TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
+      `);
+      // Proactive messaging preference + conversation tracking
+      await pool.query(`
+        ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS proactive_messages BOOLEAN DEFAULT true;
+        ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_proactive_at TIMESTAMPTZ;
+        ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_proactive BOOLEAN DEFAULT false;
+      `);
+    },
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

@@ -176,19 +176,19 @@ Text and image levels are independent, configurable per platform in admin settin
 
 ## Phase 2e: Media + Notifications
 
-### Image Generation
-- API: fal.ai (Flux Dev for images, Wan 2.6 for video) — uncensored models
-- `POST /api/media/generate` — generate image based on companion avatar + scene prompt
-- Character consistency: companion's base avatar used as reference/seed image
-- Image level enforced server-side in generation prompt
-- Storage: S3 or similar cloud storage, served via CDN URL
-- Only companion sends images (user cannot send images)
-- Companion can proactively send images based on conversation context
-- Tip requests may be tied to image generation frequency
+### Image Generation — DONE
+- API: fal.ai PuLID (primary, NSFW) + Kontext (fallback) for character-consistent images
+- Wan 2.6 image-to-video for short clips (async queue polling)
+- Integrated into /message, /next, /request-media endpoints (async background generation)
+- Character consistency via PuLID reference image (id_weight 0.9)
+- Content level enforced server-side, R2 CDN storage
+- Media reuse catalog with tag-based matching (companion_media table)
+- Rate limits: 10 images/24h, 1 video/24h per companion
+- Tip threshold blocks media generation when exceeded
 
-### Short Video
-- Same API pipeline, 5-10 second clips based on character
-- Lower priority — implement after image generation is stable
+### Short Video — DONE
+- fal.ai wan/v2.6/image-to-video, async queue API with 5min timeout
+- Integrated into chat flow via [SEND_VIDEO] tags
 
 ### Audio Messages — DONE
 - **User → Companion**: Browser Web Speech API transcribes voice to text (mic button in ChatInput)
@@ -197,31 +197,31 @@ Text and image levels are independent, configurable per platform in admin settin
 - **Voice selection**: voice_id column in user_companions (default 'nova')
 - **Cost**: ~$0.003 per message play, tracked in api_consumption (callType 'tts')
 
-### Push Notifications
-- **Web Push**: VAPID keys + service worker registration
-- **Endpoint**: `POST /api/devices/register` — saves push subscription
-- **DB table**: devices (id, user_id, subscription JSONB, platform, active, created_at)
-- **Triggers**: proactive companion messages, missed conversation reminders
+### Push Notifications — DONE
+- **Web Push**: VAPID keys + web-push library, sw.js handles push + notificationclick
+- **DB table**: push_subscriptions (user_id, endpoint, keys_p256dh, keys_auth)
+- **Endpoints**: POST/DELETE /api/user/push/subscribe, GET /api/user/vapid-key
+- **Triggers**: companion messages (via maybeNotifyUser), proactive messages
+- **Profile toggle**: enable/disable push in browser
 
-### Proactive Messaging
-- Cron job checks engagement patterns per user+companion:
-  - Time since last message, user's typical activity hours, companion activity_level setting
-- If user inactive > configured threshold: generate proactive companion message via OpenRouter
-- Delivery channels (all simultaneously):
-  - Push notification (web push or APNs)
-  - Email via Resend (with unsubscribe link)
-  - Telegram bot message (if user linked Telegram)
-- Activity level setting per companion: low (1/day), medium (2-3/day), high (5+/day)
-- Proactive messages are natural — "Hey, thinking about you" style, not system notifications
+### Proactive Messaging — DONE
+- Scheduler job runs every 30 min, finds users inactive 4+ hours with active subscription
+- Generates natural messages via plainChatCompletion() with companion personality + memory context
+- Rate limits: max 1/companion/day, max 3/user/day
+- Skips users with exceeded tip threshold (media blocked)
+- Multi-channel delivery: web push + email + Telegram
+- Profile toggle: proactive_messages preference (default: on)
+- Messages flagged as is_proactive=true in messages table
 
-### Email Notifications — PARTIALLY DONE
-- Resend integration (already configured, hello@lovetta.ai)
+### Email Notifications — DONE
 - [x] New message notification: email sent when girl sends message and user inactive 5+ min (rate limited 30min)
 - [x] user_preferences table with notify_new_messages toggle
 - [x] Notification toggle in Profile page
-- Templates: missed conversation summary, subscription reminder, welcome series
-- Every email has unsubscribe link
-- Frequency capped per user (max 2/day)
+- [x] Welcome series: day 0 (intro), day 1 (prompt to chat), day 3 (trial ending)
+- [x] Subscription renewal reminder (3 days before renewal)
+- [x] Frequency capped per user (max 2/day via Redis + DB fallback)
+- [x] All emails use brand #d6336c, include unsubscribe text
+- [x] Dedup via email_reminders table (UNIQUE constraint)
 
 ---
 
@@ -345,12 +345,26 @@ Users earn configurable commission (default 30%) from payments made by people th
 ---
 
 ## Priority Order (remaining)
-1. **Companion system** — templates + creation + management
-2. **Chat UI + OpenRouter AI** — streaming, message format, roleplay
-3. **Memory system** — summaries + facts extraction
-4. **Content moderation** — age guard + level enforcement
-5. **Image generation** — consistent characters, level-based
-6. **Audio** — voice messages + TTS playback
-7. **Push notifications** — web push + proactive messaging
-8. **PWA** — manifest, service worker, install prompt
-9. **iOS app** — Capacitor, RevenueCat, APNs
+1. ~~**Push notifications**~~ — DONE
+2. ~~**Proactive messaging**~~ — DONE
+3. ~~**Email notifications**~~ — DONE
+4. **iOS app** — Capacitor, RevenueCat, APNs (Phase 4)
+
+### Completed (no longer priorities)
+- ~~Companion system~~ — DONE
+- ~~Chat UI + OpenRouter AI~~ — DONE
+- ~~Memory system~~ — DONE
+- ~~Content moderation~~ — DONE
+- ~~Image generation~~ — DONE
+- ~~Audio~~ — DONE
+- ~~PWA~~ — DONE
+- ~~Referral program~~ — DONE
+- ~~Async scalability~~ — DONE
+- ~~Automated emails~~ — DONE
+
+## Automated Emails — DONE
+- [x] Admin notification on new registration (email/Google/Telegram) → vasilytrofimchuk@gmail.com
+- [x] Abandoned payment reminder — next-day email for users who signed up but never subscribed
+- [x] `email_reminders` table for dedup tracking
+- [x] Hourly scheduler (setInterval) with 24-48h window query
+- [x] Brand color fix: `#ec4899` → `#d6336c` in verification/reset email templates
