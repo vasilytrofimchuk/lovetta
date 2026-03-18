@@ -74,7 +74,7 @@ export default function ChatPage() {
     <div
       data-testid="chat-page"
       className="bg-brand-bg flex flex-col w-full overflow-hidden"
-      style={{ height: '100vh' }}
+      style={{ height: 'var(--app-viewport-height, 100vh)' }}
     >
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
 
