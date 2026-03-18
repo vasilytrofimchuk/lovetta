@@ -7,19 +7,14 @@ import api from './api'
 
 /** Request permissions and register for native push. Returns the device token. */
 export async function registerNativePush() {
-  const permission = await PushNotifications.requestPermissions()
-  if (permission.receive !== 'granted') {
-    throw new Error('Push notification permission denied')
-  }
-
-  // Remove any stale listeners before adding new ones
+  // Clear stale listeners first
   await PushNotifications.removeAllListeners()
 
-  // Wait for registration to complete (with timeout)
-  return new Promise((resolve, reject) => {
+  // Set up listeners BEFORE requesting permissions (iOS may auto-register on grant)
+  const tokenPromise = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error('Push registration timed out'))
-    }, 10000)
+      reject(new Error('Push registration timed out after 15s'))
+    }, 15000)
 
     PushNotifications.addListener('registration', async (token) => {
       clearTimeout(timeout)
@@ -34,12 +29,24 @@ export async function registerNativePush() {
 
     PushNotifications.addListener('registrationError', (err) => {
       clearTimeout(timeout)
-      console.error('[push] Registration error:', err)
+      console.error('[push] Registration error:', JSON.stringify(err))
       reject(new Error(err.error || 'Push registration failed'))
     })
-
-    PushNotifications.register()
   })
+
+  // Now request permissions
+  const permission = await PushNotifications.requestPermissions()
+  console.log('[push] Permission result:', permission.receive)
+  if (permission.receive !== 'granted') {
+    await PushNotifications.removeAllListeners()
+    throw new Error('Push notification permission denied')
+  }
+
+  // Trigger registration (sends device token to APNs)
+  await PushNotifications.register()
+  console.log('[push] register() called, waiting for token...')
+
+  return tokenPromise
 }
 
 /** Unregister from native push notifications. */
