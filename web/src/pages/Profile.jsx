@@ -265,15 +265,28 @@ export default function Profile() {
     setSavingPush(true);
     try {
       if (isCapacitor()) {
-        const { registerNativePush, setupPushListeners } = await import('../lib/push-native');
-        await registerNativePush();
-        setupPushListeners((url) => navigate(url));
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const perm = await PushNotifications.requestPermissions();
+        if (perm.receive === 'granted') {
+          setPushEnabled(true);
+          setPushPromptVisible(false);
+          // Register token in background — don't block UI
+          import('../lib/push-native').then(({ registerNativePush, setupPushListeners }) => {
+            registerNativePush().then(() => {
+              setupPushListeners((url) => navigate(url));
+            }).catch(err => console.error('[push] background register:', err.message));
+          });
+        } else if (perm.receive === 'denied') {
+          setPushPermissionDenied(true);
+        }
       } else {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
           if (permission === 'denied') setPushPermissionDenied(true);
           return;
         }
+        setPushEnabled(true);
+        // Register in background
         const { data: vapid } = await api.get('/api/user/vapid-key');
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.subscribe({
@@ -286,17 +299,8 @@ export default function Profile() {
           keys: subJson.keys,
         });
       }
-      setPushEnabled(true);
     } catch (err) {
       console.error('Push prompt error:', err);
-      // Still check if permission was actually granted (registration may have partially succeeded)
-      if (isCapacitor()) {
-        import('@capacitor/push-notifications').then(({ PushNotifications }) => {
-          PushNotifications.checkPermissions().then(s => {
-            if (s.receive === 'granted') setPushEnabled(true);
-          });
-        }).catch(() => {});
-      }
     } finally {
       setSavingPush(false);
       setPushPromptVisible(false);
