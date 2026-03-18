@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../Toast';
 import api, { getErrorMessage } from '../../lib/api';
 import { TIP_AMOUNTS, startTipCheckout } from '../../lib/tipCheckout';
 import { VOICES } from '../../lib/voices';
@@ -22,6 +24,8 @@ function getGradient(name) {
 }
 
 export default function CompanionSheet({ companion, onClose, onReport, onUpdate, onDelete, onTipSuccess }) {
+  const { user } = useAuth();
+  const toast = useToast();
   const [from, to] = getGradient(companion?.name || '');
   const { playingId, play: playVoice } = useVoicePreview();
   const [tipLoading, setTipLoading] = useState(null);
@@ -47,13 +51,13 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
   const handleTip = async (amount) => {
     setTipLoading(amount);
     try {
-      const result = await startTipCheckout(amount, companion.id);
+      const result = await startTipCheckout(amount, companion.id, user?.id);
       if (result?.status === 'completed') {
         onTipSuccess?.(result);
         onClose?.();
       }
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast(getErrorMessage(err));
     } finally {
       setTipLoading(null);
     }
@@ -87,7 +91,7 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
       setConfirmDelete(false);
       if (onDelete) onDelete(companion.id);
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast(getErrorMessage(err));
     } finally {
       setDeleting(false);
     }
@@ -107,7 +111,7 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
       if (onUpdate) onUpdate(data.companion);
       setEditing(false);
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast(getErrorMessage(err));
     } finally {
       setSaving(false);
     }

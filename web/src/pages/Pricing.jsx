@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/Toast'
 import api, { getErrorMessage } from '../lib/api'
 import { isAppStore } from '../lib/platform'
 import PlanModal from '../components/PlanModal'
 
 export default function Pricing() {
   const { user } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [subscription, setSubscription] = useState(null)
@@ -27,7 +29,7 @@ export default function Pricing() {
       const { data } = await api.post('/api/billing/subscribe', { plan })
       window.location.href = data.url
     } catch (err) {
-      alert(getErrorMessage(err))
+      toast(getErrorMessage(err))
     } finally {
       setLoading(null)
     }
@@ -42,7 +44,7 @@ export default function Pricing() {
       const { data } = await api.post('/api/billing/portal')
       window.location.href = data.url
     } catch (err) {
-      alert(getErrorMessage(err))
+      toast(getErrorMessage(err))
     }
   }
 

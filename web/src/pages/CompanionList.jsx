@@ -1,18 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 import api from '../lib/api';
 import CompanionCard from '../components/CompanionCard';
 import PlanModal from '../components/PlanModal';
 
 export default function CompanionList() {
   const { user } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [companions, setCompanions] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
   const [supportUnread, setSupportUnread] = useState(0);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const unreadPollRef = useRef(null);
@@ -45,13 +46,13 @@ export default function CompanionList() {
     const checkout = searchParams.get('checkout');
     const tip = searchParams.get('tip');
     if (checkout === 'success') {
-      setToast('Subscription activated!');
+      toast('Subscription activated!', { type: 'success' });
       // Mark as subscribed locally (webhook may not have fired yet on dev)
       setSubscription(prev => prev ? { ...prev, hasSubscription: true, plan: prev.plan || 'monthly' } : { hasSubscription: true, plan: 'monthly' });
       // Also try to re-fetch in case webhook did fire
       api.get('/api/billing/status').then(({ data }) => setSubscription(data)).catch(() => {});
     }
-    if (checkout === 'cancel') setToast('Checkout canceled');
+    if (checkout === 'cancel') toast('Checkout canceled', { type: 'info' });
     // Tip success/cancel handled in ChatPage via server-inserted thank-you message
   }, [searchParams]);
 
@@ -90,14 +91,6 @@ export default function CompanionList() {
       </div>
 
       <div data-testid="companion-list-content" className="app-page-gutter py-4">
-        {/* Toast */}
-        {toast && (
-          <div className="mb-4 p-3 rounded-lg bg-brand-success/10 border border-brand-success/30 text-brand-success text-sm text-center">
-            {toast}
-            <button onClick={() => setToast(null)} className="ml-3 text-brand-success/60 hover:text-brand-success">×</button>
-          </div>
-        )}
-
         {/* Subscription banner */}
         {!loading && subscription && !subscription.hasSubscription && (
           <div className="mb-4 bg-brand-card border border-brand-border rounded-xl p-4">

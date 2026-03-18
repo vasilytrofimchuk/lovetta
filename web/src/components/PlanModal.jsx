@@ -1,9 +1,28 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
+import { useToast } from './Toast'
 import api, { getErrorMessage } from '../lib/api'
 import { isAppStore } from '../lib/platform'
 import { Browser } from '@capacitor/browser'
 import { isCapacitor } from '../lib/platform'
+import {
+  getRevenueCatErrorMessage,
+  IOS_SUBSCRIPTION_PRODUCT_IDS,
+  IOS_SUBSCRIPTION_PRODUCTS,
+  isRevenueCatCancelError,
+  serializeRevenueCatError,
+  waitForSubscriptionSync,
+} from '../lib/revenuecat'
+
+const IOS_PURCHASE_ERROR_MESSAGE = 'Unable to start the iOS subscription. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account, agreements, and product status in App Store Connect.'
+const PRODUCT_TIMEOUT_MS = 15_000
+
+function withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ])
+}
 
 function openLink(url) {
   if (isCapacitor()) Browser.open({ url, presentationStyle: 'popover' })
@@ -19,54 +38,73 @@ function openLink(url) {
  *   fullScreen  — when true, renders without overlay wrapper (used by Pricing.jsx as a full page)
  */
 export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = false }) {
-  const navigate = useNavigate()
+  const { user } = useAuth()
+  const toast = useToast()
   const [loading, setLoading] = useState(null)
-  const [offerings, setOfferings] = useState(null)
   const [restoring, setRestoring] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState('yearly')
-  const pendingPlanRef = useRef(null)
+  const [error, setError] = useState('')
+  const [loadingMessage, setLoadingMessage] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
-    if (!isAppStore()) return
-    const load = async () => {
-      try {
-        const { getOfferings } = await import('../lib/revenuecat')
-        const o = await getOfferings()
-        setOfferings(o)
-      } catch {}
-    }
-    load()
+    setError('')
+    setLoadingMessage('')
   }, [isOpen])
 
-  // Auto-trigger purchase if a plan was selected before offerings loaded
-  useEffect(() => {
-    if (offerings && pendingPlanRef.current) {
-      const plan = pendingPlanRef.current
-      pendingPlanRef.current = null
-      handleSubscribe(plan)
-    }
-  }, [offerings])
-
   const handleSubscribe = async (plan) => {
+    setError('')
     setLoading(plan)
+    setLoadingMessage('Loading subscription…')
     try {
       if (isAppStore()) {
-        const o = offerings
-        if (!o) {
-          // Store pending plan and wait for offerings to load
-          pendingPlanRef.current = plan
-          const { getOfferings } = await import('../lib/revenuecat')
-          const loaded = await getOfferings()
-          setOfferings(loaded)
-          return
+        if (!user?.id) {
+          throw new Error('Please sign in again before starting a subscription.')
         }
-        const pkg = plan === 'yearly'
-          ? (o.annual || o.availablePackages?.find(p => p.identifier?.includes('year') || p.identifier?.includes('annual')))
-          : (o.monthly || o.availablePackages?.find(p => p.identifier?.includes('month')))
-        if (!pkg) throw new Error('Package not available')
-        const { purchasePackage, waitForSubscriptionSync } = await import('../lib/revenuecat')
-        await purchasePackage(pkg)
+
+        const { Purchases } = await import('@revenuecat/purchases-capacitor')
+        const productIdentifier = IOS_SUBSCRIPTION_PRODUCTS[plan]
+
+        console.log('[billing] subscribe tapped', {
+          plan,
+          productIdentifier,
+        })
+
+        console.log('[billing] products requested', {
+          plan,
+          productIdentifiers: IOS_SUBSCRIPTION_PRODUCT_IDS,
+        })
+        const productsResult = await withTimeout(
+          Purchases.getProducts({ productIdentifiers: IOS_SUBSCRIPTION_PRODUCT_IDS }),
+          PRODUCT_TIMEOUT_MS,
+          IOS_PURCHASE_ERROR_MESSAGE
+        )
+        const products = productsResult?.products || []
+        console.log('[billing] products received', {
+          plan,
+          productIdentifiers: products.map((product) => product.identifier),
+        })
+        if (!products.length) {
+          throw new Error('No iOS subscription products were returned. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account and product status in App Store Connect.')
+        }
+
+        const product = products.find((entry) => entry.identifier === productIdentifier)
+        if (!product) {
+          throw new Error(`StoreKit did not return the expected subscription product: ${productIdentifier}`)
+        }
+
+        setLoadingMessage('Opening App Store…')
+        console.log('[billing] purchase submitted', {
+          plan,
+          productIdentifier,
+        })
+        await Purchases.purchaseStoreProduct({ product })
+        console.log('[billing] purchase resolved', {
+          plan,
+          productIdentifier,
+        })
+
+        setLoadingMessage('Syncing subscription…')
         const synced = await waitForSubscriptionSync()
         onSuccess?.(synced)
       } else {
@@ -74,24 +112,53 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
         window.location.href = data.url
       }
     } catch (err) {
-      if (err?.code === 'PURCHASE_CANCELLED' || err?.userCancelled) return
-      alert(getErrorMessage(err))
+      if (isAppStore()) {
+        if (isRevenueCatCancelError(err)) return
+        const message = getRevenueCatErrorMessage(err, IOS_PURCHASE_ERROR_MESSAGE)
+        console.error('[billing] subscribe failed', serializeRevenueCatError(err))
+        setError(message)
+        return
+      }
+
+      const message = getErrorMessage(err)
+      console.error('[billing] subscribe failed', err)
+      setError(message)
+      toast(message)
     } finally {
       setLoading(null)
+      setLoadingMessage('')
     }
   }
 
   const handleRestore = async () => {
+    setError('')
     setRestoring(true)
+    setLoadingMessage('Restoring purchases…')
     try {
-      const { restorePurchases, waitForSubscriptionSync } = await import('../lib/revenuecat')
-      await restorePurchases()
+      if (isAppStore()) {
+        if (!user?.id) {
+          throw new Error('Please sign in again before restoring purchases.')
+        }
+
+        const { Purchases } = await import('@revenuecat/purchases-capacitor')
+        await Purchases.restorePurchases()
+      }
+      setLoadingMessage('Syncing subscription…')
       const synced = await waitForSubscriptionSync()
       onSuccess?.(synced)
     } catch (err) {
-      alert(getErrorMessage(err))
+      const message = isAppStore()
+        ? getRevenueCatErrorMessage(
+          err,
+          'Restore is taking too long. If using Xcode, confirm Lovetta.storekit is selected. If using Apple sandbox, verify the sandbox Apple account and product setup.'
+        )
+        : getErrorMessage(err)
+      console.error('[billing] restore failed', isAppStore() ? serializeRevenueCatError(err) : err)
+      setError(message)
+      if (!isAppStore()) toast(message)
     } finally {
       setRestoring(false)
+      setLoadingMessage('')
     }
   }
 
@@ -195,7 +262,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
             disabled={!!loading}
             className="w-full py-3.5 bg-brand-accent text-white rounded-xl font-semibold text-base hover:bg-brand-accent-hover transition-colors disabled:opacity-60"
           >
-            {loading ? 'Processing...' : 'Start Free Trial'}
+            {loading ? (loadingMessage || 'Processing...') : 'Start Free Trial'}
           </button>
 
           {isAppStore() && (
@@ -206,6 +273,12 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
             >
               {restoring ? 'Restoring...' : 'Restore Purchases'}
             </button>
+          )}
+
+          {error && (
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {error}
+            </div>
           )}
 
           {onClose && (

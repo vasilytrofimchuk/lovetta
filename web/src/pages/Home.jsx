@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/Toast'
 import api from '../lib/api'
 import Pricing from './Pricing'
 
 export default function Home() {
   const { user, logout } = useAuth()
+  const toast = useToast()
   const [searchParams] = useSearchParams()
   const [subscription, setSubscription] = useState(null)
   const [showPricing, setShowPricing] = useState(false)
-  const [toast, setToast] = useState(null)
 
   useEffect(() => {
     api.get('/api/billing/status').then(({ data }) => setSubscription(data)).catch(() => {})
@@ -18,8 +19,8 @@ export default function Home() {
   useEffect(() => {
     const checkout = searchParams.get('checkout')
     const tip = searchParams.get('tip')
-    if (checkout === 'success') setToast('Subscription activated!')
-    if (checkout === 'cancel') setToast('Checkout canceled')
+    if (checkout === 'success') toast('Subscription activated!', { type: 'success' })
+    if (checkout === 'cancel') toast('Checkout canceled', { type: 'info' })
     // Tip success/cancel handled in ChatPage via server-inserted thank-you message
   }, [searchParams])
 
@@ -41,13 +42,6 @@ export default function Home() {
             Sign out
           </button>
         </div>
-
-        {toast && (
-          <div className="mb-4 p-3 rounded-lg bg-brand-success/10 border border-brand-success/30 text-brand-success text-sm text-center">
-            {toast}
-            <button onClick={() => setToast(null)} className="ml-3 text-brand-success/60 hover:text-brand-success">×</button>
-          </div>
-        )}
 
         <div className="bg-brand-card border border-brand-border rounded-xl p-6 text-center mb-4">
           <p className="text-brand-text-secondary mb-2">

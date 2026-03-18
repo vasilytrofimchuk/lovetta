@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { ToastProvider } from './components/Toast'
 import usePwaInstall from './hooks/usePwaInstall'
 import { initIosKeyboard } from './lib/keyboard'
 import { isCapacitor } from './lib/platform'
@@ -70,6 +71,70 @@ function PwaInstallBanner() {
   )
 }
 
+function RevenueCatInitializer() {
+  const { user } = useAuth()
+  const initStateRef = useRef({
+    configured: false,
+    promise: null,
+  })
+
+  useEffect(() => {
+    if (!isCapacitor()) return
+
+    let cancelled = false
+
+    const initRevenueCat = async () => {
+      const rcKey = import.meta.env.VITE_REVENUECAT_IOS_KEY
+      if (!rcKey) {
+        console.error('VITE_REVENUECAT_IOS_KEY not configured — skipping RevenueCat init')
+        return
+      }
+
+      if (initStateRef.current.promise) {
+        await initStateRef.current.promise
+      }
+
+      const run = (async () => {
+        const { Purchases, LOG_LEVEL } = await import('@revenuecat/purchases-capacitor')
+        await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG })
+
+        if (!initStateRef.current.configured) {
+          console.log('[billing] configuring RevenueCat SDK')
+          await Purchases.configure({ apiKey: rcKey })
+          initStateRef.current.configured = true
+        }
+
+        if (user?.id) {
+          await Purchases.logIn({ appUserID: String(user.id) })
+        }
+
+        console.log('[revenuecat] initialized', { userId: user?.id || null })
+      })()
+
+      initStateRef.current.promise = run
+
+      try {
+        await run
+      } finally {
+        if (initStateRef.current.promise === run) {
+          initStateRef.current.promise = null
+        }
+      }
+    }
+
+    initRevenueCat().catch((error) => {
+      if (cancelled) return
+      console.error('[billing] failed to initialize RevenueCat', error)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  return null
+}
+
 function AppRoutes() {
   const { loading } = useAuth()
   if (loading) return <Loading />
@@ -115,13 +180,16 @@ export default function App() {
   return (
     <BrowserRouter basename={isCapacitor() ? '/' : '/my'}>
       <AuthProvider>
-        <DesktopShell>
-          {/* Push all content below the camera notch / Dynamic Island */}
-          <div style={{ paddingTop: isCapacitor() ? 'max(0px, env(safe-area-inset-top))' : undefined }}>
-            <AppRoutes />
-            <PwaInstallBanner />
-          </div>
-        </DesktopShell>
+        <ToastProvider>
+          <RevenueCatInitializer />
+          <DesktopShell>
+            {/* Push all content below the camera notch / Dynamic Island */}
+            <div style={{ paddingTop: isCapacitor() ? 'max(0px, env(safe-area-inset-top))' : undefined }}>
+              <AppRoutes />
+              <PwaInstallBanner />
+            </div>
+          </DesktopShell>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )

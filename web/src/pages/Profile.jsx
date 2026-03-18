@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 import api from '../lib/api';
 import { APP_ICON_OPTIONS, getSavedAppIcon, isAppIconPluginAvailable, saveAppIcon, setCurrentAppIcon } from '../lib/app-icon';
 import { isAppStore, isCapacitor, isIOS } from '../lib/platform';
 
 export default function Profile() {
   const { user, logout } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState(null);
   const [subLoading, setSubLoading] = useState(true);
@@ -161,7 +163,7 @@ export default function Profile() {
         } else {
           // Check if previously denied — browser won't re-prompt
           if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
-            alert('Push notifications are blocked. Please enable them in your browser settings.');
+            toast('Push notifications are blocked. Please enable them in your browser settings.');
             return;
           }
           const permission = await Notification.requestPermission();

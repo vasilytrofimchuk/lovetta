@@ -1,21 +1,25 @@
 import { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../Toast';
 import { formatActions } from './MessageBubble';
 import { TIP_AMOUNTS, startTipCheckout } from '../../lib/tipCheckout';
 import { getErrorMessage } from '../../lib/api';
 
 export default function TipPromoMessage({ message, companionId, onDismiss, onTipSuccess }) {
+  const { user } = useAuth();
+  const toast = useToast();
   const [tipLoading, setTipLoading] = useState(null);
 
   const handleTip = async (amount) => {
     setTipLoading(amount);
     try {
-      const result = await startTipCheckout(amount, companionId);
+      const result = await startTipCheckout(amount, companionId, user?.id);
       if (result?.status === 'completed') {
         onDismiss?.();
         onTipSuccess?.(result);
       }
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast(getErrorMessage(err));
     } finally {
       setTipLoading(null);
     }
