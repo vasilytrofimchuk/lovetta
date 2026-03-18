@@ -629,4 +629,118 @@ router.patch('/cashouts/:id', async (req, res) => {
   }
 });
 
+// ── Support Chat Admin ──────────────────────────────────────────────────────
+
+router.get('/support/stats', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not configured' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT status, COUNT(*)::int AS count FROM support_chats GROUP BY status`
+    );
+    const stats = { open: 0, waiting: 0, resolved: 0 };
+    for (const r of rows) stats[r.status] = r.count;
+    const unread = await pool.query(
+      `SELECT COALESCE(SUM(unread_by_admin), 0)::int AS total FROM support_chats`
+    );
+    res.json({ ...stats, totalUnread: unread.rows[0].total });
+  } catch (err) {
+    console.error('[admin] support stats error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+router.get('/support/chats', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not configured' });
+  try {
+    const statusFilter = req.query.status;
+    const where = statusFilter ? `WHERE sc.status = $1` : '';
+    const params = statusFilter ? [statusFilter] : [];
+    const { rows } = await pool.query(`
+      SELECT sc.*, u.email AS user_email, u.display_name AS user_name,
+        (SELECT content FROM support_messages sm WHERE sm.chat_id = sc.id ORDER BY sm.created_at DESC LIMIT 1) AS last_message,
+        (SELECT created_at FROM support_messages sm WHERE sm.chat_id = sc.id ORDER BY sm.created_at DESC LIMIT 1) AS last_message_at
+      FROM support_chats sc
+      LEFT JOIN users u ON u.id = sc.user_id
+      ${where}
+      ORDER BY sc.updated_at DESC
+    `, params);
+    res.json({ chats: rows });
+  } catch (err) {
+    console.error('[admin] support chats error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+router.get('/support/chats/:id', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not configured' });
+  try {
+    const chatId = parseInt(req.params.id, 10);
+    if (!chatId) return res.status(400).json({ error: 'Invalid chat id' });
+    const { rows: chats } = await pool.query(
+      `SELECT sc.*, u.email AS user_email, u.display_name AS user_name
+       FROM support_chats sc LEFT JOIN users u ON u.id = sc.user_id WHERE sc.id = $1`,
+      [chatId]
+    );
+    if (!chats.length) return res.status(404).json({ error: 'Chat not found' });
+    await pool.query(`UPDATE support_chats SET unread_by_admin = 0 WHERE id = $1`, [chatId]);
+    const msgs = await pool.query(
+      `SELECT * FROM support_messages WHERE chat_id = $1 ORDER BY created_at ASC`,
+      [chatId]
+    );
+    res.json({ chat: chats[0], messages: msgs.rows });
+  } catch (err) {
+    console.error('[admin] support chat detail error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+router.post('/support/chats/:id/reply', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not configured' });
+  try {
+    const chatId = parseInt(req.params.id, 10);
+    if (!chatId) return res.status(400).json({ error: 'Invalid chat id' });
+    const { content } = req.body;
+    if (!content || !content.trim()) return res.status(400).json({ error: 'Content required' });
+    const { rows: chats } = await pool.query(`SELECT id FROM support_chats WHERE id = $1`, [chatId]);
+    if (!chats.length) return res.status(404).json({ error: 'Chat not found' });
+    const msg = await pool.query(
+      `INSERT INTO support_messages (chat_id, content, sender_type) VALUES ($1, $2, 'admin') RETURNING *`,
+      [chatId, content.trim()]
+    );
+    await pool.query(
+      `UPDATE support_chats SET status = 'waiting', unread_by_admin = 0, updated_at = NOW() WHERE id = $1`,
+      [chatId]
+    );
+    res.json({ message: msg.rows[0] });
+  } catch (err) {
+    console.error('[admin] support reply error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+router.patch('/support/chats/:id', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not configured' });
+  try {
+    const chatId = parseInt(req.params.id, 10);
+    if (!chatId) return res.status(400).json({ error: 'Invalid chat id' });
+    const { status } = req.body;
+    if (!['open', 'waiting', 'resolved'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    await pool.query(
+      `UPDATE support_chats SET status = $1, updated_at = NOW() WHERE id = $2`,
+      [status, chatId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[admin] support status error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
 module.exports = router;

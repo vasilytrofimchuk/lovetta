@@ -29,3 +29,6 @@ public/my/
 web/ios/App/Pods/
 web/ios/App/App/public/
 web/ios/DerivedData/
+web/ios-dist/
+web/ios/App/App.xcworkspace/
+web/ios/App/App/Base.lproj/

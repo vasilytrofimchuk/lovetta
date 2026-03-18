@@ -9,10 +9,13 @@ const fs = require('fs');
 
 const EDITOR_PATH = path.join(__dirname, 'logo_editor.html');
 const OUTPUT_DIR = path.join(__dirname, '..', 'public', 'assets', 'brand');
+const IOS_ICON_DIR = path.join(__dirname, '..', 'web', 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset');
 const ICON_SIZES = [16, 32, 64, 128, 180, 512];
+const IOS_ICON_SIZES = [20, 29, 40, 58, 60, 76, 80, 87, 120, 152, 167, 180, 1024];
 
 async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  fs.mkdirSync(IOS_ICON_DIR, { recursive: true });
 
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -32,7 +35,7 @@ async function main() {
     console.log(`  icon-${size}.png`);
   }
 
-  // logo_l.png (1024x1024)
+  // logo_l.png (1024x1024, with rounded corners for web use)
   const logoLUrl = await page.evaluate(() => {
     const c = document.createElement('canvas');
     renderIconToCanvas(c, 1024);
@@ -40,6 +43,23 @@ async function main() {
   });
   fs.writeFileSync(path.join(OUTPUT_DIR, 'logo_l.png'), Buffer.from(logoLUrl.split(',')[1], 'base64'));
   console.log('  logo_l.png');
+
+  // iOS App Icons — square, full background, no corner radius (iOS clips automatically)
+  console.log('Exporting iOS app icons...');
+  for (const size of IOS_ICON_SIZES) {
+    const dataUrl = await page.evaluate((sz) => {
+      const origRadius = document.getElementById('iconRadius').value;
+      document.getElementById('iconRadius').value = 0;
+      const c = document.createElement('canvas');
+      renderIconToCanvas(c, sz);
+      document.getElementById('iconRadius').value = origRadius;
+      return c.toDataURL('image/png');
+    }, size);
+    const buf = Buffer.from(dataUrl.split(',')[1], 'base64');
+    const filename = `Icon-${size}.png`;
+    fs.writeFileSync(path.join(IOS_ICON_DIR, filename), buf);
+    console.log(`  ${filename}`);
+  }
 
   // Favicon.ico (multi-size)
   console.log('Exporting favicon...');
