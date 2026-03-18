@@ -7,7 +7,7 @@ import ChatInput from '../components/chat/ChatInput';
 import CompanionSheet from '../components/chat/CompanionSheet';
 import ReportModal from '../components/chat/ReportModal';
 import PlanModal from '../components/PlanModal';
-
+import { isCapacitor } from '../lib/platform';
 
 export default function ChatPage() {
   const { companionId } = useParams();
@@ -74,7 +74,7 @@ export default function ChatPage() {
     <div
       data-testid="chat-page"
       className="bg-brand-bg flex flex-col w-full overflow-hidden"
-      style={{ height: 'var(--app-viewport-height, 100vh)' }}
+      style={{ height: isCapacitor() ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))' : '100vh' }}
     >
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
 
