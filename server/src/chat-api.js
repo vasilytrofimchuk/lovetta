@@ -140,7 +140,7 @@ Response format: Start with a short action in *asterisks* (max 8 words, one simp
 Example: *leans closer with a playful smile* Hey, I was just thinking about you...
 BAD (too long): *She slowly walks across the room, her eyes sparkling as she settles onto the couch and looks up at him with a warm smile*
 
-Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.`;
+Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares. Never invent or assume details the user hasn't explicitly mentioned.`;
 
   if (mediaEnabled) {
     prompt += `
@@ -202,22 +202,24 @@ function parseContextText(text) {
 
 async function generateScene(companion, messageContent) {
   try {
-    const { chatCompletion } = require('./ai');
-    const result = await chatCompletion(
-      `Write a scene description in 5-8 words. Setting + mood only. No character names, no quotes, no brackets, no full sentences.
+    const { plainChatCompletion } = require('./ai');
+    const result = await plainChatCompletion(
+      `Reply with ONLY a scene description in 5-8 words. Setting and mood only. No names, no dialogue, no actions, no labels, no continuation.
 
 Examples:
 - Warm golden light across tangled sheets
 - Rain on the window, tea in hand
 - Kitchen counter, barefoot on cool tiles
-- Dim bedroom, phone glow on her face
-- Sunset balcony, wind in her hair`,
-      [{ role: 'user', content: `Character: ${companion.name}, ${companion.age}. ${companion.personality}\n\nHer message: ${messageContent}` }],
-      { model: 'thedrummer/rocinante-12b' }
+- Dim bedroom, phone glow on her face`,
+      [{ role: 'user', content: `Her message: ${messageContent}` }],
+      { model: 'thedrummer/rocinante-12b', max_tokens: 25 }
     );
-    // Clean up — remove any accidental quotes, brackets, or "Scene:" prefix
-    let scene = result.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
-    return truncateNatural(scene, 10);
+    let scene = result.content
+      .split('\n')[0]
+      .replace(/^["'\[\(-]|["'\]\)]$/g, '')
+      .replace(/[.!]$/, '')
+      .trim();
+    return truncateNatural(scene, 8);
   } catch (err) {
     console.warn('[chat] scene generation failed:', err.message);
     return null;
@@ -347,7 +349,13 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     const [mediaEnabled, videoEnabled] = await Promise.all([getMediaEnabled(), getVideoEnabled()]);
     const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled, videoEnabled });
     const memoryContext = await buildMemoryContext(conversation.id);
-    const systemPrompt = basePrompt + memoryContext;
+    let systemPrompt = basePrompt + memoryContext;
+
+    // When we know nothing about the user yet, guide AI to ask discovery questions
+    if (!memoryContext) {
+      systemPrompt += '\n\nYou are still getting to know this person. Ask genuine questions about them — their name, interests, what they do, what they enjoy. Be curious and attentive. Do NOT invent or assume any details about their life.';
+    }
+
     const platform = detectPlatform(req);
 
     let fullText = '';
@@ -498,14 +506,24 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       [conversation.id]
     );
     recentMessages.reverse();
-    const aiMessages = [
-      ...recentMessages.map(m => ({ role: m.role, content: m.content })),
-      { role: 'user', content: '[The user hasn\'t said anything yet. Reach out naturally — share something on your mind, ask how their day is going, or flirt playfully.]' },
-    ];
 
     const basePrompt = buildCompanionSystemPrompt(companion);
     const memoryContext = await buildMemoryContext(conversation.id);
-    const systemPrompt = basePrompt + memoryContext;
+    let systemPrompt = basePrompt + memoryContext;
+
+    // Discovery mode vs normal mode based on memory state
+    const syntheticContent = memoryContext
+      ? '[The user hasn\'t said anything yet. Reach out naturally — reference something from your conversations or flirt playfully.]'
+      : '[The user hasn\'t said anything yet. Reach out warmly and ask a genuine question to get to know them better.]';
+
+    if (!memoryContext) {
+      systemPrompt += '\n\nYou are still getting to know this person. Ask genuine questions about them. Do NOT invent or assume any details about their life.';
+    }
+
+    const aiMessages = [
+      ...recentMessages.map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: syntheticContent },
+    ];
     const platform = detectPlatform(req);
 
     let fullText = '';

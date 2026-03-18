@@ -592,7 +592,7 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Added timezone capture via ip-api.com on registration and country-based backfill for existing users.
 - Files: migrate.js (v36), geo.js, auth-api.js, user-api.js, proactive.js, Profile.jsx.
 
-## Real-Device iOS Billing Test Coverage — IN PROGRESS
+## Real-Device iOS Billing Test Coverage — DONE
 - Log the task in `plan.md` and `PROGRESS.md` before code changes and keep both files current through completion.
 - Fix RevenueCat backend parity for iOS billing: replace the broken subscription upsert path, add webhook idempotency, and add native tip-intent persistence so iOS tips can carry `companion_id`.
 - Extend billing APIs with native iOS tip-intent create/poll endpoints and expose `paymentProvider` in billing status so the app can differentiate RevenueCat from Stripe.
@@ -600,3 +600,86 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Add dedicated Playwright API coverage for RevenueCat webhooks and iOS tip-intent flows in the `api` bucket.
 - Add an iOS `AppUITests` target for real-device navigation coverage of pricing, restore purchases, chat tip promo, companion sheet tips, and profile subscription state.
 - Add a manual sandbox runbook for real-device App Store validation on production, including subscription lifecycle checks, all four tip SKUs, and cleanup guidance for test data.
+- Implementation notes:
+- Added `ios_tip_intents` persistence, RevenueCat webhook idempotency via `billing_events` `rc:` event ids, and explicit RevenueCat subscription update-or-insert handling.
+- Extended billing APIs with `paymentProvider`, native iOS tip-intent create/poll endpoints, and native sync polling so subscription/tip UI waits for backend confirmation.
+- Added `e2e/ios-billing.test.js`, `docs/ios-billing-sandbox.md`, and an iOS `AppUITests` target plus shared schemes for simulator/real-device billing entry-point coverage.
+- Verification:
+- `npm run test:e2e:api` passed.
+- `xcodebuild build-for-testing -workspace web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO` passed.
+- `xcodebuild test-without-building -workspace web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO` passed with 8 tests executed, 3 skipped because `UITEST_EMAIL` and `UITEST_PASSWORD` were not configured.
+
+## Fix AI Hallucination — Discovery Mode — DONE
+- Added temperature: 0.7 to constrain model randomness
+- Lowered memory extraction threshold from 10→5 assistant messages for faster grounding
+- Added discovery mode: when no memories exist, AI asks genuine questions instead of inventing details
+- Applied to /message, /next, and proactive endpoints
+- Added anti-hallucination baseline instruction to system prompt
+- Root cause: Euryale model had no temperature set + no grounding logic for new conversations
+- Files: ai.js, memory.js, chat-api.js, proactive.js
+
+## iOS Sandbox Setup Hardening — DONE
+- Log this follow-up task in `plan.md` and `PROGRESS.md` before changing files.
+- Add explicit Xcode capability metadata for the `App` target so In-App Purchase shows up consistently in Signing & Capabilities alongside the existing Apple Sign-In/push setup.
+- Add a Lovetta-specific step-by-step sandbox setup doc covering Xcode, Apple Developer/App Store Connect, real-device sandbox login, purchase/restore flows, and reset steps for repeated testing.
+- Re-verify the iOS workspace builds after the Xcode project metadata change.
+- Implementation notes:
+- Added `SystemCapabilities` metadata for `com.apple.InAppPurchase`, `com.apple.Push`, and `com.apple.SignInWithApple` on the `App` target in the Xcode project so the capability state is explicit in source control.
+- Added `docs/ios-sandbox-setup.md` with the exact Lovetta sandbox setup flow, including the local Xcode settings, the required Apple-side toggles, device login steps, and reset guidance.
+- Verification:
+- `xcodebuild build-for-testing -workspace web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO` passed after the Xcode project change.
+
+## iOS Subscribe Tap Debugging — DONE
+- Log this follow-up debugging task in `plan.md` and `PROGRESS.md` before changing files.
+- Remove the stale/pending offering race from the native subscribe button by resolving the latest offering inside the tap handler itself.
+- Add explicit RevenueCat subscribe logging and visible inline errors so failed native purchase starts are diagnosable on-device without relying on `alert()`.
+- Re-run the relevant iOS verification after the paywall handler change.
+- Implementation notes:
+- Updated the paywall button to follow the working `auto` repo pattern: resolve offerings directly inside the subscribe action, log the selected package identifier before starting the native purchase, and render any failure inline in the modal.
+- Hardened the RevenueCat wrapper so every purchase/read path self-checks configuration, reconfigures if startup init was skipped, and errors clearly when `VITE_REVENUECAT_IOS_KEY` is missing.
+- Verification:
+- `npm run test:e2e:ui` passed.
+- `npm run build:ios` passed.
+
+## iOS StoreKit Product Probe — DONE
+- Log this follow-up native debugging task in `plan.md` and `PROGRESS.md` before changing files.
+- Add a temporary direct StoreKit product fetch on iOS launch for the known Lovetta product IDs so device logs clearly show whether Apple can resolve the subscription and tip products outside RevenueCat.
+- Rebuild the iOS app after the native debug probe is added.
+- Implementation notes:
+- Added a temporary DEBUG-only direct StoreKit product fetch in `AppDelegate.swift` for `lovetta_monthly`, `lovetta_yearly`, and all four tip products so Xcode logs now show whether Apple can resolve the products independently of RevenueCat.
+- Verification:
+- `npm run build:ios` passed after the native StoreKit debug probe was added.
+
+## RevenueCat Apple Key Swap — DONE
+- Log this follow-up configuration task in `plan.md` and `PROGRESS.md` before changing files.
+- Replace the local iOS RevenueCat Test Store public key with the real Apple `appl_...` public SDK key provided by the user.
+- Rebuild the iOS app so the fresh Xcode install uses the real Apple RevenueCat project instead of the Test Store.
+- Implementation notes:
+- Updated the local `VITE_REVENUECAT_IOS_KEY` from the RevenueCat Test Store key to the Apple `appl_...` key provided by the user.
+- Verification:
+- `npm run build:ios` passed after the RevenueCat Apple key swap.
+
+## RevenueCat Apple Key Heroku Sync — DONE
+- Log this follow-up deployment-config task in `plan.md` and `PROGRESS.md` before changing anything.
+- Set `VITE_REVENUECAT_IOS_KEY` on the active Heroku app for this repo to the same Apple `appl_...` public SDK key used locally.
+- Verify the Heroku config now holds the updated iOS RevenueCat key.
+- Implementation notes:
+- The repo's Heroku remote points to app `lovetta`, so the key was synced there after `lovetta-ai` returned `not_found`.
+- Verification:
+- `heroku config:set VITE_REVENUECAT_IOS_KEY=... -a lovetta` succeeded and restarted the app on release `v116`.
+- `heroku config:get VITE_REVENUECAT_IOS_KEY -a lovetta` matched the expected Apple RevenueCat key.
+
+## RevenueCat Local Env Source Fix — DONE
+- Log this follow-up local-build configuration task in `plan.md` and `PROGRESS.md` before changing files.
+- Update the tracked `web/.env` iOS RevenueCat key so local `npm run build:ios` picks up the same Apple `appl_...` key used in the root env and Heroku config.
+- Remove the first-call RevenueCat configure race so app launch does not call `getCustomerInfo()` before the SDK is configured.
+- Expand the temporary native StoreKit product probe to test both the `lovetta_*` subscription IDs and the bare `monthly` / `yearly` IDs RevenueCat is currently requesting.
+- Rebuild iOS and verify the generated bundle no longer contains the old RevenueCat Test Store key.
+- Implementation notes:
+- Updated `web/.env` to the Apple `appl_...` RevenueCat key so local Capacitor/Vite builds stop embedding the stale Test Store key.
+- Changed the RevenueCat Capacitor client to configure immediately on first use instead of intentionally calling `getCustomerInfo()` before configuration.
+- Expanded the native StoreKit debug probe to check both `lovetta_*` IDs and bare `monthly` / `yearly` IDs so on-device logs now distinguish a code issue from an App Store Connect catalog issue.
+- Verification:
+- `npm run build:ios` passed.
+- The synced iOS bundle in `web/ios/App/App/public/assets/` now contains the Apple `appl_...` key and no longer contains the old `test_...` key.
+- `npm run test:e2e:ui` passed (`47` tests).

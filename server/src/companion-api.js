@@ -6,7 +6,7 @@
 const { Router } = require('express');
 const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
-const { chatCompletion } = require('./ai');
+const { chatCompletion, plainChatCompletion } = require('./ai');
 
 function truncateNatural(text, maxWords) {
   const words = text.split(/\s+/);
@@ -193,19 +193,23 @@ router.post('/', authenticate, async (req, res) => {
       // Always generate scene for first message
       let sceneText = null;
       try {
-        const sceneResult = await chatCompletion(
-          `Write a scene description in 5-8 words. Setting + mood only. No character names, no quotes, no brackets, no full sentences.
+        const sceneResult = await plainChatCompletion(
+          `Reply with ONLY a scene description in 5-8 words. Setting and mood only. No names, no dialogue, no actions, no labels, no continuation.
 
 Examples:
 - Warm golden light across tangled sheets
 - Rain on the window, tea in hand
 - Kitchen counter, barefoot on cool tiles
 - Dim bedroom, phone glow on her face`,
-          [{ role: 'user', content: `Character: ${companion.name}, ${companion.age}. ${companion.personality}\n\nHer first words: ${content}` }],
-          { model: 'thedrummer/rocinante-12b' }
+          [{ role: 'user', content: `Her first words: ${content}` }],
+          { model: 'thedrummer/rocinante-12b', max_tokens: 25 }
         );
-        let scene = sceneResult.content.replace(/^["'\[\(]|["'\]\)]$/g, '').replace(/^scene:\s*/i, '').trim();
-        sceneText = truncateNatural(scene, 10);
+        let scene = sceneResult.content
+          .split('\n')[0]
+          .replace(/^["'\[\(-]|["'\]\)]$/g, '')
+          .replace(/[.!]$/, '')
+          .trim();
+        sceneText = truncateNatural(scene, 8);
       } catch (err) {
         console.warn('[companions] Scene generation failed:', err.message);
       }

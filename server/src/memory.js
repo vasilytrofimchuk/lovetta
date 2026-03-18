@@ -11,7 +11,7 @@
 const { getPool } = require('./db');
 const { trackConsumption } = require('./consumption');
 
-const EXTRACTION_THRESHOLD = 10;
+const EXTRACTION_THRESHOLD = 5;
 const SUMMARY_THRESHOLD = 20;
 const MAX_MEMORY_CHARS = 2000; // ~500 tokens hard cap
 

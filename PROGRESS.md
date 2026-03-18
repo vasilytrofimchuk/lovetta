@@ -659,12 +659,86 @@
 
 ## Real-Device iOS Billing Test Coverage
 - [x] Update `plan.md` and `PROGRESS.md` for the iOS billing test-coverage task
-- [ ] Fix RevenueCat subscription handling and webhook idempotency
-- [ ] Add native iOS tip-intent persistence and billing API endpoints
-- [ ] Update native subscription/tip UI flows to wait for backend sync and use provider-aware management
-- [ ] Add Playwright API coverage for RevenueCat and native tip intents
-- [ ] Add iOS `AppUITests` target for billing entry-point coverage
-- [ ] Add manual sandbox validation runbook for production iOS billing
-- [ ] Run `npm run test:e2e:api`
-- [ ] Run native iOS test/build verification
-- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes
+- [x] Fix RevenueCat subscription handling and webhook idempotency
+- [x] Add native iOS tip-intent persistence and billing API endpoints
+- [x] Update native subscription/tip UI flows to wait for backend sync and use provider-aware management
+- [x] Add Playwright API coverage for RevenueCat and native tip intents
+- [x] Add iOS `AppUITests` target for billing entry-point coverage
+- [x] Add manual sandbox validation runbook for production iOS billing
+- [x] Run `npm run test:e2e:api`
+- [x] Run native iOS test/build verification
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+- Verification notes:
+- `npm run test:e2e:api` passed.
+- Workspace-native verification passed with `build-for-testing` and `test-without-building` on the `AppUITests` scheme for `iPhone 16` simulator (`8` tests executed, `3` skipped until `UITEST_EMAIL` and `UITEST_PASSWORD` are configured for prepared-account billing flows).
+
+## Fix AI Hallucination — Discovery Mode
+- [x] Add `temperature: 0.7` to OpenRouter chat requests (ai.js)
+- [x] Lower memory extraction threshold from 10 to 5 (memory.js)
+- [x] Add anti-hallucination baseline to system prompt (chat-api.js)
+- [x] Add discovery mode logic when no memories exist — `/message` endpoint (chat-api.js)
+- [x] Add discovery mode logic when no memories exist — `/next` endpoint (chat-api.js)
+- [x] Add anti-hallucination constraint to proactive messages (proactive.js)
+- [x] All 70 AI tests pass
+- [x] Real conversation test: 5 companions (Luna, Sophia, Emma, Chloe, Jade), 40 messages — 0 hallucinations
+- [x] Fix scene generation cleanup: strip character names, labels, extra text (chat-api.js + companion-api.js)
+- [x] Scene test: all generated scenes are clean (setting+mood only, no character names/actions)
+- [x] Fix scene generation root cause: `max_tokens: 25` + `plainChatCompletion` + simplified prompt (ai.js, chat-api.js, companion-api.js)
+- [x] Scene quality: 100% clean (11/11) vs 23% before — no heavy regex cleanup needed
+
+## iOS Sandbox Setup Hardening
+- [x] Update `plan.md` and `PROGRESS.md` for the iOS sandbox setup follow-up
+- [x] Add explicit Xcode capability metadata for In-App Purchase on the `App` target
+- [x] Add a Lovetta-specific iOS sandbox setup guide for Xcode, App Store Connect, device login, and reset flows
+- [x] Re-run native iOS build verification after the Xcode project change
+- [x] Update `plan.md` and `PROGRESS.md` with final sandbox-setup status and notes
+- Verification notes:
+- `xcodebuild build-for-testing -workspace web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO` passed after adding the Xcode capability metadata.
+
+## iOS Subscribe Tap Debugging
+- [x] Update `plan.md` and `PROGRESS.md` for the subscribe-tap debugging follow-up
+- [x] Remove the native subscribe offering race from `PlanModal`
+- [x] Add visible logging/error state for native subscribe failures
+- [x] Re-run relevant iOS verification after the paywall handler change
+- [x] Update `plan.md` and `PROGRESS.md` with final subscribe-debugging status and notes
+- Verification notes:
+- `npm run test:e2e:ui` passed.
+- `npm run build:ios` passed.
+
+## iOS StoreKit Product Probe
+- [x] Update `plan.md` and `PROGRESS.md` for the native StoreKit probe follow-up
+- [x] Add a temporary direct StoreKit product fetch on iOS launch for Lovetta subscription/tip product IDs
+- [x] Rebuild the iOS app after adding the native StoreKit probe
+- [x] Update `plan.md` and `PROGRESS.md` with final StoreKit-probe status and notes
+- Verification notes:
+- `npm run build:ios` passed after adding the temporary StoreKit product probe.
+
+## RevenueCat Apple Key Swap
+- [x] Update `plan.md` and `PROGRESS.md` for the RevenueCat Apple key swap
+- [x] Replace the local iOS RevenueCat public key with the real Apple `appl_...` key
+- [x] Rebuild the iOS app after the RevenueCat key change
+- [x] Update `plan.md` and `PROGRESS.md` with final key-swap status and notes
+- Verification notes:
+- `npm run build:ios` passed after the RevenueCat Apple key swap.
+
+## RevenueCat Apple Key Heroku Sync
+- [x] Update `plan.md` and `PROGRESS.md` for the Heroku RevenueCat key sync
+- [x] Set `VITE_REVENUECAT_IOS_KEY` on the active Heroku app for this repo
+- [x] Verify the Heroku config value is updated
+- [x] Update `plan.md` and `PROGRESS.md` with final Heroku-sync status and notes
+- Verification notes:
+- `lovetta-ai` was not found for the current Heroku account, but the repo's Heroku remote points to app `lovetta`.
+- `heroku config:set VITE_REVENUECAT_IOS_KEY=... -a lovetta` succeeded and restarted the app on release `v116`.
+- `heroku config:get VITE_REVENUECAT_IOS_KEY -a lovetta` matched the expected Apple RevenueCat key.
+
+## RevenueCat Local Env Source Fix
+- [x] Update `plan.md` and `PROGRESS.md` for the local-build RevenueCat key fix
+- [x] Update `web/.env` to the Apple `appl_...` RevenueCat key used by local iOS builds
+- [x] Remove the first-call RevenueCat configure race from the Capacitor client
+- [x] Expand the temporary StoreKit probe to check both possible subscription ID sets
+- [x] Rebuild iOS and verify the generated bundle no longer contains the old Test Store key
+- [x] Update `plan.md` and `PROGRESS.md` with final local-build fix status and notes
+- Verification notes:
+- `npm run build:ios` passed.
+- The synced iOS bundle now embeds the Apple `appl_...` key instead of the old RevenueCat Test Store key.
+- `npm run test:e2e:ui` passed (`47` tests).

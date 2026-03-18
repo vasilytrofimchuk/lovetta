@@ -75,6 +75,7 @@ Communication style: ${companion.communication_style || 'warm and playful'}
 
 ${slotInstructions[slot] || slotInstructions.random}
 Keep it 1-3 sentences. Be warm and in-character. Don't ask too many questions. Just reach out naturally.
+Only reference topics actually discussed — never invent or assume details about their life.
 
 Start with a brief action in *asterisks*, then your message.
 Example: *curls up on the couch and texts you* Hey... I was just thinking about you. How's your day going?

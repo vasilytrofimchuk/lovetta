@@ -80,9 +80,11 @@ async function buildSystemPrompt(basePrompt, platform = 'web', userId = null) {
  * Internal: make a single OpenRouter streaming request.
  * Does NOT run age guard — that's done by the caller.
  */
-async function _chatRequest(systemPrompt, messages, model) {
+async function _chatRequest(systemPrompt, messages, model, extraParams = {}) {
   const body = {
     model,
+    temperature: 0.7,
+    ...extraParams,
     messages: [
       { role: 'system', content: systemPrompt },
       ...messages,
@@ -352,7 +354,9 @@ async function plainChatCompletion(systemPrompt, messages, opts = {}) {
   // Use fallback model by default — larger models follow structured instructions better
   const model = opts.model || settings.openrouter_fallback_model || 'sao10k/l3.1-euryale-70b';
 
-  const result = await _chatRequest(systemPrompt, messages, model);
+  const extraParams = {};
+  if (opts.max_tokens) extraParams.max_tokens = opts.max_tokens;
+  const result = await _chatRequest(systemPrompt, messages, model, extraParams);
   return {
     content: result.fullText,
     inputTokens: result.inputTokens,
