@@ -650,7 +650,8 @@ async function verifyAppleToken(identityToken) {
   const decoded = jwt.verify(identityToken, pem, {
     algorithms: ['RS256'],
     issuer: 'https://appleid.apple.com',
-    audience: APPLE_CLIENT_ID || undefined,
+    // Native iOS tokens use bundle ID as audience; web uses Service ID
+    audience: [APPLE_CLIENT_ID, 'ai.lovetta.app'].filter(Boolean),
   });
   return decoded; // { sub, email, email_verified, ... }
 }
