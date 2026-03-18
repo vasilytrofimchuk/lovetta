@@ -124,7 +124,7 @@ app.post('/api/chat/stt',
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
 
 // API routes
 app.use('/api', trackingApi);
@@ -152,6 +152,27 @@ app.get('/api/app-config', async (_req, res) => {
   } catch (err) {
     console.error('[app-config] error:', err.message);
     res.json({ mediaEnabled: true, videoEnabled: false, avatarAgeFilter: false, avatarSkinFilter: false });
+  }
+});
+
+// -- Email unsubscribe --
+app.get('/api/unsubscribe', async (req, res) => {
+  const { uid, token } = req.query;
+  const { generateUnsubscribeToken } = require('./src/email');
+  const { getPool } = require('./src/db');
+  const SITE_URL = process.env.SITE_URL || 'http://localhost:3900';
+
+  if (!uid || !token || token !== generateUnsubscribeToken(uid)) {
+    return res.status(400).send('<p style="font-family:sans-serif">Invalid unsubscribe link.</p>');
+  }
+
+  try {
+    const pool = getPool();
+    await pool.query('UPDATE users SET marketing_unsubscribed = true WHERE id = $1', [uid]);
+    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Unsubscribed</title></head><body style="font-family:sans-serif;max-width:480px;margin:80px auto;text-align:center;color:#333"><h2>Unsubscribed</h2><p style="color:#666">You won't receive marketing emails from Lovetta anymore.</p><a href="${SITE_URL}/my/" style="color:#d6336c">Back to app</a></body></html>`);
+  } catch (err) {
+    console.error('[unsubscribe] error:', err.message);
+    res.status(500).send('<p style="font-family:sans-serif">Something went wrong. Please try again.</p>');
   }
 });
 
