@@ -1,9 +1,16 @@
 import { isIOS } from './platform'
 
+let keyboardVisible = false
+
 function setViewportHeight() {
   if (typeof window === 'undefined') return
 
-  const nextHeight = window.visualViewport?.height ?? window.innerHeight
+  let nextHeight = window.visualViewport?.height ?? window.innerHeight
+  // When keyboard is open, visualViewport doesn't account for the
+  // autocomplete/prediction bar — subtract extra so input bars clear it
+  if (keyboardVisible && nextHeight < window.innerHeight) {
+    nextHeight -= 10
+  }
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(nextHeight)}px`)
 }
 
@@ -40,10 +47,12 @@ export async function initIosKeyboard() {
 
     handles = await Promise.all([
       Keyboard.addListener('keyboardDidShow', () => {
+        keyboardVisible = true
         setKeyboardScrollLock(true)
         handleViewportChange()
       }),
       Keyboard.addListener('keyboardDidHide', () => {
+        keyboardVisible = false
         setKeyboardScrollLock(false)
         handleViewportChange()
       }),
