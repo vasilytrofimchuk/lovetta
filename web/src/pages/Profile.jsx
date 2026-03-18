@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
-import { APP_ICON_OPTIONS, getCurrentAppIcon, setCurrentAppIcon } from '../lib/app-icon';
+import { APP_ICON_OPTIONS, getSavedAppIcon, isAppIconPluginAvailable, saveAppIcon, setCurrentAppIcon } from '../lib/app-icon';
 import { isAppStore, isCapacitor, isIOS } from '../lib/platform';
 
 export default function Profile() {
@@ -15,8 +15,9 @@ export default function Profile() {
   const [proactiveMessages, setProactiveMessages] = useState(true);
   const [proactiveFrequency, setProactiveFrequency] = useState('normal');
   const [explicitContent, setExplicitContent] = useState(false);
-  const [appIcon, setAppIcon] = useState('default');
-  const [appIconLoading, setAppIconLoading] = useState(isIOS());
+  const [appIcon, setAppIcon] = useState(() => getSavedAppIcon());
+  const [appIconSupported, setAppIconSupported] = useState(() => isIOS() && isAppIconPluginAvailable());
+  const [appIconLoading, setAppIconLoading] = useState(false);
   const [appIconSaving, setAppIconSaving] = useState(false);
   const [prefLoading, setPrefLoading] = useState(true);
   const [savingNotify, setSavingNotify] = useState(false);
@@ -104,17 +105,13 @@ export default function Profile() {
     }
 
     if (ios) {
-      getCurrentAppIcon()
-        .then(({ icon }) => {
-          if (active) setAppIcon(icon || 'default');
-        })
-        .catch((err) => {
-          console.error('App icon load error:', err);
-        })
-        .finally(() => {
-          if (active) setAppIconLoading(false);
-        });
-    } else {
+      if (active) {
+        setAppIconSupported(isAppIconPluginAvailable());
+        setAppIcon(getSavedAppIcon());
+        setAppIconLoading(false);
+      }
+    } else if (active) {
+      setAppIconSupported(false);
       setAppIconLoading(false);
     }
 
@@ -137,6 +134,7 @@ export default function Profile() {
   };
 
   const togglePush = async () => {
+    if (savingPush) return;
     setSavingPush(true);
     try {
       if (isCapacitor()) {
@@ -161,11 +159,14 @@ export default function Profile() {
           }
           setPushEnabled(false);
         } else {
-          const permission = await Notification.requestPermission();
-          if (permission !== 'granted') {
-            setSavingPush(false);
+          // Check if previously denied — browser won't re-prompt
+          if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+            alert('Push notifications are blocked. Please enable them in your browser settings.');
             return;
           }
+          const permission = await Notification.requestPermission();
+          if (permission !== 'granted') return;
+
           const { data: vapid } = await api.get('/api/user/vapid-key');
           const reg = await navigator.serviceWorker.ready;
           const sub = await reg.pushManager.subscribe({
@@ -227,12 +228,14 @@ export default function Profile() {
   };
 
   const handleAppIconSelect = async (nextIcon) => {
-    if (appIconSaving || appIcon === nextIcon) return;
+    if (!appIconSupported || appIconSaving || appIcon === nextIcon) return;
 
     setAppIconSaving(true);
     try {
       const { icon } = await setCurrentAppIcon(nextIcon);
-      setAppIcon(icon || nextIcon);
+      const resolvedIcon = icon || nextIcon;
+      setAppIcon(resolvedIcon);
+      saveAppIcon(resolvedIcon);
     } catch (err) {
       console.error('App icon update error:', err);
     } finally {
@@ -276,7 +279,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {ios && (
+        {ios && appIconSupported && (
           <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
             <h3 className="text-sm font-semibold text-brand-text mb-1">App Icon</h3>
             <p className="text-xs text-brand-muted mb-4">
