@@ -258,6 +258,15 @@
 
 ### Fix OAuth Age/Consent Bypass
 - [x] Google OAuth: forward state param, decode in callback, use real birth date
+
+## Responsive Two-Size Layout
+
+- [x] Update `plan.md` and `PROGRESS.md` for the responsive layout task
+- [x] Update shared app shell and responsive width rules for tablet and desktop
+- [x] Remove phone-only width caps from main app pages and chat surfaces while keeping auth forms narrow
+- [x] Update landing page container, carousel, signup card, and feature grid for tablet and desktop widths
+- [x] Add tablet and desktop responsive assertions to UI E2E tests
+- [x] Run `npm run test:e2e:ui`
 - [x] Google OAuth: redirect new users without age data to /my/signup
 - [x] Telegram auth: accept birthMonth/birthYear/consents in POST body
 - [x] Telegram auth: require age/consent for new users (return age_consent_required)
@@ -575,3 +584,33 @@
 - [ ] Run `npm run test:e2e:ui`
 - [ ] Run `npm run build:ios`
 - [ ] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Web Landing + Signup Flow Parity With iOS
+- [x] Update `plan.md` and `PROGRESS.md` for the web landing/onboarding task
+- [x] Replace the public landing signup form with a welcome-style layout and informational pricing cards
+- [x] Convert web signup to a 3-step consent → registration → plan flow and remove the web LegalPopup path
+- [x] Reuse the onboarding-style plan chooser on `/my/pricing?onboarding=1` with Skip for now
+- [x] Update landing and onboarding UI tests for the new web flow
+- [x] Run `npm run test:e2e:ui`
+
+## Landing Trial Emphasis
+- [x] Update `plan.md` and `PROGRESS.md` for the landing trial-emphasis pass
+- [ ] Add a large free-trial-first badge/treatment to the landing pricing section
+- [ ] Keep the pricing section informational-only while making the trial message more prominent
+- [ ] Run `npm run test:e2e:ui`
+
+## Web Landing Trial Timeline Removal
+- [ ] Update `plan.md` and `PROGRESS.md` for the web landing timeline-removal pass
+- [ ] Remove the landing `Today / Day 3 / Day 4` timeline block for web
+- [ ] Keep the web-only trial badge and pricing cards intact
+- [ ] Run `npm run test:e2e:ui`
+
+## Landing Pricing Subtitle Removal
+- [x] Update `plan.md` and `PROGRESS.md` for the landing pricing subtitle removal
+- [x] Remove the explanatory pricing subtitle from the web landing page
+- [x] Skip tests because this is a copy-only change
+
+## Landing Cancel Anytime Emphasis
+- [x] Update `plan.md` and `PROGRESS.md` for the landing cancel-anytime emphasis change
+- [x] Replace the landing pricing note with a larger `Cancel anytime` emphasis
+- [x] Skip tests because this is a copy/presentation-only landing change

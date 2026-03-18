@@ -5,12 +5,64 @@
  */
 
 const { test, expect } = require('@playwright/test');
-const { BASE } = require('./helpers');
+const { BASE, createTestUser } = require('./helpers');
 
 // Load env for API keys
 try { process.loadEnvFile('.env'); } catch {}
 
 const TEST_PASSWORD = 'Test1234!';
+
+async function seedAuthenticatedUser(page, request) {
+  const user = await createTestUser(request);
+
+  await page.addInitScript(({ accessToken, refreshToken }) => {
+    localStorage.setItem('lovetta-token', accessToken);
+    localStorage.setItem('lovetta-refresh-token', refreshToken);
+  }, {
+    accessToken: user.accessToken,
+    refreshToken: user.refreshToken,
+  });
+
+  return user;
+}
+
+async function createCompanionViaApi(request, user) {
+  const templatesRes = await request.get(`${BASE}/api/companions/templates`, {
+    headers: user.authHeaders,
+  });
+  expect(templatesRes.ok()).toBeTruthy();
+  const templatesData = await templatesRes.json();
+  const template = templatesData.templates.find((item) => item.name === 'Luna') || templatesData.templates[0];
+  expect(template).toBeTruthy();
+
+  const createRes = await request.post(`${BASE}/api/companions`, {
+    headers: user.authHeaders,
+    data: { templateId: template.id },
+  });
+  expect(createRes.ok()).toBeTruthy();
+  const createData = await createRes.json();
+  return createData.companion;
+}
+
+/**
+ * Complete the consent step shown before web signup.
+ */
+async function completeConsentStep(page) {
+  await page.waitForSelector('text=Verify your age', { timeout: 10000 });
+  await page.locator('button:has-text("Month")').click();
+  await page.locator('button:has-text("June")').click();
+  await page.locator('button:has-text("Year")').click();
+  await page.locator('button:has-text("1995")').click();
+
+  const checkboxes = page.locator('input[type="checkbox"]');
+  const count = await checkboxes.count();
+  for (let i = 0; i < count; i++) {
+    await checkboxes.nth(i).check();
+  }
+
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.waitForSelector('input[type="email"]', { timeout: 10000 });
+}
 
 /**
  * Sign up a new user via the UI and land on companion list.
@@ -19,30 +71,16 @@ async function signupViaUI(page) {
   const email = `conativer+uitest_${Date.now()}@gmail.com`;
 
   await page.goto(`${BASE}/my/signup`);
-  await page.waitForSelector('input[type="email"]', { timeout: 10000 });
+  await completeConsentStep(page);
 
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', TEST_PASSWORD);
+  await page.getByRole('button', { name: 'Create Account' }).click();
 
-  // Age gate — custom dropdowns (not native <select>), interact via button text
-  await page.locator('button:has-text("Month")').click();
-  await page.locator('button:has-text("June")').click();
-  await page.locator('button:has-text("Year")').click();
-  await page.locator('button:has-text("1995")').click();
+  await page.waitForSelector('[data-testid="onboarding-plan-screen"]', { timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Skip for now' })).toBeVisible();
+  await page.getByRole('button', { name: 'Skip for now' }).click();
 
-  // Submit form
-  await page.locator('button[type="submit"]').click();
-
-  // Legal popup — check ALL checkboxes then click Continue
-  await page.waitForSelector('text=Before we continue', { timeout: 5000 });
-  const checkboxes = page.locator('input[type="checkbox"]');
-  const count = await checkboxes.count();
-  for (let i = 0; i < count; i++) {
-    await checkboxes.nth(i).check();
-  }
-  await page.locator('button:has-text("Continue")').last().click();
-
-  // Wait for redirect to companion list (check for profile button in header)
   await page.waitForSelector('button[title="Profile"]', { timeout: 15000 });
   return email;
 }
@@ -52,6 +90,138 @@ async function signupViaUI(page) {
 // ============================================================
 
 test.describe('Companion List', () => {
+  test('signup consent step blocks progress without age and agreements', async ({ page }) => {
+    await page.goto(`${BASE}/my/signup`);
+
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.locator('text=Please select your birth date')).toBeVisible();
+
+    await page.locator('button:has-text("Month")').click();
+    await page.locator('button:has-text("June")').click();
+    await page.locator('button:has-text("Year")').click();
+    await page.locator('button:has-text("1995")').click();
+    await page.getByRole('button', { name: 'Continue' }).click();
+
+    await expect(page.locator('text=Please accept all agreements')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Verify your age' })).toBeVisible();
+  });
+
+  test('signup routes to onboarding pricing and skip returns to app home', async ({ page }) => {
+    const email = `conativer+pricing_${Date.now()}@gmail.com`;
+
+    await page.goto(`${BASE}/my/signup`);
+    await completeConsentStep(page);
+    await page.fill('input[type="email"]', email);
+    await page.fill('input[type="password"]', TEST_PASSWORD);
+    await page.getByRole('button', { name: 'Create Account' }).click();
+
+    await page.waitForSelector('[data-testid="onboarding-plan-screen"]', { timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Start Free Trial' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Skip for now' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Skip for now' }).click();
+    await page.waitForSelector('button[title="Profile"]', { timeout: 15000 });
+    await expect(page.locator('text=Bring someone special to life')).toBeVisible();
+  });
+
+  test('tablet uses full-width app surfaces while auth stays narrow', async ({ page, request }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width: 834, height: 1194 });
+    await page.goto(`${BASE}/my/login`);
+
+    const authWidth = await page.locator('[data-testid="auth-form-shell"]').evaluate((node) => node.getBoundingClientRect().width);
+    expect(authWidth).toBeLessThan(420);
+
+    const user = await seedAuthenticatedUser(page, request);
+    const companion = await createCompanionViaApi(request, user);
+
+    await page.goto(`${BASE}/my/`);
+    await page.waitForSelector('[data-testid="companion-list-content"]', { timeout: 10000 });
+
+    const tabletListMetrics = await page.evaluate(() => {
+      const shell = document.querySelector('[data-testid="app-shell"]');
+      const content = document.querySelector('[data-testid="companion-list-content"]');
+      if (!shell || !content) return null;
+      return {
+        shellWidth: shell.getBoundingClientRect().width,
+        contentWidth: content.getBoundingClientRect().width,
+        viewportWidth: window.innerWidth,
+      };
+    });
+
+    expect(tabletListMetrics).toBeTruthy();
+    expect(Math.abs(tabletListMetrics.shellWidth - tabletListMetrics.viewportWidth)).toBeLessThanOrEqual(2);
+    expect(tabletListMetrics.contentWidth).toBeGreaterThan(760);
+
+    await page.goto(`${BASE}/my/chat/${companion.id}`);
+    await page.waitForSelector('[data-testid="chat-page"]', { timeout: 10000 });
+
+    const tabletChatMetrics = await page.evaluate(() => {
+      const shell = document.querySelector('[data-testid="app-shell"]');
+      const chat = document.querySelector('[data-testid="chat-page"]');
+      if (!shell || !chat) return null;
+      return {
+        shellWidth: shell.getBoundingClientRect().width,
+        chatWidth: chat.getBoundingClientRect().width,
+      };
+    });
+
+    expect(tabletChatMetrics).toBeTruthy();
+    expect(Math.abs(tabletChatMetrics.chatWidth - tabletChatMetrics.shellWidth)).toBeLessThanOrEqual(2);
+  });
+
+  test('desktop uses a centered 960px shell while auth stays narrow', async ({ page, request }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${BASE}/my/login`);
+
+    const authWidth = await page.locator('[data-testid="auth-form-shell"]').evaluate((node) => node.getBoundingClientRect().width);
+    expect(authWidth).toBeLessThan(420);
+
+    const user = await seedAuthenticatedUser(page, request);
+    const companion = await createCompanionViaApi(request, user);
+
+    await page.goto(`${BASE}/my/`);
+    await page.waitForSelector('[data-testid="companion-list-content"]', { timeout: 10000 });
+
+    const desktopListMetrics = await page.evaluate(() => {
+      const shell = document.querySelector('[data-testid="app-shell"]');
+      const content = document.querySelector('[data-testid="companion-list-content"]');
+      if (!shell || !content) return null;
+
+      const shellRect = shell.getBoundingClientRect();
+      return {
+        shellWidth: shellRect.width,
+        shellLeft: shellRect.left,
+        shellRight: window.innerWidth - shellRect.right,
+        contentWidth: content.getBoundingClientRect().width,
+      };
+    });
+
+    expect(desktopListMetrics).toBeTruthy();
+    expect(desktopListMetrics.shellWidth).toBeGreaterThan(940);
+    expect(desktopListMetrics.shellWidth).toBeLessThanOrEqual(960);
+    expect(Math.abs(desktopListMetrics.shellLeft - desktopListMetrics.shellRight)).toBeLessThanOrEqual(2);
+    expect(desktopListMetrics.shellLeft).toBeGreaterThan(200);
+    expect(desktopListMetrics.contentWidth).toBeGreaterThan(900);
+
+    await page.goto(`${BASE}/my/chat/${companion.id}`);
+    await page.waitForSelector('[data-testid="chat-page"]', { timeout: 10000 });
+
+    const desktopChatMetrics = await page.evaluate(() => {
+      const shell = document.querySelector('[data-testid="app-shell"]');
+      const chat = document.querySelector('[data-testid="chat-page"]');
+      if (!shell || !chat) return null;
+      return {
+        shellWidth: shell.getBoundingClientRect().width,
+        chatWidth: chat.getBoundingClientRect().width,
+      };
+    });
+
+    expect(desktopChatMetrics).toBeTruthy();
+    expect(Math.abs(desktopChatMetrics.chatWidth - desktopChatMetrics.shellWidth)).toBeLessThanOrEqual(2);
+  });
+
   test('shows empty state for new user', async ({ page }) => {
     await signupViaUI(page);
     await expect(page.locator('text=Bring someone special to life')).toBeVisible({ timeout: 5000 });

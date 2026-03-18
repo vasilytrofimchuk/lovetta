@@ -79,7 +79,7 @@ export default function SupportPage() {
       style={{ height: isCapacitor() ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))' : '100vh' }}
     >
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-brand-border flex-shrink-0 bg-brand-bg">
+      <div className="flex items-center gap-3 app-page-gutter py-3 border-b border-brand-border flex-shrink-0 bg-brand-bg">
         <button
           onClick={() => navigate('/profile')}
           aria-label="Back"
@@ -99,7 +99,7 @@ export default function SupportPage() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto app-page-gutter py-4 space-y-3">
         {loading && <div className="text-center text-brand-muted text-sm mt-12">Connecting...</div>}
         {!loading && error && (
           <div className="text-center mt-12">
@@ -131,7 +131,7 @@ export default function SupportPage() {
       {/* Input bar */}
       <form
         onSubmit={handleSend}
-        className="border-t border-brand-border bg-brand-bg px-4 pt-3 flex-shrink-0"
+        className="border-t border-brand-border bg-brand-bg app-page-gutter pt-3 flex-shrink-0"
         style={{ paddingBottom: safeAreaBottom }}
       >
         <div className="flex items-center gap-2">

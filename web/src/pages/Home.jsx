@@ -28,8 +28,8 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-bg p-4">
-      <div className="max-w-md mx-auto pt-8">
+    <div className="min-h-screen bg-brand-bg app-page-gutter py-4">
+      <div className="w-full pt-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-8" />

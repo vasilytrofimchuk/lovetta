@@ -184,9 +184,9 @@ export default function Profile() {
   const showPushToggle = isCapacitor() || ('PushManager' in window);
 
   return (
-    <div className="min-h-screen bg-brand-bg px-4 pb-8"
+    <div className="min-h-screen bg-brand-bg app-page-gutter pb-8"
       style={{ paddingTop: isCapacitor() ? 'max(2rem, env(safe-area-inset-top, 2rem))' : '2rem' }}>
-      <div className="max-w-md mx-auto">
+      <div className="w-full">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <button

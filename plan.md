@@ -218,6 +218,32 @@ Text and image levels are independent, configurable per platform in admin settin
 ### Email Notifications — DONE
 - [x] New message notification: email sent when girl sends message and user inactive 5+ min (rate limited 30min)
 - [x] user_preferences table with notify_new_messages toggle
+
+---
+
+## Responsive Two-Size Layout — DONE
+
+### Goal
+- Add a second large-screen layout mode for both the app and landing page.
+- Keep the phone-first layout under 768px.
+- Use full available width on tablet/iPad widths (768px-1023px).
+- Use a centered 960px shell on desktop widths (1024px+).
+
+### Execution Plan
+- Update shared app shell width behavior and responsive layout variables.
+- Remove phone-only width caps from content-heavy app pages and chat surfaces while keeping auth forms narrow.
+- Expand create/chat/support/welcome surfaces to use the wider tablet/desktop shell.
+- Update landing page container, carousel, signup card, and feature grid for tablet and desktop widths.
+- Add responsive UI assertions for tablet and desktop layouts.
+- Run the UI E2E bucket after the layout pass.
+
+### Implementation Notes
+- No API, DB, or copy changes.
+- Large-screen behavior is based on viewport width only, not device detection.
+- Shared app shell now stays full-width through tablet and caps at 960px on desktop.
+- Content-heavy app surfaces now use shared responsive gutters; auth forms remain narrow.
+- Landing page now uses full-width tablet layout, a 960px centered desktop container, and wider carousel/feature spacing.
+- UI coverage now includes explicit tablet and desktop responsive assertions for landing, auth, companion list, and chat.
 - [x] Notification toggle in Profile page
 - [x] Welcome series: day 0 (intro), day 1 (prompt to chat), day 3 (trial ending)
 - [x] Subscription renewal reminder (3 days before renewal)
@@ -494,3 +520,32 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Keep the Apple button visually distinct but aligned with the other controls instead of looking oversized or mismatched
 - Move the Apple button into the post-separator social-auth stack on login so it matches signup instead of sitting directly under the email submit button
 - Verify with the UI bucket after the auth button style update
+
+## Web Landing + Signup Flow Parity With iOS — DONE
+- Replaced the public landing signup form with an iOS-style welcome layout: rotator, compact feature list, Continue CTA, and informational Free/Monthly/Yearly cards.
+- Removed all public landing age/consent form logic and routed Continue directly to `/my/signup?from=landing`.
+- Converted web signup to the same onboarding shape as iOS: consent + age, registration, then the full-screen plan chooser with Skip for now.
+- Reused the onboarding-style plan chooser on `/my/pricing?onboarding=1`, and made onboarding mode render consistently even in test/dev where billing is forced active.
+- Added shared onboarding storage so Google, Apple, and Telegram all keep age/consent data and post-auth routing aligned with the new flow.
+- Updated landing, signup, and wizard UI coverage for the new landing and onboarding path, and verified with `npm run build` plus `npm run test:e2e:ui`.
+
+## Landing Trial Emphasis — IN PROGRESS
+- Increase the visual weight of the landing pricing section so the 3-day free trial is the first thing web users notice.
+- Add a large trial badge / hero treatment above the informational pricing cards without changing the routing or signup flow.
+- Keep the landing pricing section informational-only and preserve the existing CTA + card structure.
+- Re-run the UI bucket after the landing emphasis pass.
+
+## Web Landing Trial Timeline Removal — IN PROGRESS
+- Remove the `Today / Day 3 / Day 4` trial timeline from the web landing pricing section.
+- Keep the web-only trial badge and informational pricing cards intact.
+- Re-run the UI bucket after the landing cleanup.
+
+## Landing Pricing Subtitle Removal — DONE
+- Removed the explanatory subtitle under the landing pricing heading on the web landing page.
+- Kept the pricing header, trial badge, and pricing cards intact.
+- Skipped tests because this was a copy-only removal.
+
+## Landing Cancel Anytime Emphasis — DONE
+- Replaced the small landing pricing note with a stronger `Cancel anytime` emphasis on the web landing page.
+- Kept the message within the existing trial note area instead of changing the pricing card structure.
+- Skipped tests because the change stayed limited to copy and presentation in the landing note.

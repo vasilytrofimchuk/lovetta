@@ -98,7 +98,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
   const safeTop = fullScreen ? 'pt-8' : 'pt-[max(2.5rem,env(safe-area-inset-top,2.5rem))]'
 
   const content = (
-    <div className={`flex-1 flex flex-col justify-center px-5 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] ${safeTop}`}>
+    <div className={`flex-1 flex flex-col justify-center px-5 md:px-6 lg:px-8 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] ${safeTop}`}>
       <div className="text-center mb-5">
         <h2 className="text-xl font-bold text-brand-text">Start Free Trial</h2>
         <p className="text-brand-text-secondary text-sm mt-1">Meet your AI girlfriend. Cancel anytime.</p>
@@ -221,8 +221,10 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
   )
 
   return (
-    <div className="fixed inset-0 z-50 bg-brand-bg flex flex-col max-w-lg mx-auto w-full">
-      {content}
+    <div className="fixed inset-0 z-50 bg-brand-bg">
+      <div className="app-shell-width h-full bg-brand-bg flex flex-col">
+        {content}
+      </div>
     </div>
   )
 }

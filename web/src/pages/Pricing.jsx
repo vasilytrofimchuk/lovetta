@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api, { getErrorMessage } from '../lib/api'
 import { isAppStore } from '../lib/platform'
@@ -8,9 +8,11 @@ import PlanModal from '../components/PlanModal'
 export default function Pricing() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(null)
   const [subLoading, setSubLoading] = useState(true)
+  const onboarding = searchParams.get('onboarding') === '1'
 
   useEffect(() => {
     api.get('/api/billing/status').then(({ data }) => {
@@ -54,11 +56,27 @@ export default function Pricing() {
     )
   }
 
+  if (onboarding) {
+    return (
+      <div data-testid="onboarding-plan-screen">
+        <PlanModal
+          isOpen={true}
+          onClose={() => {
+            localStorage.setItem('lovetta-plan-skipped', '1')
+            navigate('/')
+          }}
+          onSuccess={() => navigate('/')}
+          fullScreen
+        />
+      </div>
+    )
+  }
+
   // Active subscription screen
   if (isActive) {
     return (
-      <div className="min-h-screen bg-brand-bg p-4">
-        <div className="max-w-md mx-auto pt-8">
+      <div className="min-h-screen bg-brand-bg app-page-gutter py-4">
+        <div className="w-full pt-8">
           <div className="flex items-center gap-3 mb-8">
             <button onClick={() => navigate('/')} className="text-brand-muted hover:text-brand-text transition-colors">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -103,8 +121,8 @@ export default function Pricing() {
 
   // Web plan selection
   return (
-    <div className="min-h-screen bg-brand-bg p-4">
-      <div className="max-w-md mx-auto pt-8">
+    <div className="min-h-screen bg-brand-bg app-page-gutter py-4">
+      <div className="w-full pt-8">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-xl font-bold text-brand-text">Subscription</h1>
           <button onClick={() => navigate('/')} className="text-sm text-brand-muted hover:text-brand-text transition-colors">Back</button>

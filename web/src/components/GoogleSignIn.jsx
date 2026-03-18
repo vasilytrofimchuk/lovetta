@@ -3,10 +3,11 @@ import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 import { useAuth } from '../contexts/AuthContext'
 import api, { getErrorMessage } from '../lib/api'
 import { isCapacitor } from '../lib/platform'
+import { clearOnboardingData, readOnboardingData } from '../lib/onboarding'
 
 const GOOGLE_WEB_CLIENT_ID = '1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com'
 
-export default function GoogleSignIn({ birthData, hideSeparator = false, onSuccess }) {
+export default function GoogleSignIn({ birthData, hideSeparator = false, onSuccess, postAuthPath = null }) {
   const { refreshUser } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -36,6 +37,8 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
       })
       localStorage.setItem('lovetta-token', data.accessToken)
       localStorage.setItem('lovetta-refresh-token', data.refreshToken)
+      clearOnboardingData()
+      localStorage.removeItem('lovetta-ref')
       await refreshUser()
       onSuccess?.()
     } catch (err) {
@@ -53,15 +56,15 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
 
   const handleWeb = () => {
     setLoading(true)
-    let stateData = null
-    if (birthData?.birthMonth && birthData?.birthYear) {
-      stateData = birthData
-    } else {
-      try {
-        const raw = localStorage.getItem('lovetta-landing-data')
-        if (raw) stateData = JSON.parse(raw)
-      } catch {}
+    const storedData = readOnboardingData()
+    let stateData = birthData?.birthMonth && birthData?.birthYear
+      ? { ...birthData }
+      : (storedData ? { ...storedData } : null)
+
+    if (postAuthPath) {
+      stateData = { ...(stateData || {}), postAuthPath }
     }
+
     const ref = localStorage.getItem('lovetta-ref')
     if (ref && stateData) stateData.referralCode = ref
     else if (ref) stateData = { referralCode: ref }

@@ -116,7 +116,7 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
 
       {/* Sheet */}
       <div
-        className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-brand-card border-t border-brand-border rounded-t-2xl p-6 pb-8 animate-slide-up"
+        className="app-shell-width relative max-h-[85vh] overflow-y-auto bg-brand-card border-t border-brand-border rounded-t-2xl p-6 pb-8 animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle */}

@@ -55,7 +55,7 @@ export default function StreamingMessage({ text, mediaLoading, mediaLoadingType,
 
         {/* Blurred avatar placeholder while media generates */}
         {mediaLoading && (
-          <div className="mb-2 relative w-[280px] aspect-[3/4] rounded-xl overflow-hidden bg-brand-surface">
+          <div className="mb-2 relative app-chat-media aspect-[3/4] rounded-xl overflow-hidden bg-brand-surface">
             {avatarUrl && (
               <img
                 src={avatarUrl}

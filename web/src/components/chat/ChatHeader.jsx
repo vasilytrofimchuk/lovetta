@@ -16,8 +16,8 @@ export default function ChatHeader({ companion, onCompanionTap }) {
   const [from, to] = getGradient(companion?.name || '');
 
   return (
-    <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border px-4 py-3">
-      <div className="max-w-md mx-auto flex items-center gap-3">
+    <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
+      <div className="w-full flex items-center gap-3">
         <button onClick={() => navigate('/')}
           className="text-brand-muted hover:text-brand-text transition-colors flex-shrink-0">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

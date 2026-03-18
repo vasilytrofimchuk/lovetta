@@ -226,8 +226,8 @@ export default function CompanionCreate() {
   return (
     <div className="min-h-screen bg-brand-bg">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border px-4 py-3">
-        <div className="max-w-md mx-auto flex items-center gap-3">
+      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
+        <div className="w-full flex items-center gap-3">
           <button onClick={() => {
             if (step === 'choose') navigate('/');
             else if (step === 'confirm' && selected?.isTemplate) setStep('templates');
@@ -250,7 +250,7 @@ export default function CompanionCreate() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-6">
+      <div className="app-page-gutter py-6">
         {/* Step: Choose path */}
         {step === 'choose' && (
           <div className="space-y-3">
@@ -287,7 +287,7 @@ export default function CompanionCreate() {
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {templates.filter(t => templateFilter === 'all' || (templateFilter === 'anime' ? t.style === 'anime' : t.style !== 'anime')).map(t => (
                 <TemplateCard key={t.id} t={t} onSelect={selectTemplate} />
               ))}

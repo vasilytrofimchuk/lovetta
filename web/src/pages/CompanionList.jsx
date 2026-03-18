@@ -58,8 +58,8 @@ export default function CompanionList() {
   return (
     <div className="min-h-screen bg-brand-bg">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border px-4 py-3">
-        <div className="max-w-md mx-auto flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
+        <div className="w-full flex items-center justify-between">
           <div className="flex items-center gap-1">
             <img src="/assets/brand/logo_l.png" alt="Lovetta" className="h-8 w-8 rounded-lg" />
             <button
@@ -89,7 +89,7 @@ export default function CompanionList() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-4">
+      <div data-testid="companion-list-content" className="app-page-gutter py-4">
         {/* Toast */}
         {toast && (
           <div className="mb-4 p-3 rounded-lg bg-brand-success/10 border border-brand-success/30 text-brand-success text-sm text-center">

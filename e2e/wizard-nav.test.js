@@ -9,23 +9,32 @@ try { process.loadEnvFile('.env'); } catch {}
 
 const TEST_PASSWORD = 'Test1234!';
 
-async function signupViaUI(page) {
-  const email = `conativer+navtest_${Date.now()}@gmail.com`;
-  await page.goto(`${BASE}/my/signup`);
-  await page.waitForSelector('input[type="email"]', { timeout: 10000 });
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', TEST_PASSWORD);
-  // Age gate — custom dropdowns (not native <select>)
+async function completeConsentStep(page) {
+  await page.waitForSelector('text=Verify your age', { timeout: 10000 });
   await page.locator('button:has-text("Month")').click();
   await page.locator('button:has-text("June")').click();
   await page.locator('button:has-text("Year")').click();
   await page.locator('button:has-text("1995")').click();
-  await page.locator('button[type="submit"]').click();
-  await page.waitForSelector('text=Before we continue', { timeout: 5000 });
+
   const checkboxes = page.locator('input[type="checkbox"]');
   const count = await checkboxes.count();
-  for (let i = 0; i < count; i++) await checkboxes.nth(i).check();
-  await page.locator('button:has-text("Continue")').last().click();
+  for (let i = 0; i < count; i++) {
+    await checkboxes.nth(i).check();
+  }
+
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.waitForSelector('input[type="email"]', { timeout: 10000 });
+}
+
+async function signupViaUI(page) {
+  const email = `conativer+navtest_${Date.now()}@gmail.com`;
+  await page.goto(`${BASE}/my/signup`);
+  await completeConsentStep(page);
+  await page.fill('input[type="email"]', email);
+  await page.fill('input[type="password"]', TEST_PASSWORD);
+  await page.getByRole('button', { name: 'Create Account' }).click();
+  await page.waitForSelector('[data-testid="onboarding-plan-screen"]', { timeout: 15000 });
+  await page.getByRole('button', { name: 'Skip for now' }).click();
   await page.waitForSelector('button[title="Profile"]', { timeout: 15000 });
 }
 

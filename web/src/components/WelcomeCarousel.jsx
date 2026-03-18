@@ -58,7 +58,7 @@ function WelcomeCarouselCard({ template, active, setRef, copyKind }) {
       data-active={active ? 'true' : 'false'}
       data-copy={copyKind}
       data-style={template.style === 'anime' ? 'anime' : 'real'}
-      className={`relative w-40 shrink-0 overflow-hidden rounded-2xl border-2 bg-brand-card transition-[border-color,transform,box-shadow] duration-300 ${
+      className={`relative w-40 md:w-48 lg:w-52 shrink-0 overflow-hidden rounded-2xl border-2 bg-brand-card transition-[border-color,transform,box-shadow] duration-300 ${
         active
           ? 'border-brand-accent scale-[1.04] shadow-[0_0_20px_rgba(214,51,108,0.28)]'
           : 'border-transparent'
@@ -242,9 +242,9 @@ export default function WelcomeCarousel() {
 
   if (loading || templates.length === 0) {
     return (
-      <div className="mx-[-20px] mb-6 px-5">
+      <div className="mb-6" style={{ marginInline: 'calc(var(--app-page-padding-x) * -1)', paddingInline: 'var(--app-page-padding-x)' }}>
         <div className="flex min-h-[220px] items-center justify-center">
-          <div className="flex aspect-[3/4] w-40 items-center justify-center rounded-2xl border border-brand-border bg-brand-card">
+          <div className="flex aspect-[3/4] w-40 md:w-48 lg:w-52 items-center justify-center rounded-2xl border border-brand-border bg-brand-card">
             <div className="h-8 w-8 rounded-full border-2 border-brand-accent border-t-transparent animate-spin" />
           </div>
         </div>
@@ -253,11 +253,12 @@ export default function WelcomeCarousel() {
   }
 
   return (
-    <section className="mx-[-20px] mb-6" aria-label="Featured girlfriends">
+    <section className="mb-6" style={{ marginInline: 'calc(var(--app-page-padding-x) * -1)' }} aria-label="Featured girlfriends">
       <div
         ref={viewportRef}
         data-testid="welcome-carousel-viewport"
-        className="overflow-hidden px-5"
+        className="overflow-hidden"
+        style={{ paddingInline: 'var(--app-page-padding-x)' }}
       >
         <div
           ref={trackRef}

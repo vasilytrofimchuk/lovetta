@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api, { getErrorMessage } from '../lib/api'
 import { isCapacitor } from '../lib/platform'
+import { clearOnboardingData, readOnboardingData } from '../lib/onboarding'
 
 export default function AppleSignIn({ onError, ageData, onSuccess }) {
   const { refreshUser } = useAuth()
@@ -25,7 +26,7 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
       })
 
       const response = result.response
-      const landingData = JSON.parse(localStorage.getItem('lovetta-landing-data') || '{}')
+      const onboardingData = readOnboardingData() || {}
       const referralCode = localStorage.getItem('lovetta-ref') || undefined
 
       const { data } = await api.post('/api/auth/apple', {
@@ -35,16 +36,18 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
           familyName: response.familyName,
         } : null,
         email: response.email,
-        birthMonth: ageData?.birthMonth || landingData.birthMonth,
-        birthYear: ageData?.birthYear || landingData.birthYear,
-        termsAccepted: ageData?.termsAccepted ?? landingData.termsAccepted,
-        privacyAccepted: ageData?.privacyAccepted ?? landingData.privacyAccepted,
-        aiConsentAccepted: ageData?.aiConsentAccepted ?? landingData.aiConsentAccepted,
+        birthMonth: ageData?.birthMonth || onboardingData.birthMonth,
+        birthYear: ageData?.birthYear || onboardingData.birthYear,
+        termsAccepted: ageData?.termsAccepted ?? onboardingData.termsAccepted,
+        privacyAccepted: ageData?.privacyAccepted ?? onboardingData.privacyAccepted,
+        aiConsentAccepted: ageData?.aiConsentAccepted ?? onboardingData.aiConsentAccepted,
         referralCode,
       })
 
       localStorage.setItem('lovetta-token', data.accessToken)
       localStorage.setItem('lovetta-refresh-token', data.refreshToken)
+      clearOnboardingData()
+      localStorage.removeItem('lovetta-ref')
       await refreshUser()
       onSuccess?.()
     } catch (err) {

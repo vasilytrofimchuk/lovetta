@@ -98,7 +98,7 @@ export default function MessageBubble({ message }) {
 
         {/* Media content (assistant only) */}
         {!isUser && message.media_pending && !message.media_url && (
-          <div className="mb-2 w-full max-w-[280px] aspect-[16/9] rounded-xl bg-brand-surface border border-brand-border overflow-hidden relative">
+          <div className="mb-2 app-chat-media aspect-[16/9] rounded-xl bg-brand-surface border border-brand-border overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-brand-border/30 to-transparent animate-shimmer" />
             <div className="absolute inset-0 flex items-center justify-center text-brand-muted text-sm">
               {message.media_type === 'video' ? 'Generating video...' : 'Generating photo...'}
@@ -107,12 +107,12 @@ export default function MessageBubble({ message }) {
         )}
         {!isUser && message.media_url && message.media_type === 'image' && (
           <div className="mb-2 rounded-xl overflow-hidden">
-            <img src={message.media_url} alt="" className="w-full max-w-[280px] rounded-xl" loading="lazy" />
+            <img src={message.media_url} alt="" className="app-chat-media rounded-xl" loading="lazy" />
           </div>
         )}
         {!isUser && message.media_url && message.media_type === 'video' && (
           <div className="mb-2 rounded-xl overflow-hidden">
-            <video src={message.media_url} autoPlay loop muted playsInline className="w-full max-w-[280px] rounded-xl" />
+            <video src={message.media_url} autoPlay loop muted playsInline className="app-chat-media rounded-xl" />
           </div>
         )}
 

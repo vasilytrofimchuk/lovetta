@@ -72,7 +72,8 @@ export default function ChatPage() {
 
   return (
     <div
-      className="bg-brand-bg flex flex-col max-w-lg mx-auto w-full overflow-hidden"
+      data-testid="chat-page"
+      className="bg-brand-bg flex flex-col w-full overflow-hidden"
       style={{ height: isCapacitor() ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))' : '100vh' }}
     >
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
@@ -98,7 +99,7 @@ export default function ChatPage() {
 
       {/* Error banner */}
       {error && error !== 'subscription_required' && error !== 'free_limit_reached' && (
-        <div className="px-4 py-2 bg-brand-error/10 border-t border-brand-error/20 text-center">
+        <div className="app-page-gutter py-2 bg-brand-error/10 border-t border-brand-error/20 text-center">
           <span className="text-sm text-brand-error">{error}</span>
         </div>
       )}

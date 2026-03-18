@@ -6,6 +6,7 @@ import GoogleSignIn from '../components/GoogleSignIn'
 import TelegramSignIn from '../components/TelegramSignIn'
 import AppleSignIn from '../components/AppleSignIn'
 import { isCapacitor } from '../lib/platform'
+import { clearOnboardingData } from '../lib/onboarding'
 import logoSrc from '../../../public/assets/brand/logo_text.png'
 
 export default function Login() {
@@ -23,13 +24,22 @@ export default function Login() {
     const accessToken = searchParams.get('accessToken')
     const refreshToken = searchParams.get('refreshToken')
     const oauthError = searchParams.get('error')
+    const nextPath = searchParams.get('next')
 
     if (oauthError) {
       setError('Google sign-in failed. Please try again.')
     } else if (oauth === 'success' && accessToken && refreshToken) {
-      localStorage.setItem('lovetta-token', accessToken)
-      localStorage.setItem('lovetta-refresh-token', refreshToken)
-      refreshUser()
+      ;(async () => {
+        localStorage.setItem('lovetta-token', accessToken)
+        localStorage.setItem('lovetta-refresh-token', refreshToken)
+        clearOnboardingData()
+        localStorage.removeItem('lovetta-ref')
+        if (nextPath?.startsWith('/')) {
+          window.location.replace(`/my${nextPath}`)
+          return
+        }
+        await refreshUser()
+      })()
     }
   }, [searchParams, refreshUser])
 
@@ -48,7 +58,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+      <div data-testid="auth-form-shell" className="w-full max-w-sm">
         <div className="text-center mb-8">
           <img src={logoSrc} alt="Lovetta" className="h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Welcome back</h1>

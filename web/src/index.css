@@ -4,11 +4,29 @@
 
 :root {
   --app-viewport-height: 100vh;
+  --app-shell-max-width: 100%;
+  --app-page-padding-x: 1rem;
+  --app-chat-media-max-width: 280px;
 }
 
 @supports (height: 100dvh) {
   :root {
     --app-viewport-height: 100dvh;
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --app-page-padding-x: 1.5rem;
+    --app-chat-media-max-width: 360px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --app-shell-max-width: 960px;
+    --app-page-padding-x: 2rem;
+    --app-chat-media-max-width: 420px;
   }
 }
 
@@ -65,6 +83,29 @@ body {
   width: 40%;
   height: 50%;
   background: radial-gradient(ellipse, rgba(26, 17, 40, 0.5) 0%, transparent 70%);
+}
+
+@layer components {
+  .app-shell-width {
+    width: 100%;
+    max-width: var(--app-shell-max-width);
+    margin-inline: auto;
+  }
+
+  .app-page-gutter {
+    padding-inline: var(--app-page-padding-x);
+  }
+
+  .app-page-inner-narrow {
+    width: 100%;
+    max-width: 28rem;
+    margin-inline: auto;
+  }
+
+  .app-chat-media {
+    width: 100%;
+    max-width: var(--app-chat-media-max-width);
+  }
 }
 
 input:-webkit-autofill,

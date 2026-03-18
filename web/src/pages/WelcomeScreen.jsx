@@ -13,7 +13,7 @@ export default function WelcomeScreen() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-brand-bg flex flex-col px-5 py-8 overflow-y-auto">
+    <div className="min-h-screen bg-brand-bg flex flex-col app-page-gutter py-8 overflow-y-auto">
       {/* Logo */}
       <div className="flex items-center justify-center gap-2 mb-6">
         <img src="/assets/brand/logo_l.png" alt="Lovetta" className="h-9 w-9 rounded-xl" />

@@ -532,6 +532,14 @@ router.get('/google/callback', async (req, res) => {
       refreshToken,
       oauth: 'success',
     });
+    if (oauthState) {
+      try {
+        const stateData = JSON.parse(Buffer.from(oauthState, 'base64').toString());
+        if (typeof stateData.postAuthPath === 'string' && stateData.postAuthPath.startsWith('/')) {
+          params.set('next', stateData.postAuthPath);
+        }
+      } catch {}
+    }
     res.redirect(`/my/login?${params}`);
   } catch (err) {
     console.error('[auth] google callback error:', err.message);

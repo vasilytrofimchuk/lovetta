@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api from '../lib/api'
 import { isCapacitor } from '../lib/platform'
+import { clearOnboardingData, getPostAuthPath, readOnboardingData } from '../lib/onboarding'
 
 const AuthContext = createContext(null)
 
@@ -47,19 +48,14 @@ export function AuthProvider({ children }) {
 
     if (tgWebApp) {
       // Telegram Mini App — auto-auth via initData
-      // Include age/consent data from landing page if available
       const payload = { initData: tgWebApp.initData }
-      try {
-        const raw = localStorage.getItem('lovetta-landing-data')
-        if (raw) {
-          const ld = JSON.parse(raw)
-          if (ld.birthMonth) payload.birthMonth = ld.birthMonth
-          if (ld.birthYear) payload.birthYear = ld.birthYear
-          if (ld.termsAccepted) payload.termsAccepted = ld.termsAccepted
-          if (ld.privacyAccepted) payload.privacyAccepted = ld.privacyAccepted
-          if (ld.aiConsentAccepted) payload.aiConsentAccepted = ld.aiConsentAccepted
-        }
-      } catch {}
+      const onboardingData = readOnboardingData()
+      const postAuthPath = getPostAuthPath(onboardingData)
+      if (onboardingData?.birthMonth) payload.birthMonth = onboardingData.birthMonth
+      if (onboardingData?.birthYear) payload.birthYear = onboardingData.birthYear
+      if (onboardingData?.termsAccepted) payload.termsAccepted = onboardingData.termsAccepted
+      if (onboardingData?.privacyAccepted) payload.privacyAccepted = onboardingData.privacyAccepted
+      if (onboardingData?.aiConsentAccepted) payload.aiConsentAccepted = onboardingData.aiConsentAccepted
 
       // Include referral code if present
       const ref = localStorage.getItem('lovetta-ref')
@@ -69,11 +65,14 @@ export function AuthProvider({ children }) {
         .then(({ data }) => {
           localStorage.setItem('lovetta-token', data.accessToken)
           localStorage.setItem('lovetta-refresh-token', data.refreshToken)
-          localStorage.removeItem('lovetta-landing-data')
+          clearOnboardingData()
           localStorage.removeItem('lovetta-ref')
           setUser(data.user)
           tgWebApp.ready?.()
           tgWebApp.expand?.()
+          if (postAuthPath) {
+            window.location.replace(`/my${postAuthPath}`)
+          }
         })
         .catch((err) => {
           // If age/consent required, redirect to signup
@@ -114,6 +113,7 @@ export function AuthProvider({ children }) {
     })
     localStorage.setItem('lovetta-token', data.accessToken)
     localStorage.setItem('lovetta-refresh-token', data.refreshToken)
+    clearOnboardingData()
     localStorage.removeItem('lovetta-ref')
     setUser(data.user)
     return data

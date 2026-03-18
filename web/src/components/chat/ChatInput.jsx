@@ -215,10 +215,10 @@ export default function ChatInput({ onSend, disabled }) {
 
   return (
     <div
-      className="border-t border-brand-border bg-brand-bg px-4 pt-3 shrink-0"
+      className="border-t border-brand-border bg-brand-bg app-page-gutter pt-3 shrink-0"
       style={{ paddingBottom: safeAreaBottom }}
     >
-      <div className="max-w-md mx-auto">
+      <div className="w-full">
         {micError && (
           <p className="mb-2 text-xs text-brand-accent">{micError}</p>
         )}

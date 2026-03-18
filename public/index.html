@@ -14,7 +14,6 @@
   <title>Lovetta — Your AI Girlfriend</title>
   <meta name="description" content="Meet your AI girlfriend. Personalized conversations, unique personality, always there for you. Create your perfect girlfriend today.">
 
-  <!-- Open Graph -->
   <meta property="og:title" content="Lovetta — Your AI Girlfriend">
   <meta property="og:description" content="Meet your AI girlfriend. Personalized conversations, unique personality, always there for you.">
   <meta property="og:image" content="https://lovetta.ai/assets/brand/og-image.png">
@@ -22,13 +21,11 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Lovetta">
 
-  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Lovetta — Your AI Girlfriend">
   <meta name="twitter:description" content="Meet your AI girlfriend. Personalized conversations, unique personality, always there for you.">
   <meta name="twitter:image" content="https://lovetta.ai/assets/brand/og-image.png">
 
-  <!-- Favicon -->
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/brand/icon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/brand/icon-16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/brand/icon-180.png">
@@ -37,163 +34,133 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <!-- Desktop background glows -->
   <div class="desktop-bg" aria-hidden="true">
     <div class="desktop-glow-pink"></div>
     <div class="desktop-glow-purple"></div>
   </div>
-  <div class="container">
+
+  <div class="container" data-testid="landing-container">
     <header>
       <img src="/assets/brand/logo_text.png" alt="Lovetta" class="logo-text">
       <a href="/my/login?utm_source=landing&utm_medium=web&utm_campaign=header_login" class="btn-login">Log in</a>
     </header>
 
-    <section class="hero">
-      <h1>Meet Your AI Girlfriend</h1>
-      <p>She remembers everything, adapts to you, and is always there when you need her. Choose your girlfriends or create your own.</p>
-    </section>
+    <main class="landing-main">
+      <section class="hero">
+        <h1>Your AI Girlfriend</h1>
+        <p>Meet someone who remembers your stories, adapts to you, and is always here when you want to talk.</p>
+      </section>
 
-    <!-- Template carousel -->
-    <section class="carousel-section" id="carousel-section">
-      <div class="carousel-viewport" id="carousel-viewport"></div>
-    </section>
+      <section class="carousel-section" id="carousel-section">
+        <div class="carousel-viewport" id="carousel-viewport" data-testid="landing-rotator"></div>
+      </section>
 
-    <section class="signup-section">
-      <div class="signup-card">
-        <h2>Start Free Trial</h2>
-        <p class="subtitle">Verify your age and meet your girlfriend in minutes.</p>
-
-        <div class="trial-info">
-          <div class="plan-cards">
-            <div class="plan-card" data-plan="monthly" onclick="selectPlan('monthly')">
-              <div class="plan-check"></div>
-              <div class="plan-label">Monthly</div>
-              <div class="plan-price">$19.99</div>
-              <div class="plan-period">per month</div>
-            </div>
-            <div class="plan-card plan-card-best selected" data-plan="yearly" onclick="selectPlan('yearly')">
-              <div class="plan-card-badge">Best value</div>
-              <div class="plan-check"></div>
-              <div class="plan-label">Yearly</div>
-              <div class="plan-price">$99.99</div>
-              <div class="plan-period">per year</div>
-              <div class="plan-save">$8.33/mo — save 58%</div>
+      <section class="welcome-stack">
+        <div class="feature-list" aria-label="Why Lovetta works">
+          <div class="feature-item">
+            <span class="feature-icon" aria-hidden="true">💬</span>
+            <div class="feature-copy">
+              <span class="feature-title">Natural Conversations</span>
+              <span class="feature-desc">She remembers your stories</span>
             </div>
           </div>
 
-          <div class="trial-timeline">
-            <div class="trial-step">
-              <div class="trial-dot active"></div>
-              <div class="trial-step-label">Today</div>
-              <div class="trial-step-desc">Full access, free</div>
-            </div>
-            <div class="trial-line"></div>
-            <div class="trial-step">
-              <div class="trial-dot"></div>
-              <div class="trial-step-label">Day 3</div>
-              <div class="trial-step-desc">Trial ends</div>
-            </div>
-            <div class="trial-line"></div>
-            <div class="trial-step">
-              <div class="trial-dot charge"></div>
-              <div class="trial-step-label">Day 4</div>
-              <div class="trial-step-desc">First charge</div>
+          <div class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🎭</span>
+            <div class="feature-copy">
+              <span class="feature-title">Unique Personality</span>
+              <span class="feature-desc">Choose or create your own</span>
             </div>
           </div>
 
-          <ul class="plan-features">
-            <li>Unlimited messages with your girlfriend</li>
-            <li>Unique personality &amp; memory</li>
-            <li>Voice messages &amp; photos</li>
-          </ul>
+          <div class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📸</span>
+            <div class="feature-copy">
+              <span class="feature-title">Photos &amp; Videos</span>
+              <span class="feature-desc">She sends AI-generated media</span>
+            </div>
+          </div>
 
-          <p class="trial-note">3-day free trial, then auto-renews. Cancel anytime — no charge during trial.</p>
+          <div class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🔔</span>
+            <div class="feature-copy">
+              <span class="feature-title">Always Connected</span>
+              <span class="feature-desc">She reaches out to you</span>
+            </div>
+          </div>
         </div>
 
-        <form id="signup-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Birth Month</label>
-              <div class="custom-select" id="month-select">
-                <div class="custom-select-trigger" tabindex="0">
-                  <span class="custom-select-value placeholder">Month</span>
-                  <svg class="custom-select-arrow" width="12" height="12" viewBox="0 0 12 12"><path fill="#7c6a9a" d="M6 8L1 3h10z"/></svg>
-                </div>
-                <div class="custom-select-options">
-                  <div class="custom-select-option" data-value="1">January</div>
-                  <div class="custom-select-option" data-value="2">February</div>
-                  <div class="custom-select-option" data-value="3">March</div>
-                  <div class="custom-select-option" data-value="4">April</div>
-                  <div class="custom-select-option" data-value="5">May</div>
-                  <div class="custom-select-option" data-value="6">June</div>
-                  <div class="custom-select-option" data-value="7">July</div>
-                  <div class="custom-select-option" data-value="8">August</div>
-                  <div class="custom-select-option" data-value="9">September</div>
-                  <div class="custom-select-option" data-value="10">October</div>
-                  <div class="custom-select-option" data-value="11">November</div>
-                  <div class="custom-select-option" data-value="12">December</div>
-                </div>
-                <input type="hidden" id="birth-month" name="birthMonth" value="">
-              </div>
+        <a
+          href="/my/signup?from=landing&utm_source=landing&utm_medium=web&utm_campaign=continue"
+          class="btn-primary continue-button"
+          data-testid="landing-continue"
+        >
+          Continue
+        </a>
+      </section>
+
+      <section class="pricing-info" aria-labelledby="pricing-info-title">
+        <div class="trial-hero" data-testid="landing-trial-badge">
+          <div class="trial-badge">
+            <span class="trial-badge-top">3-Day</span>
+            <span class="trial-badge-main">FREE TRIAL</span>
+          </div>
+          <div class="trial-hero-copy">
+            <p class="trial-hero-kicker">Start premium before you pay</p>
+            <p class="trial-hero-subtitle">Full access starts today. Your first charge only happens on day 4 if you keep your plan.</p>
+          </div>
+        </div>
+
+        <div class="pricing-header">
+          <p class="pricing-kicker">Pricing</p>
+          <h2 id="pricing-info-title">Choose a plan after signup</h2>
+        </div>
+
+        <div class="pricing-grid">
+          <article class="pricing-card pricing-card-free" data-testid="landing-pricing-card">
+            <div class="pricing-card-top">
+              <span class="pricing-plan">Free</span>
             </div>
-            <div class="form-group">
-              <label>Birth Year</label>
-              <div class="custom-select" id="year-select">
-                <div class="custom-select-trigger" tabindex="0">
-                  <span class="custom-select-value placeholder">Year</span>
-                  <svg class="custom-select-arrow" width="12" height="12" viewBox="0 0 12 12"><path fill="#7c6a9a" d="M6 8L1 3h10z"/></svg>
-                </div>
-                <div class="custom-select-options" id="year-options"></div>
-                <input type="hidden" id="birth-year" name="birthYear" value="">
-              </div>
+            <div class="pricing-price">Free</div>
+            <p class="pricing-copy">Limited free access now. Upgrade later whenever you want the full experience.</p>
+            <ul class="pricing-points">
+              <li>Try Lovetta before subscribing</li>
+              <li>Upgrade later without restarting</li>
+            </ul>
+          </article>
+
+          <article class="pricing-card pricing-card-premium" data-testid="landing-pricing-card">
+            <div class="pricing-card-top">
+              <span class="pricing-plan">Premium Monthly</span>
             </div>
-          </div>
+            <div class="pricing-price">$19.99<span>/month</span></div>
+            <p class="pricing-copy">Includes a 3-day free trial before the first charge.</p>
+            <ul class="pricing-points">
+              <li>Full access starts today</li>
+              <li>First charge on day 4 unless canceled</li>
+            </ul>
+          </article>
 
-          <div class="checkbox-group">
-            <input type="checkbox" id="agree-terms" required>
-            <label for="agree-terms">I agree to the <a href="/terms.html" target="_blank">Terms of Service</a></label>
-          </div>
+          <article class="pricing-card pricing-card-premium pricing-card-best" data-testid="landing-pricing-card">
+            <div class="pricing-card-top">
+              <span class="pricing-plan">Premium Yearly</span>
+              <span class="pricing-badge">Best value</span>
+            </div>
+            <div class="pricing-price">$99.99<span>/year</span></div>
+            <p class="pricing-copy">The same 3-day free trial, with the lowest monthly cost after that.</p>
+            <ul class="pricing-points">
+              <li>About $8.33 per month</li>
+              <li>Save 58% compared with monthly</li>
+            </ul>
+          </article>
+        </div>
 
-          <div class="checkbox-group">
-            <input type="checkbox" id="agree-privacy" required>
-            <label for="agree-privacy">I agree to the <a href="/privacy.html" target="_blank">Privacy Policy</a></label>
-          </div>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="agree-ai" required>
-            <label for="agree-ai">I understand my messages are processed by third-party AI services to generate responses</label>
-          </div>
-
-          <button type="submit" class="btn-primary" id="submit-btn">Start Free Trial</button>
-          <p class="age-notice">18+ only. Age verification required.</p>
-        </form>
-
-        <div id="form-error" class="form-message error"></div>
-      </div>
-    </section>
-
-    <section class="features">
-      <div class="feature">
-        <div class="feature-icon">💬</div>
-        <h3>Natural Conversations</h3>
-        <p>Deep, meaningful chats that feel real. She remembers your stories and preferences.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🎭</div>
-        <h3>Unique Personality</h3>
-        <p>Choose from diverse personalities or create your own. Each girlfriend is one of a kind.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">📸</div>
-        <h3>Photos & Videos</h3>
-        <p>She can send you photos and videos. AI-generated and consistent with her character.</p>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🔔</div>
-        <h3>Always Connected</h3>
-        <p>She reaches out to you. Get notifications across all your devices.</p>
-      </div>
-    </section>
+        <p class="trial-note">
+          <span class="trial-note-emphasis">Cancel anytime.</span>
+          Start premium with a 3-day free trial and pay nothing if you cancel before it ends.
+        </p>
+      </section>
+    </main>
 
     <footer>
       <p>&copy; 2026 Lovetta. All rights reserved.</p>
@@ -206,168 +173,90 @@
 
   <script src="/tracking.js"></script>
   <script>
-    // Populate birth year options
     (function() {
-      var yearOptions = document.getElementById('year-options');
-      var currentYear = new Date().getFullYear();
-      for (var y = currentYear - 18; y >= currentYear - 100; y--) {
-        var div = document.createElement('div');
-        div.className = 'custom-select-option';
-        div.setAttribute('data-value', y);
-        div.textContent = y;
-        yearOptions.appendChild(div);
-      }
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var ref = params.get('ref');
+        if (ref) localStorage.setItem('lovetta-ref', ref.trim());
+      } catch (err) {}
     })();
 
-    // Custom select behavior
-    (function() {
-      var selects = document.querySelectorAll('.custom-select');
-
-      selects.forEach(function(sel) {
-        var trigger = sel.querySelector('.custom-select-trigger');
-        var valueSpan = sel.querySelector('.custom-select-value');
-        var optionsBox = sel.querySelector('.custom-select-options');
-        var hiddenInput = sel.querySelector('input[type="hidden"]');
-        var options = optionsBox.querySelectorAll('.custom-select-option');
-
-        trigger.addEventListener('click', function() {
-          var wasOpen = sel.classList.contains('open');
-          closeAll();
-          if (!wasOpen) sel.classList.add('open');
-        });
-
-        options.forEach(function(opt) {
-          opt.addEventListener('click', function() {
-            var val = opt.getAttribute('data-value');
-            hiddenInput.value = val;
-            valueSpan.textContent = opt.textContent;
-            valueSpan.classList.remove('placeholder');
-            options.forEach(function(o) { o.classList.remove('selected'); });
-            opt.classList.add('selected');
-            sel.classList.remove('open');
-          });
-        });
-
-        // Keyboard support
-        trigger.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            trigger.click();
-          } else if (e.key === 'Escape') {
-            sel.classList.remove('open');
-          }
-        });
-      });
-
-      // Re-bind options for dynamically added year options
-      var yearSel = document.getElementById('year-select');
-      yearSel.querySelector('.custom-select-options').addEventListener('click', function(e) {
-        var opt = e.target.closest('.custom-select-option');
-        if (!opt) return;
-        var hiddenInput = yearSel.querySelector('input[type="hidden"]');
-        var valueSpan = yearSel.querySelector('.custom-select-value');
-        hiddenInput.value = opt.getAttribute('data-value');
-        valueSpan.textContent = opt.textContent;
-        valueSpan.classList.remove('placeholder');
-        yearSel.querySelectorAll('.custom-select-option').forEach(function(o) { o.classList.remove('selected'); });
-        opt.classList.add('selected');
-        yearSel.classList.remove('open');
-      });
-
-      function closeAll() {
-        selects.forEach(function(s) { s.classList.remove('open'); });
-      }
-
-      document.addEventListener('click', function(e) {
-        if (!e.target.closest('.custom-select')) closeAll();
-      });
-    })();
-
-    // Plan selection
-    var selectedPlan = 'yearly';
-    function selectPlan(plan) {
-      selectedPlan = plan;
-      var cards = document.querySelectorAll('.plan-card');
-      cards.forEach(function(c) {
-        c.classList.toggle('selected', c.getAttribute('data-plan') === plan);
-      });
-    }
-
-    // Template carousel — dating-app style cards with video
     (function() {
       fetch('/api/companions/templates/preview')
-        .then(function(r) { return r.json(); })
+        .then(function(response) { return response.json(); })
         .then(function(data) {
           var templates = data.templates || [];
           if (!templates.length) return;
 
-          // Shuffle to mix anime and realistic
           for (var i = templates.length - 1; i > 0; i--) {
             var j = Math.floor(Math.random() * (i + 1));
-            var tmp = templates[i]; templates[i] = templates[j]; templates[j] = tmp;
+            var temp = templates[i];
+            templates[i] = templates[j];
+            templates[j] = temp;
           }
 
           var viewport = document.getElementById('carousel-viewport');
+          var currentVideo = null;
 
-          // Build cards
-          templates.forEach(function(t) {
+          templates.forEach(function(template) {
             var card = document.createElement('div');
             card.className = 'tpl-card';
-            card.setAttribute('data-video', t.video_url || '');
 
-            var media = '<img class="tpl-media" src="' + t.avatar_url + '" alt="' + t.name + '" loading="lazy">';
-            if (t.video_url) {
-              media += '<video class="tpl-video" src="' + t.video_url + '" muted loop playsinline preload="none"></video>';
+            var media = '<img class="tpl-media" src="' + template.avatar_url + '" alt="' + template.name + '" loading="lazy">';
+            if (template.video_url) {
+              media += '<video class="tpl-video" src="' + template.video_url + '" muted loop playsinline preload="none"></video>';
             }
 
-            card.innerHTML = media +
+            card.innerHTML =
+              media +
               '<div class="tpl-overlay">' +
                 '<div class="tpl-info">' +
-                  '<span class="tpl-name">' + t.name + '</span>' +
-                  '<span class="tpl-age">' + t.age + '</span>' +
+                  '<span class="tpl-name">' + template.name + '</span>' +
+                  '<span class="tpl-age">' + template.age + '</span>' +
                 '</div>' +
-                '<p class="tpl-tagline">' + t.tagline + '</p>' +
+                '<p class="tpl-tagline">' + template.tagline + '</p>' +
               '</div>';
 
             card.addEventListener('click', function() {
-              document.querySelector('.signup-card').scrollIntoView({ behavior: 'smooth' });
+              var continueButton = document.querySelector('[data-testid="landing-continue"]');
+              if (continueButton) continueButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
             });
 
             viewport.appendChild(card);
           });
 
-          // Scroll handling — play video of centered card
           var cards = viewport.querySelectorAll('.tpl-card');
-          var currentVideo = null;
 
           function updateActive() {
             var viewRect = viewport.getBoundingClientRect();
             var center = viewRect.left + viewRect.width / 2;
-
             var closest = null;
-            var closestDist = Infinity;
+            var closestDistance = Infinity;
 
-            cards.forEach(function(c) {
-              var r = c.getBoundingClientRect();
-              var cardCenter = r.left + r.width / 2;
-              var dist = Math.abs(cardCenter - center);
-              if (dist < closestDist) {
-                closestDist = dist;
-                closest = c;
+            cards.forEach(function(card) {
+              var rect = card.getBoundingClientRect();
+              var cardCenter = rect.left + rect.width / 2;
+              var distance = Math.abs(cardCenter - center);
+              if (distance < closestDistance) {
+                closestDistance = distance;
+                closest = card;
               }
             });
 
-            cards.forEach(function(c) {
-              var video = c.querySelector('.tpl-video');
-              if (c === closest) {
-                c.classList.add('active');
+            cards.forEach(function(card) {
+              var video = card.querySelector('.tpl-video');
+              if (card === closest) {
+                card.classList.add('active');
                 if (video && video !== currentVideo) {
-                  if (currentVideo) { currentVideo.pause(); currentVideo.currentTime = 0; }
+                  if (currentVideo) {
+                    currentVideo.pause();
+                    currentVideo.currentTime = 0;
+                  }
                   video.play().catch(function() {});
                   currentVideo = video;
                 }
               } else {
-                c.classList.remove('active');
+                card.classList.remove('active');
                 if (video && video === currentVideo) {
                   video.pause();
                   video.currentTime = 0;
@@ -379,10 +268,9 @@
 
           viewport.addEventListener('scroll', updateActive, { passive: true });
 
-          // Slow continuous auto-scroll
           var scrollPaused = false;
           var pauseTimeout;
-          var speed = 0.4; // pixels per frame (~24px/sec at 60fps)
+          var speed = 0.4;
 
           function autoScroll() {
             if (!scrollPaused) {
@@ -395,20 +283,17 @@
             requestAnimationFrame(autoScroll);
           }
 
-          // Pause auto-scroll on user interaction
-          viewport.addEventListener('touchstart', function() {
+          function pauseAutoScroll() {
             scrollPaused = true;
             clearTimeout(pauseTimeout);
-            pauseTimeout = setTimeout(function() { scrollPaused = false; }, 5000);
-          }, { passive: true });
+            pauseTimeout = setTimeout(function() {
+              scrollPaused = false;
+            }, 5000);
+          }
 
-          viewport.addEventListener('mousedown', function() {
-            scrollPaused = true;
-            clearTimeout(pauseTimeout);
-            pauseTimeout = setTimeout(function() { scrollPaused = false; }, 5000);
-          });
+          viewport.addEventListener('touchstart', pauseAutoScroll, { passive: true });
+          viewport.addEventListener('mousedown', pauseAutoScroll);
 
-          // Initial activation + start
           setTimeout(function() {
             updateActive();
             requestAnimationFrame(autoScroll);
@@ -416,79 +301,6 @@
         })
         .catch(function() {});
     })();
-
-    // Capture referral code from URL
-    (function() {
-      try {
-        var params = new URLSearchParams(window.location.search);
-        var ref = params.get('ref');
-        if (ref) localStorage.setItem('lovetta-ref', ref.trim());
-      } catch(ex) {}
-    })();
-
-    // Form submission
-    document.getElementById('signup-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-
-      var btn = document.getElementById('submit-btn');
-      var errorEl = document.getElementById('form-error');
-      errorEl.style.display = 'none';
-
-      var birthMonth = document.getElementById('birth-month').value;
-      var birthYear = document.getElementById('birth-year').value;
-
-      if (!birthMonth || !birthYear) {
-        errorEl.textContent = 'Please fill in all fields.';
-        errorEl.style.display = 'block';
-        return;
-      }
-
-      if (!document.getElementById('agree-terms').checked) {
-        errorEl.textContent = 'Please agree to the Terms of Service.';
-        errorEl.style.display = 'block';
-        return;
-      }
-
-      if (!document.getElementById('agree-privacy').checked) {
-        errorEl.textContent = 'Please agree to the Privacy Policy.';
-        errorEl.style.display = 'block';
-        return;
-      }
-
-      if (!document.getElementById('agree-ai').checked) {
-        errorEl.textContent = 'Please agree to AI data processing.';
-        errorEl.style.display = 'block';
-        return;
-      }
-
-      // Client-side age check
-      var now = new Date();
-      var age = now.getFullYear() - parseInt(birthYear) - (now.getMonth() + 1 < parseInt(birthMonth) ? 1 : 0);
-      if (age < 18) {
-        errorEl.textContent = 'You must be 18 or older to join.';
-        errorEl.style.display = 'block';
-        return;
-      }
-
-      // Save data to localStorage for signup page
-      var landingData = {
-        birthMonth: parseInt(birthMonth, 10),
-        birthYear: parseInt(birthYear, 10),
-        selectedPlan: selectedPlan,
-        termsAccepted: true,
-        privacyAccepted: true,
-        aiConsentAccepted: true
-      };
-      try {
-        localStorage.setItem('lovetta-landing-data', JSON.stringify(landingData));
-      } catch(ex) {}
-
-      btn.disabled = true;
-      btn.textContent = 'Redirecting...';
-
-      // Redirect to signup
-      window.location.href = '/my/signup?from=landing&utm_source=landing&utm_medium=web&utm_campaign=signup_form';
-    });
   </script>
 </body>
 </html>
