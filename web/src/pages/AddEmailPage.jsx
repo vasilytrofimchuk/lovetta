@@ -43,7 +43,7 @@ export default function AddEmailPage() {
   return (
     <div
       className="bg-brand-bg flex flex-col w-full overflow-hidden"
-      style={{ height: isCapacitor() ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))' : '100vh' }}
+      style={{ height: 'var(--app-viewport-height, 100vh)' }}
     >
       {/* Header */}
       <div className="flex items-center gap-3 app-page-gutter py-3 border-b border-brand-border flex-shrink-0 bg-brand-bg">

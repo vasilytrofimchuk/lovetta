@@ -33,7 +33,8 @@ export async function initIosKeyboard() {
 
     handles = await Promise.all([
       Keyboard.addListener('keyboardDidShow', (info) => {
-        currentKeyboardHeight = info.keyboardHeight || 0
+        // Add extra for autocomplete/prediction bar not included in keyboardHeight
+        currentKeyboardHeight = (info.keyboardHeight || 0) + 44
         setKeyboardScrollLock(true)
         setViewportHeight()
       }),
