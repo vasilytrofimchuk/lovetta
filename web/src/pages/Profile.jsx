@@ -82,24 +82,34 @@ export default function Profile() {
     const dismissed = localStorage.getItem('push_prompt_dismissed');
     if (isCapacitor()) {
       import('@capacitor/push-notifications').then(({ PushNotifications }) => {
-        PushNotifications.checkPermissions().then(status => {
+        return PushNotifications.checkPermissions().then(status => {
           const granted = status.receive === 'granted';
-          setPushEnabled(granted);
-          setPushPermissionDenied(status.receive === 'denied');
-          if (!granted && status.receive !== 'denied' && !dismissed) {
-            setPushPromptVisible(true);
+          if (active) {
+            setPushEnabled(granted);
+            setPushPermissionDenied(status.receive === 'denied');
+            if (!granted && status.receive !== 'denied' && !dismissed) {
+              setPushPromptVisible(true);
+            }
           }
         });
-      }).catch(() => {});
+      }).catch((err) => {
+        // Plugin not available or check failed — show prompt anyway on Capacitor
+        console.log('[push] checkPermissions failed:', err.message);
+        if (active && !dismissed) {
+          setPushPromptVisible(true);
+        }
+      });
     } else if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready.then(reg => {
-        reg.pushManager.getSubscription().then(sub => {
+        return reg.pushManager.getSubscription().then(sub => {
           const hasSub = !!sub;
-          setPushEnabled(hasSub);
-          const denied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
-          setPushPermissionDenied(denied);
-          if (!hasSub && !denied && !dismissed) {
-            setPushPromptVisible(true);
+          if (active) {
+            setPushEnabled(hasSub);
+            const denied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
+            setPushPermissionDenied(denied);
+            if (!hasSub && !denied && !dismissed) {
+              setPushPromptVisible(true);
+            }
           }
         });
       }).catch(() => {});
@@ -390,12 +400,6 @@ export default function Profile() {
                   );
                 })}
               </div>
-            )}
-
-            {!appIconLoading && (
-              <p className="text-xs text-brand-muted mt-3">
-                {appIconSaving ? 'Updating icon...' : 'Saved on this iPhone only.'}
-              </p>
             )}
           </div>
         )}
