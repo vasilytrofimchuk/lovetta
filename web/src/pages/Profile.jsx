@@ -27,6 +27,8 @@ export default function Profile() {
   const [savingProactive, setSavingProactive] = useState(false);
   const [savingFrequency, setSavingFrequency] = useState(false);
   const [savingExplicit, setSavingExplicit] = useState(false);
+  const [pushPromptVisible, setPushPromptVisible] = useState(false);
+  const [pushPermissionDenied, setPushPermissionDenied] = useState(false);
 
   // Referral state
   const [referral, setReferral] = useState(null);
@@ -76,18 +78,29 @@ export default function Profile() {
       .catch(() => {})
       .finally(() => setPrefLoading(false));
 
-    // Check existing push subscription
+    // Check existing push subscription and show prompt if needed
+    const dismissed = localStorage.getItem('push_prompt_dismissed');
     if (isCapacitor()) {
-      // For native, check APNs registration status
       import('@capacitor/push-notifications').then(({ PushNotifications }) => {
         PushNotifications.checkPermissions().then(status => {
-          setPushEnabled(status.receive === 'granted');
+          const granted = status.receive === 'granted';
+          setPushEnabled(granted);
+          setPushPermissionDenied(status.receive === 'denied');
+          if (!granted && status.receive !== 'denied' && !dismissed) {
+            setPushPromptVisible(true);
+          }
         });
       }).catch(() => {});
     } else if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready.then(reg => {
         reg.pushManager.getSubscription().then(sub => {
-          setPushEnabled(!!sub);
+          const hasSub = !!sub;
+          setPushEnabled(hasSub);
+          const denied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
+          setPushPermissionDenied(denied);
+          if (!hasSub && !denied && !dismissed) {
+            setPushPromptVisible(true);
+          }
         });
       }).catch(() => {});
     }
@@ -235,6 +248,45 @@ export default function Profile() {
     } finally {
       setSavingExplicit(false);
     }
+  };
+
+  const handlePushPromptAllow = async () => {
+    setSavingPush(true);
+    try {
+      if (isCapacitor()) {
+        const { registerNativePush } = await import('../lib/push-native');
+        await registerNativePush();
+        setPushEnabled(true);
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          if (permission === 'denied') setPushPermissionDenied(true);
+          return;
+        }
+        const { data: vapid } = await api.get('/api/user/vapid-key');
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: vapid.publicKey,
+        });
+        const subJson = sub.toJSON();
+        await api.post('/api/user/push/subscribe', {
+          endpoint: subJson.endpoint,
+          keys: subJson.keys,
+        });
+        setPushEnabled(true);
+      }
+    } catch (err) {
+      console.error('Push prompt error:', err);
+    } finally {
+      setSavingPush(false);
+      setPushPromptVisible(false);
+    }
+  };
+
+  const dismissPushPrompt = () => {
+    setPushPromptVisible(false);
+    localStorage.setItem('push_prompt_dismissed', '1');
   };
 
   const handleAppIconSelect = async (nextIcon) => {
@@ -403,6 +455,36 @@ export default function Profile() {
             </div>
           )}
         </div>
+
+        {/* Push permission prompt */}
+        {pushPromptVisible && !pushEnabled && (
+          <div className="bg-gradient-to-br from-brand-accent/15 to-brand-card border border-brand-accent/30 rounded-xl p-5 mb-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">💌</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-brand-text mb-1">Don't miss her messages</p>
+                <p className="text-xs text-brand-text-secondary mb-3">
+                  Enable notifications so your girls can reach out to you anytime — even when you're not in the app.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handlePushPromptAllow}
+                    disabled={savingPush}
+                    className="px-4 py-2 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-50"
+                  >
+                    {savingPush ? 'Enabling...' : 'Allow Notifications'}
+                  </button>
+                  <button
+                    onClick={dismissPushPrompt}
+                    className="px-3 py-2 rounded-lg text-brand-muted text-sm hover:text-brand-text-secondary transition-colors"
+                  >
+                    Not now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Notifications */}
         <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">

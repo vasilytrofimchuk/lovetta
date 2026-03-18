@@ -144,36 +144,11 @@ function PushInitializer() {
     if (!user || initedRef.current) return
     initedRef.current = true
 
+    // Only set up tap-to-navigate listeners for native (no permission needed)
     if (isCapacitor()) {
-      // Auto-register native push + set up tap listeners
-      import('./lib/push-native').then(({ registerNativePush, setupPushListeners }) => {
-        registerNativePush().catch((err) => {
-          console.log('[push] Auto-register skipped:', err.message)
-        })
+      import('./lib/push-native').then(({ setupPushListeners }) => {
         setupPushListeners((url) => navigate(url))
       }).catch(() => {})
-    } else if ('serviceWorker' in navigator && 'PushManager' in window) {
-      // Auto-register web push
-      navigator.serviceWorker.ready.then(async (reg) => {
-        const existing = await reg.pushManager.getSubscription()
-        if (existing) return // already subscribed
-        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') return
-        const { default: api } = await import('./lib/api')
-        const { data: vapid } = await api.get('/api/user/vapid-key')
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: vapid.publicKey,
-        })
-        const subJson = sub.toJSON()
-        await api.post('/api/user/push/subscribe', {
-          endpoint: subJson.endpoint,
-          keys: subJson.keys,
-        })
-      }).catch((err) => {
-        console.log('[push] Web push auto-register skipped:', err.message)
-      })
     }
   }, [user])
 
