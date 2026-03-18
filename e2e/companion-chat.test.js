@@ -511,6 +511,7 @@ test.describe('Navigation', () => {
     await expect(page.locator('h3:has-text("Subscription")')).toBeVisible();
     await expect(page.locator('text=Sign out')).toBeVisible();
     await expect(page.locator('h3:has-text("Notifications")')).toBeVisible();
+    await expect(page.locator('h3:has-text("App Icon")')).toHaveCount(0);
   });
 
   test('profile back button returns to list', async ({ page }) => {

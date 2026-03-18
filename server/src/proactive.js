@@ -99,7 +99,8 @@ async function runProactiveMessages() {
     // - Cooldown since last proactive (checked per-frequency below)
     const { rows: candidates } = await pool.query(`
       SELECT
-        u.id AS user_id, u.email, u.display_name, u.timezone,
+        u.id AS user_id, COALESCE(u.real_email, u.email) AS email, u.display_name, u.timezone,
+        u.email_disabled, u.email_type,
         c.id AS conversation_id, c.companion_id, c.last_proactive_at,
         uc.name AS companion_name, uc.personality, uc.backstory,
         uc.traits, uc.communication_style, uc.age,
@@ -226,7 +227,7 @@ async function runProactiveMessages() {
           [row.user_id]
         );
         const pref = prefRows[0];
-        if (pref?.notify_new_messages && row.email) {
+        if (pref?.notify_new_messages && row.email && !row.email_disabled && row.email_type !== 'synthetic') {
           // Rate limit: at most once per 30 min
           const canEmail = !pref.last_notification_at ||
             (Date.now() - new Date(pref.last_notification_at).getTime() > 30 * 60 * 1000);

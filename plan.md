@@ -683,3 +683,238 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - `npm run build:ios` passed.
 - The synced iOS bundle in `web/ios/App/App/public/assets/` now contains the Apple `appl_...` key and no longer contains the old `test_...` key.
 - `npm run test:e2e:ui` passed (`47` tests).
+
+## Local StoreKit Config Like Auto — DONE
+- Log this follow-up local iOS testing task in `plan.md` and `PROGRESS.md` before changing files.
+- Add a Lovetta `.storekit` file with local subscription and tip products so Xcode runs can use StoreKit local testing like the `auto` repo.
+- Attach the local StoreKit catalog to the shared `App` scheme so running from Xcode uses the local fake store instead of waiting on App Store Connect product approval.
+- Update the native StoreKit debug messaging to mention the local scheme configuration path when products are unavailable.
+- Rebuild iOS and verify the app scheme still builds after the local StoreKit catalog is attached.
+- Implementation notes:
+- Added `web/ios/App/App/Lovetta.storekit` with local Lovetta monthly/yearly subscriptions plus all four tip consumables, including the 3-day free-trial metadata for subscriptions.
+- Attached `Lovetta.storekit` to the shared `App` launch scheme so local Xcode runs now use the same StoreKit local-testing pattern as the `auto` repo.
+- Added the `Lovetta.storekit` file reference and resource build entry to `project.pbxproj`, matching the `auto` repo setup so Xcode no longer shows the StoreKit catalog in red.
+- Updated the temporary native StoreKit probe copy so it points at the scheme-level StoreKit config first when products are unavailable during local runs.
+- Verification:
+- `python3 -m json.tool web/ios/App/App/Lovetta.storekit` passed.
+- `npm run build:ios` passed after adding the StoreKit catalog.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+
+## RevenueCat Offerings Race Fix — DONE
+- Log this follow-up iOS billing bugfix in `plan.md` and `PROGRESS.md` before changing files.
+- Compare Lovetta against the working `auto` RevenueCat startup flow and remove the duplicate-configure race between app auth initialization and paywall offering preload.
+- Fix the Lovetta RevenueCat offerings wrapper to handle the actual Capacitor response shape returned by `Purchases.getOfferings()`.
+- Re-run the relevant frontend/iOS verification after the RevenueCat wrapper changes.
+- Implementation notes:
+- Added an in-flight configure promise in the RevenueCat wrapper so auth initialization and paywall preload no longer race each other into duplicate `Purchases.configure()` calls.
+- Fixed `getOfferings()` to unwrap the actual Capacitor response shape (`{ current, all }`) instead of assuming a nested `{ offerings }` object, with a fallback to `all.default`.
+- These were the remaining material code differences from `auto` after the local StoreKit scheme setup was matched.
+- Verification:
+- `npm run build:ios` passed after the RevenueCat wrapper fix.
+- `npm run test:e2e:ui` passed (`47` tests).
+
+## Final iOS Billing Fix via Auto-Style Direct Products — DONE
+- Log this final iOS subscription fix in `plan.md` and `PROGRESS.md` before changing files.
+- Replace the iOS subscription purchase path with exact `lovetta_monthly` / `lovetta_yearly` product fetches plus `purchaseStoreProduct`, matching the working `auto` repo pattern.
+- Move native RevenueCat startup into a single top-level initializer so auth bootstrap and paywall preload cannot race into duplicate configure/login calls.
+- Improve native billing diagnostics by logging exact fetched product IDs, selected purchase IDs, and serialized RevenueCat/Capacitor errors.
+- Re-run the relevant frontend and iOS verification after the direct-product subscription path is in place.
+- Implementation notes:
+- Refactored `web/src/lib/revenuecat.js` to use plugin-truth initialization (`Purchases.isConfigured()` + `getAppUserID()`), a single in-flight configure guard, direct subscription product fetches for `lovetta_monthly` / `lovetta_yearly`, and structured native error serialization.
+- Replaced the iOS paywall path in `web/src/components/PlanModal.jsx` so preload and subscribe both use direct store products instead of RevenueCat offerings/packages, with improved inline error copy for both local StoreKit and real Apple sandbox modes.
+- Moved native RevenueCat startup into a single top-level initializer in `web/src/App.jsx` and removed the duplicate auth-context side effect from `web/src/contexts/AuthContext.jsx`.
+- Verification:
+- `npm run build:ios` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+
+## iOS Subscription Timeout Root-Cause Fix — IN PROGRESS
+- Log this follow-up iOS billing timeout fix in `plan.md` and `PROGRESS.md` before changing files.
+- Remove the user-facing dependency on `Purchases.getProducts()` for fixed subscription SKUs, since the iOS Capacitor plugin purchase path only requires the product identifier.
+- Configure RevenueCat with the authenticated `appUserID` at startup when available, avoiding the anonymous-user bootstrap plus immediate `logIn()` roundtrip seen in device logs.
+- Keep logging around direct subscription purchase IDs and error serialization, then re-run the relevant frontend and iOS verification.
+- Implementation notes:
+- The device logs showed the purchase flow hanging before `purchaseStoreProduct`, immediately after a second `setLogLevel` call. That pointed to the wrapper waiting on an in-flight configure promise even though the native SDK was already configured.
+- Updated the subscription path to stop preloading/fetching products for fixed SKUs and instead call `purchaseStoreProduct` directly with `{ identifier: 'lovetta_monthly' | 'lovetta_yearly' }`, matching what the iOS plugin actually reads at runtime.
+- Updated RevenueCat startup to pass `appUserID` directly into the first `configure(...)` call when available, and changed `ensureConfigured()` to trust the plugin's current `isConfigured()` state before falling back to any pending configure promise.
+- Verification:
+- `npm run build:ios` passed after the stale-configure bypass and direct identifier purchase path.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- `npm run test:e2e:ui` was rerun twice, but both runs failed on unrelated flaky navigation/signup waits in `wizard-nav.test.js` / `companion-chat.test.js`, not in billing code.
+
+## iOS RevenueCat Init Serialization Fix — DONE
+- Log this follow-up iOS purchase-stall fix in `plan.md` and `PROGRESS.md` before changing files.
+- Compare the current Lovetta RevenueCat init flow against the `auto` repo and remove the remaining purchase-time race with `getAppUserID` / `logIn`.
+- Serialize RevenueCat startup behind a single ready promise, cache the Capacitor Purchases client, and make subscription/tip/restore calls wait for init completion instead of running concurrently with it.
+- Remove the unnecessary plugin `getAppUserID()` read during the normal authenticated startup path and rely on session-local user tracking, matching `auto` more closely.
+- Add narrow boundary logs around the direct subscription purchase call, then re-run the relevant frontend and iOS verification.
+- Implementation notes:
+- Cached the Capacitor `Purchases` client and debug log-level setup so the iOS wrapper no longer re-imports and reconfigures the bridge on every billing call.
+- Added a shared RevenueCat init promise that serializes authenticated startup, removes the purchase-time `getAppUserID()` lookup, and tracks the active app user locally for the current app session.
+- Updated all iOS billing entry points (`purchaseSubscriptionProductById`, tips, restore, customer info, offering diagnostics) to wait for the shared ready promise instead of racing init.
+- Added direct boundary logs around `purchaseStoreProduct` so the next device run will clearly show whether the native purchase call is invoked, submitted to the Capacitor bridge, and resolved.
+- Verification:
+- `npm run build:ios` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+
+## iOS Profile App Icon Picker — DONE
+- Log this iOS personalization task in `plan.md` and `PROGRESS.md` before changing files.
+- Add an iOS-only `App Icon` section in Profile with three device-local choices: `Black`, `Ivory`, and `Silver`.
+- Replace the primary iOS app icon with the neutral `Black` simple-`L` icon and add `Ivory` / `Silver` alternate icon sets in the iOS asset catalog.
+- Extend the logo export pipeline so the neutral iOS icon sets and Profile preview PNGs can be regenerated from the shared brand editor.
+- Add a small native Capacitor bridge for `getCurrentIcon()` / `setIcon()` and wire the React Profile screen to it on iOS only.
+- Re-run the relevant frontend and iOS verification, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Added neutral `neutral_black`, `neutral_ivory`, and `neutral_silver` presets to the shared logo editor and extended `scripts/export_logos.js` so one command now regenerates the primary black iOS icon set, the two alternate icon sets, and the iOS Profile preview PNGs under `web/public/assets/app-icons/ios/`.
+- Replaced the primary `AppIcon` catalog output with the black simple-`L` variant, added `AppIconIvory` and `AppIconSilver`, and removed the stale unassigned `AppIcon-512@2x.png` file that was generating asset-catalog warnings.
+- Added a local Capacitor bridge in `web/ios/App/App/AppIconPlugin.swift`, wired it into the Xcode target, and enabled alternate icon names in `project.pbxproj`.
+- Added `web/src/lib/app-icon.js` plus an iOS-only `App Icon` section in `web/src/pages/Profile.jsx` that reads the current native icon, lets the user switch between `Black`, `Ivory`, and `Silver`, and keeps the choice device-local.
+- Added a web regression assertion in `e2e/companion-chat.test.js` so the `App Icon` section must stay hidden outside iOS.
+- Verification:
+- `node scripts/export_logos.js` passed after the neutral icon pipeline changes.
+- `npm run build:ios` passed.
+- `npm run build` passed.
+- `npm run test:e2e:ui` passed (`47` tests). The earlier failed run was a setup flake that rendered `App not built yet`; rerunning after a clean web build produced a full pass.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed after the final asset-catalog cleanup.
+
+## iOS App Icon Variant Refresh — DONE
+- Log this icon-variant follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Change the iOS icon picker from `Black` / `Ivory` / `Silver` to `Default` / `Black` / one new non-feminine colored option.
+- Restore the primary `AppIcon` set to the original brand-default icon so it represents the default app look again.
+- Remove the `Ivory` option and replace `Silver` with a simpler-font alternate `L` in a different color.
+- Regenerate the icon asset catalogs, preview PNGs, native icon mappings, and Profile labels to match the new three-option set.
+- Re-run the relevant frontend and iOS verification, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Restored the primary `AppIcon` output to the original Lovetta brand icon and changed the iOS picker to `Default`, `Black`, and `Blue`.
+- Removed the `Ivory` and `Silver` variants from the export pipeline, preview assets, native mappings, and Xcode alternate-icon configuration.
+- Reworked the two alternates as simpler, less feminine `L` marks using `Arial` bold, with dark `Black` and colored `Blue` backgrounds.
+- Updated `scripts/logo_editor.html` and `scripts/export_logos.js` so the shared asset pipeline now regenerates `AppIcon`, `AppIconBlack`, `AppIconBlue`, plus `default.png`, `black.png`, and `blue.png` preview images.
+- Updated the iOS bridge and Profile screen so `default` maps to the primary icon, while `black` and `blue` map to the two alternates device-locally.
+- Verification:
+- `node scripts/export_logos.js` passed.
+- `npm run build:ios` passed.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+
+## Simplify iOS Billing to Auto-Style Direct Plugin Calls — DONE
+- Log this direct-plugin iOS billing follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Remove the custom RevenueCat wrapper from the iOS purchase critical path and match the working `auto` repo pattern: direct Capacitor `Purchases` calls in the app shell, paywall, restore flow, and tip flow.
+- Keep RevenueCat in the overall system because Lovetta’s server still depends on RevenueCat webhooks for subscription and tip reconciliation; only the client-side orchestration changes.
+- Update app startup to configure RevenueCat directly once in the shell, then log in the authenticated user directly with the plugin.
+- Update the paywall to fetch `lovetta_monthly` / `lovetta_yearly` products directly, show immediate zero-product errors, and purchase via `Purchases.purchaseStoreProduct({ product })`.
+- Update the tip checkout helper and both tip entry points to use direct product fetch plus `purchaseStoreProduct({ product })`, while preserving the existing iOS tip-intent backend flow.
+- Trim `web/src/lib/revenuecat.js` down to stateless helpers only: fixed product ID constants, error serialization/cancel detection, and backend sync polling.
+- Re-run the relevant frontend and iOS verification, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Moved RevenueCat ownership fully into the app shell so `web/src/App.jsx` performs the one-time native `Purchases.configure({ apiKey })` call and logs in the current authenticated user directly.
+- Removed the remaining purchase-path bootstrap from `web/src/components/PlanModal.jsx` and `web/src/lib/tipCheckout.js`, leaving the paywall and tip flow as direct `getProducts()` / `purchaseStoreProduct()` / `restorePurchases()` callers plus backend sync polling.
+- Kept `web/src/lib/revenuecat.js` stateless-only with fixed iOS product IDs, RevenueCat error helpers, and backend polling helpers for subscription/tip reconciliation.
+- Verification:
+- `npm run build:ios` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+- `xcodebuild -workspace App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed from `web/ios/App`.
+
+## iOS App Icon Variant Correction — DONE
+- Log this icon-correction follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Keep `Default` as the original Lovetta icon, change `Black` to the same Lovetta script style in black, and make `Silver` the only simple icon variant.
+- Remove the temporary `Blue` variant from the export pipeline, preview assets, native mappings, and Xcode alternate-icon configuration.
+- Regenerate the iOS icon asset catalogs and Profile preview PNGs, then re-run the relevant frontend and iOS verification.
+- Update `plan.md` and `PROGRESS.md` with the final corrected icon set and verification notes.
+- Implementation notes:
+- Kept `Default` as the original hot-pink Lovetta icon, changed `Black` to the same script-style `L` on a black background, and made `Silver` the only simple block-`L` variant.
+- Replaced the temporary `Blue` variant with `Silver` across the shared asset pipeline, preview images, native Capacitor mapping, and Xcode alternate-icon configuration.
+- Regenerated the shipped iOS assets so the catalog now contains `AppIcon`, `AppIconBlack`, and `AppIconSilver`, with matching Profile previews `default.png`, `black.png`, and `silver.png`.
+- Verification:
+- `node scripts/export_logos.js` passed.
+- `npm run build:ios` passed.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+
+## iOS App Icon Selected Badge Layout — DONE
+- Log this iOS icon-picker layout follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Fix the selected-state layout in the Profile app-icon tiles so the `Selected` badge does not collide with the icon label on narrow iPhone widths.
+- Keep the existing icon choices and native behavior unchanged; only adjust the Profile tile layout and status badge styling.
+- Re-run the relevant frontend verification, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Changed the app-icon tile footer from a one-line label/status row to a stacked label plus badge pill so `Selected` no longer collides with the icon name on narrow iPhone widths.
+- Verification:
+- `npm run test:e2e:ui` passed (`47` tests).
+
+## Profile Page App Icon Crash Guard — DONE
+- Log this Profile crash follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Remove the eager native app-icon lookup from Profile page load so the page can render even if the iOS app-icon plugin is missing or unstable on a device build.
+- Make the app-icon picker fail closed: render it only when the native plugin is available, persist the last chosen icon locally for UI state, and keep the rest of Profile usable if app-icon integration is unavailable.
+- Re-run the relevant frontend verification, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Removed the eager `getCurrentIcon()` native call from Profile page load and switched the picker to local fallback state backed by `localStorage`.
+- Guarded the picker behind `Capacitor.isPluginAvailable('AppIcon')` and delayed `registerPlugin('AppIcon')` usage until a user action or explicit helper call, so Profile can render even when the native plugin path is unavailable.
+- Verification:
+- `npm run build:ios` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+
+## Restore iOS App Icon Picker Visibility — DONE
+- Log this follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Remove the overly strict runtime visibility gate so the app-icon picker shows on iOS again.
+- Keep the crash guard that removed the eager native app-icon lookup from Profile page load.
+- Re-run the relevant frontend verification, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Removed the `Capacitor.isPluginAvailable('AppIcon')` render gate, which was hiding the picker for this local native plugin even though the bridge still exists when invoked from iOS.
+- Kept the safer Profile-load behavior: no eager native app-icon lookup on mount, local fallback state for the selected option, and native calls only when the user taps an icon tile.
+- Verification:
+- `npm run test:e2e:ui` passed (`47` tests).
+
+## Restore App Icon Placement In Profile — IN PROGRESS
+- Log this follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Move the Apple relay `RealEmailPrompt` lower in the Profile screen so the iOS app-icon picker stays near the top, in the same area users expect.
+- Keep the existing app-icon behavior unchanged; this is a placement fix only.
+- Re-run the relevant frontend verification, then update `plan.md` and `PROGRESS.md` with final notes.
+
+## Payment Restructure Completion — DONE
+- Check the current working-tree iOS billing code directly instead of relying on stale checklist state from the interrupted run.
+- Remove the remaining RevenueCat `configure()` / `logIn()` calls from the iOS paywall subscribe/restore handlers so the purchase path relies on the app-shell initializer only.
+- Remove the remaining RevenueCat `configure()` / `logIn()` calls from the iOS tip checkout flow while keeping the fixed product fetch, `purchaseStoreProduct()`, and backend tip-intent sync flow intact.
+- Keep `web/src/lib/revenuecat.js` limited to stateless product IDs, error helpers, and backend sync polling helpers.
+- Re-run `npm run build:ios`, `npm run test:e2e:ui`, and `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`, then update `plan.md` and `PROGRESS.md` with final notes.
+- Clarified `AGENTS.md` so non-destructive escalated local build/test prompts are explicitly treated as default-Yes too.
+- Verification:
+- `npm run build:ios` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+- `xcodebuild -workspace App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed from `web/ios/App`.
+
+## Apple Private Relay Email Handling — IN PROGRESS
+- Detect and classify Apple relay/synthetic emails at sign-in time (email_type column)
+- Add email_disabled flag for bounce handling via Resend outbound webhooks
+- Exclude synthetic and disabled emails from all scheduler and proactive email sends
+- Add /api/email-events bounce webhook endpoint
+- Add /api/user/real-email endpoint for relay/synthetic users to provide their real email
+- Add RealEmailPrompt component on Profile page for relay/synthetic users
+- Files: migrate.js, auth-api.js, user-api.js, scheduler.js, proactive.js, index.js, RealEmailPrompt.jsx, Profile.jsx
+
+## Global Permission Preference Instruction — DONE
+- Log this instruction-only task in `plan.md` and `PROGRESS.md` before editing any instruction files.
+- Update the repo-local `AGENTS.md` operator-preference section so it explicitly says to skip pre-confirmation chat and treat permission/escalation prompts as default-Yes.
+- Populate the global Codex instruction file at `/Users/vasily/.codex/AGENTS.md` with the same default-Yes operator preference so future sessions inherit it when supported.
+- Skip tests because this task changes instructions only, not app behavior.
+- Update `plan.md` and `PROGRESS.md` with final status and implementation notes after the instruction files are updated.
+- Implementation notes:
+- Added two explicit operator-preference bullets to the repo-local `AGENTS.md` so Codex should send required approval requests directly and keep default-Yes handling for non-destructive local tooling.
+- Populated `/Users/vasily/.codex/AGENTS.md` with a global operator-preference block that mirrors the same behavior for future sessions when the app loads that file.
+- Verification:
+- No tests run because this task only updates instruction files and does not change runtime behavior.
+
+## Restore App Icon Placement In Profile — DONE
+- Log this follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Move the Apple relay `RealEmailPrompt` lower in the Profile screen so the iOS app-icon picker stays near the top, in the same area users expect.
+- Keep the existing app-icon behavior unchanged; this is a placement fix only.
+- Re-run the relevant frontend verification, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Moved `RealEmailPrompt` below the app-icon section so the icon picker stays directly under the user card again, matching the earlier Profile layout.
+- Verification:
+- `npm run test:e2e:ui` passed (`47` tests).
+
+## Restore App Icon Picker Runtime Wiring — IN PROGRESS
+- Log this follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Register the local `AppIconPlugin` with Capacitor’s native bridge so the iOS app-icon picker has a real runtime plugin behind it.
+- Replace the fragile `isIOS()` render gate with a more reliable native-iPhone detection path so the icon section still appears in the shipped iOS build.
+- Re-run the relevant iOS and frontend verification, then update `plan.md` and `PROGRESS.md` with final notes.

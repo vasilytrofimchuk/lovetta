@@ -1,0 +1,199 @@
+{
+  "identifier" : "8F4D9E10-0C18-4A33-9D61-B41D01F0D2A2",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "21449921",
+      "localizations" : [
+        {
+          "description" : "Send a $9.99 tip to your AI girlfriend.",
+          "displayName" : "Tip $9.99",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "lovetta_tip_999",
+      "referenceName" : "Tip $9.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "21449922",
+      "localizations" : [
+        {
+          "description" : "Send a $19.99 tip to your AI girlfriend.",
+          "displayName" : "Tip $19.99",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "lovetta_tip_1999",
+      "referenceName" : "Tip $19.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "49.99",
+      "familyShareable" : false,
+      "internalID" : "21449923",
+      "localizations" : [
+        {
+          "description" : "Send a $49.99 tip to your AI girlfriend.",
+          "displayName" : "Tip $49.99",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "lovetta_tip_4999",
+      "referenceName" : "Tip $49.99",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "99.99",
+      "familyShareable" : false,
+      "internalID" : "21449924",
+      "localizations" : [
+        {
+          "description" : "Send a $99.99 tip to your AI girlfriend.",
+          "displayName" : "Tip $99.99",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "lovetta_tip_9999",
+      "referenceName" : "Tip $99.99",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21449901",
+      "localizations" : [
+
+      ],
+      "name" : "Lovetta Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "19.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21449911",
+          "introductoryOffer" : {
+            "internalID" : "21449912",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "3-day free trial, then $19.99 per month.",
+              "displayName" : "Lovetta Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "lovetta_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Lovetta Monthly",
+          "subscriptionGroupID" : "21449901",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "99.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "21449913",
+          "introductoryOffer" : {
+            "internalID" : "21449914",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "3-day free trial, then $99.99 per year.",
+              "displayName" : "Lovetta Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "lovetta_yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Lovetta Yearly",
+          "subscriptionGroupID" : "21449901",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

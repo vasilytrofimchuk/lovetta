@@ -44,7 +44,7 @@ async function runAbandonedPaymentReminders() {
   try {
     // Users created 24-48h ago with no subscription and no reminder sent yet
     const { rows } = await pool.query(`
-      SELECT u.id, u.email, u.display_name
+      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name
       FROM users u
       LEFT JOIN subscriptions s ON s.user_id = u.id
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'abandoned_payment'
@@ -52,9 +52,11 @@ async function runAbandonedPaymentReminders() {
         AND s.id IS NULL
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
+        AND (u.email_disabled IS NULL OR u.email_disabled = false)
     `);
 
     for (const user of rows) {
@@ -88,15 +90,17 @@ async function runWelcomeEmailSeries() {
   try {
     // Day 0: users created in the last hour, no welcome_day0 yet
     const { rows: day0 } = await pool.query(`
-      SELECT u.id, u.email, u.display_name
+      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name
       FROM users u
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day0'
       WHERE u.created_at > NOW() - INTERVAL '1 hour'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
+        AND (u.email_disabled IS NULL OR u.email_disabled = false)
     `);
 
     for (const user of day0) {
@@ -115,7 +119,7 @@ async function runWelcomeEmailSeries() {
 
     // Day 1: users created 23-25h ago, no welcome_day1, no user messages sent
     const { rows: day1 } = await pool.query(`
-      SELECT u.id, u.email, u.display_name
+      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name
       FROM users u
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day1'
       LEFT JOIN conversations c ON c.user_id = u.id
@@ -124,9 +128,11 @@ async function runWelcomeEmailSeries() {
         AND r.id IS NULL
         AND m.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
+        AND (u.email_disabled IS NULL OR u.email_disabled = false)
     `);
 
     for (const user of day1) {
@@ -145,16 +151,18 @@ async function runWelcomeEmailSeries() {
 
     // Day 3: users created 71-73h ago, still on trial, no welcome_day3
     const { rows: day3 } = await pool.query(`
-      SELECT u.id, u.email, u.display_name
+      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name
       FROM users u
       JOIN subscriptions s ON s.user_id = u.id AND s.status = 'trialing'
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day3'
       WHERE u.created_at BETWEEN NOW() - INTERVAL '73 hours' AND NOW() - INTERVAL '71 hours'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
+        AND (u.email_disabled IS NULL OR u.email_disabled = false)
     `);
 
     for (const user of day3) {
@@ -184,15 +192,17 @@ async function runRenewalReminders() {
   try {
     // Active subscriptions renewing in ~3 days (71-73h window)
     const { rows } = await pool.query(`
-      SELECT u.id, u.email, u.display_name, s.current_period_end
+      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name, s.current_period_end
       FROM users u
       JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'renewal_reminder'
       WHERE s.current_period_end BETWEEN NOW() + INTERVAL '71 hours' AND NOW() + INTERVAL '73 hours'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
+        AND (u.email_disabled IS NULL OR u.email_disabled = false)
     `);
 
     for (const user of rows) {

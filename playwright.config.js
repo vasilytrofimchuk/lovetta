@@ -34,7 +34,7 @@ module.exports = defineConfig({
     },
     {
       name: 'ai-real',
-      testMatch: 'ai-real.test.js',
+      testMatch: ['ai-real.test.js', 'chat-scenarios.test.js'],
     },
     {
       name: 'demo',

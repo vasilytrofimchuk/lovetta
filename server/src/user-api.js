@@ -161,4 +161,38 @@ router.delete('/push/unsubscribe-apns', authenticate, async (req, res) => {
   }
 });
 
+// -- PUT /api/user/real-email — store user's real email (for relay/synthetic users) --
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+router.put('/real-email', authenticate, async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email || typeof email !== 'string' || !EMAIL_RE.test(email.trim())) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const pool = getPool();
+
+    // Check if email is already taken by another user
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM users WHERE LOWER(email) = $1 AND id != $2',
+      [normalizedEmail, req.userId]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: 'This email is already in use' });
+    }
+
+    await pool.query(
+      'UPDATE users SET real_email = $1 WHERE id = $2',
+      [normalizedEmail, req.userId]
+    );
+
+    res.json({ ok: true, real_email: normalizedEmail });
+  } catch (err) {
+    console.error('[user] real-email error:', err.message);
+    res.status(500).json({ error: 'Failed to save email' });
+  }
+});
+
 module.exports = router;

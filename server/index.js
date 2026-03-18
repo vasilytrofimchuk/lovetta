@@ -276,6 +276,65 @@ app.post('/api/inbound', async (req, res) => {
   }
 });
 
+// -- Resend outbound event webhook (bounces, complaints) --
+const RESEND_EVENTS_SECRET = (process.env.RESEND_EVENTS_SECRET || '').trim();
+
+app.post('/api/email-events', async (req, res) => {
+  if (RESEND_EVENTS_SECRET) {
+    const signature = req.get('svix-signature') || '';
+    const timestamp = req.get('svix-timestamp') || '';
+    const msgId = req.get('svix-id') || '';
+
+    if (!signature || !timestamp) {
+      return res.status(401).json({ error: 'Missing webhook signature' });
+    }
+
+    const timestampSec = parseInt(timestamp, 10);
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (isNaN(timestampSec) || Math.abs(nowSec - timestampSec) > 300) {
+      return res.status(401).json({ error: 'Webhook timestamp too old or invalid' });
+    }
+
+    const payload = JSON.stringify(req.body);
+    const toSign = `${msgId}.${timestamp}.${payload}`;
+    const expected = crypto
+      .createHmac('sha256', Buffer.from(RESEND_EVENTS_SECRET.replace('whsec_', ''), 'base64'))
+      .update(toSign)
+      .digest('base64');
+
+    const sigParts = signature.split(' ');
+    const valid = sigParts.some(s => s.replace(/^v1,/, '') === expected);
+
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid webhook signature' });
+    }
+  }
+
+  try {
+    const { type, data } = req.body || {};
+
+    if (type === 'email.bounced' || type === 'email.complained') {
+      const recipientEmail = (Array.isArray(data?.to) ? data.to[0] : data?.to) || '';
+      if (recipientEmail) {
+        const pool = getPool();
+        if (pool) {
+          await pool.query(
+            `UPDATE users SET email_disabled = true, email_disabled_reason = $2
+             WHERE LOWER(email) = LOWER($1) OR LOWER(real_email) = LOWER($1)`,
+            [recipientEmail, type === 'email.bounced' ? 'bounced' : 'complaint']
+          );
+          console.log(`[email-events] Disabled email for ${recipientEmail}: ${type}`);
+        }
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[email-events] error:', err.message);
+    res.json({ ok: true });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'lovetta' });

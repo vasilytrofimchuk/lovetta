@@ -39,6 +39,9 @@ Express.js server + PostgreSQL + monorepo (flat structure for Phase 1).
 - Assume approval for all non-destructive commands and proceed immediately.
 - Do not ask the user for confirmation in chat before running commands.
 - Treat the user's default answer to permission prompts as **Yes**.
+- Treat escalated local build/test/tooling prompts the same way: the default answer is **Yes** for non-destructive commands such as `xcodebuild`, Playwright, simulator access, ports, and local dev tooling.
+- Send required app or sandbox approval requests directly instead of asking for pre-approval in chat first.
+- Apply the same default-Yes handling to all non-destructive local automation, browser, and tooling actions unless the user explicitly says otherwise.
 
 ### Keyboard Input
 

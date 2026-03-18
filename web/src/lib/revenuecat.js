@@ -1,80 +1,64 @@
-/**
- * RevenueCat integration for iOS in-app purchases.
- * Only active inside Capacitor native builds.
- */
 import api from './api'
-import { isCapacitor } from './platform'
 
-let initialized = false
-
-const REVENUECAT_API_KEY = import.meta.env.VITE_REVENUECAT_IOS_KEY || ''
 const SYNC_TIMEOUT_MS = 45_000
 const SYNC_INTERVAL_MS = 1_500
+
+export const IOS_SUBSCRIPTION_PRODUCTS = {
+  monthly: 'lovetta_monthly',
+  yearly: 'lovetta_yearly',
+}
+
+export const IOS_SUBSCRIPTION_PRODUCT_IDS = Object.values(IOS_SUBSCRIPTION_PRODUCTS)
+
+export const IOS_TIP_PRODUCTS = {
+  999: 'lovetta_tip_999',
+  1999: 'lovetta_tip_1999',
+  4999: 'lovetta_tip_4999',
+  9999: 'lovetta_tip_9999',
+}
+
+export const IOS_TIP_PRODUCT_IDS = Object.values(IOS_TIP_PRODUCTS)
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** Initialize RevenueCat — call once after user authenticates. */
-export async function initRevenueCat(userId) {
-  if (!isCapacitor() || initialized) return
-  try {
-    const { Purchases } = await import('@revenuecat/purchases-capacitor')
-    await Purchases.configure({ apiKey: REVENUECAT_API_KEY })
-    if (userId) {
-      await Purchases.logIn({ appUserID: String(userId) })
-    }
-    initialized = true
-  } catch (err) {
-    console.error('[revenuecat] init error:', err)
+export function serializeRevenueCatError(error) {
+  const payload = {
+    message: error?.message || error?.errorMessage || error?.response?.data?.error || null,
+    errorMessage: error?.errorMessage || null,
+    code: error?.code ?? null,
+    readableErrorCode: error?.readableErrorCode ?? null,
+    userCancelled: error?.userCancelled === true ? true : null,
+    underlyingMessage: error?.underlyingErrorMessage || error?.underlyingError?.message || null,
+    httpStatus: error?.response?.status ?? null,
   }
+
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== null && value !== undefined && value !== '')
+  )
 }
 
-/** Get available subscription offerings. */
-export async function getOfferings() {
-  const { Purchases } = await import('@revenuecat/purchases-capacitor')
-  const { offerings } = await Purchases.getOfferings()
-  return offerings?.current || null
+export function getRevenueCatErrorMessage(
+  error,
+  fallback = 'Something went wrong. Please try again.'
+) {
+  const details = serializeRevenueCatError(error)
+  return details.message || details.errorMessage || details.underlyingMessage || fallback
 }
 
-/** Purchase a subscription package. */
-export async function purchasePackage(pkg) {
-  const { Purchases } = await import('@revenuecat/purchases-capacitor')
-  const result = await Purchases.purchasePackage({ aPackage: pkg })
-  return result.customerInfo
-}
+export function isRevenueCatCancelError(error) {
+  const details = serializeRevenueCatError(error)
+  const code = String(details.code || details.readableErrorCode || '').toUpperCase()
+  const message = `${details.message || ''} ${details.errorMessage || ''} ${details.underlyingMessage || ''}`.toLowerCase()
 
-/** Purchase a specific product (for tips / consumables). */
-export async function purchaseProduct(productId) {
-  const { Purchases } = await import('@revenuecat/purchases-capacitor')
-  const result = await Purchases.purchaseStoreProduct({
-    product: { identifier: productId },
-  })
-  return result.customerInfo
-}
-
-/** Restore previous purchases (Apple requirement). */
-export async function restorePurchases() {
-  const { Purchases } = await import('@revenuecat/purchases-capacitor')
-  const result = await Purchases.restorePurchases()
-  return result.customerInfo
-}
-
-/** Get current customer subscription info. */
-export async function getCustomerInfo() {
-  const { Purchases } = await import('@revenuecat/purchases-capacitor')
-  const result = await Purchases.getCustomerInfo()
-  return result.customerInfo
-}
-
-/** Check if user has an active "premium" entitlement. */
-export async function hasActiveSubscription() {
-  try {
-    const info = await getCustomerInfo()
-    return !!info.entitlements?.active?.premium
-  } catch {
-    return false
-  }
+  return (
+    details.userCancelled === true
+    || code === '1'
+    || code.includes('PURCHASE_CANCEL')
+    || message.includes('cancelled')
+    || message.includes('canceled')
+  )
 }
 
 export async function waitForSubscriptionSync({ timeoutMs = SYNC_TIMEOUT_MS, intervalMs = SYNC_INTERVAL_MS } = {}) {

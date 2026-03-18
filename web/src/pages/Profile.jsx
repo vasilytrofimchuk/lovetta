@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import api from '../lib/api';
-import { APP_ICON_OPTIONS, getSavedAppIcon, isAppIconPluginAvailable, saveAppIcon, setCurrentAppIcon } from '../lib/app-icon';
+import { APP_ICON_OPTIONS, getCurrentAppIcon, getSavedAppIcon, saveAppIcon, setCurrentAppIcon } from '../lib/app-icon';
 import { isAppStore, isCapacitor, isIOS } from '../lib/platform';
+import RealEmailPrompt from '../components/RealEmailPrompt';
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -18,8 +19,7 @@ export default function Profile() {
   const [proactiveFrequency, setProactiveFrequency] = useState('normal');
   const [explicitContent, setExplicitContent] = useState(false);
   const [appIcon, setAppIcon] = useState(() => getSavedAppIcon());
-  const [appIconSupported, setAppIconSupported] = useState(() => isIOS() && isAppIconPluginAvailable());
-  const [appIconLoading, setAppIconLoading] = useState(false);
+  const [appIconLoading, setAppIconLoading] = useState(isIOS());
   const [appIconSaving, setAppIconSaving] = useState(false);
   const [prefLoading, setPrefLoading] = useState(true);
   const [savingNotify, setSavingNotify] = useState(false);
@@ -107,13 +107,21 @@ export default function Profile() {
     }
 
     if (ios) {
-      if (active) {
-        setAppIconSupported(isAppIconPluginAvailable());
-        setAppIcon(getSavedAppIcon());
-        setAppIconLoading(false);
-      }
+      getCurrentAppIcon()
+        .then(({ icon }) => {
+          const resolvedIcon = icon || getSavedAppIcon();
+          if (!active) return;
+          setAppIcon(resolvedIcon);
+          saveAppIcon(resolvedIcon);
+        })
+        .catch((err) => {
+          console.error('App icon load error:', err);
+          if (active) setAppIcon(getSavedAppIcon());
+        })
+        .finally(() => {
+          if (active) setAppIconLoading(false);
+        });
     } else if (active) {
-      setAppIconSupported(false);
       setAppIconLoading(false);
     }
 
@@ -230,7 +238,7 @@ export default function Profile() {
   };
 
   const handleAppIconSelect = async (nextIcon) => {
-    if (!appIconSupported || appIconSaving || appIcon === nextIcon) return;
+    if (appIconSaving || appIcon === nextIcon) return;
 
     setAppIconSaving(true);
     try {
@@ -248,11 +256,10 @@ export default function Profile() {
   const showPushToggle = isCapacitor() || ('PushManager' in window);
 
   return (
-    <div className="min-h-screen bg-brand-bg app-page-gutter pb-8"
-      style={{ paddingTop: isCapacitor() ? 'max(2rem, env(safe-area-inset-top, 2rem))' : '2rem' }}>
-      <div className="w-full">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+    <div className="min-h-screen bg-brand-bg pb-8">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
+        <div className="w-full flex items-center gap-3">
           <button
             onClick={() => navigate('/')}
             aria-label="Back"
@@ -265,6 +272,9 @@ export default function Profile() {
           </button>
           <h1 className="text-xl font-bold text-brand-text">Profile</h1>
         </div>
+      </div>
+      <div className="app-page-gutter">
+      <div className="w-full">
 
         {/* User info */}
         <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
@@ -281,7 +291,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {ios && appIconSupported && (
+        {ios && (
           <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
             <h3 className="text-sm font-semibold text-brand-text mb-1">App Icon</h3>
             <p className="text-xs text-brand-muted mb-4">
@@ -337,6 +347,9 @@ export default function Profile() {
             )}
           </div>
         )}
+
+        {/* Real email prompt for Apple relay/synthetic users */}
+        <RealEmailPrompt />
 
         {/* Subscription */}
         <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
@@ -720,6 +733,7 @@ export default function Profile() {
         >
           Sign out
         </button>
+      </div>
       </div>
 
     </div>

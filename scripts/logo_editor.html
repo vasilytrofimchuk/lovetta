@@ -67,6 +67,7 @@
   <label><span>Font</span>
     <select id="fontFamily">
       <option value="Tangerine" selected>Tangerine</option>
+      <option value="Arial">Arial</option>
       <option value="Italianno">Italianno</option>
       <option value="Kaushan Script">Kaushan Script</option>
       <option value="Dancing Script">Dancing Script</option>
@@ -161,6 +162,45 @@ const PRESETS = {
   fuchsia:     { color1:"#e879f9", color2:"#a855f7", bgColor:"#100a14", gradAngle:140 },
   white_clean: { color1:"#ffffff", color2:"#e2e8f0", bgColor:"transparent", gradAngle:180 },
   dark_solid:  { color1:"#1a1a2e", color2:"#1a1a2e", bgColor:"#ffffff", gradAngle:0 },
+  brand_default: {
+    color1:"#ec4899",
+    color2:"#f43f5e",
+    bgColor:"#110a10",
+    gradAngle:180,
+    fontFamily:"Tangerine",
+    fontWeight:"400",
+    fontSlant:-3,
+    iconBg:"color",
+    iconBgColor:"#110a10",
+    iconRadius:22,
+  },
+  black_script: {
+    color1:"#f3f4f6",
+    color2:"#d1d5db",
+    bgColor:"transparent",
+    gradAngle:180,
+    fontFamily:"Tangerine",
+    fontWeight:"400",
+    fontSlant:-3,
+    iconBg:"color",
+    iconBgColor:"#121212",
+    iconRadius:22,
+  },
+  silver_simple: {
+    color1:"#f8fafc",
+    color2:"#f8fafc",
+    bgColor:"transparent",
+    gradAngle:180,
+    fontFamily:"Arial",
+    fontWeight:"700",
+    fontSlant:0,
+    iconBg:"color",
+    iconBgColor:"#9ca3af",
+    iconFontSize:68,
+    iconOffX:-1,
+    iconOffY:2,
+    iconRadius:22,
+  },
 };
 
 const presetContainer = document.getElementById('presetBtns');
@@ -172,16 +212,30 @@ Object.keys(PRESETS).forEach(name => {
 });
 
 function applyPreset(p) {
-  setVal('color1', p.color1); setVal('color1Pick', p.color1);
-  setVal('color2', p.color2); setVal('color2Pick', p.color2);
-  setVal('bgColor', p.bgColor);
-  if (p.bgColor && p.bgColor !== 'transparent') setVal('bgColorPick', p.bgColor);
-  document.getElementById('gradAngle').value = p.gradAngle;
-  document.getElementById('gradAngleVal').textContent = p.gradAngle + '°';
-  if (p.bgColor && p.bgColor !== "transparent") {
-    setVal("iconBgColor", p.bgColor); setVal("iconBgColorPick", p.bgColor); setVal("iconBg", "color");
-  } else {
-    setVal("iconBg", "transparent");
+  const scalarFields = ['fontFamily', 'fontWeight', 'text', 'fontSize', 'letterSpacing', 'iconBg', 'iconFontSize', 'iconOffX', 'iconOffY', 'iconRadius', 'paddingX', 'paddingY', 'scale', 'socialSlogan', 'socialLogoSize', 'socialSloganSize'];
+  scalarFields.forEach(id => {
+    if (p[id] !== undefined) setVal(id, p[id]);
+  });
+  ['color1', 'color2', 'iconBgColor', 'socialSloganColor', 'bgColor'].forEach(id => {
+    if (p[id] === undefined) return;
+    setVal(id, p[id]);
+    const picker = document.getElementById(id + 'Pick');
+    if (picker && /^#[0-9a-f]{6}$/i.test(p[id])) picker.value = p[id];
+  });
+  if (p.gradAngle !== undefined) {
+    document.getElementById('gradAngle').value = p.gradAngle;
+    document.getElementById('gradAngleVal').textContent = p.gradAngle + '°';
+  }
+  if (p.fontSlant !== undefined) {
+    document.getElementById('fontSlant').value = p.fontSlant;
+    document.getElementById('fontSlantVal').textContent = p.fontSlant + '°';
+  }
+  if (p.iconBg === undefined) {
+    if (p.bgColor && p.bgColor !== "transparent") {
+      setVal("iconBgColor", p.bgColor); setVal("iconBgColorPick", p.bgColor); setVal("iconBg", "color");
+    } else {
+      setVal("iconBg", "transparent");
+    }
   }
   updatePreviewBg();
   renderAll();
@@ -506,7 +560,7 @@ document.getElementById('downloadSocialBtn').addEventListener('click', () => {
 
 // ========== COMPARE ALL ==========
 document.getElementById('compareAllBtn').addEventListener('click', () => {
-  const fonts = ['Italianno', 'Tangerine', 'Kaushan Script', 'Dancing Script', 'Rouge Script', 'Marck Script', 'Niconne', 'Courgette', 'Petit Formal Script', 'Bilbo Swash Caps'];
+  const fonts = ['Arial', 'Italianno', 'Tangerine', 'Kaushan Script', 'Dancing Script', 'Rouge Script', 'Marck Script', 'Niconne', 'Courgette', 'Petit Formal Script', 'Bilbo Swash Caps'];
   const origFont = getVal('fontFamily');
 
   const allLogos = {};
@@ -553,7 +607,7 @@ h1{color:#e84393;font-size:18px;margin-bottom:16px;letter-spacing:2px;}
 });
 
 // Force-load fonts
-const fontList = ['Italianno','Tangerine','Kaushan Script','Dancing Script','Rouge Script','Marck Script','Niconne','Courgette','Petit Formal Script','Bilbo Swash Caps'];
+const fontList = ['Arial','Italianno','Tangerine','Kaushan Script','Dancing Script','Rouge Script','Marck Script','Niconne','Courgette','Petit Formal Script','Bilbo Swash Caps'];
 const loader = document.createElement('div');
 loader.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;';
 fontList.forEach(f => {

@@ -953,6 +953,19 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: 'v38_apple_relay_email',
+    fn: async (pool) => {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_type TEXT DEFAULT 'real'`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_disabled BOOLEAN DEFAULT FALSE`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_disabled_reason TEXT`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS real_email TEXT`);
+
+      // Backfill existing users
+      await pool.query(`UPDATE users SET email_type = 'relay' WHERE email LIKE '%@privaterelay.appleid.com'`);
+      await pool.query(`UPDATE users SET email_type = 'synthetic' WHERE email LIKE '%@apple.lovetta.ai' OR email LIKE '%@telegram.lovetta.ai'`);
+    },
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

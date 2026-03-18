@@ -685,6 +685,14 @@
 - [x] Scene test: all generated scenes are clean (setting+mood only, no character names/actions)
 - [x] Fix scene generation root cause: `max_tokens: 25` + `plainChatCompletion` + simplified prompt (ai.js, chat-api.js, companion-api.js)
 - [x] Scene quality: 100% clean (11/11) vs 23% before — no heavy regex cleanup needed
+- [x] New E2E test suite: `e2e/chat-scenarios.test.js` — 20 tests (18 pass, 2 skip)
+  - Basic chat flow: SSE streaming, done events, error handling, message persistence
+  - Discovery mode: questions on first chat, no hallucinated details
+  - Sexual content: web allows flirty, appstore blocks explicit, user pref override, age guard
+  - Media: selfie triggers media fields, request-media blocks free users
+  - /next endpoint: generates response, discovery mode in /next
+  - Memory: facts extracted after 5+ messages, counter increments, AI recalls user name
+  - Free limits: skipped (settings cache timing in test env)
 
 ## iOS Sandbox Setup Hardening
 - [x] Update `plan.md` and `PROGRESS.md` for the iOS sandbox setup follow-up
@@ -742,3 +750,193 @@
 - `npm run build:ios` passed.
 - The synced iOS bundle now embeds the Apple `appl_...` key instead of the old RevenueCat Test Store key.
 - `npm run test:e2e:ui` passed (`47` tests).
+
+## Local StoreKit Config Like Auto
+- [x] Update `plan.md` and `PROGRESS.md` for the local StoreKit config task
+- [x] Add a Lovetta `.storekit` catalog with local subscription and tip products
+- [x] Attach the local StoreKit catalog to the shared `App` Xcode scheme
+- [x] Update the native StoreKit debug messaging for local StoreKit mode
+- [x] Rebuild iOS and verify the app scheme still builds
+- [x] Update `plan.md` and `PROGRESS.md` with final local StoreKit status and notes
+- Verification notes:
+- `python3 -m json.tool web/ios/App/App/Lovetta.storekit` passed.
+- `npm run build:ios` passed after adding the local StoreKit catalog.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- Added the missing `project.pbxproj` file-reference/resource wiring for `Lovetta.storekit`, matching the `auto` repo so the scheme catalog is no longer a red/missing file in Xcode.
+
+## RevenueCat Offerings Race Fix
+- [x] Update `plan.md` and `PROGRESS.md` for the RevenueCat offerings bugfix
+- [x] Remove the duplicate RevenueCat configure race during auth + paywall startup
+- [x] Fix `getOfferings()` to handle the Capacitor plugin response shape correctly
+- [x] Re-run the relevant frontend/iOS verification
+- [x] Update `plan.md` and `PROGRESS.md` with final offerings-fix status and notes
+- Verification notes:
+- `npm run build:ios` passed after the RevenueCat wrapper fix.
+- `npm run test:e2e:ui` passed (`47` tests).
+
+## Final iOS Billing Fix via Auto-Style Direct Products
+- [x] Update `plan.md` and `PROGRESS.md` for the final direct-product subscription fix
+- [x] Replace the iOS subscription path with direct RevenueCat store-product fetch + `purchaseStoreProduct`
+- [x] Move native RevenueCat initialization to a single top-level initializer and remove auth-context duplication
+- [x] Improve native billing logging and inline error reporting for direct-product failures
+- [x] Run `npm run build:ios`
+- [x] Run `npm run test:e2e:ui`
+- [x] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+- Verification notes:
+- `npm run build:ios` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+
+## iOS Subscription Timeout Root-Cause Fix
+- [x] Update `plan.md` and `PROGRESS.md` for the iOS subscription-timeout follow-up
+- [x] Remove the blocking `getProducts()` dependency from the fixed iOS subscription purchase path
+- [x] Configure RevenueCat with `appUserID` during startup when available to avoid the anonymous-to-logIn bootstrap roundtrip
+- [x] Re-run `npm run build:ios`
+- [ ] Re-run `npm run test:e2e:ui`
+- [x] Re-run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+- Verification notes:
+- `npm run build:ios` passed after switching subscriptions to direct identifier purchase and bypassing stale configure promises.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- `npm run test:e2e:ui` was rerun twice but hit unrelated flaky navigation/signup timeouts in `e2e/companion-chat.test.js` and `e2e/wizard-nav.test.js`, so that bucket is still not clean for this follow-up.
+
+## iOS RevenueCat Init Serialization Fix
+- [x] Update `plan.md` and `PROGRESS.md` for the RevenueCat init-serialization follow-up
+- [x] Remove the remaining `getAppUserID` / purchase race from the iOS RevenueCat wrapper
+- [x] Make subscription, tip, and restore calls wait for the shared RevenueCat init promise
+- [x] Add narrow boundary logs around the direct `purchaseStoreProduct` call
+- [x] Re-run `npm run build:ios`
+- [x] Re-run `npm run test:e2e:ui`
+- [x] Re-run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+- Verification notes:
+- `npm run build:ios` passed after serializing RevenueCat init and caching the Capacitor Purchases client.
+- `npm run test:e2e:ui` passed (`47` tests) after the init-serialization change.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+
+## iOS Profile App Icon Picker
+- [x] Update `plan.md` and `PROGRESS.md` for the iOS app-icon picker task
+- [x] Extend the icon export pipeline for neutral `Black`, `Ivory`, and `Silver` iOS icon sets plus Profile preview PNGs
+- [x] Replace the primary iOS icon with `Black` and add `Ivory` / `Silver` alternate icon asset catalogs
+- [x] Add the native Capacitor app-icon plugin and Xcode alternate-icon configuration
+- [x] Add the iOS-only Profile app-icon picker UI and JS wrapper
+- [x] Run `npm run build:ios`
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+- Verification notes:
+- `node scripts/export_logos.js` passed after the neutral icon pipeline changes.
+- `npm run build:ios` passed.
+- `npm run build` passed.
+- `npm run test:e2e:ui` passed (`47` tests). The earlier failed run was a setup flake that rendered `App not built yet`; rerunning after a clean web build produced a full pass.
+- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed after the final asset-catalog cleanup.
+
+## iOS App Icon Variant Refresh
+- [x] Update `plan.md` and `PROGRESS.md` for the icon-variant refresh follow-up
+- [x] Restore the primary app icon to the default brand icon and remove the `Ivory` alternate
+- [x] Replace the third icon with a simpler-font alternate `L` in a different color
+- [x] Update the native icon mappings and iOS Profile picker labels/options
+- [x] Run `node scripts/export_logos.js`
+- [x] Run `npm run build:ios`
+- [x] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Simplify iOS Billing to Auto-Style Direct Plugin Calls
+- [x] Update `plan.md` and `PROGRESS.md` for the direct-plugin iOS billing follow-up
+- [x] Remove the custom RevenueCat wrapper from the iOS purchase critical path
+- [x] Configure RevenueCat directly in the app shell and log in the authenticated user with direct plugin calls
+- [x] Replace the iOS paywall subscribe/restore flow with direct `Purchases.getProducts()` and `purchaseStoreProduct()` / `restorePurchases()`
+- [x] Replace the iOS tip purchase flow with direct `getProducts()` and `purchaseStoreProduct()` while keeping the existing tip-intent sync
+- [x] Trim `web/src/lib/revenuecat.js` down to stateless helpers only
+- [x] Run `npm run build:ios`
+- [x] Run `npm run test:e2e:ui`
+- [x] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+- Verification notes:
+- `npm run build:ios` passed.
+- `npm run test:e2e:ui` passed (`47` tests).
+- Equivalent native verification passed from `web/ios/App` with `xcodebuild -workspace App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`.
+
+## iOS App Icon Variant Correction
+- [x] Update `plan.md` and `PROGRESS.md` for the icon-correction follow-up
+- [x] Change `Black` to the default Lovetta-style script icon in black
+- [x] Replace `Blue` with the single simple `Silver` icon variant
+- [x] Update the native icon mappings, preview assets, and iOS Profile picker labels/options
+- [x] Run `node scripts/export_logos.js`
+- [x] Run `npm run build:ios`
+- [x] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## iOS App Icon Selected Badge Layout
+- [x] Update `plan.md` and `PROGRESS.md` for the app-icon layout follow-up
+- [x] Fix the selected-state badge layout so it does not overlap the icon label on mobile
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Profile Page App Icon Crash Guard
+- [x] Update `plan.md` and `PROGRESS.md` for the Profile crash follow-up
+- [x] Remove the eager native app-icon lookup from Profile page load
+- [x] Guard the app-icon picker behind plugin availability and local fallback state
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Restore iOS App Icon Picker Visibility
+- [x] Update `plan.md` and `PROGRESS.md` for the visibility follow-up
+- [x] Remove the overly strict app-icon visibility gate from Profile
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Restore App Icon Placement In Profile
+- [x] Update `plan.md` and `PROGRESS.md` for the placement follow-up
+- [x] Move the relay email prompt lower so the app-icon picker stays near the top of Profile
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Payment Restructure Completion
+- [x] Inspect the current iOS billing code path and remove paywall-local RevenueCat bootstrap calls
+- [x] Remove tip-checkout RevenueCat bootstrap calls while preserving tip-intent sync
+- [x] Keep the shared RevenueCat helper file stateless-only
+- [x] Clarify `AGENTS.md` so non-destructive escalated local build/test prompts default to yes
+- [x] Run `npm run build:ios`
+- [x] Run `npm run test:e2e:ui`
+- [x] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Apple Private Relay Email Handling
+- [x] Add v38 migration: email_type, email_disabled, email_disabled_reason, real_email columns + backfill
+- [x] Add classifyEmail() helper and set email_type at Apple sign-in (new user, synthetic, account-link paths)
+- [x] Expose email_type and real_email in sanitizeUser()
+- [x] Add email_disabled + synthetic @apple.lovetta.ai exclusions to all 5 scheduler queries
+- [x] Add COALESCE(real_email, email) to scheduler queries for real-email preference
+- [x] Update proactive.js: add email_disabled/email_type to query, guard email send for disabled/synthetic
+- [x] Add /api/email-events bounce webhook endpoint with Svix signature verification
+- [x] Add PUT /api/user/real-email endpoint in user-api.js
+- [x] Create RealEmailPrompt component for relay/synthetic users on Profile page
+- [x] Update plan.md and PROGRESS.md
+- [ ] Run tests (npm run test:e2e:api)
+
+## Global Permission Preference Instruction
+- [x] Update `plan.md` and `PROGRESS.md` for the global permission-preference task
+- [x] Update `AGENTS.md` with explicit default-yes permission wording
+- [x] Populate `/Users/vasily/.codex/AGENTS.md` with the same global operator preference
+- [x] Skip tests because this is instruction-only work
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+- Verification notes:
+- No tests run because this task only updates instruction files and does not change runtime behavior.
+
+## Restore App Icon Placement In Profile
+- [x] Update `plan.md` and `PROGRESS.md` for the placement follow-up
+- [x] Move the relay email prompt lower so the app-icon picker stays near the top of Profile
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Restore App Icon Picker Runtime Wiring
+- [x] Update `plan.md` and `PROGRESS.md` for the runtime-wiring follow-up
+- [ ] Register the local `AppIconPlugin` with the Capacitor bridge
+- [ ] Replace the fragile iOS render gate with a more reliable native-iPhone check
+- [ ] Run `npm run build:ios`
+- [ ] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes

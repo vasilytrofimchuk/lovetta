@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api from '../lib/api'
-import { isCapacitor } from '../lib/platform'
 import { clearOnboardingData, getPostAuthPath, readOnboardingData } from '../lib/onboarding'
 
 const AuthContext = createContext(null)
@@ -89,15 +88,6 @@ export function AuthProvider({ children }) {
       refreshUser()
     }
   }, [refreshUser])
-
-  // Initialize RevenueCat when user authenticates (iOS only)
-  useEffect(() => {
-    if (user?.id && isCapacitor()) {
-      import('../lib/revenuecat').then(({ initRevenueCat }) => {
-        initRevenueCat(user.id).catch(() => {})
-      })
-    }
-  }, [user?.id])
 
   const login = async (email, password) => {
     const { data } = await api.post('/api/auth/login', { email, password })

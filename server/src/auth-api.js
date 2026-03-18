@@ -41,6 +41,13 @@ const resendLimiter = isTest ? (req, res, next) => next() : rateLimit({
 // -- Helpers ----------------------------------------------
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function classifyEmail(email) {
+  if (!email) return 'synthetic';
+  if (email.endsWith('@privaterelay.appleid.com')) return 'relay';
+  if (email.endsWith('@apple.lovetta.ai') || email.endsWith('@telegram.lovetta.ai')) return 'synthetic';
+  return 'real';
+}
+
 function generateReferralCode() {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
@@ -68,6 +75,8 @@ function sanitizeUser(row) {
     email_verified: row.email_verified,
     auth_provider: row.auth_provider,
     created_at: row.created_at,
+    email_type: row.email_type,
+    real_email: row.real_email,
   };
 }
 
@@ -715,8 +724,8 @@ router.post('/apple', authLimiter, async (req, res) => {
           ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ')
           : null;
         await pool.query(
-          'UPDATE users SET apple_id = $1, email_verified = TRUE, display_name = COALESCE(display_name, $2) WHERE id = $3',
-          [appleId, displayName, user.id]
+          'UPDATE users SET apple_id = $1, email_verified = TRUE, display_name = COALESCE(display_name, $2), email_type = COALESCE(email_type, $4) WHERE id = $3',
+          [appleId, displayName, user.id, classifyEmail(email)]
         );
       } else {
         // New user — require age/consent
@@ -740,12 +749,12 @@ router.post('/apple', authLimiter, async (req, res) => {
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
-                              referral_code, referred_by)
-           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12)
+                              referral_code, referred_by, email_type)
+           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12, $13)
            RETURNING *`,
           [email, appleId, displayName, month, year,
            ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
-           refCode, referredBy]
+           refCode, referredBy, classifyEmail(email)]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
@@ -773,8 +782,8 @@ router.post('/apple', authLimiter, async (req, res) => {
       const { rows: [newUser] } = await pool.query(
         `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
                             terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
-                            referral_code, referred_by)
-         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12)
+                            referral_code, referred_by, email_type)
+         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12, 'synthetic')
          RETURNING *`,
         [syntheticEmail, appleId, displayName, month, year,
          ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
