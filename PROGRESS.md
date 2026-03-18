@@ -970,9 +970,15 @@
 - FAILED: Subtract 44px when keyboard open — condition `nextHeight < window.innerHeight` NEVER TRUE because resize:body shrinks both values together
 - FAILED: Delayed scrollTo(0,0) on keyboardDidHide — header shift not fixed
 - Root cause: `KeyboardResize.Body` makes Capacitor resize the WKWebView body, so both `window.innerHeight` and `visualViewport.height` shrink equally. Manual viewport tracking has no effect.
-- [x] Switch to `KeyboardResize.None` so body stays full-size and `visualViewport.height` properly reports keyboard
+- [x] Switch to `KeyboardResize.None` so body stays full-size — visualViewport doesn't update with None either
 - [x] Change capacitor.config.json `resize: "none"` + `style: "dark"`
-- [x] Clean keyboard.js: remove broken conditions, keep viewport tracking + scroll lock + dark style
+- FAILED: KeyboardResize.None + visualViewport.height — vv.height doesn't shrink with None, input stays covered
+- FAILED: KeyboardResize.None + keyboardHeight from event — input works but top shifts (keyboardHeight includes safe area bottom that innerHeight doesn't)
+- FAILED: KeyboardResize.None + min(vv.height, baseHeight - kbHeight) — input ok, top shifts (kbHeight wins and overshoots)
+- FAILED: KeyboardResize.None + only vv.height on keyboardDidShow — vv.height doesn't shrink, both break
+- FAILED: KeyboardResize.None + kbHeight - measured safeAreaBottom — measurement off, both still broken
+- FAILED: KeyboardResize.None + vv.height with resize listener — causes jumping during animation
+- **CURRENT STATE (input WORKS, top BROKEN):** `KeyboardResize.None` + `baseHeight - keyboardHeight` — input fully visible above keyboard, but top header shifts down because keyboardHeight includes safe area bottom (~34px) that innerHeight doesn't
+- [ ] Fix top shift (separate task — needs to account for safe area bottom difference between keyboardHeight and innerHeight)
 - [ ] Run `npm run test:e2e:ui`
 - [ ] Run `npm run build:ios` + manual device test
-- [ ] Update `plan.md` and `PROGRESS.md` with final status

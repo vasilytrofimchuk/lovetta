@@ -1,9 +1,6 @@
 import { isIOS } from './platform'
 
 let baseHeight = 0
-// Safe area bottom (home indicator) — keyboardHeight includes it but
-// baseHeight (innerHeight) does not, so we must subtract it
-let safeAreaBottom = 34
 
 function applyHeight(h) {
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(h)}px`)
@@ -19,14 +16,6 @@ export async function initIosKeyboard() {
   if (!isIOS()) return () => {}
 
   baseHeight = window.innerHeight
-  // Measure safe area bottom from CSS
-  const div = document.createElement('div')
-  div.style.cssText = 'position:fixed;bottom:0;height:env(safe-area-inset-bottom,0px);pointer-events:none;'
-  document.body.appendChild(div)
-  const measured = div.offsetHeight
-  document.body.removeChild(div)
-  if (measured > 0) safeAreaBottom = measured
-
   applyHeight(baseHeight)
 
   let handles = []
@@ -40,9 +29,8 @@ export async function initIosKeyboard() {
 
     handles = await Promise.all([
       Keyboard.addListener('keyboardDidShow', (info) => {
-        const kbHeight = (info.keyboardHeight || 0) - safeAreaBottom
         setKeyboardScrollLock(true)
-        applyHeight(baseHeight - kbHeight)
+        applyHeight(baseHeight - (info.keyboardHeight || 0))
       }),
       Keyboard.addListener('keyboardDidHide', () => {
         setKeyboardScrollLock(false)
