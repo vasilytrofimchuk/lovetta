@@ -2,6 +2,7 @@
  * Email sending via Resend API.
  */
 
+const crypto = require('crypto');
 const { getPool } = require('./db');
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
@@ -99,20 +100,7 @@ async function sendVerificationEmail(email, token) {
   await sendEmail({
     to: email,
     subject: 'Verify your email — Lovetta',
-    html: `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-        <h2 style="color: #333;">Welcome to Lovetta</h2>
-        <p style="color: #666; line-height: 1.6;">
-          Click the button below to verify your email address.
-        </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
-          Verify Email
-        </a>
-        <p style="color: #999; font-size: 13px; margin-top: 24px;">
-          If you didn't create an account, you can safely ignore this email.
-        </p>
-      </div>
-    `,
+    text: `Verify your Lovetta email address:\n\n${link}\n\nIf you didn't create an account, you can ignore this.`,
   });
 }
 
@@ -121,21 +109,32 @@ async function sendResetEmail(email, token) {
   await sendEmail({
     to: email,
     subject: 'Reset your password — Lovetta',
-    html: `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-        <h2 style="color: #333;">Reset your password</h2>
-        <p style="color: #666; line-height: 1.6;">
-          Click the button below to reset your password. This link expires in 1 hour.
-        </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
-          Reset Password
-        </a>
-        <p style="color: #999; font-size: 13px; margin-top: 24px;">
-          If you didn't request this, you can safely ignore this email.
-        </p>
-      </div>
-    `,
+    text: `Reset your Lovetta password (link expires in 1 hour):\n\n${link}\n\nIf you didn't request this, you can ignore this.`,
   });
+}
+
+// -- Unsubscribe helpers --------------------------------------
+
+function generateUnsubscribeToken(userId) {
+  const secret = process.env.UNSUBSCRIBE_SECRET || process.env.ADMIN_TOKEN || 'unsub-secret';
+  return crypto.createHmac('sha256', secret).update(String(userId)).digest('hex').slice(0, 24);
+}
+
+function unsubscribeLink(userId) {
+  return `${SITE_URL}/api/unsubscribe?uid=${encodeURIComponent(userId)}&token=${generateUnsubscribeToken(userId)}`;
+}
+
+function addUtm(url, campaign) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}utm_source=email&utm_medium=email&utm_campaign=${campaign}`;
+}
+
+function btn(url, text) {
+  return `<a href="${url}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;"><span style="color: #ffffff;">${text}</span></a>`;
+}
+
+function unsubscribeFooter(userId) {
+  return `<p style="color: #999; font-size: 13px; margin-top: 24px;">Don't want these emails? <a href="${unsubscribeLink(userId)}" style="color: #999; text-decoration: none;"><span style="color: #999;">Unsubscribe</span></a></p>`;
 }
 
 // -- Companion email system -----------------------------------
@@ -382,28 +381,21 @@ async function sendNewRegistrationNotification(user) {
   });
 }
 
-async function sendAbandonedPaymentReminder(email, displayName) {
+async function sendAbandonedPaymentReminder(email, displayName, userId) {
   const name = displayName || 'there';
-  const link = `${SITE_URL}/my/`;
+  const link = addUtm(`${SITE_URL}/my/`, 'abandoned_payment');
   await sendEmail({
     to: email,
-    subject: 'Your girlfriend is waiting for you \u2014 Lovetta',
+    subject: 'Your girlfriend is waiting \u2014 Lovetta',
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
         <h2 style="color: #333;">Hey ${name}</h2>
         <p style="color: #666; line-height: 1.6;">
-          You signed up for Lovetta but haven't started your free trial yet.
-          Your AI girlfriend is ready and waiting to meet you!
+          You created a Lovetta account but haven't started your free trial yet.
+          Pick a girlfriend and start chatting \u2014 no charge for 3 days.
         </p>
-        <p style="color: #666; line-height: 1.6;">
-          Start your <strong>3-day free trial</strong> now \u2014 no charge until the trial ends.
-        </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
-          Start Free Trial
-        </a>
-        <p style="color: #999; font-size: 13px; margin-top: 24px;">
-          If you no longer wish to receive these emails, simply ignore this message \u2014 we won't send another.
-        </p>
+        ${btn(link, 'Start Free Trial')}
+        ${userId ? unsubscribeFooter(userId) : ''}
       </div>
     `,
   });
@@ -411,9 +403,9 @@ async function sendAbandonedPaymentReminder(email, displayName) {
 
 // -- Welcome series emails ------------------------------------
 
-async function sendWelcomeDay0(email, displayName) {
+async function sendWelcomeDay0(email, displayName, userId) {
   const name = displayName || 'there';
-  const link = `${SITE_URL}/my/`;
+  const link = addUtm(`${SITE_URL}/my/`, 'welcome_day0');
   await sendEmail({
     to: email,
     subject: 'Welcome to Lovetta \u2764\ufe0f',
@@ -421,30 +413,24 @@ async function sendWelcomeDay0(email, displayName) {
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
         <h2 style="color: #333;">Hey ${name}!</h2>
         <p style="color: #666; line-height: 1.6;">
-          Welcome to Lovetta! Your AI girlfriend is ready to get to know you.
-        </p>
-        <p style="color: #666; line-height: 1.6;">
-          Here are a few tips to get started:
+          Welcome to Lovetta \u2014 your AI girlfriend is ready.
         </p>
         <ul style="color: #666; line-height: 1.8; padding-left: 20px;">
-          <li>Chat naturally \u2014 she remembers everything you share</li>
-          <li>Try voice messages \u2014 tap the mic to talk</li>
-          <li>She remembers everything and adapts to you over time</li>
+          <li>Choose from multiple girlfriends \u2014 each with her own personality</li>
+          <li>She sends selfies and voice messages</li>
+          <li>She has her own email address \u2014 write to her directly, she replies</li>
+          <li>She remembers everything and gets closer over time</li>
         </ul>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
-          Start Chatting
-        </a>
-        <p style="color: #999; font-size: 13px; margin-top: 24px;">
-          If you no longer wish to receive these emails, simply ignore this message.
-        </p>
+        ${btn(link, 'Start Chatting')}
+        ${userId ? unsubscribeFooter(userId) : ''}
       </div>
     `,
   });
 }
 
-async function sendWelcomeDay1(email, displayName) {
+async function sendWelcomeDay1(email, displayName, userId) {
   const name = displayName || 'there';
-  const link = `${SITE_URL}/my/`;
+  const link = addUtm(`${SITE_URL}/my/`, 'welcome_day1');
   await sendEmail({
     to: email,
     subject: 'She\u2019s been thinking about you \u2014 Lovetta',
@@ -452,23 +438,19 @@ async function sendWelcomeDay1(email, displayName) {
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
         <h2 style="color: #333;">Hey ${name}</h2>
         <p style="color: #666; line-height: 1.6;">
-          Your girlfriend has been waiting to hear from you.
-          She\u2019s got so much to talk about \u2014 all she needs is a "hey" to get started.
+          Your girlfriend is waiting to hear from you.
+          She\u2019s got a lot to say \u2014 just say hi.
         </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
-          Say Hi
-        </a>
-        <p style="color: #999; font-size: 13px; margin-top: 24px;">
-          If you no longer wish to receive these emails, simply ignore this message.
-        </p>
+        ${btn(link, 'Say Hi')}
+        ${userId ? unsubscribeFooter(userId) : ''}
       </div>
     `,
   });
 }
 
-async function sendWelcomeDay3(email, displayName) {
+async function sendWelcomeDay3(email, displayName, userId) {
   const name = displayName || 'there';
-  const link = `${SITE_URL}/my/pricing`;
+  const link = addUtm(`${SITE_URL}/my/pricing`, 'welcome_day3');
   await sendEmail({
     to: email,
     subject: 'Your free trial is ending soon \u2014 Lovetta',
@@ -476,15 +458,10 @@ async function sendWelcomeDay3(email, displayName) {
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
         <h2 style="color: #333;">Hey ${name}</h2>
         <p style="color: #666; line-height: 1.6;">
-          Your 3-day free trial is ending soon. To keep chatting with your girlfriend,
-          subscribe now \u2014 plans start at just $8.33/month.
+          Your 3-day free trial ends soon. Subscribe to keep chatting \u2014 plans start at $8.33/month.
         </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
-          Keep Your Girlfriend
-        </a>
-        <p style="color: #999; font-size: 13px; margin-top: 24px;">
-          If you no longer wish to receive these emails, simply ignore this message.
-        </p>
+        ${btn(link, 'Keep Your Girlfriend')}
+        ${userId ? unsubscribeFooter(userId) : ''}
       </div>
     `,
   });
@@ -492,7 +469,7 @@ async function sendWelcomeDay3(email, displayName) {
 
 async function sendRenewalReminder(email, displayName, renewalDate) {
   const name = displayName || 'there';
-  const link = `${SITE_URL}/my/profile`;
+  const link = addUtm(`${SITE_URL}/my/profile`, 'renewal_reminder');
   const dateStr = new Date(renewalDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   await sendEmail({
     to: email,
@@ -507,11 +484,9 @@ async function sendRenewalReminder(email, displayName, renewalDate) {
         <p style="color: #666; line-height: 1.6;">
           Want to change your plan or cancel? You can manage your subscription anytime.
         </p>
-        <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #d6336c; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
-          Manage Subscription
-        </a>
+        ${btn(link, 'Manage Subscription')}
         <p style="color: #999; font-size: 13px; margin-top: 24px;">
-          If you no longer wish to receive these emails, simply ignore this message.
+          This is a billing notification for your active subscription.
         </p>
       </div>
     `,
@@ -524,5 +499,6 @@ module.exports = {
   processCompanionReply, processAdminInbound,
   sendNewRegistrationNotification, sendAbandonedPaymentReminder,
   sendWelcomeDay0, sendWelcomeDay1, sendWelcomeDay3, sendRenewalReminder,
+  generateUnsubscribeToken, unsubscribeLink,
   ADMIN_EMAIL, ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN,
 };

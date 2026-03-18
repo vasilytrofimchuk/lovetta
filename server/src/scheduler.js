@@ -52,12 +52,13 @@ async function runAbandonedPaymentReminders() {
         AND s.id IS NULL
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
     `);
 
     for (const user of rows) {
       try {
         if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
-        await sendAbandonedPaymentReminder(user.email, user.display_name);
+        await sendAbandonedPaymentReminder(user.email, user.display_name, user.id);
         await pool.query(
           `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'abandoned_payment') ON CONFLICT DO NOTHING`,
           [user.id]
@@ -91,12 +92,13 @@ async function runWelcomeEmailSeries() {
       WHERE u.created_at > NOW() - INTERVAL '1 hour'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
     `);
 
     for (const user of day0) {
       try {
         if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
-        await sendWelcomeDay0(user.email, user.display_name);
+        await sendWelcomeDay0(user.email, user.display_name, user.id);
         await pool.query(
           `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'welcome_day0') ON CONFLICT DO NOTHING`,
           [user.id]
@@ -118,12 +120,13 @@ async function runWelcomeEmailSeries() {
         AND r.id IS NULL
         AND m.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
     `);
 
     for (const user of day1) {
       try {
         if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
-        await sendWelcomeDay1(user.email, user.display_name);
+        await sendWelcomeDay1(user.email, user.display_name, user.id);
         await pool.query(
           `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'welcome_day1') ON CONFLICT DO NOTHING`,
           [user.id]
@@ -143,12 +146,13 @@ async function runWelcomeEmailSeries() {
       WHERE u.created_at BETWEEN NOW() - INTERVAL '73 hours' AND NOW() - INTERVAL '71 hours'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
     `);
 
     for (const user of day3) {
       try {
         if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
-        await sendWelcomeDay3(user.email, user.display_name);
+        await sendWelcomeDay3(user.email, user.display_name, user.id);
         await pool.query(
           `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'welcome_day3') ON CONFLICT DO NOTHING`,
           [user.id]
