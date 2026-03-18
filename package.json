@@ -10,6 +10,7 @@
     "dev": "node scripts/run-dev.js",
     "dev:agent": "node scripts/run-dev-agent.js",
     "build": "npm -w web run build",
+    "postinstall": "patch-package",
     "heroku-postbuild": "npm run build",
     "migrate": "node server/src/migrate.js",
     "kill:dev": "node scripts/kill-lovetta-runtime.js && node scripts/kill-ports.js 3900 5173",
