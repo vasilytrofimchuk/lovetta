@@ -216,8 +216,8 @@ export default function useChat(companionId) {
                 created_at: new Date().toISOString(),
               });
             } else if (event.type === 'error') {
-              if (event.code === 'subscription_required') {
-                setError('subscription_required');
+              if (event.code === 'subscription_required' || event.code === 'free_limit_reached') {
+                setError(event.code);
               } else {
                 setError("She's a bit overwhelmed right now. Try again in a moment.");
               }
@@ -342,10 +342,12 @@ export default function useChat(companionId) {
 
   const showMediaButton = mediaEnabled && messagesSinceLastMedia >= mediaButtonThresholdRef.current;
 
+  const clearError = () => setError(null);
+
   return {
     messages, companion, setCompanion, conversation, loading, streaming, streamingText,
     hasMore, error, shouldRequestTip, tipPromoMessage,
     mediaLoading, mediaLoadingType, showMediaButton,
-    loadChat, loadMore, sendMessage, triggerNext, requestMedia, dismissTip,
+    loadChat, loadMore, sendMessage, triggerNext, requestMedia, dismissTip, clearError,
   };
 }

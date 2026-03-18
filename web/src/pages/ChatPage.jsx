@@ -6,6 +6,7 @@ import MessageList from '../components/chat/MessageList';
 import ChatInput from '../components/chat/ChatInput';
 import CompanionSheet from '../components/chat/CompanionSheet';
 import ReportModal from '../components/chat/ReportModal';
+import PlanModal from '../components/PlanModal';
 import { isCapacitor } from '../lib/platform';
 
 export default function ChatPage() {
@@ -16,7 +17,7 @@ export default function ChatPage() {
     messages, companion, setCompanion, loading, streaming, streamingText,
     hasMore, error, tipPromoMessage,
     mediaLoading, mediaLoadingType, showMediaButton,
-    loadChat, loadMore, sendMessage, triggerNext, requestMedia, dismissTip,
+    loadChat, loadMore, sendMessage, triggerNext, requestMedia, dismissTip, clearError,
   } = useChat(companionId);
   const [showSheet, setShowSheet] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -68,31 +69,6 @@ export default function ChatPage() {
     );
   }
 
-  if (error === 'subscription_required') {
-    return (
-      <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
-        <div className="max-w-sm text-center">
-          <div className="text-5xl mb-4">💜</div>
-          <h2 className="text-xl font-semibold text-brand-text mb-2">She's waiting for you</h2>
-          <p className="text-brand-text-secondary mb-6">
-            Start your free trial to talk with {companion?.name || 'her'}. 3 days free, cancel anytime.
-          </p>
-          <button
-            onClick={() => navigate('/pricing')}
-            className="px-6 py-3 rounded-xl bg-brand-accent text-white font-semibold hover:bg-brand-accent-hover transition-colors"
-          >
-            View Plans
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="block mx-auto mt-3 text-sm text-brand-muted hover:text-brand-text transition-colors"
-          >
-            Go back
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const chatHeight = isCapacitor()
     ? 'calc(100vh - env(safe-area-inset-top, 0px))'
@@ -122,7 +98,7 @@ export default function ChatPage() {
       />
 
       {/* Error banner */}
-      {error && error !== 'subscription_required' && (
+      {error && error !== 'subscription_required' && error !== 'free_limit_reached' && (
         <div className="px-4 py-2 bg-brand-error/10 border-t border-brand-error/20 text-center">
           <span className="text-sm text-brand-error">{error}</span>
         </div>
@@ -148,6 +124,12 @@ export default function ChatPage() {
           onClose={() => setShowReport(false)}
         />
       )}
+
+      <PlanModal
+        isOpen={error === 'subscription_required' || error === 'free_limit_reached'}
+        onClose={clearError}
+        onSuccess={clearError}
+      />
     </div>
   );
 }

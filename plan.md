@@ -403,3 +403,11 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - [x] `email_reminders` table for dedup tracking
 - [x] Hourly scheduler (setInterval) with 24-48h window query
 - [x] Brand color fix: `#ec4899` → `#d6336c` in verification/reset email templates
+
+## Phase N: Universal Subscription UX + Free Message Tier + iOS Onboarding — IN PROGRESS
+- Universal PlanModal component (same look as iOS Pricing page, works as popup or full-screen)
+- Free user cost threshold (tip_request_threshold_free_usd, default $0.10, same logic as trial threshold)
+- Post-signup plan modal for web users
+- iOS WelcomeScreen (rotator + features + Continue button)
+- Chat error: PlanModal overlay instead of full-page replacement
+- Admin setting for free user threshold

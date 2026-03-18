@@ -101,6 +101,8 @@ export default function Signup() {
       await signup({ email, password, birthMonth: parseInt(birthMonth), birthYear: parseInt(birthYear), termsAccepted, privacyAccepted, aiConsentAccepted, referralCode })
       if (nativeApp) {
         handleAccountCreated()
+      } else {
+        navigate('/?newUser=true')
       }
     } catch (err) {
       setError(getErrorMessage(err))
@@ -143,8 +145,8 @@ export default function Signup() {
   if (nativeApp && step === 1) {
     return (
       <div className="min-h-screen bg-brand-bg flex flex-col justify-center p-6">
-        <div className="text-center mb-8">
-          <img src={logoSrc} alt="Lovetta" className="h-14 mx-auto mb-6" />
+        <div className="text-center mb-5">
+          <img src={logoSrc} alt="Lovetta" className="h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-brand-text">Verify your age</h1>
           <p className="text-brand-text-secondary mt-2">You must be 18+ to use Lovetta</p>
         </div>
@@ -156,26 +158,26 @@ export default function Signup() {
             onChange={({ birthMonth: m, birthYear: y }) => { setBirthMonth(m); setBirthYear(y) }}
           />
 
-          <div className="space-y-4 pt-2">
-            <label className="flex items-start gap-3 cursor-pointer">
+          <div className="space-y-1 pt-1">
+            <label className="flex items-center gap-3 cursor-pointer py-3 px-1">
               <input type="checkbox" checked={termsChecked} onChange={e => setTermsChecked(e.target.checked)}
-                className="mt-0.5 w-5 h-5 accent-brand-accent flex-shrink-0" />
+                className="w-6 h-6 accent-brand-accent flex-shrink-0" />
               <span className="text-sm text-brand-text-secondary leading-relaxed">
                 I agree to the{' '}
                 <button type="button" onClick={() => openLink('https://lovetta.ai/terms.html')} className="text-brand-accent underline">Terms of Service</button>
               </span>
             </label>
-            <label className="flex items-start gap-3 cursor-pointer">
+            <label className="flex items-center gap-3 cursor-pointer py-3 px-1">
               <input type="checkbox" checked={privacyChecked} onChange={e => setPrivacyChecked(e.target.checked)}
-                className="mt-0.5 w-5 h-5 accent-brand-accent flex-shrink-0" />
+                className="w-6 h-6 accent-brand-accent flex-shrink-0" />
               <span className="text-sm text-brand-text-secondary leading-relaxed">
                 I agree to the{' '}
                 <button type="button" onClick={() => openLink('https://lovetta.ai/privacy.html')} className="text-brand-accent underline">Privacy Policy</button>
               </span>
             </label>
-            <label className="flex items-start gap-3 cursor-pointer">
+            <label className="flex items-center gap-3 cursor-pointer py-3 px-1">
               <input type="checkbox" checked={aiConsentChecked} onChange={e => setAiConsentChecked(e.target.checked)}
-                className="mt-0.5 w-5 h-5 accent-brand-accent flex-shrink-0" />
+                className="w-6 h-6 accent-brand-accent flex-shrink-0" />
               <span className="text-sm text-brand-text-secondary leading-relaxed">
                 I understand my messages are processed by AI services
               </span>

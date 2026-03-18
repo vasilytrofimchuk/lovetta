@@ -14,7 +14,9 @@ const {
   hashToken,
 } = require('./jwt');
 const { authenticate } = require('./auth-middleware');
-const { sendVerificationEmail, sendResetEmail, sendNewRegistrationNotification } = require('./email');
+const { sendVerificationEmail, sendResetEmail, sendNewRegistrationNotification, sendAppleReviewerLoginAlert } = require('./email');
+
+const APPLE_REVIEWER_ID = '00000000-0000-0000-0000-000000001234';
 
 const crypto = require('crypto');
 
@@ -185,6 +187,10 @@ router.post('/login', authLimiter, async (req, res) => {
 
     // Update activity (non-blocking)
     pool.query('UPDATE users SET last_activity = NOW() WHERE id = $1', [user.id]).catch(() => {});
+
+    if (user.id === APPLE_REVIEWER_ID) {
+      sendAppleReviewerLoginAlert(user).catch(() => {});
+    }
 
     res.json({ user: sanitizeUser(user), accessToken, refreshToken });
   } catch (err) {

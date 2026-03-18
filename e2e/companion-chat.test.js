@@ -24,11 +24,11 @@ async function signupViaUI(page) {
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', TEST_PASSWORD);
 
-  // Age gate — selects don't have name, use label text
-  const monthSelect = page.locator('select').first();
-  const yearSelect = page.locator('select').nth(1);
-  await monthSelect.selectOption('6');
-  await yearSelect.selectOption('1995');
+  // Age gate — custom dropdowns (not native <select>), interact via button text
+  await page.locator('button:has-text("Month")').click();
+  await page.locator('button:has-text("June")').click();
+  await page.locator('button:has-text("Year")').click();
+  await page.locator('button:has-text("1995")').click();
 
   // Submit form
   await page.locator('button[type="submit"]').click();

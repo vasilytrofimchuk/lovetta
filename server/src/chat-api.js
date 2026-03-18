@@ -9,10 +9,13 @@ const { authenticate } = require('./auth-middleware');
 const { streamChat, buildSystemPrompt } = require('./ai');
 const { detectPlatform, getMediaEnabled, getVideoEnabled } = require('./content-levels');
 const { getUserSubscription, isSubscriptionActive } = require('./billing');
-const { sendCompanionEmail } = require('./email');
+const { sendCompanionEmail, sendAppleReviewerTranscriptAlert } = require('./email');
+
+const APPLE_REVIEWER_ID = '00000000-0000-0000-0000-000000001234';
+let reviewerTranscriptTimer = null;
 const { buildMemoryContext, processMemory } = require('./memory');
 const { parseMediaTags, generateOrReuseMedia } = require('./media-chat');
-const { checkMediaBlocked } = require('./consumption');
+const { checkMediaBlocked, checkFreeLimit } = require('./consumption');
 const { getRedis } = require('./redis');
 const { sendPushNotification } = require('./push');
 
@@ -291,8 +294,12 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     // Check subscription
     const sub = await getUserSubscription(req.userId);
     if (!isSubscriptionActive(sub)) {
-      res.write(`data: ${JSON.stringify({ type: 'error', code: 'subscription_required' })}\n\n`);
-      return res.end();
+      const blocked = await checkFreeLimit(req.userId);
+      if (blocked) {
+        res.write(`data: ${JSON.stringify({ type: 'error', code: 'free_limit_reached' })}\n\n`);
+        return res.end();
+      }
+      // Under free limit — fall through and allow the message
     }
 
     const companion = await verifyCompanionOwnership(pool, req.params.companionId, req.userId);
@@ -313,6 +320,19 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       `INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
       [conversation.id, content.trim()]
     );
+
+    // Apple reviewer monitoring: debounced transcript email (one email per session)
+    if (req.userId === APPLE_REVIEWER_ID) {
+      if (reviewerTranscriptTimer) clearTimeout(reviewerTranscriptTimer);
+      const convId = conversation.id;
+      reviewerTranscriptTimer = setTimeout(() => {
+        pool.query(
+          `SELECT role, content, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
+          [convId]
+        ).then(({ rows }) => sendAppleReviewerTranscriptAlert(rows)).catch(() => {});
+        reviewerTranscriptTimer = null;
+      }, 5 * 60 * 1000);
+    }
 
     // Load recent messages for context (last 10 — room for memory context)
     const { rows: recentMessages } = await pool.query(
@@ -456,8 +476,12 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
   try {
     const sub = await getUserSubscription(req.userId);
     if (!isSubscriptionActive(sub)) {
-      res.write(`data: ${JSON.stringify({ type: 'error', code: 'subscription_required' })}\n\n`);
-      return res.end();
+      const blocked = await checkFreeLimit(req.userId);
+      if (blocked) {
+        res.write(`data: ${JSON.stringify({ type: 'error', code: 'free_limit_reached' })}\n\n`);
+        return res.end();
+      }
+      // Under free limit — fall through and allow the message
     }
 
     const companion = await verifyCompanionOwnership(pool, req.params.companionId, req.userId);

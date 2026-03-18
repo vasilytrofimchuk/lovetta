@@ -109,6 +109,31 @@ async function _checkThreshold(pool, userId, subscription) {
 }
 
 /**
+ * Check if a free (unsubscribed) user has exceeded the free cost threshold.
+ * Returns true if they should be blocked (show plan modal).
+ */
+async function checkFreeLimit(userId) {
+  const pool = getPool();
+  if (!pool) return false;
+
+  const { rows: costRows } = await pool.query(
+    `SELECT COALESCE(SUM(cost_usd), 0) AS monthly_cost
+     FROM api_consumption
+     WHERE user_id = $1 AND created_at >= date_trunc('month', NOW())`,
+    [userId]
+  );
+  const monthlyCost = parseFloat(costRows[0].monthly_cost);
+
+  const { rows: settings } = await pool.query(
+    `SELECT value FROM app_settings WHERE key = 'tip_request_threshold_free_usd'`
+  );
+  const threshold = parseFloat(settings[0]?.value || '0.10');
+
+  if (threshold === 0) return false; // 0 = no free tier, subscription required immediately
+  return monthlyCost >= threshold;
+}
+
+/**
  * Invalidate threshold cache for a user (call after tip payment).
  */
 async function invalidateThresholdCache(userId) {
@@ -252,6 +277,7 @@ module.exports = {
   trackConsumption,
   resetTipCounter,
   checkMediaBlocked,
+  checkFreeLimit,
   invalidateThresholdCache,
   getConsumptionSummary,
 };

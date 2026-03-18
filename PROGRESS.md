@@ -463,3 +463,18 @@
 - [x] web/src/components/SupportChat.jsx: in-app modal panel, brand-themed, 10s poll, auto-scroll
 - [x] web/src/pages/Profile.jsx: Contact Support button + SupportChat modal
 - [x] public/admin.html: Support tab — filter buttons, chat list, detail with reply + resolve, 30s auto-refresh, badge with unread count
+
+## Universal Subscription UX + Free Message Tier + iOS Onboarding
+- [x] server/src/consumption.js: add checkFreeLimit(userId) — checks monthly cost vs tip_request_threshold_free_usd
+- [x] server/src/chat-api.js: pre-subscription check at 2 spots (chat + proactive) — free_limit_reached error code; media always requires subscription
+- [x] server/src/migrate.js: v34_free_user_threshold migration — seeds tip_request_threshold_free_usd = "0.10"
+- [x] public/admin.html: add Free User Threshold (USD) input to AI Settings
+- [x] web/src/components/PlanModal.jsx: NEW — universal plan selection modal (exact iOS UI, fullScreen prop for page use)
+- [x] web/src/pages/WelcomeScreen.jsx: NEW — iOS pre-signup rotator (fetches /api/companions/templates/preview, features list, Continue button)
+- [x] web/src/App.jsx: add /welcome route (PublicRoute); ProtectedRoute iOS redirect → /welcome
+- [x] web/src/pages/Signup.jsx: after web signup success, navigate('/?newUser=true')
+- [x] web/src/pages/CompanionList.jsx: auto-show PlanModal on ?newUser=true or first visit; smarter subscription banner with View Plans button
+- [x] web/src/pages/Pricing.jsx: iOS branch replaced with <PlanModal fullScreen />; web branch unchanged
+- [x] web/src/hooks/useChat.js: handle free_limit_reached error; add clearError()
+- [x] web/src/components/chat/ChatPage.jsx: remove full-page subscription_required screen; add PlanModal overlay for subscription_required + free_limit_reached
+- [x] e2e/companion-chat.test.js + wizard-nav.test.js: fix signupViaUI() to use custom dropdown buttons instead of native <select> (AgeGate uses CustomSelect component)

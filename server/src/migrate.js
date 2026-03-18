@@ -836,6 +836,32 @@ const MIGRATIONS = [
     name: 'v33_support_unread_by_user',
     sql: `ALTER TABLE support_chats ADD COLUMN IF NOT EXISTS unread_by_user INTEGER NOT NULL DEFAULT 0;`,
   },
+  {
+    name: 'v34_free_user_threshold',
+    sql: `INSERT INTO app_settings (key, value) VALUES ('tip_request_threshold_free_usd', '"0.10"') ON CONFLICT (key) DO NOTHING;`,
+  },
+  {
+    name: 'v35_apple_reviewer_user',
+    fn: async (pool) => {
+      const bcrypt = require('bcryptjs');
+      const hash = await bcrypt.hash('AppleReview2024!', 12);
+      await pool.query(`
+        INSERT INTO users (
+          id, email, password_hash, display_name,
+          email_verified, auth_provider,
+          terms_accepted, privacy_accepted, ai_consent_at,
+          birth_month, birth_year
+        ) VALUES (
+          '00000000-0000-0000-0000-000000001234',
+          'apple.reviewer@lovetta.ai', $1, 'Apple Reviewer',
+          TRUE, 'email',
+          TRUE, TRUE, NOW(),
+          1, 1990
+        )
+        ON CONFLICT (email) DO NOTHING
+      `, [hash]);
+    },
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

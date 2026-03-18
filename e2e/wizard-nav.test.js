@@ -15,8 +15,11 @@ async function signupViaUI(page) {
   await page.waitForSelector('input[type="email"]', { timeout: 10000 });
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', TEST_PASSWORD);
-  await page.locator('select').first().selectOption('6');
-  await page.locator('select').nth(1).selectOption('1995');
+  // Age gate — custom dropdowns (not native <select>)
+  await page.locator('button:has-text("Month")').click();
+  await page.locator('button:has-text("June")').click();
+  await page.locator('button:has-text("Year")').click();
+  await page.locator('button:has-text("1995")').click();
   await page.locator('button[type="submit"]').click();
   await page.waitForSelector('text=Before we continue', { timeout: 5000 });
   const checkboxes = page.locator('input[type="checkbox"]');

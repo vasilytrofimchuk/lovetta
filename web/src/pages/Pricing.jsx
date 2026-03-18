@@ -1,15 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api, { getErrorMessage } from '../lib/api'
 import { isAppStore } from '../lib/platform'
-import { Browser } from '@capacitor/browser'
-import { isCapacitor } from '../lib/platform'
-
-function openLink(url) {
-  if (isCapacitor()) Browser.open({ url, presentationStyle: 'popover' })
-  else window.open(url, '_blank')
-}
+import PlanModal from '../components/PlanModal'
 
 export default function Pricing() {
   const { user } = useAuth()
@@ -17,72 +11,20 @@ export default function Pricing() {
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(null)
   const [subLoading, setSubLoading] = useState(true)
-  const [offerings, setOfferings] = useState(null)
-  const [restoring, setRestoring] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState('yearly')
-  const pendingPlanRef = useRef(null)
 
   useEffect(() => {
-    // Load offerings first for AppStore, then billing status
-    const init = async () => {
-      if (isAppStore()) {
-        try {
-          const { getOfferings } = await import('../lib/revenuecat')
-          const o = await getOfferings()
-          setOfferings(o)
-        } catch {}
-      }
-
-      try {
-        const { data } = await api.get('/api/billing/status')
-        setSubscription(data)
-        if (!data?.hasSubscription) {
-          const plan = localStorage.getItem('lovetta-selected-plan')
-          if (plan === 'monthly' || plan === 'yearly') {
-            localStorage.removeItem('lovetta-selected-plan')
-            pendingPlanRef.current = plan
-            setSelectedPlan(plan)
-          }
-        } else {
-          localStorage.removeItem('lovetta-selected-plan')
-        }
-      } catch {} finally {
-        setSubLoading(false)
-      }
-    }
-    init()
+    api.get('/api/billing/status').then(({ data }) => {
+      setSubscription(data)
+    }).catch(() => {}).finally(() => setSubLoading(false))
   }, [])
 
-  // Auto-trigger purchase once both offerings and pending plan are known
-  useEffect(() => {
-    if (offerings && pendingPlanRef.current && !subLoading) {
-      const plan = pendingPlanRef.current
-      pendingPlanRef.current = null
-      handleSubscribe(plan)
-    }
-  }, [offerings, subLoading])
-
+  // Web-only subscribe handler (web plan selection buttons)
   const handleSubscribe = async (plan) => {
     setLoading(plan)
     try {
-      if (isAppStore()) {
-        const o = offerings
-        if (!o) throw new Error('Offerings not available yet')
-        const pkg = plan === 'yearly'
-          ? (o.annual || o.availablePackages?.find(p => p.identifier?.includes('year') || p.identifier?.includes('annual')))
-          : (o.monthly || o.availablePackages?.find(p => p.identifier?.includes('month')))
-        if (!pkg) throw new Error('Package not available')
-        const { purchasePackage } = await import('../lib/revenuecat')
-        await purchasePackage(pkg)
-        const { data } = await api.get('/api/billing/status')
-        setSubscription(data)
-        if (data?.hasSubscription) navigate('/')
-      } else {
-        const { data } = await api.post('/api/billing/subscribe', { plan })
-        window.location.href = data.url
-      }
+      const { data } = await api.post('/api/billing/subscribe', { plan })
+      window.location.href = data.url
     } catch (err) {
-      if (err?.code === 'PURCHASE_CANCELLED' || err?.userCancelled) return
       alert(getErrorMessage(err))
     } finally {
       setLoading(null)
@@ -99,25 +41,6 @@ export default function Pricing() {
       window.location.href = data.url
     } catch (err) {
       alert(getErrorMessage(err))
-    }
-  }
-
-  const handleRestore = async () => {
-    setRestoring(true)
-    try {
-      const { restorePurchases } = await import('../lib/revenuecat')
-      await restorePurchases()
-      const { data } = await api.get('/api/billing/status')
-      setSubscription(data)
-      if (data?.hasSubscription) {
-        navigate('/')
-      } else {
-        alert('No previous purchases found.')
-      }
-    } catch (err) {
-      alert(getErrorMessage(err))
-    } finally {
-      setRestoring(false)
     }
   }
 
@@ -162,124 +85,15 @@ export default function Pricing() {
     )
   }
 
-  // AppStore plan selection — landing-page style
+  // AppStore: use PlanModal in fullScreen mode (same look as before, now powered by PlanModal)
   if (isAppStore()) {
     return (
-      <div className="bg-brand-bg flex flex-col px-5" style={{
-        minHeight: '100vh',
-        paddingTop: 'max(env(safe-area-inset-top, 0px) + 20px, 40px)',
-        paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 12px, 24px)',
-      }}>
-        <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-brand-text">Start Free Trial</h2>
-          <p className="text-brand-text-secondary text-sm mt-1">Meet your AI girlfriend. Cancel anytime.</p>
-        </div>
-
-        {/* Plan cards */}
-        <div className="grid grid-cols-2 gap-2.5 mb-6">
-          <button
-            onClick={() => setSelectedPlan('monthly')}
-            className={`relative rounded-lg p-4 text-center cursor-pointer transition-all border-[1.5px] bg-brand-surface ${
-              selectedPlan === 'monthly'
-                ? 'border-brand-accent shadow-[0_0_16px_rgba(214,51,108,0.3)]'
-                : 'border-brand-border hover:border-brand-muted'
-            }`}
-          >
-            <div className={`w-[18px] h-[18px] rounded-full border-2 mx-auto mb-2 transition-all ${
-              selectedPlan === 'monthly'
-                ? 'border-brand-accent bg-brand-accent shadow-[inset_0_0_0_3px_#1a1128]'
-                : 'border-brand-border'
-            }`} />
-            <div className="text-[0.75rem] text-brand-muted uppercase tracking-wide font-semibold mb-1">Monthly</div>
-            <div className="text-2xl font-extrabold text-brand-text leading-tight">$19.99</div>
-            <div className="text-[0.78rem] text-brand-text-secondary mt-0.5">per month</div>
-          </button>
-
-          <button
-            onClick={() => setSelectedPlan('yearly')}
-            className={`relative rounded-lg p-4 text-center cursor-pointer transition-all border-[1.5px] bg-brand-surface ${
-              selectedPlan === 'yearly'
-                ? 'border-brand-accent shadow-[0_0_16px_rgba(214,51,108,0.3)]'
-                : 'border-brand-border hover:border-brand-muted'
-            }`}
-          >
-            <span className="absolute -top-[9px] left-1/2 -translate-x-1/2 bg-brand-accent text-white text-[0.65rem] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap">
-              Best value
-            </span>
-            <div className={`w-[18px] h-[18px] rounded-full border-2 mx-auto mb-2 transition-all ${
-              selectedPlan === 'yearly'
-                ? 'border-brand-accent bg-brand-accent shadow-[inset_0_0_0_3px_#1a1128]'
-                : 'border-brand-border'
-            }`} />
-            <div className="text-[0.75rem] text-brand-muted uppercase tracking-wide font-semibold mb-1">Yearly</div>
-            <div className="text-2xl font-extrabold text-brand-text leading-tight">$99.99</div>
-            <div className="text-[0.78rem] text-brand-text-secondary mt-0.5">per year</div>
-            <div className="text-[0.7rem] text-green-400 font-semibold mt-1.5">$8.33/mo — save 58%</div>
-          </button>
-        </div>
-
-        {/* Trial timeline */}
-        <div className="flex items-start justify-center mb-4 px-4">
-          <div className="flex flex-col items-center flex-1">
-            <div className="w-2 h-2 rounded-full bg-brand-accent border-2 border-brand-accent shadow-[0_0_8px_rgba(214,51,108,0.3)] mb-1.5" />
-            <div className="text-[0.68rem] font-bold text-brand-text leading-none">Today</div>
-            <div className="text-[0.6rem] text-brand-muted mt-0.5 whitespace-nowrap">Full access, free</div>
-          </div>
-          <div className="h-px flex-1 min-w-4 bg-brand-border mt-1" />
-          <div className="flex flex-col items-center flex-1">
-            <div className="w-2 h-2 rounded-full bg-brand-card border-2 border-brand-muted mb-1.5" />
-            <div className="text-[0.68rem] font-bold text-brand-text leading-none">Day 3</div>
-            <div className="text-[0.6rem] text-brand-muted mt-0.5">Trial ends</div>
-          </div>
-          <div className="h-px flex-1 min-w-4 bg-brand-border mt-1" />
-          <div className="flex flex-col items-center flex-1">
-            <div className="w-2 h-2 rounded-full bg-brand-card border-2 border-brand-text-secondary mb-1.5" />
-            <div className="text-[0.68rem] font-bold text-brand-text leading-none">Day 4</div>
-            <div className="text-[0.6rem] text-brand-muted mt-0.5">First charge</div>
-          </div>
-        </div>
-
-        {/* Features */}
-        <ul className="list-none p-0 mb-4 space-y-1.5">
-          {['Unlimited messages with your girlfriend', 'Unique personality & memory', 'Voice messages & photos'].map(f => (
-            <li key={f} className="flex items-start gap-2 text-[0.82rem] text-brand-text-secondary">
-              <span className="text-brand-accent font-bold text-[0.9rem] leading-none mt-px flex-shrink-0">✓</span>
-              <span>{f}</span>
-            </li>
-          ))}
-        </ul>
-
-        {/* Spacer pushes buttons to bottom */}
-        <div className="flex-1" />
-
-        {/* Trial note + links */}
-        <p className="text-[0.72rem] text-brand-muted text-center leading-snug mb-4">
-          3-day free trial, then auto-renews. Cancel anytime — no charge during trial.{' '}
-          <button type="button" onClick={() => openLink('https://lovetta.ai/privacy.html')} className="text-brand-accent underline">Privacy Policy</button>
-          {' · '}
-          <button type="button" onClick={() => openLink('https://lovetta.ai/terms.html')} className="text-brand-accent underline">Terms of Service</button>
-        </p>
-
-        <button
-          onClick={() => handleSubscribe(selectedPlan)}
-          disabled={!!loading}
-          className="w-full py-3.5 bg-brand-accent text-white rounded-xl font-semibold text-base hover:bg-brand-accent-hover transition-colors disabled:opacity-60"
-        >
-          {loading ? 'Processing...' : 'Start Free Trial'}
-        </button>
-
-        <button
-          onClick={handleRestore}
-          disabled={restoring}
-          className="w-full py-3 text-brand-muted text-sm hover:text-brand-text-secondary transition-colors mt-1"
-        >
-          {restoring ? 'Restoring...' : 'Restore Purchases'}
-        </button>
-
-        <button onClick={() => navigate('/')} className="w-full py-2 text-brand-muted text-sm mt-1">
-          Skip for now
-        </button>
-      </div>
+      <PlanModal
+        isOpen={true}
+        onClose={() => navigate('/')}
+        onSuccess={() => navigate('/')}
+        fullScreen
+      />
     )
   }
 

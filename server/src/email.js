@@ -493,6 +493,53 @@ async function sendRenewalReminder(email, displayName, renewalDate) {
   });
 }
 
+async function sendAppleReviewerLoginAlert(user) {
+  await sendEmail({
+    to: ADMIN_FORWARD_EMAIL,
+    subject: '🍎 Apple reviewer logged in',
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+        <h3 style="color: #333;">Apple Reviewer Connected</h3>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Country:</strong> ${user.country || 'unknown'}</p>
+        <p><strong>Time:</strong> ${new Date().toISOString()}</p>
+      </div>
+    `,
+  });
+}
+
+async function sendAppleReviewerTranscriptAlert(messages) {
+  if (!messages || messages.length === 0) return;
+  const lines = messages.map(m => {
+    const time = m.created_at ? new Date(m.created_at).toISOString() : '';
+    const label = m.role === 'user' ? '👤 User' : '🤖 AI';
+    return `<tr>
+      <td style="padding:4px 8px;color:#999;font-size:12px;white-space:nowrap;">${time}</td>
+      <td style="padding:4px 8px;font-weight:bold;">${label}</td>
+      <td style="padding:4px 8px;">${m.content}</td>
+    </tr>`;
+  }).join('');
+  await sendEmail({
+    to: ADMIN_FORWARD_EMAIL,
+    subject: `🍎 Apple reviewer session transcript (${messages.filter(m => m.role === 'user').length} messages)`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <h3 style="color: #333;">Apple Reviewer Session Transcript</h3>
+        <table style="border-collapse:collapse;width:100%;">
+          <thead>
+            <tr style="background:#f5f5f5;">
+              <th style="padding:4px 8px;text-align:left;">Time</th>
+              <th style="padding:4px 8px;text-align:left;">Role</th>
+              <th style="padding:4px 8px;text-align:left;">Message</th>
+            </tr>
+          </thead>
+          <tbody>${lines}</tbody>
+        </table>
+      </div>
+    `,
+  });
+}
+
 module.exports = {
   sendEmail, sendVerificationEmail, sendResetEmail,
   sendCompanionEmail, companionEmailAddress, parseCompanionEmailId,
@@ -500,5 +547,6 @@ module.exports = {
   sendNewRegistrationNotification, sendAbandonedPaymentReminder,
   sendWelcomeDay0, sendWelcomeDay1, sendWelcomeDay3, sendRenewalReminder,
   generateUnsubscribeToken, unsubscribeLink,
+  sendAppleReviewerLoginAlert, sendAppleReviewerTranscriptAlert,
   ADMIN_EMAIL, ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN,
 };

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
 import CompanionCard from '../components/CompanionCard';
+import PlanModal from '../components/PlanModal';
 
 export default function CompanionList() {
   const { user } = useAuth();
@@ -13,12 +14,21 @@ export default function CompanionList() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [supportUnread, setSupportUnread] = useState(0);
+  const [showPlanModal, setShowPlanModal] = useState(false);
   const unreadPollRef = useRef(null);
 
   useEffect(() => {
     Promise.all([
       api.get('/api/companions').then(({ data }) => setCompanions(data.companions || [])),
-      api.get('/api/billing/status').then(({ data }) => setSubscription(data)),
+      api.get('/api/billing/status').then(({ data }) => {
+        setSubscription(data);
+        const isNewUser = new URLSearchParams(window.location.search).get('newUser') === 'true';
+        const skipped = localStorage.getItem('lovetta-plan-skipped');
+        if (!data?.hasSubscription && (isNewUser || !skipped)) {
+          setShowPlanModal(true);
+          if (isNewUser) window.history.replaceState({}, '', window.location.pathname);
+        }
+      }),
     ]).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -93,15 +103,14 @@ export default function CompanionList() {
           <div className="mb-4 bg-brand-card border border-brand-border rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-sm text-brand-text-secondary">Subscription</span>
-                <p className="text-brand-muted font-medium">No active plan</p>
-                <p className="text-xs text-brand-text-secondary mt-0.5">3-day free trial included</p>
+                <p className="text-sm font-semibold text-brand-text">Start your free trial</p>
+                <p className="text-xs text-brand-text-secondary mt-0.5">3 days free · Monthly or Yearly</p>
               </div>
               <button
-                onClick={() => navigate('/pricing')}
+                onClick={() => setShowPlanModal(true)}
                 className="px-4 py-2 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors"
               >
-                Try Free
+                View Plans
               </button>
             </div>
           </div>
@@ -138,6 +147,12 @@ export default function CompanionList() {
           </div>
         )}
       </div>
+
+      <PlanModal
+        isOpen={showPlanModal}
+        onClose={() => { localStorage.setItem('lovetta-plan-skipped', '1'); setShowPlanModal(false); }}
+        onSuccess={() => { setShowPlanModal(false); api.get('/api/billing/status').then(({ data }) => setSubscription(data)).catch(() => {}); }}
+      />
     </div>
   );
 }

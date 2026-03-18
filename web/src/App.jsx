@@ -12,6 +12,7 @@ import CompanionCreate from './pages/CompanionCreate'
 import ChatPage from './pages/ChatPage'
 import Pricing from './pages/Pricing'
 import Profile from './pages/Profile'
+import WelcomeScreen from './pages/WelcomeScreen'
 import DesktopShell from './components/DesktopShell'
 
 function Loading() {
@@ -32,7 +33,7 @@ function PublicRoute({ children }) {
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <Loading />
-  if (!user) return <Navigate to={isCapacitor() ? '/signup' : '/login'} replace />
+  if (!user) return <Navigate to={isCapacitor() ? '/welcome' : '/login'} replace />
   return children
 }
 
@@ -74,6 +75,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+      <Route path="/welcome" element={<PublicRoute><WelcomeScreen /></PublicRoute>} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
