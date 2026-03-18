@@ -28,15 +28,13 @@ export async function initIosKeyboard() {
     await Keyboard.setStyle({ style: KeyboardStyle.Dark })
 
     handles = await Promise.all([
-      Keyboard.addListener('keyboardDidShow', (info) => {
-        const kbHeight = info.keyboardHeight || 0
+      Keyboard.addListener('keyboardDidShow', () => {
         setKeyboardScrollLock(true)
-        // Try visualViewport first — if it reported a smaller height, use it
-        const vvHeight = window.visualViewport?.height || baseHeight
-        // Use whichever gives a smaller (more correct) available height
-        const fromKb = baseHeight - kbHeight
-        const available = Math.min(vvHeight, fromKb > 0 ? fromKb : vvHeight)
-        applyHeight(Math.max(available, 200))
+        // keyboardDidShow fires after animation — visualViewport is settled
+        const vv = window.visualViewport
+        if (vv && vv.height < baseHeight) {
+          applyHeight(vv.height)
+        }
       }),
       Keyboard.addListener('keyboardDidHide', () => {
         setKeyboardScrollLock(false)
