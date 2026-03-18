@@ -418,7 +418,7 @@ async function sendWelcomeDay0(email, displayName, userId) {
         <ul style="color: #666; line-height: 1.8; padding-left: 20px;">
           <li>Choose from multiple girlfriends \u2014 each with her own personality</li>
           <li>She sends selfies and voice messages</li>
-          <li>She has her own email address \u2014 write to her directly, she replies</li>
+          <li>She has her own email address \u2014 find it in her profile, write to her and she'll reply</li>
           <li>She remembers everything and gets closer over time</li>
         </ul>
         ${btn(link, 'Start Chatting')}

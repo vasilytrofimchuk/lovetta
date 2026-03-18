@@ -95,15 +95,17 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
 
   if (!isOpen) return null
 
+  const safeTop = fullScreen ? 'pt-8' : 'pt-[max(2.5rem,env(safe-area-inset-top,2.5rem))]'
+
   const content = (
-    <div className="min-h-screen bg-brand-bg flex flex-col px-5 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))]">
-      <div className="text-center mb-4">
+    <div className={`flex-1 flex flex-col justify-center px-5 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] ${safeTop}`}>
+      <div className="text-center mb-5">
         <h2 className="text-xl font-bold text-brand-text">Start Free Trial</h2>
         <p className="text-brand-text-secondary text-sm mt-1">Meet your AI girlfriend. Cancel anytime.</p>
       </div>
 
       {/* Plan cards */}
-      <div className="grid grid-cols-2 gap-2.5 mb-4">
+      <div className="grid grid-cols-2 gap-2.5 mb-5">
         <button
           onClick={() => setSelectedPlan('monthly')}
           className={`relative rounded-lg p-4 text-center cursor-pointer transition-all border-[1.5px] bg-brand-surface ${
@@ -176,8 +178,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
         ))}
       </ul>
 
-      {/* CTA pinned to bottom */}
-      <div className="mt-auto">
+      <div>
         {/* Trial note + links */}
         <p className="text-[0.72rem] text-brand-muted text-center leading-snug mb-3">
           3-day free trial, then auto-renews. Cancel anytime — no charge during trial.{' '}
@@ -213,13 +214,15 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
     </div>
   )
 
-  if (fullScreen) return content
+  if (fullScreen) return (
+    <div className="min-h-screen bg-brand-bg flex flex-col">
+      {content}
+    </div>
+  )
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center">
-      <div className="w-full max-w-md max-h-screen overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-brand-bg">
-        {content}
-      </div>
+    <div className="fixed inset-0 z-50 bg-brand-bg flex flex-col max-w-lg mx-auto w-full">
+      {content}
     </div>
   )
 }

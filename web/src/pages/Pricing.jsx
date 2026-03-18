@@ -59,9 +59,13 @@ export default function Pricing() {
     return (
       <div className="min-h-screen bg-brand-bg p-4">
         <div className="max-w-md mx-auto pt-8">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3 mb-8">
+            <button onClick={() => navigate('/')} className="text-brand-muted hover:text-brand-text transition-colors">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+            </button>
             <h1 className="text-xl font-bold text-brand-text">Subscription</h1>
-            <button onClick={() => navigate('/')} className="text-sm text-brand-muted hover:text-brand-text transition-colors">Back</button>
           </div>
           <div className="bg-brand-card border border-brand-border rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-3">

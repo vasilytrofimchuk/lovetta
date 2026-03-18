@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
 import { isAppStore, isCapacitor } from '../lib/platform';
-import SupportChat from '../components/SupportChat';
 
-export default function Profile({ openSupport = false }) {
+export default function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState(null);
@@ -35,17 +34,16 @@ export default function Profile({ openSupport = false }) {
     { value: 'credit', label: 'Account Credit' },
   ];
 
-  const [supportOpen, setSupportOpen] = useState(openSupport);
+
   const [referralExpanded, setReferralExpanded] = useState(false);
   const appStore = isAppStore();
 
-  // Auto-open support chat if there are unread messages
+  // Navigate to support if there are unread messages
   useEffect(() => {
-    if (openSupport) return; // already opened via prop
     api.get('/api/support/unread')
-      .then(({ data }) => { if (data.count > 0) setSupportOpen(true); })
+      .then(({ data }) => { if (data.count > 0) navigate('/support'); })
       .catch(() => {});
-  }, [openSupport]);
+  }, []);
 
   useEffect(() => {
     api.get('/api/billing/status')
@@ -186,14 +184,17 @@ export default function Profile({ openSupport = false }) {
   const showPushToggle = isCapacitor() || ('PushManager' in window);
 
   return (
-    <div className="min-h-screen bg-brand-bg p-4">
-      <div className="max-w-md mx-auto pt-8">
+    <div className="min-h-screen bg-brand-bg px-4 pb-8"
+      style={{ paddingTop: isCapacitor() ? 'max(2rem, env(safe-area-inset-top, 2rem))' : '2rem' }}>
+      <div className="max-w-md mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-xl font-bold text-brand-text">Profile</h1>
-          <button onClick={() => navigate('/')} className="text-sm text-brand-muted hover:text-brand-text transition-colors">
-            Back
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => navigate('/')} className="text-brand-muted hover:text-brand-text transition-colors">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
           </button>
+          <h1 className="text-xl font-bold text-brand-text">Profile</h1>
         </div>
 
         {/* User info */}
@@ -547,7 +548,7 @@ export default function Profile({ openSupport = false }) {
             Have a question or need help? Chat with our support team.
           </p>
           <button
-            onClick={() => setSupportOpen(true)}
+            onClick={() => navigate('/support')}
             className="w-full py-2.5 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors"
           >
             Contact Support
@@ -563,7 +564,6 @@ export default function Profile({ openSupport = false }) {
         </button>
       </div>
 
-      {supportOpen && <SupportChat onClose={() => setSupportOpen(false)} />}
     </div>
   );
 }

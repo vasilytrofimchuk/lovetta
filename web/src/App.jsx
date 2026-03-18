@@ -12,6 +12,7 @@ import CompanionCreate from './pages/CompanionCreate'
 import ChatPage from './pages/ChatPage'
 import Pricing from './pages/Pricing'
 import Profile from './pages/Profile'
+import SupportPage from './pages/SupportPage'
 import WelcomeScreen from './pages/WelcomeScreen'
 import DesktopShell from './components/DesktopShell'
 
@@ -84,7 +85,7 @@ function AppRoutes() {
       <Route path="/chat/:companionId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
       <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-      <Route path="/support" element={<ProtectedRoute><Profile openSupport /></ProtectedRoute>} />
+      <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
