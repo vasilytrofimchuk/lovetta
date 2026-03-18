@@ -6,15 +6,23 @@ export default function SupportChat({ onClose }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const scrollRef = useRef(null);
   const pollRef = useRef(null);
 
   const loadChat = useCallback(async () => {
     try {
+      setError(null);
       const { data } = await api.get('/api/support/chat');
       setChat(data.chat);
       setMessages(data.messages);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('[support] loadChat error:', err);
+      setError('Could not connect to support. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const pollMessages = useCallback(async () => {
@@ -25,7 +33,7 @@ export default function SupportChat({ onClose }) {
       if (data.messages.length) {
         setMessages(prev => [...prev, ...data.messages]);
       }
-    } catch { /* ignore */ }
+    } catch { /* ignore poll errors */ }
   }, [chat, messages]);
 
   useEffect(() => {
@@ -53,8 +61,12 @@ export default function SupportChat({ onClose }) {
     try {
       const { data } = await api.post(`/api/support/chat/${chat.id}/messages`, { content: msg });
       setMessages(prev => [...prev, data.message]);
-    } catch { /* ignore */ }
-    setSending(false);
+    } catch (err) {
+      console.error('[support] send error:', err);
+      setInput(msg); // restore on failure
+    } finally {
+      setSending(false);
+    }
   }
 
   function handleKeyDown(e) {
@@ -69,10 +81,8 @@ export default function SupportChat({ onClose }) {
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       onClick={onClose}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60" />
 
-      {/* Panel */}
       <div
         className="relative w-full sm:max-w-md mx-auto bg-brand-card border border-brand-border rounded-t-2xl sm:rounded-2xl flex flex-col"
         style={{ height: '70vh', maxHeight: 600 }}
@@ -82,7 +92,9 @@ export default function SupportChat({ onClose }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-brand-border flex-shrink-0">
           <div>
             <p className="font-semibold text-brand-text">Support</p>
-            <p className="text-xs text-brand-muted">We typically reply within a few hours</p>
+            <p className="text-xs text-brand-muted">
+              {loading ? 'Connecting...' : error ? 'Connection failed' : 'We typically reply within a few hours'}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -96,7 +108,21 @@ export default function SupportChat({ onClose }) {
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-          {messages.length === 0 && (
+          {loading && (
+            <div className="text-center text-brand-muted text-sm mt-8">Connecting...</div>
+          )}
+          {!loading && error && (
+            <div className="text-center mt-8">
+              <p className="text-brand-accent text-sm mb-3">{error}</p>
+              <button
+                onClick={loadChat}
+                className="px-4 py-2 bg-brand-accent text-white text-sm font-semibold rounded-lg hover:bg-brand-accent-hover transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {!loading && !error && messages.length === 0 && (
             <div className="text-center text-brand-muted text-sm mt-8 leading-relaxed">
               How can we help?<br />Send us a message and we'll get back to you.
             </div>
@@ -126,18 +152,19 @@ export default function SupportChat({ onClose }) {
         <div className="flex gap-2 px-4 py-3 border-t border-brand-border flex-shrink-0">
           <textarea
             rows={2}
-            placeholder="Type a message..."
+            placeholder={loading ? 'Connecting...' : error ? 'Connection failed — retry above' : 'Type a message...'}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 px-3 py-2 bg-brand-surface border border-brand-border rounded-xl text-brand-text text-sm placeholder:text-brand-muted resize-none focus:outline-none focus:border-brand-accent/50"
+            disabled={loading || !!error || !chat}
+            className="flex-1 px-3 py-2 bg-brand-surface border border-brand-border rounded-xl text-brand-text text-sm placeholder:text-brand-muted resize-none focus:outline-none focus:border-brand-accent/50 disabled:opacity-40"
           />
           <button
             onClick={handleSend}
-            disabled={sending || !input.trim()}
+            disabled={sending || !input.trim() || !chat || loading || !!error}
             className="px-4 py-2 bg-brand-accent text-white text-sm font-semibold rounded-xl hover:bg-brand-accent-hover transition-colors disabled:opacity-40 self-end"
           >
-            Send
+            {sending ? '...' : 'Send'}
           </button>
         </div>
       </div>
