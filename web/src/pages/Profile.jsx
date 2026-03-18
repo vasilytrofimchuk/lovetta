@@ -39,6 +39,14 @@ export default function Profile({ openSupport = false }) {
   const [referralExpanded, setReferralExpanded] = useState(false);
   const appStore = isAppStore();
 
+  // Auto-open support chat if there are unread messages
+  useEffect(() => {
+    if (openSupport) return; // already opened via prop
+    api.get('/api/support/unread')
+      .then(({ data }) => { if (data.count > 0) setSupportOpen(true); })
+      .catch(() => {});
+  }, [openSupport]);
+
   useEffect(() => {
     api.get('/api/billing/status')
       .then(({ data }) => setSubscription(data))
