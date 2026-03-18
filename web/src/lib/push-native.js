@@ -7,9 +7,6 @@ import api from './api'
 
 /** Request permissions and register for native push. Returns the device token. */
 export async function registerNativePush() {
-  // Clear stale listeners first
-  await PushNotifications.removeAllListeners()
-
   // Set up listeners BEFORE requesting permissions (iOS may auto-register on grant)
   const tokenPromise = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -19,7 +16,6 @@ export async function registerNativePush() {
     PushNotifications.addListener('registration', async (token) => {
       clearTimeout(timeout)
       console.log('[push] Got device token:', token.value?.slice(0, 20) + '...')
-      // Save token to server (don't fail if this errors — permission is still granted)
       try {
         await api.post('/api/user/push/subscribe-apns', { token: token.value })
         console.log('[push] Token saved to server')
@@ -36,15 +32,12 @@ export async function registerNativePush() {
     })
   })
 
-  // Now request permissions
   const permission = await PushNotifications.requestPermissions()
   console.log('[push] Permission result:', permission.receive)
   if (permission.receive !== 'granted') {
-    await PushNotifications.removeAllListeners()
     throw new Error('Push notification permission denied')
   }
 
-  // Trigger registration (sends device token to APNs)
   await PushNotifications.register()
   console.log('[push] register() called, waiting for token...')
 
