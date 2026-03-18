@@ -712,7 +712,7 @@ router.post('/support/chats/:id/reply', async (req, res) => {
       [chatId, content.trim()]
     );
     await pool.query(
-      `UPDATE support_chats SET status = 'waiting', unread_by_admin = 0, updated_at = NOW() WHERE id = $1`,
+      `UPDATE support_chats SET status = 'waiting', unread_by_admin = 0, unread_by_user = unread_by_user + 1, updated_at = NOW() WHERE id = $1`,
       [chatId]
     );
     res.json({ message: msg.rows[0] });

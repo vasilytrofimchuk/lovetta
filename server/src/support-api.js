@@ -25,6 +25,8 @@ router.get('/chat', authenticate, async (req, res) => {
       );
       chat = ins.rows[0];
     }
+    // Reset unread count when user opens chat
+    await pool.query(`UPDATE support_chats SET unread_by_user = 0 WHERE id = $1`, [chat.id]);
     const msgs = await pool.query(
       `SELECT * FROM support_messages WHERE chat_id = $1 ORDER BY created_at ASC`,
       [chat.id]
@@ -92,6 +94,21 @@ router.get('/chat/:id/messages', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[support] poll error:', err.message);
     res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// GET /api/support/unread — lightweight unread count for badge polling
+router.get('/unread', authenticate, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ count: 0 });
+  try {
+    const { rows } = await pool.query(
+      `SELECT COALESCE(SUM(unread_by_user), 0)::int AS count FROM support_chats WHERE user_id = $1`,
+      [req.userId]
+    );
+    res.json({ count: rows[0].count });
+  } catch {
+    res.json({ count: 0 });
   }
 });
 

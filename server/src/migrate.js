@@ -828,6 +828,14 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_support_messages_chat_id ON support_messages(chat_id);
     `,
   },
+  {
+    name: 'v32_marketing_unsubscribe',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_unsubscribed BOOLEAN DEFAULT false;`,
+  },
+  {
+    name: 'v33_support_unread_by_user',
+    sql: `ALTER TABLE support_chats ADD COLUMN IF NOT EXISTS unread_by_user INTEGER NOT NULL DEFAULT 0;`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
@@ -12,12 +12,23 @@ export default function CompanionList() {
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [supportUnread, setSupportUnread] = useState(0);
+  const unreadPollRef = useRef(null);
 
   useEffect(() => {
     Promise.all([
       api.get('/api/companions').then(({ data }) => setCompanions(data.companions || [])),
       api.get('/api/billing/status').then(({ data }) => setSubscription(data)),
     ]).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const fetchUnread = () => {
+      api.get('/api/support/unread').then(({ data }) => setSupportUnread(data.count || 0)).catch(() => {});
+    };
+    fetchUnread();
+    unreadPollRef.current = setInterval(fetchUnread, 60000);
+    return () => clearInterval(unreadPollRef.current);
   }, []);
 
   useEffect(() => {
@@ -54,13 +65,16 @@ export default function CompanionList() {
           </div>
           <button
             onClick={() => navigate('/profile')}
-            className="p-2 rounded-lg border border-brand-border text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"
+            className="relative p-2 rounded-lg border border-brand-border text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"
             title="Profile"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="8" r="4" />
               <path d="M20 21a8 8 0 0 0-16 0" />
             </svg>
+            {supportUnread > 0 && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-brand-accent rounded-full border-2 border-brand-bg" />
+            )}
           </button>
         </div>
       </div>
