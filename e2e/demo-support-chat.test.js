@@ -11,7 +11,7 @@ const TEST_PASSWORD = 'Test1234!';
 const ADMIN_HEADERS = { 'Authorization': 'Bearer test-admin-token', 'Content-Type': 'application/json' };
 
 async function signupViaUI(page) {
-  const email = `demo_support_${Date.now()}@example.com`;
+  const email = `conativer+demo_support_${Date.now()}@gmail.com`;
   await page.route('**/accounts.google.com/**', route => route.abort());
   await page.goto(`${BASE}/my/signup`);
   await page.waitForSelector('input[type="email"]', { timeout: 10000 });

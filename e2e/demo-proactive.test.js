@@ -13,7 +13,7 @@ const TEST_PASSWORD = 'Test1234!';
 const ADMIN_HEADERS = { 'Authorization': 'Bearer test-admin-token', 'Content-Type': 'application/json' };
 
 async function signupViaUI(page) {
-  const email = `demo_proactive_${Date.now()}@example.com`;
+  const email = `conativer+demo_proactive_${Date.now()}@gmail.com`;
   // Block Google GSI
   await page.route('**/accounts.google.com/**', route => route.abort());
 
@@ -101,7 +101,7 @@ test('demo: proactive messaging — notification settings + message in chat', as
 
   if (companionId) {
     // Login via API to get token
-    const loginEmail = `demo_proactive_${Date.now()}@example.com`;
+    const loginEmail = `conativer+demo_proactive_${Date.now()}@gmail.com`;
 
     // Use admin API to insert a proactive message into the conversation
     const convRes = await request.get(`${BASE}/api/admin/stats`, { headers: ADMIN_HEADERS });

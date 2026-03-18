@@ -52,6 +52,8 @@ async function runAbandonedPaymentReminders() {
         AND s.id IS NULL
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@example.com'
+        AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
     `);
 
@@ -92,6 +94,8 @@ async function runWelcomeEmailSeries() {
       WHERE u.created_at > NOW() - INTERVAL '1 hour'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@example.com'
+        AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
     `);
 
@@ -120,6 +124,8 @@ async function runWelcomeEmailSeries() {
         AND r.id IS NULL
         AND m.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@example.com'
+        AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
     `);
 
@@ -146,6 +152,8 @@ async function runWelcomeEmailSeries() {
       WHERE u.created_at BETWEEN NOW() - INTERVAL '73 hours' AND NOW() - INTERVAL '71 hours'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@example.com'
+        AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
     `);
 
@@ -183,6 +191,8 @@ async function runRenewalReminders() {
       WHERE s.current_period_end BETWEEN NOW() + INTERVAL '71 hours' AND NOW() + INTERVAL '73 hours'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
+        AND u.email NOT LIKE '%@example.com'
+        AND u.email NOT LIKE '%@test.com'
     `);
 
     for (const user of rows) {

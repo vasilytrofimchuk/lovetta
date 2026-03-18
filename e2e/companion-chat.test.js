@@ -16,7 +16,7 @@ const TEST_PASSWORD = 'Test1234!';
  * Sign up a new user via the UI and land on companion list.
  */
 async function signupViaUI(page) {
-  const email = `uitest_${Date.now()}@example.com`;
+  const email = `conativer+uitest_${Date.now()}@gmail.com`;
 
   await page.goto(`${BASE}/my/signup`);
   await page.waitForSelector('input[type="email"]', { timeout: 10000 });

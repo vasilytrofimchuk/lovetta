@@ -13,7 +13,7 @@ try { process.loadEnvFile('.env'); } catch {}
 const TEST_PASSWORD = 'Test1234!';
 
 async function signupViaUI(page) {
-  const email = `demo_explicit_${Date.now()}@example.com`;
+  const email = `conativer+demo_explicit_${Date.now()}@gmail.com`;
   await page.goto(`${BASE}/my/signup`);
   await page.waitForSelector('input[type="email"]', { timeout: 10000 });
   await page.fill('input[type="email"]', email);

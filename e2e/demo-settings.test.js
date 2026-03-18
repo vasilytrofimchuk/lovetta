@@ -11,7 +11,7 @@ const { BASE, saveNamedDemoVideo, adminHeaders } = require('./helpers');
 const TEST_PASSWORD = 'Test1234!';
 
 async function signupViaUI(page) {
-  const email = `demo_settings_${Date.now()}@example.com`;
+  const email = `conativer+demo_settings_${Date.now()}@gmail.com`;
 
   // Block Google GSI to prevent React DOM crash
   await page.route('**/accounts.google.com/**', route => route.abort());

@@ -432,3 +432,17 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Added a minimal iOS keyboard bootstrap in `web/src/lib/keyboard.js` that updates `--app-viewport-height`, disables WKWebView scroll while the app is active, resets scroll on `keyboardDidHide`, and sets resize mode to `body`
 - Chat and support full-screen layouts now size from `var(--app-viewport-height)` instead of raw `100vh`, while safe-area bottom spacing stays local to the composer bars instead of inflating the global document
 - Synced iOS and verified with `npm run build:ios` plus `npm run test:e2e:ui`; manual device/simulator validation is still required for final acceptance
+
+## iOS Native Chat API Routing Fix — DONE
+- Trace the native chat/send path end-to-end and compare the shared API client base URL against raw `fetch()` usage in chat and voice input
+- Replace native-relative `/api/...` streaming/upload calls with a shared absolute API URL helper so Capacitor requests hit the server instead of the local webview origin
+- Extend the shared native fetch path with token refresh + HTTP error handling so expired auth does not look like a silent chat failure
+- Verify the fix with the UI test bucket and a production build; note any remaining manual iOS push/chat validation still needed
+- Verification complete: `npm run build:ios` and `npm run test:e2e:ui`
+- Native chat/STT now share the same absolute API base and refresh-aware auth path; expired tokens surface a visible sign-in error instead of a silent no-response state
+
+## Fix: Stop sending emails to test @example.com addresses — DONE
+- Scheduler was sending real marketing emails (welcome, abandoned payment) to `@example.com` test users created by E2E tests, damaging domain sending reputation
+- Added `NOT LIKE '%@example.com'` and `NOT LIKE '%@test.com'` filters to all 5 scheduler queries as safety net
+- Changed all test files to use `conativer+tag@gmail.com` (Gmail plus-addressing) instead of `@example.com`
+- Updated CLAUDE.md with mandatory test email rules

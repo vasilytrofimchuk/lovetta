@@ -504,3 +504,17 @@
 - [x] Sync the iOS native project and rebuild the web bundle
 - [x] Run `npm run test:e2e:ui`
 - [x] Update plan.md and PROGRESS.md with final status and notes
+
+## iOS Native Chat API Routing Fix
+- [x] Update plan.md with the native chat routing scope
+- [x] Trace native chat/STT requests and compare shared axios base routing against raw fetch usage
+- [x] Replace native-relative chat/STT fetch paths with a shared absolute API URL helper
+- [x] Add refresh-aware shared fetch handling for chat/STT and surface HTTP auth failures instead of failing silently
+- [x] Run `npm run test:e2e:ui`
+- [x] Update plan.md and PROGRESS.md with final status and notes
+
+## Fix: Stop sending emails to test @example.com addresses
+- [x] Add `@example.com` and `@test.com` exclusion filters to all 5 scheduler queries
+- [x] Replace `@example.com` with `conativer+tag@gmail.com` in all E2E test files (11 files)
+- [x] Update `sendNewRegistrationNotification` filter to match new `conativer+` pattern
+- [x] Update CLAUDE.md with test email rules

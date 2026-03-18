@@ -206,7 +206,7 @@ async function setupUsers(count) {
 
   // Create users one at a time to avoid auth rate limiter (express-rate-limit)
   for (let idx = 0; idx < count; idx++) {
-    const email = `loadtest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@test.com`;
+    const email = `conativer+loadtest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@gmail.com`;
 
     // Sign up (with retry on 429 — auth rate limit is 20/15min per IP)
     let signup;

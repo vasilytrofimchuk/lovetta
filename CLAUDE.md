@@ -82,6 +82,11 @@ Run E2E tests **only when changes could break functionality**. **Text/copy-only 
 - **NEVER** run `test:e2e` (full suite) for routine changes — pick the right bucket
 - All tests in the chosen bucket must pass before marking task complete
 
+**Test emails — MANDATORY:**
+- **NEVER** use `@example.com` or `@test.com` for test user emails — bounced emails damage domain sending reputation
+- **ALWAYS** use `conativer+tag@gmail.com` with Gmail plus-addressing (e.g. `conativer+test_${Date.now()}@gmail.com`)
+- The scheduler filters out `@example.com` and `@test.com` as a safety net, but don't rely on it
+
 **Demo Tests (Video Recording)**:
 - `npm run test:e2e:demo` — runs demo tests with video recording enabled
 - Demo test files: `e2e/demo-*.test.js` (separate Playwright project, excluded from regular tests)

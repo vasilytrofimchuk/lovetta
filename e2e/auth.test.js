@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 const { BASE } = require('./helpers');
 
 test.describe('Auth API', () => {
-  const testEmail = `test_${Date.now()}@example.com`;
+  const testEmail = `conativer+test_${Date.now()}@gmail.com`;
   const testPassword = 'password123';
 
   test('POST /api/auth/signup creates user', async ({ request }) => {
@@ -28,7 +28,7 @@ test.describe('Auth API', () => {
   test('POST /api/auth/signup rejects underage', async ({ request }) => {
     const res = await request.post(`${BASE}/api/auth/signup`, {
       data: {
-        email: 'young@example.com',
+        email: 'conativer+young@gmail.com',
         password: testPassword,
         birthMonth: 1,
         birthYear: 2015,
@@ -58,7 +58,7 @@ test.describe('Auth API', () => {
   test('POST /api/auth/signup rejects without terms', async ({ request }) => {
     const res = await request.post(`${BASE}/api/auth/signup`, {
       data: {
-        email: 'noterms@example.com',
+        email: 'conativer+noterms@gmail.com',
         password: testPassword,
         birthMonth: 6,
         birthYear: 1995,
@@ -140,7 +140,7 @@ test.describe('Auth API', () => {
 
     // Non-existent email also returns ok (no leak)
     const res2 = await request.post(`${BASE}/api/auth/forgot-password`, {
-      data: { email: 'nonexistent@example.com' },
+      data: { email: 'conativer+nonexistent@gmail.com' },
     });
     expect(res2.ok()).toBeTruthy();
   });

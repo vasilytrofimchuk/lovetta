@@ -20,12 +20,12 @@ async function seedEmail(page) {
         type: 'email.received',
         data: {
           email_id: 'test-seed',
-          from: 'tester@example.com',
+          from: 'conativer+tester@gmail.com',
           to: 'v@lovetta.ai',
           subject: 'Seeded test email',
           text: 'Hello from test seed!',
           html: '',
-          headers: { 'message-id': '<seed-msg@example.com>' }
+          headers: { 'message-id': '<seed-msg@lovetta.ai>' }
         }
       })
     });
@@ -103,7 +103,7 @@ test.describe('Admin Email Tab', () => {
     await page.waitForTimeout(500);
 
     // Should show inbound email
-    await expect(page.locator('#email-rows')).toContainText('tester@example.com');
+    await expect(page.locator('#email-rows')).toContainText('conativer+tester@gmail.com');
     await expect(page.locator('#email-rows')).toContainText('Seeded test email');
 
     // Unread badge should be visible
@@ -137,7 +137,7 @@ test.describe('Admin Email Tab', () => {
     await expect(page.locator('#email-compose')).toBeVisible();
     await expect(page.locator('#compose-title')).toHaveText('Reply');
     const toValue = await page.locator('#compose-to').inputValue();
-    expect(toValue).toBe('tester@example.com');
+    expect(toValue).toBe('conativer+tester@gmail.com');
     const subjectValue = await page.locator('#compose-subject').inputValue();
     expect(subjectValue).toContain('Re:');
 
@@ -156,7 +156,7 @@ test.describe('Admin Email Tab', () => {
     await page.locator('#tab-email button', { hasText: 'Compose' }).click();
     await expect(page.locator('#email-compose')).toBeVisible();
 
-    await page.fill('#compose-to', 'uitest@example.com');
+    await page.fill('#compose-to', 'conativer+uitest@gmail.com');
     await page.fill('#compose-subject', 'UI Test Email');
     await page.fill('#compose-body', 'Sent from Playwright test');
 
@@ -170,6 +170,6 @@ test.describe('Admin Email Tab', () => {
     // Switch to Sent filter
     await page.locator('.email-filter[data-dir="outbound"]').click();
     await page.waitForTimeout(500);
-    await expect(page.locator('#email-rows')).toContainText('uitest@example.com');
+    await expect(page.locator('#email-rows')).toContainText('conativer+uitest@gmail.com');
   });
 });

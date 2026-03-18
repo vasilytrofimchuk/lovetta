@@ -55,7 +55,7 @@ async function saveNamedDemoVideo(page, filename) {
  * @param {import('@playwright/test').APIRequestContext} request
  */
 async function createTestUser(request) {
-  const email = `test_${Date.now()}_${Math.random().toString(36).slice(2, 6)}@example.com`;
+  const email = `conativer+test_${Date.now()}_${Math.random().toString(36).slice(2, 6)}@gmail.com`;
   const res = await request.post(`${BASE}/api/auth/signup`, {
     data: {
       email,
