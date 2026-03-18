@@ -5,7 +5,7 @@ import api from '../lib/api';
 import { isAppStore, isCapacitor } from '../lib/platform';
 import SupportChat from '../components/SupportChat';
 
-export default function Profile() {
+export default function Profile({ openSupport = false }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState(null);
@@ -35,7 +35,7 @@ export default function Profile() {
     { value: 'credit', label: 'Account Credit' },
   ];
 
-  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(openSupport);
   const appStore = isAppStore();
 
   useEffect(() => {

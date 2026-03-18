@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support — Lovetta</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent: #d6336c;
+      --bg: #0f0a1a;
+      --surface: #1a1128;
+      --card: #231838;
+      --border: #2d1f45;
+      --text: #f0e6ff;
+      --text-secondary: #b8a4d6;
+      --muted: #7c6a9a;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 40px;
+      text-decoration: none;
+    }
+
+    .logo img {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+    }
+
+    .logo-name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      margin-bottom: 36px;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(214, 51, 108, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .icon svg {
+      width: 20px;
+      height: 20px;
+      color: var(--accent);
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .card p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 0.15s;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .faq-item {
+      border-bottom: 1px solid var(--border);
+      padding: 16px 0;
+    }
+
+    .faq-item:last-child { border-bottom: none; }
+
+    .faq-q {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+
+    .faq-a {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    footer {
+      margin-top: 48px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    footer a {
+      color: var(--muted);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <a href="/" class="logo">
+    <img src="/assets/brand/logo_l.png" alt="Lovetta" />
+    <span class="logo-name">Lovetta</span>
+  </a>
+
+  <div class="container">
+    <h1>Support</h1>
+    <p class="subtitle">We're here to help. Reach out through the app or email us directly.</p>
+
+    <!-- In-app support -->
+    <div class="section-title">Contact Us</div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <h2>In-App Support Chat</h2>
+      </div>
+      <p>The fastest way to get help. Open the Lovetta app, go to your Profile, and tap <strong style="color: var(--text)">Support</strong>. We typically reply within a few hours.</p>
+      <a href="lovetta://support" class="btn btn-primary">Open Lovetta App</a>
+    </div>
+
+    <div class="card" style="margin-top: 4px;">
+      <div class="card-header">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+        </div>
+        <h2>Email Support</h2>
+      </div>
+      <p>Prefer email? Write to us and we'll get back to you as soon as possible.</p>
+      <a href="mailto:support@lovetta.ai" class="btn btn-secondary">support@lovetta.ai</a>
+    </div>
+
+    <!-- FAQ -->
+    <div class="section-title" style="margin-top: 32px;">Common Questions</div>
+
+    <div class="card">
+      <div class="faq-item">
+        <div class="faq-q">How do I cancel my subscription?</div>
+        <div class="faq-a">On iOS, go to <strong>Settings → Apple ID → Subscriptions</strong> and cancel Lovetta. On web, go to Profile → Manage Subscription.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">How do I restore my purchases?</div>
+        <div class="faq-a">In the Lovetta app, go to the subscription screen and tap <strong>Restore Purchases</strong>.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">What is the 3-day free trial?</div>
+        <div class="faq-a">All new subscribers get a 3-day free trial. You won't be charged until Day 4. Cancel any time before that and you owe nothing.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">My account isn't working. What should I do?</div>
+        <div class="faq-a">Try signing out and back in. If the issue persists, contact us via the in-app chat or email above.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">How do I delete my account?</div>
+        <div class="faq-a">Go to Profile → Delete Account, or contact support and we'll remove your data within 30 days.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <a href="/privacy.html">Privacy Policy</a> &middot;
+    <a href="/terms.html">Terms of Service</a> &middot;
+    &copy; 2025 Lovetta
+  </footer>
+</body>
+</html>
