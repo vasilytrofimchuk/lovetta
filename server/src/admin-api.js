@@ -784,7 +784,7 @@ router.post('/push/test', async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'No database' });
 
   try {
-    const { email, userId, title, body } = req.body || {};
+    const { email, userId, title, body, url } = req.body || {};
     if (!email && !userId) return res.status(400).json({ error: 'email or userId required' });
 
     const userQuery = userId
@@ -798,7 +798,7 @@ router.post('/push/test', async (req, res) => {
     await sendPushNotification(user.id, {
       title: title || 'Lovetta Test',
       body: body || 'Push notifications are working! 🎉',
-      url: '/my/',
+      url: url || '/my/',
     });
 
     // Check how many devices were targeted
