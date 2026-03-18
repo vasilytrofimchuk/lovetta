@@ -1,9 +1,12 @@
 import { isIOS } from './platform'
 
+let currentKeyboardHeight = 0
+
 function setViewportHeight() {
   if (typeof window === 'undefined') return
-  const nextHeight = window.visualViewport?.height ?? window.innerHeight
-  document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(nextHeight)}px`)
+  const fullHeight = window.innerHeight
+  const availableHeight = fullHeight - currentKeyboardHeight
+  document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(availableHeight)}px`)
 }
 
 function setKeyboardScrollLock(isLocked) {
@@ -17,11 +20,7 @@ export async function initIosKeyboard() {
 
   setViewportHeight()
 
-  const handleViewportChange = () => setViewportHeight()
-
-  window.addEventListener('resize', handleViewportChange)
-  window.visualViewport?.addEventListener('resize', handleViewportChange)
-  window.visualViewport?.addEventListener('scroll', handleViewportChange)
+  window.addEventListener('resize', setViewportHeight)
 
   let handles = []
 
@@ -33,13 +32,15 @@ export async function initIosKeyboard() {
     await Keyboard.setStyle({ style: KeyboardStyle.Dark })
 
     handles = await Promise.all([
-      Keyboard.addListener('keyboardDidShow', () => {
+      Keyboard.addListener('keyboardDidShow', (info) => {
+        currentKeyboardHeight = info.keyboardHeight || 0
         setKeyboardScrollLock(true)
-        handleViewportChange()
+        setViewportHeight()
       }),
       Keyboard.addListener('keyboardDidHide', () => {
+        currentKeyboardHeight = 0
         setKeyboardScrollLock(false)
-        handleViewportChange()
+        setViewportHeight()
       }),
     ])
   } catch (error) {
@@ -47,9 +48,7 @@ export async function initIosKeyboard() {
   }
 
   return () => {
-    window.removeEventListener('resize', handleViewportChange)
-    window.visualViewport?.removeEventListener('resize', handleViewportChange)
-    window.visualViewport?.removeEventListener('scroll', handleViewportChange)
+    window.removeEventListener('resize', setViewportHeight)
     setKeyboardScrollLock(false)
     handles.forEach((handle) => handle?.remove?.())
     handles = []
