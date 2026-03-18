@@ -62,10 +62,10 @@ function TemplateCard({ t, onSelect }) {
     const card = cardRef.current;
     if (!card || !t.video_url) return;
 
-    // Shrink the intersection zone to a narrow band in the center — only 1 row (2 cards) activates
+    // Active zone covers upper ~40% of viewport — 2 rows (4 cards) activate near the top
     const observer = new IntersectionObserver(
       ([entry]) => setCentered(entry.isIntersecting),
-      { rootMargin: '-40% 0px -40% 0px', threshold: 0.5 }
+      { rootMargin: '-5% 0px -55% 0px', threshold: 0.1 }
     );
     observer.observe(card);
     return () => observer.disconnect();
