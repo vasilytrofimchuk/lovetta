@@ -954,3 +954,25 @@
 - `npm run build:ios` passed.
 - [x] Run `npm run test:e2e:ui`
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Remove App Icon Helper Copy
+- [x] Update `plan.md` and `PROGRESS.md` for the Profile copy cleanup
+- [x] Remove the `Saved on this iPhone only.` helper line from the app-icon card
+- [x] Skip tests because this is a copy-only UI change
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## iOS Keyboard Covering Input Bars + Header Shift
+- Problem: (1) keyboard covers input bars on chat/support/add-email, (2) header shifts down after keyboard closes
+- FAILED: scrollIntoView on focus — broke screen size
+- FAILED: textarea rows=1 SupportChat pattern — broke scrollable Profile page
+- FAILED: Remove all manual tracking (match auto no-op) — 100vh doesn't work with resize:body, input disappeared
+- FAILED: Restore tracking, remove scroll lock/reset only — input still covered
+- FAILED: Subtract 44px when keyboard open — condition `nextHeight < window.innerHeight` NEVER TRUE because resize:body shrinks both values together
+- FAILED: Delayed scrollTo(0,0) on keyboardDidHide — header shift not fixed
+- Root cause: `KeyboardResize.Body` makes Capacitor resize the WKWebView body, so both `window.innerHeight` and `visualViewport.height` shrink equally. Manual viewport tracking has no effect.
+- [x] Switch to `KeyboardResize.None` so body stays full-size and `visualViewport.height` properly reports keyboard
+- [x] Change capacitor.config.json `resize: "none"` + `style: "dark"`
+- [x] Clean keyboard.js: remove broken conditions, keep viewport tracking + scroll lock + dark style
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Run `npm run build:ios` + manual device test
+- [ ] Update `plan.md` and `PROGRESS.md` with final status

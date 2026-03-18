@@ -12,7 +12,8 @@
   },
   "plugins": {
     "Keyboard": {
-      "resize": "body"
+      "resize": "none",
+      "style": "dark"
     },
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
