@@ -19,6 +19,7 @@
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "@revenuecat/purchases-capacitor": "^12.2.4",
     "axios": "^1.7.0",
+    "capacitor-voice-recorder": "^7.0.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0"

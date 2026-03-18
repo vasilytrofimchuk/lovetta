@@ -41,6 +41,16 @@ const app = express();
 const PORT = process.env.PORT || 3900;
 app.set('trust proxy', 1);
 
+function getAudioExtension(contentType = '') {
+  const lower = String(contentType).toLowerCase();
+  if (lower.includes('wav')) return 'wav';
+  if (lower.includes('aac')) return 'aac';
+  if (lower.includes('m4a')) return 'm4a';
+  if (lower.includes('mp4')) return 'mp4';
+  if (lower.includes('mp3') || lower.includes('mpeg')) return 'mp3';
+  return 'webm';
+}
+
 // Allow Capacitor native app origin
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
@@ -112,7 +122,7 @@ app.post('/api/chat/stt',
       }
       const { transcribeSpeech } = require('./src/ai');
       const ct = req.headers['content-type'] || 'audio/webm';
-      const ext = ct.includes('wav') ? 'wav' : ct.includes('mp4') ? 'mp4' : ct.includes('mp3') || ct.includes('mpeg') ? 'mp3' : 'webm';
+      const ext = getAudioExtension(ct);
       const { text } = await transcribeSpeech(req.body, `voice.${ext}`);
       res.json({ text });
     } catch (err) {

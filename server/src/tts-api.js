@@ -13,6 +13,16 @@ const { trackConsumption } = require('./consumption');
 
 const router = Router();
 
+function getAudioExtension(contentType = '') {
+  const lower = String(contentType).toLowerCase();
+  if (lower.includes('wav')) return 'wav';
+  if (lower.includes('aac')) return 'aac';
+  if (lower.includes('m4a')) return 'm4a';
+  if (lower.includes('mp4')) return 'mp4';
+  if (lower.includes('mp3') || lower.includes('mpeg')) return 'mp3';
+  return 'webm';
+}
+
 // In-flight TTS requests: messageId → Promise<audioUrl>
 // Prevents duplicate concurrent ElevenLabs calls for the same message
 const ttsInFlight = new Map();
@@ -151,7 +161,7 @@ router.post('/stt', authenticate, async (req, res) => {
     if (!audioBuffer.length) return res.status(400).json({ error: 'No audio data' });
 
     const contentType = req.headers['content-type'] || 'audio/webm';
-    const ext = contentType.includes('wav') ? 'wav' : contentType.includes('mp4') ? 'mp4' : 'webm';
+    const ext = getAudioExtension(contentType);
 
     const { text } = await transcribeSpeech(audioBuffer, `voice.${ext}`);
     res.json({ text });

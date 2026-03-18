@@ -455,9 +455,42 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Changed all test files to use `conativer+tag@gmail.com` (Gmail plus-addressing) instead of `@example.com`
 - Updated CLAUDE.md with mandatory test email rules
 
-## iOS Welcome Carousel Parity — IN PROGRESS
-- Replace the single-card fade rotator on `web/src/pages/WelcomeScreen.jsx` with a landing-style horizontal carousel that shows multiple cards at once.
-- Extract a reusable React carousel component for the welcome flow so the focused-card logic, slow auto-scroll, and video playback are isolated from the page shell.
-- Match the landing behavior: fetch `/api/companions/templates/preview`, shuffle once, highlight the card nearest the viewport center, autoplay only the active card video, and pause auto-scroll for 5 seconds after interaction.
-- Keep the rest of the iOS welcome page intact aside from spacing needed to fit the carousel.
-- Add UI coverage for `/my/welcome` and run `npm run test:e2e:ui`.
+## iOS Welcome Carousel Parity — DONE
+- Replaced the single-card fade rotator on `web/src/pages/WelcomeScreen.jsx` with a shared `WelcomeCarousel` component so the welcome page now shows a landing-style horizontal row of multiple cards.
+- The new carousel mirrors the public landing behavior: it fetches `/api/companions/templates/preview`, shuffles templates once, tracks the card closest to the viewport center, scales/highlights the active card, autoplays only that card's video, and pauses auto-scroll for 5 seconds after touch or mouse interaction.
+- Kept the rest of the iOS welcome page intact: logo, headline, feature list, CTA, and legal links are unchanged.
+- Added `/my/welcome` UI coverage in `e2e/landing.test.js` to verify multi-card rendering, single active focus, and CTA/legal visibility.
+- Verification complete: `npm -w web run build`, `npm run test:e2e:ui`, and `npm run build:ios`.
+
+## iOS Chat Voice Button Restore — DONE
+- Trace why the mic button disappears in the Capacitor iOS chat composer and compare the visibility gating against WebView media capability behavior
+- Restore the left-side mic button for native iOS while keeping the actual recording capability check inside the click flow so missing APIs do not hide the control
+- Add the required iOS microphone permission usage string to the native plist, then rebuild iOS and rerun the UI bucket
+- Root cause was the composer hiding the mic behind a browser-style `navigator.mediaDevices` check; in Capacitor iOS that was too brittle and could remove the control entirely
+- The chat composer now always renders the left-side mic button on native iOS, while the actual media API support check stays inside the click handler
+- Added `NSMicrophoneUsageDescription` to `web/ios/App/App/Info.plist` so iOS can request microphone access for voice messages
+- Verification complete: `npm run build:ios` and `npm run test:e2e:ui`
+
+## iOS Welcome Carousel Motion Fix — IN PROGRESS
+- Fix the welcome carousel auto-scroll so it visibly moves left on iOS instead of appearing static.
+- Replace the per-frame `scrollLeft += 0.4` mutation with an accumulated scroll position ref so sub-pixel motion still advances on WebKit when the DOM property is rounded.
+- Add UI coverage that asserts the welcome carousel viewport actually moves over time, not just that multiple cards render and one card is active.
+- Re-run the UI bucket and rebuild the iOS bundle after the motion fix.
+
+## iOS Native Voice Recording Fix — IN PROGRESS
+- Replace the Capacitor iOS chat recorder path from browser `MediaRecorder` to a native voice recorder plugin so microphone permission is requested explicitly and audio capture is stable inside the WebView
+- Keep the existing browser recording fallback for web, but route native iOS through a dedicated permission + start/stop flow with clear error handling
+- Add the missing `NSMicrophoneUsageDescription` to the real iOS app plist so native permission requests do not abort the process on simulator or device
+- Update STT upload handling to accept the native iOS audio MIME type/extension correctly, then rebuild iOS and rerun the UI bucket
+- Current root cause confirmed locally: the synced iOS app plist was missing `NSMicrophoneUsageDescription`, which causes iOS to abort the app as soon as microphone access is requested.
+
+## iOS Welcome Carousel Style Mixing Fix — IN PROGRESS
+- Replace the pure random shuffle in the welcome carousel with style-aware interleaving so anime cards are distributed between real cards when both groups are present.
+- Shuffle within each style bucket first, then merge the buckets in alternating order with real cards leading the sequence.
+- Extend the welcome route UI coverage to verify the primary carousel sequence does not render adjacent anime cards for a mixed input fixture.
+
+## Auth Button Polish — IN PROGRESS
+- Normalize the login/signup auth CTAs so email sign-in, Apple, and Google buttons share the same height, corner radius, font weight, and spacing
+- Keep the Apple button visually distinct but aligned with the other controls instead of looking oversized or mismatched
+- Move the Apple button into the post-separator social-auth stack on login so it matches signup instead of sitting directly under the email submit button
+- Verify with the UI bucket after the auth button style update

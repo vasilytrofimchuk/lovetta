@@ -100,14 +100,26 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-brand-accent text-white rounded-lg font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-60"
+            className="w-full h-14 px-4 rounded-2xl bg-brand-accent text-white text-base font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-60"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <AppleSignIn onError={setError} />
-        <GoogleSignIn />
+        <div className="relative my-5">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-brand-border" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-brand-bg px-3 text-brand-muted">or</span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <AppleSignIn onError={setError} />
+          <GoogleSignIn hideSeparator />
+        </div>
+
         {!isCapacitor() && (
           <div className="mt-3">
             <TelegramSignIn />

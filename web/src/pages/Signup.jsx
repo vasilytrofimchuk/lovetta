@@ -369,7 +369,7 @@ export default function Signup() {
           )}
 
           <button type="submit" disabled={loading}
-            className="w-full py-3 bg-brand-accent text-white rounded-lg font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-60">
+            className="w-full h-14 px-4 rounded-2xl bg-brand-accent text-white text-base font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-60">
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
@@ -378,7 +378,9 @@ export default function Signup() {
           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brand-border" /></div>
           <div className="relative flex justify-center text-sm"><span className="bg-brand-bg px-3 text-brand-muted">or</span></div>
         </div>
-        <AppleSignIn onError={setError} ageData={consentData} onSuccess={nativeApp ? handleAccountCreated : undefined} />
+        <div className="mt-3">
+          <AppleSignIn onError={setError} ageData={consentData} onSuccess={nativeApp ? handleAccountCreated : undefined} />
+        </div>
         <div className="mt-3">
           <GoogleSignIn birthData={consentData} hideSeparator onSuccess={nativeApp ? handleAccountCreated : undefined} />
         </div>

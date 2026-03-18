@@ -16,6 +16,8 @@ PODS:
     - Capacitor
   - CapacitorPushNotifications (8.0.2):
     - Capacitor
+  - CapacitorVoiceRecorder (7.0.6):
+    - Capacitor
   - CodetrixStudioCapacitorGoogleAuth (0.0.1):
     - Capacitor
     - GoogleSignIn (~> 6.2.4)
@@ -41,6 +43,7 @@ DEPENDENCIES:
   - "CapacitorCordova (from `../../../node_modules/@capacitor/ios`)"
   - "CapacitorKeyboard (from `../../../node_modules/@capacitor/keyboard`)"
   - "CapacitorPushNotifications (from `../../../node_modules/@capacitor/push-notifications`)"
+  - CapacitorVoiceRecorder (from `../../../node_modules/capacitor-voice-recorder`)
   - "CodetrixStudioCapacitorGoogleAuth (from `../../../node_modules/@codetrix-studio/capacitor-google-auth`)"
   - "RevenuecatPurchasesCapacitor (from `../../../node_modules/@revenuecat/purchases-capacitor`)"
 
@@ -66,6 +69,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/@capacitor/keyboard"
   CapacitorPushNotifications:
     :path: "../../../node_modules/@capacitor/push-notifications"
+  CapacitorVoiceRecorder:
+    :path: "../../../node_modules/capacitor-voice-recorder"
   CodetrixStudioCapacitorGoogleAuth:
     :path: "../../../node_modules/@codetrix-studio/capacitor-google-auth"
   RevenuecatPurchasesCapacitor:
@@ -79,6 +84,7 @@ SPEC CHECKSUMS:
   CapacitorCordova: a9ac88d84a1f5280f33b349fe50fce1902683ac0
   CapacitorKeyboard: 867eb4b3c901d9bb5c3d0c93b546185d52484e19
   CapacitorPushNotifications: 5a1de4191a9fdbeacc84907313eede0bd59d2eb0
+  CapacitorVoiceRecorder: 9158861be982f32d411769723a4d813d6ce46135
   CodetrixStudioCapacitorGoogleAuth: 9dcfabfb7dd804ad6231a1513bc6e81e620cbec6
   GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
   GTMAppAuth: 0ff230db599948a9ad7470ca667337803b3fc4dd
@@ -87,6 +93,6 @@ SPEC CHECKSUMS:
   RevenueCat: c7310bad19cb96a1551c68045303e1faaa1942a5
   RevenuecatPurchasesCapacitor: 6b652e6e001224841fbfb9a97322c46f14d32504
 
-PODFILE CHECKSUM: d6bf73eaeec5a0ae850685eb15e8a11cc9181ee9
+PODFILE CHECKSUM: ad8b41005dfbb49a1768f15f868535582dacbee9
 
 COCOAPODS: 1.16.2

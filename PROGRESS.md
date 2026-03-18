@@ -528,8 +528,50 @@
 
 ## iOS Welcome Carousel Parity
 - [x] Update `plan.md` with the welcome carousel scope and implementation notes
-- [ ] Create a reusable React welcome carousel component that mirrors the landing carousel behavior
-- [ ] Replace the single-card rotator in `web/src/pages/WelcomeScreen.jsx` with the shared carousel
-- [ ] Add `/my/welcome` UI coverage for multi-card rendering, active-card focus, and CTA/legal visibility
+- [x] Create a reusable React welcome carousel component that mirrors the landing carousel behavior
+- [x] Replace the single-card rotator in `web/src/pages/WelcomeScreen.jsx` with the shared carousel
+- [x] Add `/my/welcome` UI coverage for multi-card rendering, active-card focus, and CTA/legal visibility
+- [x] Run `npm run test:e2e:ui`
+- [x] Run `npm run build:ios`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## iOS Chat Voice Button Restore
+- [x] Update `plan.md` with the iOS mic-button restore scope
+- [x] Trace the native mic button visibility/permission path in the chat composer
+- [x] Restore the left-side mic button for Capacitor iOS without hiding it behind a brittle browser capability check
+- [x] Add the required microphone usage description in the iOS plist
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## iOS Welcome Carousel Motion Fix
+- [x] Update `plan.md` with the iOS carousel motion fix scope
+- [x] Change the welcome carousel auto-scroll to use an accumulated scroll position that advances reliably on iOS
+- [x] Extend `/my/welcome` UI coverage to assert the carousel viewport actually moves left over time
 - [ ] Run `npm run test:e2e:ui`
+- [ ] Run `npm run build:ios`
+- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## iOS Native Voice Recording Fix
+- [x] Update `plan.md` with the native voice recording scope
+- [x] Replace the iOS WebView `MediaRecorder` path with a native Capacitor voice recorder flow
+- [x] Add explicit native microphone permission request/error handling in chat input
+- [x] Add the missing `NSMicrophoneUsageDescription` to the actual iOS `Info.plist` so mic requests do not crash the app
+- [x] Accept native iOS AAC audio correctly in the STT upload path
+- [x] Run `npm run build:ios`
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## Auth Button Polish
+- [x] Update `plan.md` with the auth-button polish scope
+- [ ] Move the Apple button below the auth separator on login and keep social button spacing controlled by the page layout
+- [ ] Normalize login/signup button sizing and spacing across email, Apple, and Google CTAs
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes
+
+## iOS Welcome Carousel Style Mixing Fix
+- [x] Update `plan.md` with the style-mixing scope
+- [x] Change the welcome carousel ordering to interleave anime and real templates instead of using a pure random shuffle
+- [x] Extend `/my/welcome` UI coverage to verify anime cards are not adjacent when mixed styles are available
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Run `npm run build:ios`
 - [ ] Update `plan.md` and `PROGRESS.md` with final status and notes

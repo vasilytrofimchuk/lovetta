@@ -17,6 +17,7 @@ def capacitor_pods
   pod 'CapacitorPushNotifications', :path => '../../../node_modules/@capacitor/push-notifications'
   pod 'CodetrixStudioCapacitorGoogleAuth', :path => '../../../node_modules/@codetrix-studio/capacitor-google-auth'
   pod 'RevenuecatPurchasesCapacitor', :path => '../../../node_modules/@revenuecat/purchases-capacitor'
+  pod 'CapacitorVoiceRecorder', :path => '../../../node_modules/capacitor-voice-recorder'
 end
 
 target 'App' do

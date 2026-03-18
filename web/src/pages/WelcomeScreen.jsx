@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../lib/api'
 import { Browser } from '@capacitor/browser'
+import WelcomeCarousel from '../components/WelcomeCarousel'
 
 const FEATURES = [
   { icon: '💬', title: 'Natural Conversations', desc: 'She remembers your stories' },
@@ -12,31 +11,6 @@ const FEATURES = [
 
 export default function WelcomeScreen() {
   const navigate = useNavigate()
-  const [templates, setTemplates] = useState([])
-  const [currentIdx, setCurrentIdx] = useState(0)
-  const [visible, setVisible] = useState(true)
-  const intervalRef = useRef(null)
-
-  useEffect(() => {
-    api.get('/api/companions/templates/preview').then(({ data }) => {
-      const t = (data.templates || []).filter(t => t.avatar_url)
-      if (t.length > 0) setTemplates(t)
-    }).catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    if (templates.length <= 1) return
-    intervalRef.current = setInterval(() => {
-      setVisible(false)
-      setTimeout(() => {
-        setCurrentIdx(i => (i + 1) % templates.length)
-        setVisible(true)
-      }, 400)
-    }, 3000)
-    return () => clearInterval(intervalRef.current)
-  }, [templates.length])
-
-  const current = templates[currentIdx]
 
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col px-5 py-8 overflow-y-auto">
@@ -52,33 +26,7 @@ export default function WelcomeScreen() {
         <p className="text-brand-text-secondary text-sm mt-1">Meet someone who's always here for you</p>
       </div>
 
-      {/* Rotating girl card */}
-      <div className="flex justify-center mb-6">
-        <div
-          className="w-48 h-64 rounded-2xl overflow-hidden border border-brand-border bg-brand-card relative shadow-lg transition-opacity duration-400"
-          style={{ opacity: visible ? 1 : 0 }}
-        >
-          {current ? (
-            <>
-              <img
-                src={current.avatar_url}
-                alt={current.name}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                <p className="text-white font-semibold text-sm">{current.name}</p>
-                {current.tagline && (
-                  <p className="text-white/70 text-xs mt-0.5 line-clamp-1">{current.tagline}</p>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="w-8 h-8 border-2 border-brand-accent border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-        </div>
-      </div>
+      <WelcomeCarousel />
 
       {/* Features */}
       <div className="space-y-3 mb-7">
