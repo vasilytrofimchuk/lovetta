@@ -50,7 +50,7 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+      <div className="app-auth-shell">
         <h1 className="text-2xl font-bold text-center mb-8">Set new password</h1>
 
         {done ? (

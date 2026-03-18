@@ -128,12 +128,12 @@ router.post('/signup', authLimiter, async (req, res) => {
 
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (email, password_hash, birth_month, birth_year, terms_accepted, privacy_accepted,
-                          ai_consent_at, verify_token, ip_address, country, city, user_agent, auth_provider,
+                          ai_consent_at, verify_token, ip_address, country, city, timezone, user_agent, auth_provider,
                           referral_code, referred_by)
-       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, 'email', $12, $13)
+       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, 'email', $13, $14)
        RETURNING *`,
       [email.trim(), passwordHash, month, year, true, true,
-       verifyToken, ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+       verifyToken, ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
        refCode, referredBy]
     );
 
@@ -509,12 +509,12 @@ router.get('/google/callback', async (req, res) => {
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
                               referral_code, referred_by)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'google', $11, $12)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'google', $12, $13)
            RETURNING *`,
           [email, googleId, name, picture, birthMonth, birthYear,
-           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+           ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
            refCode, referredBy]
         );
         user = newUser;
@@ -603,12 +603,12 @@ router.post('/google/token', async (req, res) => {
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
                               referral_code, referred_by)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'google', $11, $12)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'google', $12, $13)
            RETURNING *`,
           [email, googleId, name, picture, bMonth, bYear,
-           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+           ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
            refCode, referredBy]
         );
         user = newUser;
@@ -739,12 +739,12 @@ router.post('/apple', authLimiter, async (req, res) => {
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
                               referral_code, referred_by)
-           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, 'apple', $10, $11)
+           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12)
            RETURNING *`,
           [email, appleId, displayName, month, year,
-           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+           ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
            refCode, referredBy]
         );
         user = newUser;
@@ -772,12 +772,12 @@ router.post('/apple', authLimiter, async (req, res) => {
 
       const { rows: [newUser] } = await pool.query(
         `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
-                            terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                            terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
                             referral_code, referred_by)
-         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, 'apple', $10, $11)
+         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12)
          RETURNING *`,
         [syntheticEmail, appleId, displayName, month, year,
-         ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+         ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
          refCode, referredBy]
       );
       user = newUser;
@@ -869,12 +869,12 @@ router.post('/telegram', authLimiter, async (req, res) => {
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, user_agent, auth_provider,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
                               referral_code, referred_by)
-           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, 'telegram', $11, $12)
+           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'telegram', $12, $13)
            RETURNING *`,
           [syntheticEmail, telegramId, displayName, tgUser.photoUrl, month, year,
-           ip, geo.country || null, geo.city || null, req.get('User-Agent') || null,
+           ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
            refCode, referredBy]
         );
         user = newUser;

@@ -105,6 +105,16 @@ body {
     box-shadow: none;
   }
 
+  .signup-consent-shell {
+    width: 100%;
+    max-width: 24rem;
+  }
+
+  .app-auth-shell {
+    width: 100%;
+    max-width: 24rem;
+  }
+
   .app-page-gutter {
     padding-inline: var(--app-page-padding-x);
   }
@@ -130,6 +140,16 @@ body {
     border-left: 1px solid rgba(45, 31, 69, 0.3);
     border-right: 1px solid rgba(45, 31, 69, 0.3);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@media (min-width: 768px) {
+  html.wide-tablet-shell .signup-consent-shell {
+    max-width: 48rem;
+  }
+
+  html.wide-tablet-shell .app-auth-shell {
+    max-width: 48rem;
   }
 }
 

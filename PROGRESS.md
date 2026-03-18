@@ -620,3 +620,39 @@
 - [x] Keep the app and landing shells full-width on iPad landscape instead of applying the desktop frame
 - [x] Add iPad landscape UI assertions for `/` and `/my/welcome`
 - [x] Run `npm run test:e2e:ui`
+
+## Apple Sign-In Debug Removal
+- [x] Update `plan.md` and `PROGRESS.md` for the Apple Sign-In debug cleanup
+- [x] Remove the temporary Apple Sign-In debug alert and verbose logging
+- [x] Run `npm run build`
+
+## Apple Sign-In Cancel Error Suppression
+- [x] Update `plan.md` and `PROGRESS.md` for the Apple cancel-error suppression fix
+- [x] Suppress the native Apple authorization error that represents user-cancel on iOS
+- [x] Run `npm run build`
+
+## iPad Signup Consent Width Fix
+- [x] Update `plan.md` and `PROGRESS.md` for the iPad signup consent-width fix
+- [x] Make the signup consent step wider on iPad/tablet without widening the regular auth forms
+- [x] Add UI coverage for the tablet/iPad consent-step width
+- [ ] Run `npm run test:e2e:ui`
+
+## iPad Auth Screen Width Consistency
+- [x] Update `plan.md` and `PROGRESS.md` for the broader iPad auth-width pass
+- [x] Make all full-screen auth pages wider on iPad while keeping desktop behavior unchanged
+- [x] Update UI coverage for the iPad login and consent widths
+- [ ] Run `npm run test:e2e:ui`
+
+## Plan Modal Button Spacing
+- [x] Update `plan.md` and `PROGRESS.md` for the plan-modal spacing tweak
+- [x] Increase the vertical spacing between the pricing modal action buttons
+- [x] Run `npm run build`
+
+## Three-Type Proactive Messages: Morning, Evening & Random
+- [x] Add migration v36: users.timezone, messages.proactive_slot, user_preferences.proactive_frequency + country backfill
+- [x] Add timezone to geo.js IP lookup (ip-api.com timezone field)
+- [x] Save timezone on user registration in auth-api.js (all 6 INSERT statements)
+- [x] Add proactive_frequency to preferences API GET/PUT in user-api.js
+- [x] Rewrite proactive.js: timezone-aware slots (morning/evening/random), frequency config (low/normal/high), slot-specific prompts
+- [x] Add frequency selector (segmented control) to Profile page below proactive toggle
+- [ ] Run tests

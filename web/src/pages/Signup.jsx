@@ -162,7 +162,7 @@ export default function Signup() {
   if (step === 1) {
     return (
       <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
-        <div data-testid="auth-form-shell" className="w-full max-w-sm">
+        <div data-testid="signup-consent-shell" className="signup-consent-shell">
           <div className="text-center mb-5">
             <img src={logoSrc} alt="Lovetta" className="h-12 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-brand-text">Verify your age</h1>
@@ -249,7 +249,7 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
-      <div data-testid="auth-form-shell" className="w-full max-w-sm">
+      <div data-testid="auth-form-shell" className="app-auth-shell">
         <div className="text-center mb-8">
           <img src={logoSrc} alt="Lovetta" className="h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Create account</h1>

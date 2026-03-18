@@ -12,6 +12,7 @@ export default function Profile() {
   const [notifyMessages, setNotifyMessages] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [proactiveMessages, setProactiveMessages] = useState(true);
+  const [proactiveFrequency, setProactiveFrequency] = useState('normal');
   const [explicitContent, setExplicitContent] = useState(false);
   const [prefLoading, setPrefLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +57,7 @@ export default function Profile() {
         setNotifyMessages(data.notify_new_messages);
         setExplicitContent(data.explicit_content);
         setProactiveMessages(data.proactive_messages ?? true);
+        setProactiveFrequency(data.proactive_frequency ?? 'normal');
       })
       .catch(() => {})
       .finally(() => setPrefLoading(false));
@@ -163,6 +165,19 @@ export default function Profile() {
       await api.put('/api/user/preferences', { proactive_messages: newVal });
     } catch {
       setProactiveMessages(!newVal);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateFrequency = async (val) => {
+    const prev = proactiveFrequency;
+    setProactiveFrequency(val);
+    setSaving(true);
+    try {
+      await api.put('/api/user/preferences', { proactive_frequency: val });
+    } catch {
+      setProactiveFrequency(prev);
     } finally {
       setSaving(false);
     }
@@ -347,6 +362,38 @@ export default function Profile() {
                 />
               </button>
             </div>
+
+            {/* Proactive message frequency — only shown when proactive is ON */}
+            {proactiveMessages && (
+              <div>
+                <p className="text-sm text-brand-text mb-2">How often</p>
+                <div className="flex rounded-lg overflow-hidden border border-brand-border">
+                  {[
+                    { value: 'low', label: 'Less' },
+                    { value: 'normal', label: 'Normal' },
+                    { value: 'high', label: 'More' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => updateFrequency(opt.value)}
+                      disabled={prefLoading || saving}
+                      className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                        proactiveFrequency === opt.value
+                          ? 'bg-brand-accent text-white'
+                          : 'bg-brand-surface text-brand-text-secondary hover:bg-brand-card'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-brand-muted mt-1">
+                  {proactiveFrequency === 'low' && 'Up to 1 message per day'}
+                  {proactiveFrequency === 'normal' && 'Morning & evening check-ins'}
+                  {proactiveFrequency === 'high' && 'Morning, daytime & evening messages'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

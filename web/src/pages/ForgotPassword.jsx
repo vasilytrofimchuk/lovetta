@@ -24,7 +24,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+      <div className="app-auth-shell">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold">Reset password</h1>
           <p className="text-brand-text-secondary mt-1">We'll send you a reset link</p>

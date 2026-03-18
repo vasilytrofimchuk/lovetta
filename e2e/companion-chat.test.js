@@ -4,7 +4,7 @@
  * Uses real OpenRouter API for chat (costs a few cents).
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect, devices } = require('@playwright/test');
 const { BASE, createTestUser } = require('./helpers');
 
 // Load env for API keys
@@ -124,13 +124,22 @@ test.describe('Companion List', () => {
     await expect(page.locator('text=Bring someone special to life')).toBeVisible();
   });
 
-  test('tablet uses full-width app surfaces while auth stays narrow', async ({ page, request }) => {
+  test('ipad uses wide auth screens and full-width app surfaces', async ({ browser, request }) => {
     test.setTimeout(60000);
-    await page.setViewportSize({ width: 834, height: 1194 });
+    const context = await browser.newContext({
+      ...devices['iPad Pro 11 landscape'],
+    });
+    const page = await context.newPage();
+
     await page.goto(`${BASE}/my/login`);
 
     const authWidth = await page.locator('[data-testid="auth-form-shell"]').evaluate((node) => node.getBoundingClientRect().width);
-    expect(authWidth).toBeLessThan(420);
+    expect(authWidth).toBeGreaterThan(700);
+
+    await page.goto(`${BASE}/my/signup`);
+
+    const consentWidth = await page.locator('[data-testid="signup-consent-shell"]').evaluate((node) => node.getBoundingClientRect().width);
+    expect(consentWidth).toBeGreaterThan(700);
 
     const user = await seedAuthenticatedUser(page, request);
     const companion = await createCompanionViaApi(request, user);
@@ -168,6 +177,8 @@ test.describe('Companion List', () => {
 
     expect(tabletChatMetrics).toBeTruthy();
     expect(Math.abs(tabletChatMetrics.chatWidth - tabletChatMetrics.shellWidth)).toBeLessThanOrEqual(2);
+
+    await context.close();
   });
 
   test('desktop uses a centered 960px shell while auth stays narrow', async ({ page, request }) => {

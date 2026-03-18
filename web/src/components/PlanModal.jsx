@@ -178,38 +178,40 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
         ))}
       </ul>
 
-      <div>
+      <div className="pt-3">
         {/* Trial note + links */}
-        <p className="text-[0.72rem] text-brand-muted text-center leading-snug mb-3">
+        <p className="text-[0.72rem] text-brand-muted text-center leading-snug mb-5">
           3-day free trial, then auto-renews. Cancel anytime — no charge during trial.{' '}
           <button type="button" onClick={() => openLink('https://lovetta.ai/privacy.html')} className="text-brand-accent underline">Privacy Policy</button>
           {' · '}
           <button type="button" onClick={() => openLink('https://lovetta.ai/terms.html')} className="text-brand-accent underline">Terms of Service</button>
         </p>
 
-        <button
-          onClick={() => handleSubscribe(selectedPlan)}
-          disabled={!!loading}
-          className="w-full py-3.5 bg-brand-accent text-white rounded-xl font-semibold text-base hover:bg-brand-accent-hover transition-colors disabled:opacity-60"
-        >
-          {loading ? 'Processing...' : 'Start Free Trial'}
-        </button>
-
-        {isAppStore() && (
+        <div className="space-y-5">
           <button
-            onClick={handleRestore}
-            disabled={restoring}
-            className="w-full py-3 text-brand-muted text-sm hover:text-brand-text-secondary transition-colors mt-1"
+            onClick={() => handleSubscribe(selectedPlan)}
+            disabled={!!loading}
+            className="w-full py-3.5 bg-brand-accent text-white rounded-xl font-semibold text-base hover:bg-brand-accent-hover transition-colors disabled:opacity-60"
           >
-            {restoring ? 'Restoring...' : 'Restore Purchases'}
+            {loading ? 'Processing...' : 'Start Free Trial'}
           </button>
-        )}
 
-        {onClose && (
-          <button onClick={onClose} className="w-full py-3 text-brand-muted text-sm mt-1">
-            Skip for now
-          </button>
-        )}
+          {isAppStore() && (
+            <button
+              onClick={handleRestore}
+              disabled={restoring}
+              className="w-full py-3 text-brand-muted text-sm hover:text-brand-text-secondary transition-colors"
+            >
+              {restoring ? 'Restoring...' : 'Restore Purchases'}
+            </button>
+          )}
+
+          {onClose && (
+            <button onClick={onClose} className="w-full py-3 text-brand-muted text-sm">
+              Skip for now
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

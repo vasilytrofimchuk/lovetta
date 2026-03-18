@@ -20,7 +20,7 @@ export default function VerifyEmail() {
 
   return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
-      <div className="text-center max-w-sm">
+      <div className="app-auth-shell text-center">
         {status === 'verifying' && (
           <>
             <div className="w-8 h-8 border-2 border-brand-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />

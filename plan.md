@@ -555,3 +555,39 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Updated the app shell and landing frame CSS to apply the 960px centered desktop frame only when that iPad/tablet class is absent.
 - Tightened the landing UI test to verify the iPad wide-shell class, full-width `/my/welcome` shell, and wider welcome CTA on iPad landscape.
 - Verified with `npm run build`, `npm run test:e2e:ui`, and `npm run build:ios` so the synced iOS bundle also includes the fix.
+
+## Apple Sign-In Debug Removal — DONE
+- Removed the temporary Apple Sign-In debug popup and verbose bridge logging from the Capacitor login flow in the shared React component.
+- Kept the existing user-cancel handling and normal user-facing error messaging intact.
+- Verified with `npm run build` to catch syntax regressions without running a broader UI suite.
+
+## Apple Sign-In Cancel Error Suppression — DONE
+- Treated the native Apple authorization error shown when the user backs out of the sheet as a silent cancel instead of a visible form error.
+- Kept real Apple sign-in failures user-visible while widening the cancel detection for the Capacitor plugin's iOS error variants, including the `AuthorizationError error 1000` case seen on device.
+- Verified with `npm run build`; no browser UI test covers the native Apple sheet path.
+
+## iPad Signup Consent Width Fix — IN PROGRESS
+- Expand the signup consent step on iPad/tablet so it no longer sits in the narrow phone-width auth wrapper while keeping login and registration forms compact.
+- Add explicit UI coverage for the iPad/tablet consent-step width alongside the existing shell-width assertions.
+- Implemented via a shared auth-shell pass; the targeted iPad auth assertions now pass.
+- Full `npm run test:e2e:ui` reruns still hit unrelated existing timeouts in companion/chat navigation tests, so the bucket is not fully green yet.
+
+## iPad Auth Screen Width Consistency — IN PROGRESS
+- Expand all full-screen auth pages on iPad so login, signup, forgot/reset password, and verify email no longer render as phone-width cards while desktop can keep the narrower auth presentation.
+- Reuse one shared auth-shell class so the iPad-specific width behavior stays consistent across these screens.
+- Added shared `app-auth-shell` sizing for the auth screens while preserving the narrower desktop auth layout.
+- Updated UI coverage to check iPad login and signup consent widths in a real iPad device context.
+- Full `npm run test:e2e:ui` reruns still hit unrelated existing timeouts in companion/chat navigation tests, so the bucket is not fully green yet.
+
+## Plan Modal Button Spacing — DONE
+- Increase the vertical spacing between the primary CTA, restore purchases action, and skip action in the pricing/onboarding plan modal.
+- Keep the existing button order, copy, and behavior unchanged.
+- Increased the spacing above the button stack and between the stacked actions so the separation is larger on all resolutions.
+- Verified with `npm run build`.
+
+## Three-Type Proactive Messages — IN PROGRESS
+- Changed proactive messaging from 1 message/day to 3 timezone-aware slots: morning (8–11 AM), evening (7–10 PM), random (11 AM–7 PM). No messages at night.
+- Added user-configurable frequency setting (low/normal/high) in Profile page with segmented control.
+- Frequency controls max messages per companion per day: low=1, normal=2, high=3.
+- Added timezone capture via ip-api.com on registration and country-based backfill for existing users.
+- Files: migrate.js (v36), geo.js, auth-api.js, user-api.js, proactive.js, Profile.jsx.

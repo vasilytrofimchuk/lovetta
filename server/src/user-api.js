@@ -22,7 +22,7 @@ router.get('/preferences', authenticate, async (req, res) => {
   try {
     const pool = getPool();
     const { rows } = await pool.query(
-      'SELECT notify_new_messages, explicit_content, proactive_messages FROM user_preferences WHERE user_id = $1',
+      'SELECT notify_new_messages, explicit_content, proactive_messages, proactive_frequency FROM user_preferences WHERE user_id = $1',
       [req.userId]
     );
 
@@ -33,6 +33,7 @@ router.get('/preferences', authenticate, async (req, res) => {
       notify_new_messages: rows[0]?.notify_new_messages ?? false,
       explicit_content: rows[0]?.explicit_content ?? defaultExplicit,
       proactive_messages: rows[0]?.proactive_messages ?? true,
+      proactive_frequency: rows[0]?.proactive_frequency ?? 'normal',
     });
   } catch (err) {
     console.error('[user] preferences error:', err.message);
@@ -43,7 +44,7 @@ router.get('/preferences', authenticate, async (req, res) => {
 // -- PUT /api/user/preferences --------------------------------
 router.put('/preferences', authenticate, async (req, res) => {
   try {
-    const { notify_new_messages, explicit_content, proactive_messages } = req.body || {};
+    const { notify_new_messages, explicit_content, proactive_messages, proactive_frequency } = req.body || {};
     const pool = getPool();
 
     // Build dynamic SET clause — only update fields that are provided
@@ -51,6 +52,9 @@ router.put('/preferences', authenticate, async (req, res) => {
     if (notify_new_messages !== undefined) updates.notify_new_messages = Boolean(notify_new_messages);
     if (explicit_content !== undefined) updates.explicit_content = Boolean(explicit_content);
     if (proactive_messages !== undefined) updates.proactive_messages = Boolean(proactive_messages);
+    if (proactive_frequency !== undefined && ['low', 'normal', 'high'].includes(proactive_frequency)) {
+      updates.proactive_frequency = proactive_frequency;
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No preferences to update' });

@@ -862,6 +862,74 @@ const MIGRATIONS = [
       `, [hash]);
     },
   },
+  {
+    name: 'v36_proactive_slots_and_timezone',
+    fn: async (pool) => {
+      // Timezone on users for time-of-day proactive messaging
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT`);
+      // Proactive slot tracking (morning/evening/random)
+      await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS proactive_slot TEXT`);
+      // User frequency preference for proactive messages
+      await pool.query(`ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS proactive_frequency TEXT DEFAULT 'normal'`);
+
+      // Backfill timezone from country for existing users
+      await pool.query(`
+        UPDATE users SET timezone = CASE country
+          WHEN 'United States' THEN 'America/New_York'
+          WHEN 'United Kingdom' THEN 'Europe/London'
+          WHEN 'Germany' THEN 'Europe/Berlin'
+          WHEN 'France' THEN 'Europe/Paris'
+          WHEN 'Spain' THEN 'Europe/Madrid'
+          WHEN 'Italy' THEN 'Europe/Rome'
+          WHEN 'Netherlands' THEN 'Europe/Amsterdam'
+          WHEN 'Poland' THEN 'Europe/Warsaw'
+          WHEN 'Sweden' THEN 'Europe/Stockholm'
+          WHEN 'Norway' THEN 'Europe/Oslo'
+          WHEN 'Denmark' THEN 'Europe/Copenhagen'
+          WHEN 'Finland' THEN 'Europe/Helsinki'
+          WHEN 'Switzerland' THEN 'Europe/Zurich'
+          WHEN 'Austria' THEN 'Europe/Vienna'
+          WHEN 'Belgium' THEN 'Europe/Brussels'
+          WHEN 'Portugal' THEN 'Europe/Lisbon'
+          WHEN 'Greece' THEN 'Europe/Athens'
+          WHEN 'Romania' THEN 'Europe/Bucharest'
+          WHEN 'Czech Republic' THEN 'Europe/Prague'
+          WHEN 'Czechia' THEN 'Europe/Prague'
+          WHEN 'Hungary' THEN 'Europe/Budapest'
+          WHEN 'Ireland' THEN 'Europe/Dublin'
+          WHEN 'Russia' THEN 'Europe/Moscow'
+          WHEN 'Ukraine' THEN 'Europe/Kyiv'
+          WHEN 'Turkey' THEN 'Europe/Istanbul'
+          WHEN 'India' THEN 'Asia/Kolkata'
+          WHEN 'Japan' THEN 'Asia/Tokyo'
+          WHEN 'South Korea' THEN 'Asia/Seoul'
+          WHEN 'China' THEN 'Asia/Shanghai'
+          WHEN 'Singapore' THEN 'Asia/Singapore'
+          WHEN 'Philippines' THEN 'Asia/Manila'
+          WHEN 'Thailand' THEN 'Asia/Bangkok'
+          WHEN 'Vietnam' THEN 'Asia/Ho_Chi_Minh'
+          WHEN 'Indonesia' THEN 'Asia/Jakarta'
+          WHEN 'Malaysia' THEN 'Asia/Kuala_Lumpur'
+          WHEN 'Israel' THEN 'Asia/Jerusalem'
+          WHEN 'United Arab Emirates' THEN 'Asia/Dubai'
+          WHEN 'Saudi Arabia' THEN 'Asia/Riyadh'
+          WHEN 'Canada' THEN 'America/Toronto'
+          WHEN 'Mexico' THEN 'America/Mexico_City'
+          WHEN 'Brazil' THEN 'America/Sao_Paulo'
+          WHEN 'Argentina' THEN 'America/Argentina/Buenos_Aires'
+          WHEN 'Colombia' THEN 'America/Bogota'
+          WHEN 'Chile' THEN 'America/Santiago'
+          WHEN 'Australia' THEN 'Australia/Sydney'
+          WHEN 'New Zealand' THEN 'Pacific/Auckland'
+          WHEN 'South Africa' THEN 'Africa/Johannesburg'
+          WHEN 'Nigeria' THEN 'Africa/Lagos'
+          WHEN 'Egypt' THEN 'Africa/Cairo'
+          ELSE NULL
+        END
+        WHERE timezone IS NULL AND country IS NOT NULL
+      `);
+    },
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

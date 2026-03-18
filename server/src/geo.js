@@ -9,11 +9,11 @@ async function geoFromIp(ip) {
     return {};
   }
   try {
-    const r = await fetch(`http://ip-api.com/json/${clean}?fields=country,regionName,city`);
+    const r = await fetch(`http://ip-api.com/json/${clean}?fields=country,regionName,city,timezone`);
     if (!r.ok) return {};
     const d = await r.json();
     if (d.status === 'fail') return {};
-    return { country: d.country || null, state: d.regionName || null, city: d.city || null };
+    return { country: d.country || null, state: d.regionName || null, city: d.city || null, timezone: d.timezone || null };
   } catch {
     return {};
   }
