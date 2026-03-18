@@ -199,6 +199,26 @@
     .email-compose-input:focus { outline: none; border-color: var(--accent); }
     .from-badge { font-size: 11px !important; padding: 2px 10px !important; }
     .from-badge.active { background: var(--accent) !important; color: white !important; border-color: var(--accent) !important; }
+
+    /* Tab header & refresh button */
+    .tab-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .tab-header h2 { color: var(--text); font-size: 18px; font-weight: 600; margin: 0; }
+    .refresh-btn {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text2); padding: 6px 14px; border-radius: 8px;
+      cursor: pointer; font-size: 13px; transition: all 0.15s;
+    }
+    .refresh-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Settings 3-column layout */
+    .settings-section { margin-bottom: 28px; }
+    .settings-section-title {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px;
+    }
+    .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+    .settings-col { display: flex; flex-direction: column; gap: 10px; }
+    .settings-col .setting-row { margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -221,21 +241,22 @@
     </div>
 
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('overview')">Overview</button>
-      <button class="tab" onclick="switchTab('visitors')">Visitors</button>
-      <button class="tab" onclick="switchTab('users')">Users</button>
-      <button class="tab" onclick="switchTab('economics')">Economics</button>
-      <button class="tab" onclick="switchTab('settings')">Settings</button>
-      <button class="tab" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
-      <button class="tab" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
-      <button class="tab" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
-      <button class="tab" onclick="switchTab('companion-emails')">Girl Emails</button>
-      <button class="tab" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
-      <button class="tab" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+      <button class="tab" data-tab="visitors" onclick="switchTab('visitors')">Visitors</button>
+      <button class="tab" data-tab="users" onclick="switchTab('users')">Users</button>
+      <button class="tab" data-tab="economics" onclick="switchTab('economics')">Economics</button>
+      <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
+      <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" data-tab="sentry" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" data-tab="email" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" data-tab="companion-emails" onclick="switchTab('companion-emails')">Girl Emails</button>
+      <button class="tab" data-tab="cashouts" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" data-tab="support" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
     </div>
 
     <!-- Overview Tab -->
     <div id="tab-overview" class="tab-content active">
+      <div class="tab-header"><h2>Overview</h2><button class="refresh-btn" onclick="loadOverview()">↻ Refresh</button></div>
       <h3 class="section-title" style="margin-top:0;">Visitors</h3>
       <div class="stat-cards" id="overview-visitor-cards"></div>
       <div class="breakdown-grid" id="overview-visitor-breakdowns"></div>
@@ -247,6 +268,7 @@
 
     <!-- Visitors Tab -->
     <div id="tab-visitors" class="tab-content">
+      <div class="tab-header"><h2>Visitors</h2><button class="refresh-btn" onclick="loadVisitors()">↻ Refresh</button></div>
       <table>
         <thead><tr>
           <th>Session</th><th>Page</th><th>Device</th><th>Country</th><th>City</th>
@@ -260,6 +282,7 @@
 
     <!-- Users Tab -->
     <div id="tab-users" class="tab-content">
+      <div class="tab-header"><h2>Users</h2><button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button></div>
       <div class="search-bar">
         <input type="text" id="user-search" placeholder="Search by email or name..." onkeydown="if(event.key==='Enter'){userPage=1;loadUsers();}">
       </div>
@@ -275,15 +298,30 @@
 
     <!-- Settings Tab -->
     <div id="tab-settings" class="tab-content">
-      <h3 style="margin-bottom: 16px; color: var(--text2);">AI Models</h3>
-      <div id="model-badges" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px;"></div>
-      <h3 style="margin-bottom: 16px; color: var(--text2);">Content Levels by Platform</h3>
-      <div id="settings-list"></div>
-      <div id="ai-settings-list"></div>
+      <div class="tab-header"><h2>Settings</h2><button class="refresh-btn" onclick="loadSettings()">↻ Refresh</button></div>
+      <div class="settings-section">
+        <div class="settings-section-title">AI Models</div>
+        <div id="model-badges" style="display:flex;flex-wrap:wrap;gap:12px;"></div>
+      </div>
+      <div class="settings-grid">
+        <div class="settings-col">
+          <div class="settings-section-title">Content Levels</div>
+          <div id="settings-list"></div>
+        </div>
+        <div class="settings-col">
+          <div class="settings-section-title">App Limits &amp; Toggles</div>
+          <div id="ai-settings-toggles"></div>
+        </div>
+        <div class="settings-col">
+          <div class="settings-section-title">AI Settings</div>
+          <div id="ai-settings-list"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Economics Tab -->
     <div id="tab-economics" class="tab-content">
+      <div class="tab-header"><h2>Economics</h2><button class="refresh-btn" onclick="loadEconomics(econPeriod||'7d')">↻ Refresh</button></div>
       <div style="display:flex;gap:8px;margin-bottom:20px;">
         <button class="econ-period active" onclick="loadEconomics('7d', this)">7d</button>
         <button class="econ-period" onclick="loadEconomics('30d', this)">30d</button>
@@ -309,6 +347,7 @@
 
     <!-- Reports Tab -->
     <div id="tab-reports" class="tab-content">
+      <div class="tab-header"><h2>Reports</h2><button class="refresh-btn" onclick="loadReports()">↻ Refresh</button></div>
       <div class="stat-cards" id="reports-cards"></div>
       <div style="display:flex;gap:8px;margin-bottom:20px;">
         <button class="econ-period active" onclick="loadReports(1, 'all', this)">All</button>
@@ -323,11 +362,13 @@
 
     <!-- Sentry Tab -->
     <div id="tab-sentry" class="tab-content">
+      <div class="tab-header"><h2>Sentry</h2><button class="refresh-btn" onclick="loadSentry()">↻ Refresh</button></div>
       <div id="sentry-content" style="font-size:14px;color:var(--muted);">Loading...</div>
     </div>
 
     <!-- Email Tab -->
     <div id="tab-email" class="tab-content">
+      <div class="tab-header"><h2>Email</h2><button class="refresh-btn" onclick="loadEmails()">↻ Refresh</button></div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;">
         <button class="email-filter active" data-dir="inbound" onclick="filterEmail('inbound')">Inbox</button>
         <button class="email-filter" data-dir="outbound" onclick="filterEmail('outbound')">Sent</button>
@@ -372,6 +413,7 @@
 
     <!-- Girl Emails Tab -->
     <div id="tab-companion-emails" class="tab-content">
+      <div class="tab-header"><h2>Girl Emails</h2><button class="refresh-btn" onclick="loadCompanionEmails()">↻ Refresh</button></div>
       <div class="search-bar">
         <input type="text" id="companion-email-search" placeholder="Search by user email, girl name, or content..." onkeydown="if(event.key==='Enter'){companionEmailPage=1;loadCompanionEmails();}">
       </div>
@@ -386,6 +428,7 @@
 
     <!-- Cashouts Tab -->
     <div id="tab-cashouts" class="tab-content">
+      <div class="tab-header"><h2>Cashouts</h2><button class="refresh-btn" onclick="loadCashouts()">↻ Refresh</button></div>
       <div class="search-bar" style="display:flex;gap:8px;align-items:center;">
         <select id="cashout-status-filter" onchange="cashoutPage=1;loadCashouts();" style="padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
           <option value="">All statuses</option>
@@ -457,8 +500,11 @@
     function showDashboard() {
       document.getElementById('auth-gate').style.display = 'none';
       document.getElementById('dashboard').style.display = 'block';
-      loadOverview();
-      loadSettings();
+      var validTabs = ['overview','visitors','users','economics','settings','reports','sentry','email','companion-emails','cashouts','support'];
+      var hash = window.location.hash.slice(1);
+      var initialTab = validTabs.indexOf(hash) !== -1 ? hash : 'overview';
+      switchTab(initialTab);
+      if (initialTab !== 'settings') loadSettings();
       loadSentryBadge();
       loadReportsBadge();
       loadSupportBadge();
@@ -468,15 +514,18 @@
     function switchTab(name) {
       document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
       document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
-      event.target.closest('.tab').classList.add('active');
+      var btn = document.querySelector('.tab[data-tab="' + name + '"]');
+      if (btn) btn.classList.add('active');
       document.getElementById('tab-' + name).classList.add('active');
+      window.location.hash = name;
       if (supportPollInterval) { clearInterval(supportPollInterval); supportPollInterval = null; }
       if (name === 'overview') loadOverview();
       else if (name === 'visitors') loadVisitors();
       else if (name === 'users') loadUsers();
+      else if (name === 'settings') loadSettings();
       else if (name === 'reports') loadReports();
       else if (name === 'sentry') loadSentry();
-      else if (name === 'economics') loadEconomics('7d');
+      else if (name === 'economics') loadEconomics(econPeriod || '7d');
       else if (name === 'email') loadEmails();
       else if (name === 'companion-emails') loadCompanionEmails();
       else if (name === 'cashouts') loadCashouts();
@@ -721,36 +770,33 @@
         });
         document.getElementById('model-badges').innerHTML = badgesHtml;
 
-        var html = '';
-
-        // Content level dropdowns
+        // Col 1: Content level dropdowns
+        var contentHtml = '';
         CONTENT_SETTING_DEFS.forEach(function(def) {
           var current = parseInt(settings[def.key], 10) || 0;
           var options = CONTENT_LEVELS.map(function(l, i) {
             return '<option value="' + i + '"' + (i === current ? ' selected' : '') + '>' + l + '</option>';
           }).join('');
-          html += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
+          contentHtml += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
             '<div style="display:flex;align-items:center;"><select onchange="saveSetting(\'' + def.key + '\', this.value, this)">' + options + '</select>' +
             '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
         });
+        document.getElementById('settings-list').innerHTML = contentHtml;
 
-        // Number inputs
-        html += '<h3 style="margin: 24px 0 16px; color: var(--text2);">App Limits</h3>';
+        // Col 2: Number inputs + Feature toggles
+        var togglesHtml = '';
         NUMBER_SETTING_DEFS.forEach(function(def) {
           var current = parseInt(settings[def.key], 10) || def.min || 1;
-          html += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
+          togglesHtml += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
             '<div style="display:flex;align-items:center;"><input type="number" min="' + (def.min || 1) + '" max="' + (def.max || 100) + '" value="' + current + '" ' +
             'style="width:70px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;text-align:center;" ' +
             'onchange="saveSetting(\'' + def.key + '\', parseInt(this.value, 10), this)">' +
             '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
         });
-
-        // Feature toggles
-        html += '<h3 style="margin: 24px 0 16px; color: var(--text2);">Feature Toggles</h3>';
         TOGGLE_SETTING_DEFS.forEach(function(def) {
           var val = settings[def.key];
           var isOn = val === true || val === 'true';
-          html += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
+          togglesHtml += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
             '<div style="display:flex;align-items:center;">' +
             '<label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">' +
             '<input type="checkbox" id="toggle-' + def.key + '" ' + (isOn ? 'checked' : '') +
@@ -762,10 +808,9 @@
             ';bottom:2px;background:white;border-radius:50%;transition:0.3s;"></span></span></label>' +
             '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
         });
+        document.getElementById('ai-settings-toggles').innerHTML = togglesHtml;
 
-        document.getElementById('settings-list').innerHTML = html;
-
-        // AI Settings
+        // Col 3: AI Settings
         var AI_SETTINGS = [
           { key: 'tip_request_threshold_usd', label: 'Tip Request Threshold (USD)', desc: 'API cost before companion asks for a tip (paid users)', type: 'number' },
           { key: 'tip_request_threshold_trial_usd', label: 'Trial Tip Threshold (USD)', desc: 'API cost before trial user is asked for a tip (media blocked)', type: 'number' },
@@ -773,7 +818,7 @@
           { key: 'fal_image_model', label: 'fal.ai Image Model', desc: 'Default image generation model', type: 'text' },
           { key: 'fal_video_model', label: 'fal.ai Video Model', desc: 'Default video generation model', type: 'text' },
         ];
-        var aiHtml = '<h3 style="margin: 24px 0 16px; color: var(--text2);">AI Settings</h3>';
+        var aiHtml = '';
         AI_SETTINGS.forEach(function(def) {
           var val = settings[def.key];
           if (typeof val === 'string') val = val.replace(/^"|"$/g, '');
@@ -782,7 +827,7 @@
             '<div style="display:flex;align-items:center;">' +
             '<input type="' + def.type + '" value="' + esc(String(val)) + '" ' +
             (def.type === 'number' ? 'step="0.01" min="0" style="width:100px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;text-align:center;" ' :
-            'style="width:280px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;font-family:monospace;" ') +
+            'style="width:100%;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;font-family:monospace;" ') +
             'onchange="saveEconSetting(\'' + def.key + '\', this.value, \'' + def.type + '\', this)">' +
             '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
         });
@@ -897,6 +942,7 @@
             '">' + label + '</button>';
         }
         var filterHtml =
+          '<div class="tab-header"><h2>Support</h2><button class="refresh-btn" onclick="loadSupport()">↻ Refresh</button></div>' +
           '<div style="display:flex;gap:0.5rem;margin-bottom:1rem">' +
             sbtn('All', '') + sbtn('Open', 'open') + sbtn('Waiting', 'waiting') + sbtn('Resolved', 'resolved') +
           '</div>';
