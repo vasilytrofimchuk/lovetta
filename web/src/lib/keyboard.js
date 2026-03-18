@@ -2,20 +2,28 @@ import { isIOS } from './platform'
 
 let keyboardOpen = false
 let baseHeight = 0
+let rafId = 0
+
+function applyHeight(h) {
+  document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(h)}px`)
+}
 
 function setViewportHeight() {
   if (typeof window === 'undefined') return
   if (!baseHeight) baseHeight = window.innerHeight
 
-  let height
-  if (keyboardOpen && window.visualViewport) {
-    // With KeyboardResize.None, visualViewport.height reports the
-    // actual visible area above the keyboard — use it directly
-    height = window.visualViewport.height
-  } else {
-    height = baseHeight
+  if (!keyboardOpen) {
+    applyHeight(baseHeight)
+    return
   }
-  document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(height)}px`)
+
+  // When keyboard is open, wait for animation to settle before applying
+  cancelAnimationFrame(rafId)
+  rafId = requestAnimationFrame(() => {
+    if (window.visualViewport) {
+      applyHeight(window.visualViewport.height)
+    }
+  })
 }
 
 function setKeyboardScrollLock(isLocked) {
@@ -28,9 +36,11 @@ export async function initIosKeyboard() {
   if (!isIOS()) return () => {}
 
   baseHeight = window.innerHeight
-  setViewportHeight()
+  applyHeight(baseHeight)
 
-  const handleViewportChange = () => setViewportHeight()
+  const handleViewportChange = () => {
+    if (keyboardOpen) setViewportHeight()
+  }
 
   window.visualViewport?.addEventListener('resize', handleViewportChange)
 
@@ -47,12 +57,16 @@ export async function initIosKeyboard() {
       Keyboard.addListener('keyboardDidShow', () => {
         keyboardOpen = true
         setKeyboardScrollLock(true)
-        setViewportHeight()
+        // keyboardDidShow fires after animation — apply final height
+        if (window.visualViewport) {
+          applyHeight(window.visualViewport.height)
+        }
       }),
       Keyboard.addListener('keyboardDidHide', () => {
         keyboardOpen = false
         setKeyboardScrollLock(false)
-        setViewportHeight()
+        cancelAnimationFrame(rafId)
+        applyHeight(baseHeight)
       }),
     ])
   } catch (error) {
@@ -62,6 +76,7 @@ export async function initIosKeyboard() {
   return () => {
     window.visualViewport?.removeEventListener('resize', handleViewportChange)
     setKeyboardScrollLock(false)
+    cancelAnimationFrame(rafId)
     handles.forEach((handle) => handle?.remove?.())
     handles = []
   }
