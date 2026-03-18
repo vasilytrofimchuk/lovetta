@@ -47,7 +47,7 @@ export default function MessageList({ messages, streaming, streamingText, hasMor
   }, [hasMore, onLoadMore]);
 
   return (
-    <div className="flex-1 overflow-hidden relative">
+    <div className="flex-1 min-h-0 overflow-hidden relative">
       <div ref={containerRef} className="h-full overflow-y-auto px-4 py-4">
         {/* Load more sentinel */}
         {hasMore && <div ref={sentinelRef} className="text-center text-brand-muted text-xs py-2">Loading earlier messages...</div>}

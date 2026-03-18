@@ -37,7 +37,7 @@ test.describe('Wizard back button navigation', () => {
     await page.waitForSelector('text=Surprise Me');
 
     // Back from choose → companion list
-    await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await page.waitForSelector('text=Bring someone special to life', { timeout: 5000 });
   });
 
@@ -48,7 +48,7 @@ test.describe('Wizard back button navigation', () => {
     await page.waitForSelector('text=Luna', { timeout: 5000 });
 
     // Back from templates → choose
-    await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await page.waitForSelector('text=Surprise Me', { timeout: 5000 });
   });
 
@@ -61,7 +61,7 @@ test.describe('Wizard back button navigation', () => {
     await page.waitForSelector('text=Awaken Luna', { timeout: 5000 });
 
     // Back from confirm → should see template grid (Luna, Sophia, etc.)
-    await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await page.waitForSelector('text=Sophia', { timeout: 5000 });
     // Verify we're on templates, not choose
     await expect(page.locator('text=Choose a Soul')).toBeVisible();
@@ -74,7 +74,7 @@ test.describe('Wizard back button navigation', () => {
     await page.waitForSelector('textarea', { timeout: 5000 });
 
     // Back from custom → choose
-    await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await page.waitForSelector('text=Surprise Me', { timeout: 5000 });
   });
 
@@ -88,7 +88,7 @@ test.describe('Wizard back button navigation', () => {
     await page.waitForSelector('text=Awaken TestGirl', { timeout: 5000 });
 
     // Back from confirm → should see custom form
-    await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await page.waitForSelector('textarea', { timeout: 5000 });
     await expect(page.locator('text=Be the Creator')).toBeVisible();
   });
@@ -100,7 +100,7 @@ test.describe('Wizard back button navigation', () => {
     await page.waitForSelector('button:has-text("Awaken")', { timeout: 5000 });
 
     // Surprise Me sets isTemplate=true, so back should go to templates
-    await page.locator('svg path[d="M19 12H5M12 19l-7-7 7-7"]').click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     // Should go to templates grid (since isTemplate=true)
     await page.waitForTimeout(500);
     const onTemplates = await page.locator('text=Choose a Soul').isVisible();

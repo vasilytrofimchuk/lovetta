@@ -234,6 +234,8 @@ export default function CompanionCreate() {
             else if (step === 'confirm') setStep('custom');
             else setStep('choose');
           }}
+            aria-label="Back"
+            title="Back"
             className="text-brand-muted hover:text-brand-text transition-colors">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 19l-7-7 7-7" />

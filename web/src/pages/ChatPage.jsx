@@ -71,7 +71,10 @@ export default function ChatPage() {
 
 
   return (
-    <div className="bg-brand-bg flex flex-col max-w-lg mx-auto w-full" style={{ height: isCapacitor() ? 'calc(100vh - env(safe-area-inset-top, 0px))' : '100vh' }}>
+    <div
+      className="bg-brand-bg flex flex-col max-w-lg mx-auto w-full overflow-hidden"
+      style={{ height: isCapacitor() ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))' : '100vh' }}
+    >
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
 
       <MessageList

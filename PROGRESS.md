@@ -478,3 +478,29 @@
 - [x] web/src/hooks/useChat.js: handle free_limit_reached error; add clearError()
 - [x] web/src/components/chat/ChatPage.jsx: remove full-page subscription_required screen; add PlanModal overlay for subscription_required + free_limit_reached
 - [x] e2e/companion-chat.test.js + wizard-nav.test.js: fix signupViaUI() to use custom dropdown buttons instead of native <select> (AgeGate uses CustomSelect component)
+
+## iOS Chat Input / Keyboard Fix
+- [x] Update plan.md with task scope and implementation notes
+- [x] Add Capacitor keyboard plugin + iOS keyboard bootstrap for body resize and scroll reset
+- [x] Refactor app shell/root sizing for internal full-screen scrolling without body bottom padding
+- [x] Update chat and support input layouts for iOS-safe font sizing and bottom safe-area handling
+- [x] Sync iOS native project after Capacitor keyboard config changes
+- [x] Run `npm run test:e2e:ui`
+- [x] Add explicit Back labels to create/profile/support headers and switch UI tests to exact-name back button selectors
+- [x] Update plan.md and PROGRESS.md with final status and notes
+
+## iOS Bottom Background Fix
+- [x] Update plan.md with task scope and implementation notes
+- [x] Make the root/html background match the dark app shell so iOS bottom inset never shows white
+- [x] Run `npm run test:e2e:ui`
+- [x] Update plan.md and PROGRESS.md with final status and notes
+
+## iOS Keyboard Shift Follow-up
+- [x] Update plan.md with the repo comparison and follow-up scope
+- [x] Compare local iOS viewport/keyboard patterns (`auto`, `frendly`, other repos) against Lovetta's current chat shell
+- [x] Remove the iOS body-lock viewport workaround from chat/support
+- [x] Move native safe-area handling off the global document and onto the affected chat/support layouts
+- [x] Reapply the Capacitor Keyboard `resize: body` pattern from `auto` with a minimal iOS bootstrap
+- [x] Sync the iOS native project and rebuild the web bundle
+- [x] Run `npm run test:e2e:ui`
+- [x] Update plan.md and PROGRESS.md with final status and notes

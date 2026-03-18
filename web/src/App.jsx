@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import usePwaInstall from './hooks/usePwaInstall'
+import { initIosKeyboard } from './lib/keyboard'
 import { isCapacitor } from './lib/platform'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -92,6 +94,24 @@ function AppRoutes() {
 }
 
 export default function App() {
+  useEffect(() => {
+    let dispose = () => {}
+    let active = true
+
+    initIosKeyboard().then((cleanup) => {
+      if (!active) {
+        cleanup?.()
+        return
+      }
+      if (typeof cleanup === 'function') dispose = cleanup
+    })
+
+    return () => {
+      active = false
+      dispose()
+    }
+  }, [])
+
   return (
     <BrowserRouter basename={isCapacitor() ? '/' : '/my'}>
       <AuthProvider>

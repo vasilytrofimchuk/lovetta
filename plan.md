@@ -411,3 +411,24 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - iOS WelcomeScreen (rotator + features + Continue button)
 - Chat error: PlanModal overlay instead of full-page replacement
 - Admin setting for free user threshold
+
+## iOS Chat Input / Keyboard Fix — DONE
+- Prevent iOS auto-zoom in chat/support text inputs by using 16px editable text size
+- Replace chat/support full-screen `100vh` sizing with app-shell-driven flex heights and internal scrolling
+- Remove global body safe-area bottom padding; apply bottom safe-area spacing on chat/support composer bars instead
+- Add Capacitor keyboard bootstrap for iOS: `@capacitor/keyboard`, resize mode `body`, WebView scroll disabled, reset scroll after keyboard hide
+- Sync iOS project after keyboard plugin/config update and verify chat/support behavior with UI tests plus manual iPhone validation
+- Added explicit back-button labels in create/profile/support flows and updated UI tests to use stable exact-name selectors
+- Verification complete: `npm run build:ios` and `npm run test:e2e:ui`
+
+## iOS Bottom Background Fix — DONE
+- Root app surfaces (`html`, `body`, `#root`, desktop shell) now inherit the dark app background and use the shared live viewport height instead of relying on stale `100vh`
+- Capacitor iOS background color is now `#0f0a1a`, so any temporary native exposure matches the app shell instead of showing white
+- Verified with `npm run build:ios` and `npm run test:e2e:ui`
+
+## iOS Keyboard Shift Follow-up — DONE
+- Compared Lovetta with the local working patterns: `auto` contributes the Capacitor Keyboard `resize: body` approach, while `frendly` confirms the `visualViewport` resize signal is the right local source for live keyboard height tracking
+- Removed the experimental `useIosViewportLock` body-fix hook from chat/support because it was leaving the screen offset after keyboard focus/blur
+- Added a minimal iOS keyboard bootstrap in `web/src/lib/keyboard.js` that updates `--app-viewport-height`, disables WKWebView scroll while the app is active, resets scroll on `keyboardDidHide`, and sets resize mode to `body`
+- Chat and support full-screen layouts now size from `var(--app-viewport-height)` instead of raw `100vh`, while safe-area bottom spacing stays local to the composer bars instead of inflating the global document
+- Synced iOS and verified with `npm run build:ios` plus `npm run test:e2e:ui`; manual device/simulator validation is still required for final acceptance

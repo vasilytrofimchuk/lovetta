@@ -7,6 +7,9 @@ export default function ChatInput({ onSend, disabled }) {
   const textareaRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const safeAreaBottom = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
+    ? 'max(0.75rem, env(safe-area-inset-bottom, 0px))'
+    : '0.75rem';
 
   function handleSend() {
     if (!text.trim() || disabled) return;
@@ -93,7 +96,10 @@ export default function ChatInput({ onSend, disabled }) {
   const hasMic = typeof navigator !== 'undefined' && navigator.mediaDevices;
 
   return (
-    <div className="border-t border-brand-border bg-brand-bg px-4 py-3">
+    <div
+      className="border-t border-brand-border bg-brand-bg px-4 pt-3 shrink-0"
+      style={{ paddingBottom: safeAreaBottom }}
+    >
       <div className="max-w-md mx-auto flex items-end gap-2">
         {/* Mic button — left side, small */}
         {hasMic && !disabled && (
@@ -124,7 +130,7 @@ export default function ChatInput({ onSend, disabled }) {
           placeholder={listening ? 'Listening...' : 'Type a message...'}
           rows={1}
           disabled={disabled}
-          className="flex-1 resize-none py-2.5 px-4 rounded-2xl bg-brand-surface border border-brand-border text-brand-text placeholder:text-brand-muted focus:outline-none focus:border-brand-accent text-[15px] leading-relaxed disabled:opacity-50"
+          className="flex-1 resize-none py-2.5 px-4 rounded-2xl bg-brand-surface border border-brand-border text-brand-text placeholder:text-brand-muted focus:outline-none focus:border-brand-accent text-base leading-relaxed disabled:opacity-50"
           style={{ maxHeight: '120px' }}
         />
 

@@ -2,21 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --app-viewport-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-viewport-height: 100dvh;
+  }
+}
+
+html, body, #root {
+  background-color: #0f0a1a;
+  min-height: 100%;
+}
+
 html, body {
   overflow-x: hidden;
   width: 100%;
 }
 
-body {
-  /* iOS safe area bottom (home indicator) */
-  padding-bottom: env(safe-area-inset-bottom);
+#root {
+  min-height: var(--app-viewport-height, 100vh);
 }
 
 body {
+  margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #0f0a1a;
   color: #f0e6ff;
 }
 

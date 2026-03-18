@@ -336,7 +336,7 @@ test.describe('Navigation', () => {
     await signupViaUI(page);
     await page.click('button[title="Profile"]');
     await page.waitForURL('**/my/profile');
-    await page.click('text=Back');
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await page.waitForSelector('button[title="Profile"]', { timeout: 10000 });
   });
 

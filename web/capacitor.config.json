@@ -7,9 +7,13 @@
   },
   "ios": {
     "scheme": "Lovetta",
-    "contentInset": "automatic"
+    "contentInset": "automatic",
+    "backgroundColor": "#0f0a1a"
   },
   "plugins": {
+    "Keyboard": {
+      "resize": "body"
+    },
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
     },
@@ -23,6 +27,7 @@
   "packageClassList": [
     "SignInWithApple",
     "CAPBrowserPlugin",
+    "KeyboardPlugin",
     "PushNotificationsPlugin",
     "GoogleAuth",
     "PurchasesPlugin"

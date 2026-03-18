@@ -189,7 +189,12 @@ export default function Profile() {
       <div className="max-w-md mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate('/')} className="text-brand-muted hover:text-brand-text transition-colors">
+          <button
+            onClick={() => navigate('/')}
+            aria-label="Back"
+            title="Back"
+            className="text-brand-muted hover:text-brand-text transition-colors"
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>

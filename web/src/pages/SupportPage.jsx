@@ -14,6 +14,9 @@ export default function SupportPage() {
   const scrollRef = useRef(null);
   const pollRef = useRef(null);
   const inputRef = useRef(null);
+  const safeAreaBottom = isCapacitor()
+    ? 'max(0.75rem, env(safe-area-inset-bottom, 0px))'
+    : '0.75rem';
 
   const loadChat = useCallback(async () => {
     try {
@@ -71,10 +74,18 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="bg-brand-bg flex flex-col w-full" style={{ height: isCapacitor() ? 'calc(100vh - env(safe-area-inset-top, 0px))' : '100vh' }}>
+    <div
+      className="bg-brand-bg flex flex-col w-full overflow-hidden"
+      style={{ height: isCapacitor() ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))' : '100vh' }}
+    >
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-brand-border flex-shrink-0 bg-brand-bg">
-        <button onClick={() => navigate('/profile')} className="text-brand-muted hover:text-brand-text transition-colors">
+        <button
+          onClick={() => navigate('/profile')}
+          aria-label="Back"
+          title="Back"
+          className="text-brand-muted hover:text-brand-text transition-colors"
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
@@ -88,7 +99,7 @@ export default function SupportPage() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
         {loading && <div className="text-center text-brand-muted text-sm mt-12">Connecting...</div>}
         {!loading && error && (
           <div className="text-center mt-12">
@@ -118,7 +129,11 @@ export default function SupportPage() {
       </div>
 
       {/* Input bar */}
-      <form onSubmit={handleSend} className="border-t border-brand-border bg-brand-bg px-4 py-3 flex-shrink-0">
+      <form
+        onSubmit={handleSend}
+        className="border-t border-brand-border bg-brand-bg px-4 pt-3 flex-shrink-0"
+        style={{ paddingBottom: safeAreaBottom }}
+      >
         <div className="flex items-center gap-2">
           <input
             ref={inputRef}
@@ -127,7 +142,7 @@ export default function SupportPage() {
             value={input}
             onChange={e => setInput(e.target.value)}
             disabled={loading || !!error || !chat}
-            className="flex-1 min-w-0 py-2.5 px-4 rounded-2xl bg-brand-surface border border-brand-border text-brand-text placeholder:text-brand-muted focus:outline-none focus:border-brand-accent text-[15px] disabled:opacity-50"
+            className="flex-1 min-w-0 py-2.5 px-4 rounded-2xl bg-brand-surface border border-brand-border text-brand-text placeholder:text-brand-muted focus:outline-none focus:border-brand-accent text-base disabled:opacity-50"
           />
           <button
             type="submit"

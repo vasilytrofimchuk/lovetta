@@ -12,6 +12,8 @@ PODS:
   - CapacitorCommunityAppleSignIn (7.1.0):
     - Capacitor
   - CapacitorCordova (8.2.0)
+  - CapacitorKeyboard (8.0.1):
+    - Capacitor
   - CapacitorPushNotifications (8.0.2):
     - Capacitor
   - CodetrixStudioCapacitorGoogleAuth (0.0.1):
@@ -37,6 +39,7 @@ DEPENDENCIES:
   - "CapacitorBrowser (from `../../../node_modules/@capacitor/browser`)"
   - "CapacitorCommunityAppleSignIn (from `../../../node_modules/@capacitor-community/apple-sign-in`)"
   - "CapacitorCordova (from `../../../node_modules/@capacitor/ios`)"
+  - "CapacitorKeyboard (from `../../../node_modules/@capacitor/keyboard`)"
   - "CapacitorPushNotifications (from `../../../node_modules/@capacitor/push-notifications`)"
   - "CodetrixStudioCapacitorGoogleAuth (from `../../../node_modules/@codetrix-studio/capacitor-google-auth`)"
   - "RevenuecatPurchasesCapacitor (from `../../../node_modules/@revenuecat/purchases-capacitor`)"
@@ -59,6 +62,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/@capacitor-community/apple-sign-in"
   CapacitorCordova:
     :path: "../../../node_modules/@capacitor/ios"
+  CapacitorKeyboard:
+    :path: "../../../node_modules/@capacitor/keyboard"
   CapacitorPushNotifications:
     :path: "../../../node_modules/@capacitor/push-notifications"
   CodetrixStudioCapacitorGoogleAuth:
@@ -72,6 +77,7 @@ SPEC CHECKSUMS:
   CapacitorBrowser: 76847841b74c11ccac0a1afae18cf06e3bd59044
   CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
   CapacitorCordova: a9ac88d84a1f5280f33b349fe50fce1902683ac0
+  CapacitorKeyboard: 867eb4b3c901d9bb5c3d0c93b546185d52484e19
   CapacitorPushNotifications: 5a1de4191a9fdbeacc84907313eede0bd59d2eb0
   CodetrixStudioCapacitorGoogleAuth: 9dcfabfb7dd804ad6231a1513bc6e81e620cbec6
   GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
@@ -81,6 +87,6 @@ SPEC CHECKSUMS:
   RevenueCat: c7310bad19cb96a1551c68045303e1faaa1942a5
   RevenuecatPurchasesCapacitor: 6b652e6e001224841fbfb9a97322c46f14d32504
 
-PODFILE CHECKSUM: 5af149bc7628f0c6213e29aa980321eddf950971
+PODFILE CHECKSUM: d6bf73eaeec5a0ae850685eb15e8a11cc9181ee9
 
 COCOAPODS: 1.16.2
