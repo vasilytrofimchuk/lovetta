@@ -231,6 +231,7 @@
       <button class="tab" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
       <button class="tab" onclick="switchTab('companion-emails')">Girl Emails</button>
       <button class="tab" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
     </div>
 
     <!-- Overview Tab -->
@@ -402,6 +403,8 @@
       </table>
       <div class="pagination" id="cashout-pagination"></div>
     </div>
+
+    <div id="tab-support" class="tab-content"></div>
   </div>
 
   <script>
@@ -416,6 +419,10 @@
     var adminAddressesLoaded = false;
     var companionEmailPage = 1;
     var cashoutPage = 1;
+    var supportFilter = '';
+    var supportActiveChatId = null;
+    var supportChatData = null;
+    var supportPollInterval = null;
 
     // Auth
     function headers() {
@@ -454,6 +461,7 @@
       loadSettings();
       loadSentryBadge();
       loadReportsBadge();
+      loadSupportBadge();
     }
 
     // Tabs
@@ -462,6 +470,7 @@
       document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
       event.target.closest('.tab').classList.add('active');
       document.getElementById('tab-' + name).classList.add('active');
+      if (supportPollInterval) { clearInterval(supportPollInterval); supportPollInterval = null; }
       if (name === 'overview') loadOverview();
       else if (name === 'visitors') loadVisitors();
       else if (name === 'users') loadUsers();
@@ -471,6 +480,7 @@
       else if (name === 'email') loadEmails();
       else if (name === 'companion-emails') loadCompanionEmails();
       else if (name === 'cashouts') loadCashouts();
+      else if (name === 'support') { loadSupport(); supportPollInterval = setInterval(loadSupport, 30000); }
     }
 
     // --- Helper functions (ported from KeyID) ---
@@ -859,6 +869,143 @@
       var d = document.createElement('div');
       d.textContent = s;
       return d.innerHTML;
+    }
+
+    // Support
+    function loadSupportBadge() {
+      apiFetch('/api/admin/support/stats').then(function(stats) {
+        var badge = document.getElementById('support-badge');
+        if (!badge) return;
+        if (stats.totalUnread > 0) {
+          badge.textContent = stats.totalUnread;
+          badge.style.display = 'inline';
+        } else {
+          badge.style.display = 'none';
+        }
+      }).catch(function() {});
+    }
+
+    function loadSupport() {
+      loadSupportBadge();
+      var url = '/api/admin/support/chats' + (supportFilter ? '?status=' + supportFilter : '');
+      apiFetch(url).then(function(data) {
+        var chats = data.chats || [];
+        function sbtn(label, val) {
+          var active = supportFilter === val;
+          return '<button onclick="filterSupport(\'' + val + '\')" style="padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:500;' +
+            (active ? 'background:var(--accent);color:#fff;border:1px solid var(--accent)' : 'background:var(--bg2);color:var(--text2);border:1px solid var(--border)') +
+            '">' + label + '</button>';
+        }
+        var filterHtml =
+          '<div style="display:flex;gap:0.5rem;margin-bottom:1rem">' +
+            sbtn('All', '') + sbtn('Open', 'open') + sbtn('Waiting', 'waiting') + sbtn('Resolved', 'resolved') +
+          '</div>';
+        var listHtml = '';
+        if (!chats.length) {
+          listHtml = '<div style="color:var(--muted);padding:1rem">No support chats</div>';
+        } else {
+          chats.forEach(function(c) {
+            var selected = c.id === supportActiveChatId;
+            var statusColor = c.status === 'open' ? 'var(--success)' : c.status === 'waiting' ? '#f59e0b' : 'var(--muted)';
+            var preview = (c.last_message || '').substring(0, 80);
+            listHtml +=
+              '<div onclick="selectSupportChat(' + c.id + ')" style="padding:0.75rem;margin-bottom:0.5rem;cursor:pointer;background:var(--bg3);border:1px solid ' + (selected ? 'var(--accent)' : 'var(--border)') + ';border-radius:8px">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center">' +
+                  '<strong style="font-size:0.9rem">' + esc(c.user_name || c.user_email || 'User #' + c.user_id) + '</strong>' +
+                  '<span style="font-size:0.75rem;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,0.2);color:' + statusColor + '">' + c.status + '</span>' +
+                '</div>' +
+                (c.unread_by_admin > 0 ? '<span style="font-size:0.75rem;padding:2px 6px;border-radius:10px;background:rgba(255,77,106,0.15);color:var(--error);margin-top:4px;display:inline-block">' + c.unread_by_admin + ' unread</span>' : '') +
+                (preview ? '<div style="color:var(--muted);font-size:0.82rem;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(preview) + '</div>' : '') +
+                (c.last_message_at ? '<div style="color:var(--muted);font-size:0.75rem;margin-top:2px">' + timeAgo(c.last_message_at) + '</div>' : '') +
+              '</div>';
+          });
+        }
+        var detailHtml = '';
+        if (supportActiveChatId && supportChatData) {
+          var chat = supportChatData.chat;
+          var msgs = supportChatData.messages || [];
+          detailHtml =
+            '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:1rem">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">' +
+                '<div>' +
+                  '<strong>' + esc(chat.user_name || chat.user_email || 'User #' + chat.user_id) + '</strong>' +
+                  (chat.user_email ? '<div style="font-size:0.8rem;color:var(--muted)">' + esc(chat.user_email) + '</div>' : '') +
+                '</div>' +
+                '<div style="display:flex;gap:0.5rem">' +
+                  (chat.status !== 'resolved' ? '<button onclick="supportStatus(' + chat.id + ',\'resolved\')" style="padding:6px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;font-size:0.85rem">Resolve</button>' : '') +
+                  (chat.status === 'resolved' ? '<button onclick="supportStatus(' + chat.id + ',\'open\')" style="padding:6px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;font-size:0.85rem">Reopen</button>' : '') +
+                '</div>' +
+              '</div>' +
+              '<div style="max-height:360px;overflow-y:auto;margin-bottom:1rem;display:flex;flex-direction:column;gap:0.5rem">';
+          if (!msgs.length) {
+            detailHtml += '<div style="color:var(--muted);text-align:center;padding:1rem">No messages yet</div>';
+          } else {
+            msgs.forEach(function(m) {
+              var isAdmin = m.sender_type === 'admin';
+              detailHtml +=
+                '<div style="display:flex;justify-content:' + (isAdmin ? 'flex-end' : 'flex-start') + '">' +
+                  '<div style="max-width:75%;padding:0.5rem 0.75rem;border-radius:0.75rem;' +
+                    (isAdmin ? 'background:var(--accent);color:#fff' : 'background:var(--bg2);border:1px solid var(--border);color:var(--text)') + '">' +
+                    '<div style="white-space:pre-wrap;font-size:0.9rem">' + esc(m.content) + '</div>' +
+                    '<div style="font-size:0.7rem;color:' + (isAdmin ? 'rgba(255,255,255,0.65)' : 'var(--muted)') + ';margin-top:2px">' + timeAgo(m.created_at) + '</div>' +
+                  '</div>' +
+                '</div>';
+            });
+          }
+          detailHtml += '</div>';
+          if (chat.status !== 'resolved') {
+            detailHtml +=
+              '<div style="display:flex;gap:0.5rem">' +
+                '<textarea id="support-reply-input" rows="3" placeholder="Type a reply..." style="flex:1;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;resize:vertical"></textarea>' +
+                '<button onclick="sendSupportReply()" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;align-self:flex-end">Send</button>' +
+              '</div>';
+          }
+          detailHtml += '</div>';
+        }
+        var panel = document.getElementById('tab-support');
+        panel.innerHTML = filterHtml +
+          '<div style="display:flex;gap:1rem;align-items:flex-start">' +
+            '<div style="flex:1;min-width:0">' + listHtml + '</div>' +
+            (detailHtml ? '<div style="flex:2;min-width:0">' + detailHtml + '</div>' : '') +
+          '</div>';
+      });
+    }
+
+    function selectSupportChat(id) {
+      supportActiveChatId = id;
+      apiFetch('/api/admin/support/chats/' + id).then(function(data) {
+        supportChatData = data;
+        loadSupportBadge();
+        loadSupport();
+      });
+    }
+
+    function sendSupportReply() {
+      var input = document.getElementById('support-reply-input');
+      if (!input) return;
+      var content = input.value.trim();
+      if (!content || !supportActiveChatId) return;
+      fetch('/api/admin/support/chats/' + supportActiveChatId + '/reply', {
+        method: 'POST', headers: headers(), body: JSON.stringify({ content: content }),
+      }).then(function(r) { return r.json(); }).then(function() {
+        selectSupportChat(supportActiveChatId);
+      });
+    }
+
+    function supportStatus(id, status) {
+      fetch('/api/admin/support/chats/' + id, {
+        method: 'PATCH', headers: headers(), body: JSON.stringify({ status: status }),
+      }).then(function(r) { return r.json(); }).then(function() {
+        if (status === 'resolved') supportActiveChatId = null;
+        loadSupport();
+      });
+    }
+
+    function filterSupport(status) {
+      supportFilter = status;
+      supportActiveChatId = null;
+      supportChatData = null;
+      loadSupport();
     }
 
     // Sentry

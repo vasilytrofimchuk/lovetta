@@ -6,7 +6,7 @@ import { isCapacitor } from '../lib/platform'
 
 const GOOGLE_WEB_CLIENT_ID = '1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com'
 
-export default function GoogleSignIn({ birthData, hideSeparator = false }) {
+export default function GoogleSignIn({ birthData, hideSeparator = false, onSuccess }) {
   const { refreshUser } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -15,6 +15,11 @@ export default function GoogleSignIn({ birthData, hideSeparator = false }) {
     setLoading(true)
     setError('')
     try {
+      await GoogleAuth.initialize({
+        clientId: '1007256282722-jhi7vl1mj4jv12638fv5vh8ao9ribr3a.apps.googleusercontent.com',
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      })
       const googleUser = await GoogleAuth.signIn()
       const idToken = googleUser.authentication?.idToken
       if (!idToken) throw new Error('No ID token from Google')
@@ -32,6 +37,7 @@ export default function GoogleSignIn({ birthData, hideSeparator = false }) {
       localStorage.setItem('lovetta-token', data.accessToken)
       localStorage.setItem('lovetta-refresh-token', data.refreshToken)
       await refreshUser()
+      onSuccess?.()
     } catch (err) {
       if (err?.message?.includes('cancel') || err?.message?.includes('Cancel')) return
       const serverErr = err?.response?.data?.error || ''

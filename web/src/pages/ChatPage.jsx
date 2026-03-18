@@ -6,6 +6,7 @@ import MessageList from '../components/chat/MessageList';
 import ChatInput from '../components/chat/ChatInput';
 import CompanionSheet from '../components/chat/CompanionSheet';
 import ReportModal from '../components/chat/ReportModal';
+import { isCapacitor } from '../lib/platform';
 
 export default function ChatPage() {
   const { companionId } = useParams();
@@ -93,8 +94,12 @@ export default function ChatPage() {
     );
   }
 
+  const chatHeight = isCapacitor()
+    ? 'calc(100vh - env(safe-area-inset-top, 0px))'
+    : '100vh'
+
   return (
-    <div className="h-screen bg-brand-bg flex flex-col max-w-lg mx-auto w-full">
+    <div className="bg-brand-bg flex flex-col max-w-lg mx-auto w-full" style={{ height: chatHeight }}>
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} />
 
       <MessageList

@@ -19,39 +19,49 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 
 /**
  * Send push notification to all subscriptions for a user.
+ * Sends both web push (VAPID) and native iOS push (APNs).
  * Removes expired/invalid subscriptions automatically.
  */
 async function sendPushNotification(userId, { title, body, url }) {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
-
   const pool = getPool();
   if (!pool) return;
 
-  const { rows: subs } = await pool.query(
-    'SELECT id, endpoint, keys_p256dh, keys_auth FROM push_subscriptions WHERE user_id = $1',
-    [userId]
-  );
+  // Web push via VAPID
+  if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+    const { rows: subs } = await pool.query(
+      'SELECT id, endpoint, keys_p256dh, keys_auth FROM push_subscriptions WHERE user_id = $1',
+      [userId]
+    );
 
-  if (!subs.length) return;
+    const payload = JSON.stringify({ title, body, url });
 
-  const payload = JSON.stringify({ title, body, url });
+    for (const sub of subs) {
+      const subscription = {
+        endpoint: sub.endpoint,
+        keys: { p256dh: sub.keys_p256dh, auth: sub.keys_auth },
+      };
 
-  for (const sub of subs) {
-    const subscription = {
-      endpoint: sub.endpoint,
-      keys: { p256dh: sub.keys_p256dh, auth: sub.keys_auth },
-    };
-
-    try {
-      await webpush.sendNotification(subscription, payload);
-    } catch (err) {
-      // 410 Gone or 404 = subscription expired, clean up
-      if (err.statusCode === 410 || err.statusCode === 404) {
-        await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
-        console.log(`[push] Removed expired subscription ${sub.id}`);
-      } else {
-        console.warn(`[push] Failed to send to subscription ${sub.id}:`, err.message);
+      try {
+        await webpush.sendNotification(subscription, payload);
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
+          console.log(`[push] Removed expired subscription ${sub.id}`);
+        } else {
+          console.warn(`[push] Failed to send to subscription ${sub.id}:`, err.message);
+        }
       }
+    }
+  }
+
+  // Native iOS push via APNs
+  try {
+    const { sendApnsPushToUser } = require('./push-apns');
+    await sendApnsPushToUser(userId, { title, body, data: { url } });
+  } catch (err) {
+    // APNs not configured or failed — non-fatal
+    if (!err.message?.includes('not configured')) {
+      console.warn(`[push] APNs error for user ${userId}:`, err.message);
     }
   }
 }

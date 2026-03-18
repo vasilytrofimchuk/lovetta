@@ -6,7 +6,8 @@
     "appendUserAgent": "Capacitor lovetta-ios"
   },
   "ios": {
-    "scheme": "Lovetta"
+    "scheme": "Lovetta",
+    "contentInset": "automatic"
   },
   "plugins": {
     "PushNotifications": {
@@ -18,5 +19,12 @@
       "serverClientId": "1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com",
       "forceCodeForRefreshToken": false
     }
-  }
+  },
+  "packageClassList": [
+    "SignInWithApple",
+    "CAPBrowserPlugin",
+    "PushNotificationsPlugin",
+    "GoogleAuth",
+    "PurchasesPlugin"
+  ]
 }

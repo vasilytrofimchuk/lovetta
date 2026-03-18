@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
 import { isAppStore, isCapacitor } from '../lib/platform';
+import SupportChat from '../components/SupportChat';
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -34,6 +35,7 @@ export default function Profile() {
     { value: 'credit', label: 'Account Credit' },
   ];
 
+  const [supportOpen, setSupportOpen] = useState(false);
   const appStore = isAppStore();
 
   useEffect(() => {
@@ -518,6 +520,20 @@ export default function Profile() {
           </div>
         )}
 
+        {/* Support */}
+        <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
+          <h3 className="text-sm font-semibold text-brand-text mb-1">Support</h3>
+          <p className="text-xs text-brand-muted mb-3">
+            Have a question or need help? Chat with our support team.
+          </p>
+          <button
+            onClick={() => setSupportOpen(true)}
+            className="w-full py-2.5 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors"
+          >
+            Contact Support
+          </button>
+        </div>
+
         {/* Sign out */}
         <button
           onClick={logout}
@@ -526,6 +542,8 @@ export default function Profile() {
           Sign out
         </button>
       </div>
+
+      {supportOpen && <SupportChat onClose={() => setSupportOpen(false)} />}
     </div>
   );
 }

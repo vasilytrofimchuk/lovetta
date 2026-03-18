@@ -385,6 +385,18 @@ Users earn configurable commission (default 30%) from payments made by people th
 - Enable Xcode capabilities (Sign in with Apple, Push Notifications)
 - Provisioning profiles, App Store screenshots, metadata
 
+## Support Chat — DONE
+
+Users can contact support from the Profile page. Admins view, reply, and resolve chats in the admin Support tab.
+
+**DB:** `support_chats` (user_id, status: open/waiting/resolved, unread_by_admin) + `support_messages` (chat_id, content, sender_type: user/admin)
+**User API:** `/api/support/chat` (GET auto-create + messages), `/api/support/chat/:id/messages` (POST send, GET poll)
+**Admin API:** `/api/admin/support/stats`, `/api/admin/support/chats`, `/api/admin/support/chats/:id`, reply + status
+**Frontend:** `web/src/components/SupportChat.jsx` (modal, 10s poll), Profile page "Contact Support" button
+**Admin:** Support tab in admin.html — filter All/Open/Waiting/Resolved, chat list + detail + reply + resolve, 30s auto-refresh, unread badge
+
+---
+
 ## Automated Emails — DONE
 - [x] Admin notification on new registration (email/Google/Telegram) → vasilytrofimchuk@gmail.com
 - [x] Abandoned payment reminder — next-day email for users who signed up but never subscribed

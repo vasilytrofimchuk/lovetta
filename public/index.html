@@ -45,6 +45,7 @@
   <div class="container">
     <header>
       <img src="/assets/brand/logo_text.png" alt="Lovetta" class="logo-text">
+      <a href="/my/login" class="btn-login">Log in</a>
     </header>
 
     <section class="hero">
@@ -112,28 +113,39 @@
         <form id="signup-form">
           <div class="form-row">
             <div class="form-group">
-              <label for="birth-month">Birth Month</label>
-              <select id="birth-month" name="birthMonth" required>
-                <option value="">Month</option>
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
+              <label>Birth Month</label>
+              <div class="custom-select" id="month-select">
+                <div class="custom-select-trigger" tabindex="0">
+                  <span class="custom-select-value placeholder">Month</span>
+                  <svg class="custom-select-arrow" width="12" height="12" viewBox="0 0 12 12"><path fill="#7c6a9a" d="M6 8L1 3h10z"/></svg>
+                </div>
+                <div class="custom-select-options">
+                  <div class="custom-select-option" data-value="1">January</div>
+                  <div class="custom-select-option" data-value="2">February</div>
+                  <div class="custom-select-option" data-value="3">March</div>
+                  <div class="custom-select-option" data-value="4">April</div>
+                  <div class="custom-select-option" data-value="5">May</div>
+                  <div class="custom-select-option" data-value="6">June</div>
+                  <div class="custom-select-option" data-value="7">July</div>
+                  <div class="custom-select-option" data-value="8">August</div>
+                  <div class="custom-select-option" data-value="9">September</div>
+                  <div class="custom-select-option" data-value="10">October</div>
+                  <div class="custom-select-option" data-value="11">November</div>
+                  <div class="custom-select-option" data-value="12">December</div>
+                </div>
+                <input type="hidden" id="birth-month" name="birthMonth" value="">
+              </div>
             </div>
             <div class="form-group">
-              <label for="birth-year">Birth Year</label>
-              <select id="birth-year" name="birthYear" required>
-                <option value="">Year</option>
-              </select>
+              <label>Birth Year</label>
+              <div class="custom-select" id="year-select">
+                <div class="custom-select-trigger" tabindex="0">
+                  <span class="custom-select-value placeholder">Year</span>
+                  <svg class="custom-select-arrow" width="12" height="12" viewBox="0 0 12 12"><path fill="#7c6a9a" d="M6 8L1 3h10z"/></svg>
+                </div>
+                <div class="custom-select-options" id="year-options"></div>
+                <input type="hidden" id="birth-year" name="birthYear" value="">
+              </div>
             </div>
           </div>
 
@@ -194,16 +206,81 @@
 
   <script src="/tracking.js"></script>
   <script>
-    // Populate birth year dropdown
+    // Populate birth year options
     (function() {
-      var yearSelect = document.getElementById('birth-year');
+      var yearOptions = document.getElementById('year-options');
       var currentYear = new Date().getFullYear();
       for (var y = currentYear - 18; y >= currentYear - 100; y--) {
-        var opt = document.createElement('option');
-        opt.value = y;
-        opt.textContent = y;
-        yearSelect.appendChild(opt);
+        var div = document.createElement('div');
+        div.className = 'custom-select-option';
+        div.setAttribute('data-value', y);
+        div.textContent = y;
+        yearOptions.appendChild(div);
       }
+    })();
+
+    // Custom select behavior
+    (function() {
+      var selects = document.querySelectorAll('.custom-select');
+
+      selects.forEach(function(sel) {
+        var trigger = sel.querySelector('.custom-select-trigger');
+        var valueSpan = sel.querySelector('.custom-select-value');
+        var optionsBox = sel.querySelector('.custom-select-options');
+        var hiddenInput = sel.querySelector('input[type="hidden"]');
+        var options = optionsBox.querySelectorAll('.custom-select-option');
+
+        trigger.addEventListener('click', function() {
+          var wasOpen = sel.classList.contains('open');
+          closeAll();
+          if (!wasOpen) sel.classList.add('open');
+        });
+
+        options.forEach(function(opt) {
+          opt.addEventListener('click', function() {
+            var val = opt.getAttribute('data-value');
+            hiddenInput.value = val;
+            valueSpan.textContent = opt.textContent;
+            valueSpan.classList.remove('placeholder');
+            options.forEach(function(o) { o.classList.remove('selected'); });
+            opt.classList.add('selected');
+            sel.classList.remove('open');
+          });
+        });
+
+        // Keyboard support
+        trigger.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            trigger.click();
+          } else if (e.key === 'Escape') {
+            sel.classList.remove('open');
+          }
+        });
+      });
+
+      // Re-bind options for dynamically added year options
+      var yearSel = document.getElementById('year-select');
+      yearSel.querySelector('.custom-select-options').addEventListener('click', function(e) {
+        var opt = e.target.closest('.custom-select-option');
+        if (!opt) return;
+        var hiddenInput = yearSel.querySelector('input[type="hidden"]');
+        var valueSpan = yearSel.querySelector('.custom-select-value');
+        hiddenInput.value = opt.getAttribute('data-value');
+        valueSpan.textContent = opt.textContent;
+        valueSpan.classList.remove('placeholder');
+        yearSel.querySelectorAll('.custom-select-option').forEach(function(o) { o.classList.remove('selected'); });
+        opt.classList.add('selected');
+        yearSel.classList.remove('open');
+      });
+
+      function closeAll() {
+        selects.forEach(function(s) { s.classList.remove('open'); });
+      }
+
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('.custom-select')) closeAll();
+      });
     })();
 
     // Plan selection

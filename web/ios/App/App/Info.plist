@@ -49,7 +49,15 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.googleusercontent.apps</string>
+			<string>ai.lovetta.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>lovetta</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.googleusercontent.apps.1007256282722-jhi7vl1mj4jv12638fv5vh8ao9ribr3a</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.1007256282722-jhi7vl1mj4jv12638fv5vh8ao9ribr3a</string>

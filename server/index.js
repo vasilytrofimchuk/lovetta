@@ -35,6 +35,7 @@ const chatApi = require('./src/chat-api');
 const ttsApi = require('./src/tts-api');
 const userApi = require('./src/user-api');
 const referralApi = require('./src/referral-api');
+const supportApi = require('./src/support-api');
 
 const app = express();
 const PORT = process.env.PORT || 3900;
@@ -136,6 +137,7 @@ app.use('/api/chat', chatApi);
 app.use('/api/chat', ttsApi);
 app.use('/api/user', userApi);
 app.use('/api/referral', referralApi);
+app.use('/api/support', supportApi);
 
 // -- Public app config (feature flags for frontend) --
 const { getMediaEnabled, getVideoEnabled, getAvatarFilterSettings } = require('./src/content-levels');

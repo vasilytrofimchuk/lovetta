@@ -20,8 +20,8 @@ test.describe('Landing page', () => {
     await page.goto(BASE);
 
     await expect(page.locator('#signup-form')).toBeVisible();
-    await expect(page.locator('#birth-month')).toBeVisible();
-    await expect(page.locator('#birth-year')).toBeVisible();
+    await expect(page.locator('#month-select .custom-select-trigger')).toBeVisible();
+    await expect(page.locator('#year-select .custom-select-trigger')).toBeVisible();
     await expect(page.locator('#agree-terms')).toBeVisible();
     await expect(page.locator('#submit-btn')).toBeVisible();
   });

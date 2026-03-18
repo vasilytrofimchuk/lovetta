@@ -40,7 +40,7 @@ export default function CompanionList() {
       <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border px-4 py-3">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-7" />
+            <img src="/assets/brand/logo_l.png" alt="Lovetta" className="h-8 w-8 rounded-lg" />
             <button
               onClick={() => navigate('/create')}
               className="p-2 rounded-lg border border-brand-border text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors"

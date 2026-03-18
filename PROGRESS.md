@@ -446,3 +446,20 @@
 - [x] email.js: neutralize "photos and videos" in welcome email
 - [x] Profile.jsx: change toggle description to "Allow mature content"
 - [x] Template descriptions cleaned: Aria, Sophia, Isabella, Zara, Ruby, Violet, Mei — removed suggestive language and traits
+
+## iOS Auth Fixes (Session 3)
+- [x] GoogleSignIn.jsx: add GoogleAuth.initialize() call before signIn() — fixes crash (matching auto repo pattern)
+- [x] AppleSignIn.jsx: add clientId ('ai.lovetta.app') and redirectURI ('https://lovetta.ai') to authorize() call
+- [x] Info.plist: fix CFBundleURLName to use full reversed client ID (matching auto repo)
+- [x] capacitor.config.json: add packageClassList for explicit native plugin registration
+- [x] Signup.jsx: add Step 2 plan selection screen in native flow (consent → plan → account creation)
+- [x] Rebuilt ios-dist bundle and synced Xcode project
+
+## Support Chat System
+- [x] server/src/migrate.js: v31_support_chat migration — support_chats + support_messages tables
+- [x] server/src/support-api.js: user API (GET /chat auto-create, POST messages, GET messages?after= poll)
+- [x] server/index.js: mount supportApi at /api/support
+- [x] server/src/admin-api.js: admin routes — GET /support/stats, GET /support/chats, GET /support/chats/:id, POST /support/chats/:id/reply, PATCH /support/chats/:id
+- [x] web/src/components/SupportChat.jsx: in-app modal panel, brand-themed, 10s poll, auto-scroll
+- [x] web/src/pages/Profile.jsx: Contact Support button + SupportChat modal
+- [x] public/admin.html: Support tab — filter buttons, chat list, detail with reply + resolve, 30s auto-refresh, badge with unread count

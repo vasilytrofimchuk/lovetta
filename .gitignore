@@ -24,3 +24,8 @@ tmp-*.png
 
 # Vite build output (served by Express)
 public/my/
+
+# iOS build artifacts
+web/ios/App/Pods/
+web/ios/App/App/public/
+web/ios/DerivedData/

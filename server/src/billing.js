@@ -365,11 +365,119 @@ function isSubscriptionActive(sub) {
   return true;
 }
 
+// -- RevenueCat webhook handler (iOS in-app purchases) ----
+
+const REVENUECAT_WEBHOOK_SECRET = (process.env.REVENUECAT_SECRET_KEY || '').trim();
+
+async function handleRevenueCatWebhook(body, authHeader) {
+  // Verify webhook authorization
+  if (REVENUECAT_WEBHOOK_SECRET) {
+    const token = (authHeader || '').replace('Bearer ', '');
+    if (token !== REVENUECAT_WEBHOOK_SECRET) {
+      throw new Error('Invalid RevenueCat webhook authorization');
+    }
+  }
+
+  const pool = getPool();
+  if (!pool) throw new Error('Database not available');
+
+  const event = body?.event;
+  if (!event) throw new Error('Missing event data');
+
+  const rcType = event.type; // INITIAL_PURCHASE, RENEWAL, CANCELLATION, EXPIRATION, etc.
+  const appUserId = event.app_user_id; // Our user ID (set via Purchases.logIn)
+  const productId = event.product_id;
+  const subscriberId = event.subscriber_id || event.original_app_user_id;
+
+  if (!appUserId || appUserId.startsWith('$RCAnonymousID')) {
+    console.warn('[revenuecat] Skipping anonymous user event:', rcType);
+    return { status: 'skipped' };
+  }
+
+  const userId = appUserId; // We set app_user_id to our user ID
+
+  // Determine plan from product ID
+  let plan = 'monthly';
+  if (productId?.includes('yearly') || productId?.includes('annual')) plan = 'yearly';
+
+  // Determine period end from event
+  const expiresAt = event.expiration_at_ms
+    ? new Date(event.expiration_at_ms)
+    : null;
+
+  switch (rcType) {
+    case 'INITIAL_PURCHASE':
+    case 'RENEWAL':
+    case 'PRODUCT_CHANGE':
+    case 'UNCANCELLATION': {
+      await pool.query(
+        `INSERT INTO subscriptions (user_id, plan, status, payment_provider, revenuecat_id, current_period_end, updated_at)
+         VALUES ($1, $2, 'active', 'revenuecat', $3, $4, NOW())
+         ON CONFLICT ON CONSTRAINT subscriptions_user_id_key DO UPDATE SET
+           plan = $2, status = 'active', payment_provider = 'revenuecat',
+           revenuecat_id = COALESCE($3, subscriptions.revenuecat_id),
+           current_period_end = COALESCE($4, subscriptions.current_period_end), updated_at = NOW()`,
+        [userId, plan, subscriberId, expiresAt]
+      );
+      console.log(`[revenuecat] ${rcType}: user=${userId} plan=${plan}`);
+
+      // Credit referral commission
+      if (rcType === 'INITIAL_PURCHASE' || rcType === 'RENEWAL') {
+        const amount = plan === 'yearly' ? 9999 : 1999;
+        try { await creditReferralCommission(pool, userId, 'subscription', `rc_${event.id || Date.now()}`, amount); } catch (e) { console.warn('[revenuecat] referral error:', e.message); }
+      }
+      break;
+    }
+
+    case 'CANCELLATION': {
+      await pool.query(
+        `UPDATE subscriptions SET status = 'canceling', updated_at = NOW()
+         WHERE user_id = $1 AND payment_provider = 'revenuecat'`,
+        [userId]
+      );
+      console.log(`[revenuecat] Cancellation: user=${userId}`);
+      break;
+    }
+
+    case 'EXPIRATION': {
+      await pool.query(
+        `UPDATE subscriptions SET status = 'canceled', updated_at = NOW()
+         WHERE user_id = $1 AND payment_provider = 'revenuecat'`,
+        [userId]
+      );
+      console.log(`[revenuecat] Expiration: user=${userId}`);
+      break;
+    }
+
+    case 'NON_RENEWING_PURCHASE': {
+      // Tip / consumable purchase via RevenueCat
+      const amount = event.price_in_purchased_currency
+        ? Math.round(event.price_in_purchased_currency * 100)
+        : 0;
+      if (amount > 0) {
+        await pool.query(
+          'INSERT INTO tips (user_id, amount, stripe_payment_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+          [userId, amount, `rc_${event.id || Date.now()}`]
+        );
+        console.log(`[revenuecat] Tip: user=${userId} amount=${amount}`);
+        try { await creditReferralCommission(pool, userId, 'tip', `rc_tip_${event.id || Date.now()}`, amount); } catch (e) { console.warn('[revenuecat] referral error:', e.message); }
+      }
+      break;
+    }
+
+    default:
+      console.log(`[revenuecat] Unhandled event type: ${rcType}`);
+  }
+
+  return { status: 'processed', type: rcType };
+}
+
 module.exports = {
   createSubscriptionCheckout,
   createTipCheckout,
   createPortalSession,
   handleWebhook,
+  handleRevenueCatWebhook,
   getUserSubscription,
   isSubscriptionActive,
   TIP_AMOUNTS,

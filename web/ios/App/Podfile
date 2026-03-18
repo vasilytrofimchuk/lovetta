@@ -12,6 +12,7 @@ def capacitor_pods
   pod 'Capacitor', :path => '../../../node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../../node_modules/@capacitor/ios'
   pod 'CapacitorCommunityAppleSignIn', :path => '../../../node_modules/@capacitor-community/apple-sign-in'
+  pod 'CapacitorBrowser', :path => '../../../node_modules/@capacitor/browser'
   pod 'CapacitorPushNotifications', :path => '../../../node_modules/@capacitor/push-notifications'
   pod 'CodetrixStudioCapacitorGoogleAuth', :path => '../../../node_modules/@codetrix-studio/capacitor-google-auth'
   pod 'RevenuecatPurchasesCapacitor', :path => '../../../node_modules/@revenuecat/purchases-capacitor'

@@ -92,8 +92,11 @@ export default function App() {
     <BrowserRouter basename={isCapacitor() ? '/' : '/my'}>
       <AuthProvider>
         <DesktopShell>
-          <AppRoutes />
-          <PwaInstallBanner />
+          {/* Push all content below the camera notch / Dynamic Island */}
+          <div style={{ paddingTop: isCapacitor() ? 'max(0px, env(safe-area-inset-top))' : undefined }}>
+            <AppRoutes />
+            <PwaInstallBanner />
+          </div>
         </DesktopShell>
       </AuthProvider>
     </BrowserRouter>

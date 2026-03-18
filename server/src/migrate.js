@@ -803,6 +803,31 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: 'v31_support_chat',
+    sql: `
+      CREATE TABLE IF NOT EXISTS support_chats (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status TEXT NOT NULL DEFAULT 'open',
+        unread_by_admin INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_support_chats_user_id ON support_chats(user_id);
+      CREATE INDEX IF NOT EXISTS idx_support_chats_status ON support_chats(status);
+
+      CREATE TABLE IF NOT EXISTS support_messages (
+        id SERIAL PRIMARY KEY,
+        chat_id INTEGER NOT NULL REFERENCES support_chats(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        sender_type TEXT NOT NULL,
+        sender_id UUID,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_support_messages_chat_id ON support_messages(chat_id);
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
