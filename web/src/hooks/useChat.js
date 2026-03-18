@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import api from '../lib/api';
+import api, { authFetch, getResponseErrorMessage } from '../lib/api';
 
 const TIP_PROMO_MESSAGES = [
   "*smiles warmly* Hey... I love spending time with you. A little support would mean everything to me 💕",
@@ -127,24 +127,50 @@ export default function useChat(companionId) {
     setShouldRequestTip(false);
     setError(null);
 
-    const token = localStorage.getItem('lovetta-token');
     const controller = new AbortController();
     abortRef.current = controller;
 
     let pendingDone = null;
 
+    function resetStreamingState() {
+      setStreamingText('');
+      setStreaming(false);
+      setMediaLoading(false);
+      setMediaLoadingType(null);
+      abortRef.current = null;
+    }
+
     try {
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
 
-      const reader = response.body.getReader();
+      if (!response.ok) {
+        if (response.status === 401) {
+          setError('Your session expired. Please sign in again.');
+        } else {
+          const message = await getResponseErrorMessage(
+            response,
+            "She's a bit overwhelmed right now. Try again in a moment."
+          );
+          setError(message);
+        }
+        resetStreamingState();
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        setError('No response stream available. Please try again.');
+        resetStreamingState();
+        return;
+      }
+
       const decoder = new TextDecoder();
       let buffer = '';
       let accumulated = '';
@@ -302,11 +328,7 @@ export default function useChat(companionId) {
       }
     }
 
-    setStreamingText('');
-    setStreaming(false);
-    setMediaLoading(false);
-    setMediaLoadingType(null);
-    abortRef.current = null;
+    resetStreamingState();
   }
 
   const sendMessage = useCallback(async (content) => {

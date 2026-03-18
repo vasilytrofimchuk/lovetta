@@ -441,8 +441,23 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Verification complete: `npm run build:ios` and `npm run test:e2e:ui`
 - Native chat/STT now share the same absolute API base and refresh-aware auth path; expired tokens surface a visible sign-in error instead of a silent no-response state
 
+## iOS Global Scroll Regression Fix — DONE
+- Trace the global iOS scroll lock path introduced by the keyboard bootstrap and confirm whether scrolling is being disabled at app startup
+- Narrow any keyboard-related scroll locking to the keyboard-open window only so normal page scrolling works again across the app
+- Rebuild iOS and rerun the UI test bucket after the keyboard helper change; manual simulator/device scrolling verification still required
+- Root cause was the startup-time `Keyboard.setScroll({ isDisabled: true })` call in the iOS keyboard bootstrap, which blocked normal scrolling across the entire app
+- The keyboard helper now toggles a temporary `ios-keyboard-open` document class only while the keyboard is visible, preserving normal page scrolling the rest of the time
+- Verification complete: `npm run build:ios` and `npm run test:e2e:ui`
+
 ## Fix: Stop sending emails to test @example.com addresses — DONE
 - Scheduler was sending real marketing emails (welcome, abandoned payment) to `@example.com` test users created by E2E tests, damaging domain sending reputation
 - Added `NOT LIKE '%@example.com'` and `NOT LIKE '%@test.com'` filters to all 5 scheduler queries as safety net
 - Changed all test files to use `conativer+tag@gmail.com` (Gmail plus-addressing) instead of `@example.com`
 - Updated CLAUDE.md with mandatory test email rules
+
+## iOS Welcome Carousel Parity — IN PROGRESS
+- Replace the single-card fade rotator on `web/src/pages/WelcomeScreen.jsx` with a landing-style horizontal carousel that shows multiple cards at once.
+- Extract a reusable React carousel component for the welcome flow so the focused-card logic, slow auto-scroll, and video playback are isolated from the page shell.
+- Match the landing behavior: fetch `/api/companions/templates/preview`, shuffle once, highlight the card nearest the viewport center, autoplay only the active card video, and pause auto-scroll for 5 seconds after interaction.
+- Keep the rest of the iOS welcome page intact aside from spacing needed to fit the carousel.
+- Add UI coverage for `/my/welcome` and run `npm run test:e2e:ui`.

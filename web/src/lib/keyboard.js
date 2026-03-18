@@ -7,6 +7,11 @@ function setViewportHeight() {
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(nextHeight)}px`)
 }
 
+function setKeyboardScrollLock(isLocked) {
+  document.documentElement.classList.toggle('ios-keyboard-open', isLocked)
+  document.body.classList.toggle('ios-keyboard-open', isLocked)
+}
+
 export async function initIosKeyboard() {
   if (typeof window === 'undefined') return () => {}
 
@@ -25,18 +30,20 @@ export async function initIosKeyboard() {
   window.visualViewport?.addEventListener('scroll', handleViewportChange)
 
   let handles = []
-  let Keyboard = null
 
   try {
     const keyboardModule = await import('@capacitor/keyboard')
-    Keyboard = keyboardModule.Keyboard
+    const { Keyboard, KeyboardResize } = keyboardModule
 
-    await Keyboard.setResizeMode({ mode: keyboardModule.KeyboardResize.Body })
-    await Keyboard.setScroll({ isDisabled: true })
+    await Keyboard.setResizeMode({ mode: KeyboardResize.Body })
 
     handles = await Promise.all([
-      Keyboard.addListener('keyboardDidShow', handleViewportChange),
+      Keyboard.addListener('keyboardDidShow', () => {
+        setKeyboardScrollLock(true)
+        handleViewportChange()
+      }),
       Keyboard.addListener('keyboardDidHide', () => {
+        setKeyboardScrollLock(false)
         handleViewportChange()
         window.requestAnimationFrame(() => {
           window.scrollTo(0, 0)
@@ -53,11 +60,9 @@ export async function initIosKeyboard() {
     window.visualViewport?.removeEventListener('resize', handleViewportChange)
     window.visualViewport?.removeEventListener('scroll', handleViewportChange)
 
+    setKeyboardScrollLock(false)
+
     handles.forEach((handle) => handle?.remove?.())
     handles = []
-
-    if (Keyboard) {
-      Keyboard.setScroll({ isDisabled: false }).catch(() => {})
-    }
   }
 }

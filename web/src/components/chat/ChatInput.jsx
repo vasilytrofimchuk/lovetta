@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import api from '../../lib/api';
+import { authFetch, getResponseErrorMessage } from '../../lib/api';
 
 export default function ChatInput({ onSend, disabled }) {
   const [text, setText] = useState('');
@@ -59,15 +59,20 @@ export default function ChatInput({ onSend, disabled }) {
         if (blob.size < 100) return;
 
         try {
-          const token = localStorage.getItem('lovetta-token') || '';
-          const resp = await fetch('/api/chat/stt', {
+          const resp = await authFetch('/api/chat/stt', {
             method: 'POST',
             headers: {
               'Content-Type': mediaRecorder.mimeType,
-              'Authorization': `Bearer ${token}`,
             },
             body: blob,
           });
+
+          if (!resp.ok) {
+            const message = await getResponseErrorMessage(resp, 'Could not transcribe audio');
+            console.error('[stt]', message);
+            return;
+          }
+
           if (resp.ok) {
             const data = await resp.json();
             const transcript = (data.text || '').trim();

@@ -513,8 +513,23 @@
 - [x] Run `npm run test:e2e:ui`
 - [x] Update plan.md and PROGRESS.md with final status and notes
 
+## iOS Global Scroll Regression Fix
+- [x] Update plan.md with the global scroll regression scope
+- [x] Trace the keyboard bootstrap and confirm where iOS scrolling is being disabled globally
+- [x] Restrict keyboard scroll locking to active keyboard sessions without blocking normal page scrolling
+- [x] Run `npm run test:e2e:ui`
+- [x] Update plan.md and PROGRESS.md with final status and notes
+
 ## Fix: Stop sending emails to test @example.com addresses
 - [x] Add `@example.com` and `@test.com` exclusion filters to all 5 scheduler queries
 - [x] Replace `@example.com` with `conativer+tag@gmail.com` in all E2E test files (11 files)
 - [x] Update `sendNewRegistrationNotification` filter to match new `conativer+` pattern
 - [x] Update CLAUDE.md with test email rules
+
+## iOS Welcome Carousel Parity
+- [x] Update `plan.md` with the welcome carousel scope and implementation notes
+- [ ] Create a reusable React welcome carousel component that mirrors the landing carousel behavior
+- [ ] Replace the single-card rotator in `web/src/pages/WelcomeScreen.jsx` with the shared carousel
+- [ ] Add `/my/welcome` UI coverage for multi-card rendering, active-card focus, and CTA/legal visibility
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes

@@ -22,6 +22,12 @@ html, body {
   width: 100%;
 }
 
+html.ios-keyboard-open,
+body.ios-keyboard-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 #root {
   min-height: var(--app-viewport-height, 100vh);
 }
@@ -32,6 +38,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #f0e6ff;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Desktop background decorations */
