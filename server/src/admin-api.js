@@ -743,4 +743,79 @@ router.patch('/support/chats/:id', async (req, res) => {
   }
 });
 
+// -- Push Notification Testing --------------------------------
+
+// GET /api/admin/push/status?email= — check registered push devices for a user
+router.get('/push/status', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'No database' });
+
+  try {
+    const email = (req.query.email || '').trim();
+    const userId = (req.query.userId || '').trim();
+    if (!email && !userId) return res.status(400).json({ error: 'email or userId required' });
+
+    const userQuery = userId
+      ? pool.query('SELECT id, email, display_name FROM users WHERE id = $1', [userId])
+      : pool.query('SELECT id, email, display_name FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+    const { rows: users } = await userQuery;
+    if (!users.length) return res.status(404).json({ error: 'User not found' });
+
+    const user = users[0];
+    const [apns, web] = await Promise.all([
+      pool.query('SELECT device_token, created_at FROM apns_subscriptions WHERE user_id = $1', [user.id]),
+      pool.query('SELECT endpoint, created_at FROM push_subscriptions WHERE user_id = $1', [user.id]),
+    ]);
+
+    res.json({
+      user: { id: user.id, email: user.email, name: user.display_name },
+      apns: apns.rows,
+      web: web.rows.map(r => ({ endpoint: r.endpoint.slice(0, 80) + '…', created_at: r.created_at })),
+    });
+  } catch (err) {
+    console.error('[admin] push status error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/push/test — send a test push notification
+router.post('/push/test', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'No database' });
+
+  try {
+    const { email, userId, title, body } = req.body || {};
+    if (!email && !userId) return res.status(400).json({ error: 'email or userId required' });
+
+    const userQuery = userId
+      ? pool.query('SELECT id, email FROM users WHERE id = $1', [userId])
+      : pool.query('SELECT id, email FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+    const { rows: users } = await userQuery;
+    if (!users.length) return res.status(404).json({ error: 'User not found' });
+
+    const user = users[0];
+    const { sendPushNotification } = require('./push');
+    await sendPushNotification(user.id, {
+      title: title || 'Lovetta Test',
+      body: body || 'Push notifications are working! 🎉',
+      url: '/my/',
+    });
+
+    // Check how many devices were targeted
+    const [apns, web] = await Promise.all([
+      pool.query('SELECT COUNT(*)::int AS count FROM apns_subscriptions WHERE user_id = $1', [user.id]),
+      pool.query('SELECT COUNT(*)::int AS count FROM push_subscriptions WHERE user_id = $1', [user.id]),
+    ]);
+
+    res.json({
+      ok: true,
+      user: user.email,
+      devices: { apns: apns.rows[0].count, web: web.rows[0].count },
+    });
+  } catch (err) {
+    console.error('[admin] push test error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
