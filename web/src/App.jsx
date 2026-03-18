@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ToastProvider } from './components/Toast'
 import usePwaInstall from './hooks/usePwaInstall'
@@ -135,6 +135,51 @@ function RevenueCatInitializer() {
   return null
 }
 
+function PushInitializer() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const initedRef = useRef(false)
+
+  useEffect(() => {
+    if (!user || initedRef.current) return
+    initedRef.current = true
+
+    if (isCapacitor()) {
+      // Auto-register native push + set up tap listeners
+      import('./lib/push-native').then(({ registerNativePush, setupPushListeners }) => {
+        registerNativePush().catch((err) => {
+          console.log('[push] Auto-register skipped:', err.message)
+        })
+        setupPushListeners((url) => navigate(url))
+      }).catch(() => {})
+    } else if ('serviceWorker' in navigator && 'PushManager' in window) {
+      // Auto-register web push
+      navigator.serviceWorker.ready.then(async (reg) => {
+        const existing = await reg.pushManager.getSubscription()
+        if (existing) return // already subscribed
+        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') return
+        const { default: api } = await import('./lib/api')
+        const { data: vapid } = await api.get('/api/user/vapid-key')
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: vapid.publicKey,
+        })
+        const subJson = sub.toJSON()
+        await api.post('/api/user/push/subscribe', {
+          endpoint: subJson.endpoint,
+          keys: subJson.keys,
+        })
+      }).catch((err) => {
+        console.log('[push] Web push auto-register skipped:', err.message)
+      })
+    }
+  }, [user])
+
+  return null
+}
+
 function AppRoutes() {
   const { loading } = useAuth()
   if (loading) return <Loading />
@@ -182,6 +227,7 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <RevenueCatInitializer />
+          <PushInitializer />
           <DesktopShell>
             {/* Push all content below the camera notch / Dynamic Island */}
             <div style={{ paddingTop: isCapacitor() ? 'max(0px, env(safe-area-inset-top))' : undefined }}>
