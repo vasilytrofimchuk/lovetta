@@ -56,18 +56,20 @@ export default function RealEmailPrompt() {
           aria-label="Dismiss"
         >&times;</button>
       </div>
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="email"
+      <form onSubmit={handleSubmit} className="flex items-end gap-2">
+        <textarea
+          rows={1}
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={e => setEmail(e.target.value.replace(/\n/g, ''))}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(e); } }}
           placeholder="your@email.com"
-          className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-bg border border-brand-border text-brand-text text-base placeholder:text-brand-muted focus:outline-none focus:border-brand-accent"
+          className="flex-1 min-w-0 px-3 py-2.5 bg-brand-surface border border-brand-border rounded-xl text-brand-text text-sm placeholder:text-brand-muted resize-none focus:outline-none focus:border-brand-accent/50"
+          style={{ maxHeight: 80 }}
         />
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-brand-accent text-white text-sm font-medium rounded-lg hover:bg-brand-accent-hover disabled:opacity-50 flex-shrink-0"
+          className="px-4 py-2.5 bg-brand-accent text-white text-sm font-medium rounded-xl hover:bg-brand-accent-hover disabled:opacity-50 flex-shrink-0"
         >
           {saving ? '...' : 'Save'}
         </button>
