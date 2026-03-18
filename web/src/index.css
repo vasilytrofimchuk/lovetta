@@ -43,12 +43,6 @@ html, body {
   width: 100%;
 }
 
-html.ios-keyboard-open,
-body.ios-keyboard-open {
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-
 #root {
   min-height: var(--app-viewport-height, 100vh);
 }
