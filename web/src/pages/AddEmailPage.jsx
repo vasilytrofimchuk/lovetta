@@ -14,12 +14,12 @@ export default function AddEmailPage() {
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const nativePlatform = isCapacitor();
-  const safeAreaBottom = nativePlatform
+  const safeAreaBottom = isCapacitor()
     ? 'max(0.75rem, env(safe-area-inset-bottom, 0px))'
     : '0.75rem';
 
-  const handleSubmit = async () => {
+  async function handleSend(e) {
+    e?.preventDefault();
     setError('');
     const trimmed = email.trim();
     if (!trimmed || !EMAIL_RE.test(trimmed)) {
@@ -38,7 +38,7 @@ export default function AddEmailPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }
 
   return (
     <div
@@ -46,51 +46,62 @@ export default function AddEmailPage() {
       style={{ height: isCapacitor() ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))' : '100vh' }}
     >
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-brand-border flex-shrink-0">
+      <div className="flex items-center gap-3 app-page-gutter py-3 border-b border-brand-border flex-shrink-0 bg-brand-bg">
         <button
           onClick={() => navigate('/profile')}
           aria-label="Back"
+          title="Back"
           className="text-brand-muted hover:text-brand-text transition-colors"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="text-lg font-bold text-brand-text">Add Email</h1>
+        <div>
+          <p className="font-semibold text-brand-text leading-tight">Add Email</p>
+          <p className="text-xs text-brand-muted">For notifications and account recovery</p>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-8">
-        <p className="text-sm text-brand-text-secondary text-center leading-relaxed">
+      <div className="flex-1 min-h-0 overflow-y-auto app-page-gutter py-4 space-y-3">
+        <div className="text-center text-brand-muted text-sm mt-12 leading-relaxed">
           Your Apple account uses a private relay email.<br />
           Add your real email to receive messages from your girlfriends and account recovery.
-        </p>
-        {error && <p className="text-xs text-red-400 text-center mt-3">{error}</p>}
+        </div>
+        {error && (
+          <div className="text-center">
+            <p className="text-brand-accent text-sm">{error}</p>
+          </div>
+        )}
       </div>
 
       {/* Input bar */}
-      <div
-        className="flex items-end gap-2 px-4 py-3 border-t border-brand-border flex-shrink-0"
+      <form
+        onSubmit={handleSend}
+        className="border-t border-brand-border bg-brand-bg app-page-gutter pt-3 flex-shrink-0"
         style={{ paddingBottom: safeAreaBottom }}
       >
-        <textarea
-          rows={1}
-          value={email}
-          onChange={e => setEmail(e.target.value.replace(/\n/g, ''))}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(); } }}
-          placeholder="your@email.com"
-          autoFocus
-          className="flex-1 min-w-0 px-3 py-2.5 bg-brand-surface border border-brand-border rounded-xl text-brand-text text-sm placeholder:text-brand-muted resize-none focus:outline-none focus:border-brand-accent/50"
-          style={{ maxHeight: 80 }}
-        />
-        <button
-          onClick={handleSubmit}
-          disabled={saving || !email.trim()}
-          className="flex-shrink-0 px-4 py-2.5 bg-brand-accent text-white text-sm font-semibold rounded-xl disabled:opacity-40"
-        >
-          {saving ? '...' : 'Save'}
-        </button>
-      </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="email"
+            placeholder="your@email.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            disabled={saving}
+            className="flex-1 min-w-0 py-2.5 px-4 rounded-2xl bg-brand-surface border border-brand-border text-brand-text placeholder:text-brand-muted focus:outline-none focus:border-brand-accent text-base disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={saving || !email.trim()}
+            className="flex-shrink-0 p-2.5 rounded-full bg-brand-accent text-white disabled:opacity-30 hover:bg-brand-accent-hover transition-colors"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
