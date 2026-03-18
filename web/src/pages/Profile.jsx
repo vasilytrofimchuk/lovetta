@@ -177,8 +177,9 @@ export default function Profile() {
           await unregisterNativePush();
           setPushEnabled(false);
         } else {
-          const { registerNativePush } = await import('../lib/push-native');
+          const { registerNativePush, setupPushListeners } = await import('../lib/push-native');
           await registerNativePush();
+          setupPushListeners((url) => navigate(url));
           setPushEnabled(true);
         }
       } else {
@@ -264,8 +265,10 @@ export default function Profile() {
     setSavingPush(true);
     try {
       if (isCapacitor()) {
-        const { registerNativePush } = await import('../lib/push-native');
+        const { registerNativePush, setupPushListeners } = await import('../lib/push-native');
         await registerNativePush();
+        // Re-add tap listeners (registerNativePush clears all listeners)
+        setupPushListeners((url) => navigate(url));
         setPushEnabled(true);
       } else {
         const permission = await Notification.requestPermission();

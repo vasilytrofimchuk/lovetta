@@ -12,9 +12,18 @@ export async function registerNativePush() {
     throw new Error('Push notification permission denied')
   }
 
-  // Wait for registration to complete
+  // Remove any stale listeners before adding new ones
+  await PushNotifications.removeAllListeners()
+
+  // Wait for registration to complete (with timeout)
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Push registration timed out'))
+    }, 10000)
+
     PushNotifications.addListener('registration', async (token) => {
+      clearTimeout(timeout)
+      console.log('[push] Got device token:', token.value?.slice(0, 20) + '...')
       try {
         await api.post('/api/user/push/subscribe-apns', { token: token.value })
         resolve(token.value)
@@ -24,6 +33,8 @@ export async function registerNativePush() {
     })
 
     PushNotifications.addListener('registrationError', (err) => {
+      clearTimeout(timeout)
+      console.error('[push] Registration error:', err)
       reject(new Error(err.error || 'Push registration failed'))
     })
 
