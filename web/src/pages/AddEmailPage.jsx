@@ -32,7 +32,7 @@ export default function AddEmailPage() {
       await api.put('/api/user/real-email', { email: trimmed });
       refreshUser?.();
       toast('Email saved');
-      navigate('/my/profile');
+      navigate('/profile');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save email');
     } finally {
@@ -48,7 +48,7 @@ export default function AddEmailPage() {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-brand-border flex-shrink-0">
         <button
-          onClick={() => navigate('/my/profile')}
+          onClick={() => navigate('/profile')}
           aria-label="Back"
           className="text-brand-muted hover:text-brand-text transition-colors"
         >

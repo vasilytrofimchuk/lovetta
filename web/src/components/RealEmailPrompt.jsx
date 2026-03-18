@@ -18,7 +18,7 @@ export default function RealEmailPrompt() {
     setDismissed(true);
   };
 
-  const openAddEmail = () => navigate('/my/add-email');
+  const openAddEmail = () => navigate('/add-email');
 
   return (
     <div className="bg-brand-card border border-brand-accent/30 rounded-xl p-4 mb-4">
