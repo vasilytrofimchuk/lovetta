@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
-import { isAppStore, isCapacitor } from '../lib/platform';
+import { APP_ICON_OPTIONS, getCurrentAppIcon, setCurrentAppIcon } from '../lib/app-icon';
+import { isAppStore, isCapacitor, isIOS } from '../lib/platform';
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -14,8 +15,15 @@ export default function Profile() {
   const [proactiveMessages, setProactiveMessages] = useState(true);
   const [proactiveFrequency, setProactiveFrequency] = useState('normal');
   const [explicitContent, setExplicitContent] = useState(false);
+  const [appIcon, setAppIcon] = useState('default');
+  const [appIconLoading, setAppIconLoading] = useState(isIOS());
+  const [appIconSaving, setAppIconSaving] = useState(false);
   const [prefLoading, setPrefLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingNotify, setSavingNotify] = useState(false);
+  const [savingPush, setSavingPush] = useState(false);
+  const [savingProactive, setSavingProactive] = useState(false);
+  const [savingFrequency, setSavingFrequency] = useState(false);
+  const [savingExplicit, setSavingExplicit] = useState(false);
 
   // Referral state
   const [referral, setReferral] = useState(null);
@@ -37,6 +45,7 @@ export default function Profile() {
 
 
   const [referralExpanded, setReferralExpanded] = useState(false);
+  const ios = isIOS();
   const appStore = isAppStore();
 
   // Navigate to support if there are unread messages
@@ -47,6 +56,8 @@ export default function Profile() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
     api.get('/api/billing/status')
       .then(({ data }) => setSubscription(data))
       .catch(() => {})
@@ -91,23 +102,42 @@ export default function Profile() {
     } else {
       setRefLoading(false);
     }
+
+    if (ios) {
+      getCurrentAppIcon()
+        .then(({ icon }) => {
+          if (active) setAppIcon(icon || 'default');
+        })
+        .catch((err) => {
+          console.error('App icon load error:', err);
+        })
+        .finally(() => {
+          if (active) setAppIconLoading(false);
+        });
+    } else {
+      setAppIconLoading(false);
+    }
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const toggleNotify = async () => {
     const newVal = !notifyMessages;
     setNotifyMessages(newVal);
-    setSaving(true);
+    setSavingNotify(true);
     try {
       await api.put('/api/user/preferences', { notify_new_messages: newVal });
     } catch {
       setNotifyMessages(!newVal);
     } finally {
-      setSaving(false);
+      setSavingNotify(false);
     }
   };
 
   const togglePush = async () => {
-    setSaving(true);
+    setSavingPush(true);
     try {
       if (isCapacitor()) {
         // Native push via Capacitor
@@ -133,7 +163,7 @@ export default function Profile() {
         } else {
           const permission = await Notification.requestPermission();
           if (permission !== 'granted') {
-            setSaving(false);
+            setSavingPush(false);
             return;
           }
           const { data: vapid } = await api.get('/api/user/vapid-key');
@@ -153,46 +183,60 @@ export default function Profile() {
     } catch (err) {
       console.error('Push toggle error:', err);
     } finally {
-      setSaving(false);
+      setSavingPush(false);
     }
   };
 
   const toggleProactive = async () => {
     const newVal = !proactiveMessages;
     setProactiveMessages(newVal);
-    setSaving(true);
+    setSavingProactive(true);
     try {
       await api.put('/api/user/preferences', { proactive_messages: newVal });
     } catch {
       setProactiveMessages(!newVal);
     } finally {
-      setSaving(false);
+      setSavingProactive(false);
     }
   };
 
   const updateFrequency = async (val) => {
     const prev = proactiveFrequency;
     setProactiveFrequency(val);
-    setSaving(true);
+    setSavingFrequency(true);
     try {
       await api.put('/api/user/preferences', { proactive_frequency: val });
     } catch {
       setProactiveFrequency(prev);
     } finally {
-      setSaving(false);
+      setSavingFrequency(false);
     }
   };
 
   const toggleExplicit = async () => {
     const newVal = !explicitContent;
     setExplicitContent(newVal);
-    setSaving(true);
+    setSavingExplicit(true);
     try {
       await api.put('/api/user/preferences', { explicit_content: newVal });
     } catch {
       setExplicitContent(!newVal);
     } finally {
-      setSaving(false);
+      setSavingExplicit(false);
+    }
+  };
+
+  const handleAppIconSelect = async (nextIcon) => {
+    if (appIconSaving || appIcon === nextIcon) return;
+
+    setAppIconSaving(true);
+    try {
+      const { icon } = await setCurrentAppIcon(nextIcon);
+      setAppIcon(icon || nextIcon);
+    } catch (err) {
+      console.error('App icon update error:', err);
+    } finally {
+      setAppIconSaving(false);
     }
   };
 
@@ -231,6 +275,63 @@ export default function Profile() {
             </div>
           </div>
         </div>
+
+        {ios && (
+          <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
+            <h3 className="text-sm font-semibold text-brand-text mb-1">App Icon</h3>
+            <p className="text-xs text-brand-muted mb-4">
+              Choose how Lovetta looks on your Home Screen.
+            </p>
+
+            {appIconLoading ? (
+              <p className="text-sm text-brand-muted">Loading...</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {APP_ICON_OPTIONS.map((option) => {
+                  const selected = appIcon === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => handleAppIconSelect(option.id)}
+                      disabled={appIconSaving}
+                      className={`rounded-xl border p-2.5 text-left transition-all ${
+                        selected
+                          ? 'border-brand-accent bg-brand-accent/10 ring-1 ring-brand-accent/30'
+                          : 'border-brand-border bg-brand-surface hover:border-brand-accent/50'
+                      } ${appIconSaving ? 'disabled:opacity-80' : ''}`}
+                    >
+                      <img
+                        src={option.preview}
+                        alt={`${option.label} icon preview`}
+                        className="w-full rounded-[18px] mb-2 border border-black/5"
+                      />
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="text-sm font-semibold text-brand-text leading-tight">{option.label}</span>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold leading-none ${
+                            selected
+                              ? 'bg-brand-accent/15 text-brand-accent border border-brand-accent/30'
+                              : 'bg-brand-bg/30 text-brand-muted border border-brand-border'
+                          }`}
+                        >
+                          {selected ? 'Selected' : 'Use'}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {!appIconLoading && (
+              <p className="text-xs text-brand-muted mt-3">
+                {appIconSaving ? 'Updating icon...' : 'Saved on this iPhone only.'}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Subscription */}
         <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
@@ -299,7 +400,7 @@ export default function Profile() {
               </div>
               <button
                 onClick={toggleNotify}
-                disabled={prefLoading || saving}
+                disabled={prefLoading || savingNotify}
                 className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
                   notifyMessages ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
                 }`}
@@ -324,7 +425,7 @@ export default function Profile() {
                 </div>
                 <button
                   onClick={togglePush}
-                  disabled={prefLoading || saving}
+                  disabled={prefLoading || savingPush}
                   className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
                     pushEnabled ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
                   }`}
@@ -349,7 +450,7 @@ export default function Profile() {
               </div>
               <button
                 onClick={toggleProactive}
-                disabled={prefLoading || saving}
+                disabled={prefLoading || savingProactive}
                 className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
                   proactiveMessages ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
                 }`}
@@ -376,7 +477,7 @@ export default function Profile() {
                     <button
                       key={opt.value}
                       onClick={() => updateFrequency(opt.value)}
-                      disabled={prefLoading || saving}
+                      disabled={prefLoading || savingFrequency}
                       className={`flex-1 py-2 text-xs font-medium transition-colors ${
                         proactiveFrequency === opt.value
                           ? 'bg-brand-accent text-white'
@@ -410,7 +511,7 @@ export default function Profile() {
               </div>
               <button
                 onClick={toggleExplicit}
-                disabled={prefLoading || saving}
+                disabled={prefLoading || savingExplicit}
                 className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
                   explicitContent ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
                 }`}
