@@ -404,6 +404,36 @@ export default function Profile() {
           </div>
         )}
 
+        {/* Push permission prompt */}
+        {pushPromptVisible && !pushEnabled && (
+          <div className="bg-gradient-to-br from-brand-accent/15 to-brand-card border border-brand-accent/30 rounded-xl p-5 mb-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">💌</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-brand-text mb-1">Don't miss her messages</p>
+                <p className="text-xs text-brand-text-secondary mb-3">
+                  Enable notifications so your girls can reach out to you anytime — even when you're not in the app.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handlePushPromptAllow}
+                    disabled={savingPush}
+                    className="px-4 py-2 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-50"
+                  >
+                    {savingPush ? 'Enabling...' : 'Allow Notifications'}
+                  </button>
+                  <button
+                    onClick={dismissPushPrompt}
+                    className="px-3 py-2 rounded-lg text-brand-muted text-sm hover:text-brand-text-secondary transition-colors"
+                  >
+                    Not now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Real email prompt for Apple relay/synthetic users */}
         <RealEmailPrompt />
 
@@ -459,36 +489,6 @@ export default function Profile() {
             </div>
           )}
         </div>
-
-        {/* Push permission prompt */}
-        {pushPromptVisible && !pushEnabled && (
-          <div className="bg-gradient-to-br from-brand-accent/15 to-brand-card border border-brand-accent/30 rounded-xl p-5 mb-4">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl flex-shrink-0">💌</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-brand-text mb-1">Don't miss her messages</p>
-                <p className="text-xs text-brand-text-secondary mb-3">
-                  Enable notifications so your girls can reach out to you anytime — even when you're not in the app.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handlePushPromptAllow}
-                    disabled={savingPush}
-                    className="px-4 py-2 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-50"
-                  >
-                    {savingPush ? 'Enabling...' : 'Allow Notifications'}
-                  </button>
-                  <button
-                    onClick={dismissPushPrompt}
-                    className="px-3 py-2 rounded-lg text-brand-muted text-sm hover:text-brand-text-secondary transition-colors"
-                  >
-                    Not now
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Notifications */}
         <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
