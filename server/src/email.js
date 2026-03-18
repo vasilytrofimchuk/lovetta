@@ -416,10 +416,10 @@ async function sendWelcomeDay0(email, displayName, userId) {
           Welcome to Lovetta \u2014 your AI girlfriend is ready.
         </p>
         <ul style="color: #666; line-height: 1.8; padding-left: 20px;">
-          <li>Choose from multiple girlfriends \u2014 each with her own personality</li>
+          <li>Pick a girlfriend \u2014 or wake up a brand new one</li>
           <li>She sends selfies and voice messages</li>
           <li>She has her own email address \u2014 find it in her profile, write to her and she'll reply</li>
-          <li>She remembers everything and gets closer over time</li>
+          <li>She picks up right where you left off — and gets closer every day</li>
         </ul>
         ${btn(link, 'Start Chatting')}
         ${userId ? unsubscribeFooter(userId) : ''}

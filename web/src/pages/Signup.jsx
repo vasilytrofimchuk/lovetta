@@ -253,7 +253,7 @@ export default function Signup() {
         <div className="text-center mb-8">
           <img src={logoSrc} alt="Lovetta" className="h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Create account</h1>
-          <p className="text-brand-text-secondary mt-1">Meet your AI girlfriend</p>
+          <p className="text-brand-text-secondary mt-1">Your girlfriend is waiting</p>
         </div>
 
         <button

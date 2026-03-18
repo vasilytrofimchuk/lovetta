@@ -3,10 +3,10 @@ import { Browser } from '@capacitor/browser'
 import WelcomeCarousel from '../components/WelcomeCarousel'
 
 const FEATURES = [
-  { icon: '💬', title: 'Natural Conversations', desc: 'She remembers your stories' },
-  { icon: '🎭', title: 'Unique Personality', desc: 'Choose or create your own' },
-  { icon: '📸', title: 'Photos & Videos', desc: 'She sends AI-generated photos' },
-  { icon: '🔔', title: 'Always Connected', desc: 'She reaches out to you' },
+  { icon: '💬', title: 'Natural Conversations', desc: 'She picks up where you left off' },
+  { icon: '🎭', title: 'Unique Personality', desc: 'Wake up a new girl or pick one you like' },
+  { icon: '📸', title: 'Photos & Videos', desc: 'Selfies, videos, little surprises' },
+  { icon: '🔔', title: 'Always Connected', desc: 'She can text first' },
 ]
 
 export default function WelcomeScreen() {
@@ -23,7 +23,7 @@ export default function WelcomeScreen() {
       {/* Tagline */}
       <div className="text-center mb-6">
         <h1 className="text-2xl font-bold text-brand-text">Your AI Girlfriend</h1>
-        <p className="text-brand-text-secondary text-sm mt-1">Meet someone who's always here for you</p>
+        <p className="text-brand-text-secondary text-sm mt-1">She picks up right where you left off</p>
       </div>
 
       <WelcomeCarousel />

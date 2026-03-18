@@ -549,3 +549,9 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Replaced the small landing pricing note with a stronger `Cancel anytime` emphasis on the web landing page.
 - Kept the message within the existing trial note area instead of changing the pricing card structure.
 - Skipped tests because the change stayed limited to copy and presentation in the landing note.
+
+## iPad Full-Width Shell Fix — DONE
+- Replaced the desktop-frame media heuristic with an explicit `wide-tablet-shell` class on both the public landing and the React app entry HTML so iPad keeps the wide layout even when WebKit reports desktop-like pointer support.
+- Updated the app shell and landing frame CSS to apply the 960px centered desktop frame only when that iPad/tablet class is absent.
+- Tightened the landing UI test to verify the iPad wide-shell class, full-width `/my/welcome` shell, and wider welcome CTA on iPad landscape.
+- Verified with `npm run build`, `npm run test:e2e:ui`, and `npm run build:ios` so the synced iOS bundle also includes the fix.

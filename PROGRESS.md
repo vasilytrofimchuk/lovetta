@@ -614,3 +614,9 @@
 - [x] Update `plan.md` and `PROGRESS.md` for the landing cancel-anytime emphasis change
 - [x] Replace the landing pricing note with a larger `Cancel anytime` emphasis
 - [x] Skip tests because this is a copy/presentation-only landing change
+
+## iPad Full-Width Shell Fix
+- [x] Update `plan.md` and `PROGRESS.md` for the iPad shell-width fix
+- [x] Keep the app and landing shells full-width on iPad landscape instead of applying the desktop frame
+- [x] Add iPad landscape UI assertions for `/` and `/my/welcome`
+- [x] Run `npm run test:e2e:ui`

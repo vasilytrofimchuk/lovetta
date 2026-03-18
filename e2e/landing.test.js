@@ -1,5 +1,12 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect, devices } = require('@playwright/test');
 const { BASE } = require('./helpers');
+
+const WELCOME_TEMPLATES = [
+  { name: 'Sakura', age: 24, style: 'anime', tagline: 'Adventure is out there!', avatar_url: '/assets/brand/og-image.png', video_url: '' },
+  { name: 'Aiko', age: 26, style: 'anime', tagline: 'Late nights and good stories.', avatar_url: '/assets/brand/og-image.png', video_url: '' },
+  { name: 'Aria', age: 23, style: 'real', tagline: 'Sweet, playful, impossible to forget.', avatar_url: '/assets/brand/og-image.png', video_url: '' },
+  { name: 'Luna', age: 25, style: 'real', tagline: 'A little mystery makes it better.', avatar_url: '/assets/brand/og-image.png', video_url: '' },
+];
 
 test.describe('Landing page', () => {
   test('uses full width on tablet and centered shell on desktop', async ({ page }) => {
@@ -39,19 +46,71 @@ test.describe('Landing page', () => {
     expect(desktopMetrics.left).toBeGreaterThan(200);
   });
 
-  test('ios welcome route shows the landing-style carousel', async ({ page }) => {
-    const templates = [
-      { name: 'Sakura', age: 24, style: 'anime', tagline: 'Adventure is out there!', avatar_url: '/assets/brand/og-image.png', video_url: '' },
-      { name: 'Aiko', age: 26, style: 'anime', tagline: 'Late nights and good stories.', avatar_url: '/assets/brand/og-image.png', video_url: '' },
-      { name: 'Aria', age: 23, style: 'real', tagline: 'Sweet, playful, impossible to forget.', avatar_url: '/assets/brand/og-image.png', video_url: '' },
-      { name: 'Luna', age: 25, style: 'real', tagline: 'A little mystery makes it better.', avatar_url: '/assets/brand/og-image.png', video_url: '' },
-    ];
+  test('ipad landscape stays full-width for both landing and ios welcome shell', async ({ browser }) => {
+    const context = await browser.newContext({
+      ...devices['iPad Pro 11 landscape'],
+    });
+    const page = await context.newPage();
 
     await page.route('**/api/companions/templates/preview', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ templates }),
+        body: JSON.stringify({ templates: WELCOME_TEMPLATES }),
+      });
+    });
+
+    await page.goto(BASE);
+
+    const landingMetrics = await page.locator('[data-testid="landing-container"]').evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        wideTabletShell: document.documentElement.classList.contains('wide-tablet-shell'),
+        width: rect.width,
+        left: rect.left,
+        right: window.innerWidth - rect.right,
+        viewportWidth: window.innerWidth,
+      };
+    });
+
+    expect(landingMetrics.wideTabletShell).toBe(true);
+    expect(Math.abs(landingMetrics.width - landingMetrics.viewportWidth)).toBeLessThanOrEqual(2);
+    expect(landingMetrics.left).toBeLessThanOrEqual(1);
+    expect(landingMetrics.right).toBeLessThanOrEqual(1);
+
+    await page.goto(`${BASE}/my/welcome`);
+
+    const shellMetrics = await page.locator('[data-testid="app-shell"]').evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      const cta = Array.from(document.querySelectorAll('button, a'))
+        .find((element) => element.textContent?.trim() === 'Continue');
+      return {
+        wideTabletShell: document.documentElement.classList.contains('wide-tablet-shell'),
+        width: rect.width,
+        left: rect.left,
+        right: window.innerWidth - rect.right,
+        viewportWidth: window.innerWidth,
+        borderLeftWidth: window.getComputedStyle(node).borderLeftWidth,
+        ctaWidth: cta ? cta.getBoundingClientRect().width : 0,
+      };
+    });
+
+    expect(shellMetrics.wideTabletShell).toBe(true);
+    expect(Math.abs(shellMetrics.width - shellMetrics.viewportWidth)).toBeLessThanOrEqual(2);
+    expect(shellMetrics.left).toBeLessThanOrEqual(1);
+    expect(shellMetrics.right).toBeLessThanOrEqual(1);
+    expect(parseFloat(shellMetrics.borderLeftWidth)).toBe(0);
+    expect(shellMetrics.ctaWidth).toBeGreaterThan(shellMetrics.viewportWidth * 0.6);
+
+    await context.close();
+  });
+
+  test('ios welcome route shows the landing-style carousel', async ({ page }) => {
+    await page.route('**/api/companions/templates/preview', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ templates: WELCOME_TEMPLATES }),
       });
     });
 

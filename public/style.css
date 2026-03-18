@@ -577,7 +577,7 @@ footer p {
 }
 
 @media (min-width: 1024px) {
-  .desktop-bg {
+  html:not(.wide-tablet-shell) .desktop-bg {
     display: block;
     position: fixed;
     inset: 0;
@@ -586,7 +586,7 @@ footer p {
     z-index: 0;
   }
 
-  .desktop-bg .desktop-glow-pink {
+  html:not(.wide-tablet-shell) .desktop-bg .desktop-glow-pink {
     position: absolute;
     top: -10%;
     left: -5%;
@@ -595,7 +595,7 @@ footer p {
     background: radial-gradient(ellipse, rgba(214, 51, 108, 0.07) 0%, transparent 70%);
   }
 
-  .desktop-bg .desktop-glow-purple {
+  html:not(.wide-tablet-shell) .desktop-bg .desktop-glow-purple {
     position: absolute;
     bottom: -10%;
     right: -5%;
@@ -604,7 +604,7 @@ footer p {
     background: radial-gradient(ellipse, rgba(26, 17, 40, 0.5) 0%, transparent 70%);
   }
 
-  .container {
+  html:not(.wide-tablet-shell) .container {
     max-width: 960px;
     border-left: 1px solid rgba(45, 31, 69, 0.3);
     border-right: 1px solid rgba(45, 31, 69, 0.3);

@@ -13,6 +13,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    (function() {
+      function isWideTabletShell() {
+        var ua = navigator.userAgent || '';
+        var platform = navigator.platform || '';
+        var isIPad = /iPad/.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        return isIPad && window.innerWidth >= 768;
+      }
+
+      function syncWideTabletShell() {
+        document.documentElement.classList.toggle('wide-tablet-shell', isWideTabletShell());
+      }
+
+      syncWideTabletShell();
+      window.addEventListener('resize', syncWideTabletShell, { passive: true });
+      window.addEventListener('orientationchange', syncWideTabletShell);
+    })();
+  </script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
