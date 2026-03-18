@@ -1,12 +1,20 @@
 import { isIOS } from './platform'
 
-let currentKeyboardHeight = 0
+let keyboardOpen = false
 let baseHeight = 0
 
 function setViewportHeight() {
   if (typeof window === 'undefined') return
   if (!baseHeight) baseHeight = window.innerHeight
-  const height = baseHeight - currentKeyboardHeight
+
+  let height
+  if (keyboardOpen && window.visualViewport) {
+    // With KeyboardResize.None, visualViewport.height reports the
+    // actual visible area above the keyboard — use it directly
+    height = window.visualViewport.height
+  } else {
+    height = baseHeight
+  }
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(height)}px`)
 }
 
@@ -22,6 +30,10 @@ export async function initIosKeyboard() {
   baseHeight = window.innerHeight
   setViewportHeight()
 
+  const handleViewportChange = () => setViewportHeight()
+
+  window.visualViewport?.addEventListener('resize', handleViewportChange)
+
   let handles = []
 
   try {
@@ -32,13 +44,13 @@ export async function initIosKeyboard() {
     await Keyboard.setStyle({ style: KeyboardStyle.Dark })
 
     handles = await Promise.all([
-      Keyboard.addListener('keyboardDidShow', (info) => {
-        currentKeyboardHeight = info.keyboardHeight || 0
+      Keyboard.addListener('keyboardDidShow', () => {
+        keyboardOpen = true
         setKeyboardScrollLock(true)
         setViewportHeight()
       }),
       Keyboard.addListener('keyboardDidHide', () => {
-        currentKeyboardHeight = 0
+        keyboardOpen = false
         setKeyboardScrollLock(false)
         setViewportHeight()
       }),
@@ -48,6 +60,7 @@ export async function initIosKeyboard() {
   }
 
   return () => {
+    window.visualViewport?.removeEventListener('resize', handleViewportChange)
     setKeyboardScrollLock(false)
     handles.forEach((handle) => handle?.remove?.())
     handles = []
