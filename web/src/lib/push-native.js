@@ -19,12 +19,14 @@ export async function registerNativePush() {
     PushNotifications.addListener('registration', async (token) => {
       clearTimeout(timeout)
       console.log('[push] Got device token:', token.value?.slice(0, 20) + '...')
+      // Save token to server (don't fail if this errors — permission is still granted)
       try {
         await api.post('/api/user/push/subscribe-apns', { token: token.value })
-        resolve(token.value)
+        console.log('[push] Token saved to server')
       } catch (err) {
-        reject(err)
+        console.error('[push] Failed to save token to server:', err.message)
       }
+      resolve(token.value)
     })
 
     PushNotifications.addListener('registrationError', (err) => {
@@ -58,12 +60,10 @@ export async function unregisterNativePush() {
 
 /** Set up listeners for incoming notifications and taps. */
 export function setupPushListeners(navigateFn) {
-  // Notification received while app is in foreground
   PushNotifications.addListener('pushNotificationReceived', (notification) => {
     console.log('[push] Received:', notification)
   })
 
-  // User tapped a notification
   PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
     const data = action.notification?.data
     if (data?.url) {
