@@ -251,6 +251,23 @@ Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
 - Media files (images, videos) are stored in **Cloudflare R2** (public CDN) — same URLs work in dev and prod
 - Custom avatar URLs are hardcoded in `web/src/pages/CompanionCreate.jsx` — no DB dependency
 
+### Apple Sign-In (iOS) — Critical Rules
+
+**Plugin**: `@capacitor-community/apple-sign-in@7.1.0` has a bug — missing `presentationContextProvider`. Fixed via `patches/@capacitor-community+apple-sign-in+7.1.0.patch` (patch-package). `patch-package` must be in `dependencies` (not devDependencies) so Heroku runs `postinstall`.
+
+**Client (`web/src/components/AppleSignIn.jsx`)**:
+- **ALWAYS dynamic import**: `const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')` inside the handler. Static top-level import breaks because the Capacitor native bridge hasn't initialized yet.
+- `clientId`/`redirectURI` params are ignored by native iOS — only `scopes` matters.
+- Component renders only when `isCapacitor()` is true.
+
+**Server (`server/src/auth-api.js`)**:
+- Native iOS JWT audience = bundle ID `"ai.lovetta.app"`. Web JWT audience = Service ID `"ai.lovetta.signin"` (`APPLE_CLIENT_ID` env var).
+- Must accept both: `audience: [APPLE_CLIENT_ID, 'ai.lovetta.app'].filter(Boolean)`
+
+**Cannot test on iOS Simulator** — requires real device with proper developer cert (not adhoc signing).
+
+**Entitlements** (`web/ios/App/App/App.entitlements`): must have `com.apple.developer.applesignin = [Default]`.
+
 ### Ports
 
 - **3900** — Dev server
