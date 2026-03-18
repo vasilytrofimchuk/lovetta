@@ -1042,8 +1042,13 @@
       fetch('/api/admin/support/chats/' + id, {
         method: 'PATCH', headers: headers(), body: JSON.stringify({ status: status }),
       }).then(function(r) { return r.json(); }).then(function() {
-        if (status === 'resolved') supportActiveChatId = null;
-        loadSupport();
+        if (status === 'resolved') {
+          supportActiveChatId = null;
+          supportChatData = null;
+          loadSupport();
+        } else {
+          selectSupportChat(id);
+        }
       });
     }
 

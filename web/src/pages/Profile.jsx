@@ -36,6 +36,7 @@ export default function Profile({ openSupport = false }) {
   ];
 
   const [supportOpen, setSupportOpen] = useState(openSupport);
+  const [referralExpanded, setReferralExpanded] = useState(false);
   const appStore = isAppStore();
 
   useEffect(() => {
@@ -367,9 +368,20 @@ export default function Profile({ openSupport = false }) {
         {/* Referral Program — hidden on App Store (Apple doesn't allow external payment incentives) */}
         {!appStore && (
           <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
-            <h3 className="text-sm font-semibold text-brand-text mb-3">Referral Program</h3>
-            {refLoading ? (
-              <p className="text-sm text-brand-muted">Loading...</p>
+            <button
+              onClick={() => setReferralExpanded(e => !e)}
+              className="w-full flex items-center justify-between"
+            >
+              <h3 className="text-sm font-semibold text-brand-text">Referral Program</h3>
+              <svg
+                className={`w-4 h-4 text-brand-muted transition-transform ${referralExpanded ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {referralExpanded && (refLoading ? (
+              <p className="text-sm text-brand-muted mt-3">Loading...</p>
             ) : referral ? (
               <div className="space-y-4">
                 {/* Referral link */}
@@ -516,7 +528,7 @@ export default function Profile({ openSupport = false }) {
                   </p>
                 </div>
               </div>
-            ) : null}
+            ) : null)}
           </div>
         )}
 
