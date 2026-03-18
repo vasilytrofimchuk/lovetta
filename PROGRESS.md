@@ -934,9 +934,23 @@
 
 ## Restore App Icon Picker Runtime Wiring
 - [x] Update `plan.md` and `PROGRESS.md` for the runtime-wiring follow-up
-- [ ] Register the local `AppIconPlugin` with the Capacitor bridge
-- [ ] Replace the fragile iOS render gate with a more reliable native-iPhone check
-- [ ] Run `npm run build:ios`
-- [ ] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
-- [ ] Run `npm run test:e2e:ui`
-- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes
+- [x] Register the local `AppIconPlugin` with the Capacitor bridge
+- [x] Replace the fragile iOS render gate with a more reliable native-iPhone check
+- [x] Run `npm run build:ios`
+- [x] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+
+## iOS Tip Thank-You Sync Fix
+- [x] Add `thankYouReady` to the private iOS tip-intent status response
+- [x] Wait for `thankYouReady` in the iOS RevenueCat tip poller before resolving tip success
+- [x] Extend API billing coverage for companion-bound and non-companion iOS tip intent readiness
+- [x] Add Stripe webhook coverage for the web companion tip thank-you path
+- [x] Run `npm run test:e2e:api`
+- [x] Run `npm run test:e2e:ui`
+- [x] Run `npm run build:ios`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes
+- Verification notes:
+- `npm run test:e2e:api` passed (`28` tests), including new iOS tip-intent readiness coverage and Stripe companion-tip webhook coverage.
+- `npm run test:e2e:ui` passed (`47` tests).
+- `npm run build:ios` passed.
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and notes

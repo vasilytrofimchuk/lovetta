@@ -84,7 +84,7 @@ export async function waitForIosTipIntent(intentId, { timeoutMs = SYNC_TIMEOUT_M
 
   while (Date.now() < deadline) {
     const { data } = await api.get(`/api/billing/ios/tip-intents/${intentId}`)
-    if (data?.status === 'completed') return data
+    if (data?.status === 'completed' && (!data?.companionId || data?.thankYouReady)) return data
     if (data?.status === 'expired') {
       throw new Error('Tip purchase did not sync in time. Please try again.')
     }

@@ -1,9 +1,13 @@
 const { test, expect } = require('@playwright/test');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const Stripe = require('stripe');
 const { BASE, createTestUser } = require('./helpers');
 
 const RC_SECRET = process.env.REVENUECAT_SECRET_KEY || 'test-revenuecat-secret';
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'test-stripe-secret';
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'test-stripe-webhook-secret';
+const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 function revenueCatHeaders(secret = RC_SECRET) {
   return {
@@ -16,6 +20,19 @@ async function postRevenueCatEvent(request, event, secret = RC_SECRET) {
   return request.post(`${BASE}/api/webhooks/revenuecat`, {
     headers: revenueCatHeaders(secret),
     data: { event },
+  });
+}
+
+async function postStripeEvent(request, event, secret = STRIPE_WEBHOOK_SECRET) {
+  const payload = JSON.stringify(event);
+  const signature = stripe.webhooks.generateTestHeaderString({ payload, secret });
+
+  return request.post(`${BASE}/api/webhooks/stripe`, {
+    headers: {
+      'stripe-signature': signature,
+      'Content-Type': 'application/json',
+    },
+    data: payload,
   });
 }
 
@@ -224,6 +241,7 @@ test.describe('iOS Billing — RevenueCat', () => {
     expect(intentStatus.status).toBe('completed');
     expect(intentStatus.companionId).toBe(companionId);
     expect(intentStatus.tipId).toBeTruthy();
+    expect(intentStatus.thankYouReady).toBe(true);
 
     const { rows: tipRows } = await pool.query(
       `SELECT id, amount, companion_id, stripe_payment_id
@@ -267,5 +285,113 @@ test.describe('iOS Billing — RevenueCat', () => {
       [user.userId]
     );
     expect(duplicateTipRows).toHaveLength(1);
+  });
+
+  test('native iOS non-companion tip intent reports thank-you ready once completed', async ({ request }) => {
+    const user = await createTestUser(request);
+
+    const intentRes = await request.post(`${BASE}/api/billing/ios/tip-intents`, {
+      headers: user.authHeaders,
+      data: {
+        productId: 'lovetta_tip_999',
+        amount: 999,
+      },
+    });
+    expect(intentRes.ok()).toBeTruthy();
+    const intent = await intentRes.json();
+    expect(intent.status).toBe('pending');
+
+    const webhookEventId = `rc_tip_nocomp_${Date.now()}`;
+    const webhookRes = await postRevenueCatEvent(request, {
+      id: webhookEventId,
+      type: 'NON_RENEWING_PURCHASE',
+      app_user_id: user.userId,
+      subscriber_id: `sub_tip_${webhookEventId}`,
+      product_id: 'lovetta_tip_999',
+      price_in_purchased_currency: 9.99,
+    });
+    expect(webhookRes.ok()).toBeTruthy();
+
+    const intentStatusRes = await request.get(`${BASE}/api/billing/ios/tip-intents/${intent.intentId}`, {
+      headers: user.authHeaders,
+    });
+    expect(intentStatusRes.ok()).toBeTruthy();
+    const intentStatus = await intentStatusRes.json();
+    expect(intentStatus.status).toBe('completed');
+    expect(intentStatus.companionId).toBeNull();
+    expect(intentStatus.tipId).toBeTruthy();
+    expect(intentStatus.thankYouReady).toBe(true);
+
+    const { rows: tipRows } = await pool.query(
+      `SELECT amount, companion_id, stripe_payment_id
+         FROM tips
+        WHERE user_id = $1`,
+      [user.userId]
+    );
+    expect(tipRows).toHaveLength(1);
+    expect(tipRows[0].amount).toBe(999);
+    expect(tipRows[0].companion_id).toBeNull();
+    expect(tipRows[0].stripe_payment_id).toBe(`rc_${webhookEventId}`);
+  });
+
+  test('web Stripe companion tip webhook inserts thank-you message', async ({ request }) => {
+    const user = await createTestUser(request);
+    const companionId = crypto.randomUUID();
+
+    await pool.query(
+      `INSERT INTO user_companions (id, user_id, name, personality, communication_style, age)
+       VALUES ($1, $2, 'Luna', 'Playful and affectionate', 'playful', 24)`,
+      [companionId, user.userId]
+    );
+
+    const eventId = `evt_tip_${Date.now()}`;
+    const paymentIntentId = `pi_tip_${Date.now()}`;
+    const webhookRes = await postStripeEvent(request, {
+      id: eventId,
+      object: 'event',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: `cs_tip_${Date.now()}`,
+          object: 'checkout.session',
+          mode: 'payment',
+          payment_intent: paymentIntentId,
+          metadata: {
+            userId: user.userId,
+            type: 'tip',
+            amount: '999',
+            companionId,
+          },
+        },
+      },
+    });
+    expect(webhookRes.ok()).toBeTruthy();
+
+    const { rows: tipRows } = await pool.query(
+      `SELECT amount, companion_id, stripe_payment_id
+         FROM tips
+        WHERE user_id = $1`,
+      [user.userId]
+    );
+    expect(tipRows).toHaveLength(1);
+    expect(tipRows[0].amount).toBe(999);
+    expect(tipRows[0].companion_id).toBe(companionId);
+    expect(tipRows[0].stripe_payment_id).toBe(paymentIntentId);
+
+    const { rows: conversationRows } = await pool.query(
+      `SELECT id FROM conversations WHERE user_id = $1 AND companion_id = $2`,
+      [user.userId, companionId]
+    );
+    expect(conversationRows).toHaveLength(1);
+
+    const { rows: messageRows } = await pool.query(
+      `SELECT role, content, context_text
+         FROM messages
+        WHERE conversation_id = $1`,
+      [conversationRows[0].id]
+    );
+    expect(messageRows).toHaveLength(1);
+    expect(messageRows[0].role).toBe('assistant');
+    expect(messageRows[0].content).toContain('made my whole day');
   });
 });

@@ -16,6 +16,7 @@ import ChatPage from './pages/ChatPage'
 import Pricing from './pages/Pricing'
 import Profile from './pages/Profile'
 import SupportPage from './pages/SupportPage'
+import AddEmailPage from './pages/AddEmailPage'
 import WelcomeScreen from './pages/WelcomeScreen'
 import DesktopShell from './components/DesktopShell'
 
@@ -173,6 +174,7 @@ function AppRoutes() {
       <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
+      <Route path="/add-email" element={<ProtectedRoute><AddEmailPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

@@ -918,3 +918,26 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Register the local `AppIconPlugin` with Capacitor’s native bridge so the iOS app-icon picker has a real runtime plugin behind it.
 - Replace the fragile `isIOS()` render gate with a more reliable native-iPhone detection path so the icon section still appears in the shipped iOS build.
 - Re-run the relevant iOS and frontend verification, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Added `/web/ios/App/App/AppViewController.swift` as a `CAPBridgeViewController` subclass and registered `AppIconPlugin()` in `capacitorDidLoad()`, then pointed `Main.storyboard` at that custom bridge controller.
+- Hardened platform detection so the Profile page treats native iOS correctly even if `isNativePlatform()` is not the signal that wins at runtime; the app-icon section now relies on a more reliable native-iOS check.
+- Restored the current-icon load on Profile mount now that the plugin is actually registered, while keeping the selected icon cached locally and the updated badge layout in place.
+- Verification:
+- `npm run build:ios` passed.
+- `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- `npm run test:e2e:ui` passed (`47` tests) after one rerun to clear an unrelated flaky companion-creation timeout.
+
+## iOS Tip Thank-You Sync Fix — DONE
+- Log this follow-up in `plan.md` and `PROGRESS.md` before changing files.
+- Keep the existing thank-you message generation path unchanged, but make the private iOS tip-intent status API expose a `thankYouReady` signal that stays false until the companion thank-you message is actually visible in chat.
+- For companion-bound iOS tips, compute `thankYouReady` from the presence of a new assistant message in the matching conversation at or after the tip intent completion timestamp; for non-companion tips, mark `thankYouReady` true immediately once the intent is completed.
+- Update the iOS RevenueCat tip poller so `startTipCheckout()` does not resolve until both tip persistence and thank-you visibility are ready, keeping the existing `onTipSuccess={loadChat}` wiring unchanged for the chat promo and companion sheet.
+- Extend API billing coverage for the companion-bound and non-companion iOS tip cases, add Stripe webhook coverage for the web thank-you path, then run `npm run test:e2e:api`, `npm run test:e2e:ui`, and `npm run build:ios` before updating `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- Added `isIosTipThankYouReady()` in `server/src/billing.js` so companion-bound iOS tip intents only report ready after the matching conversation has a new assistant thank-you message created at or after `completed_at`, while non-companion intents flip ready immediately once completed.
+- Extended `GET /api/billing/ios/tip-intents/:id` in `server/src/billing-api.js` to return `thankYouReady`, and updated the client poller in `web/src/lib/revenuecat.js` to wait for that signal before resolving iOS tip success.
+- Added API coverage in `e2e/ios-billing.test.js` for companion-bound and non-companion iOS tip readiness plus the web Stripe companion-tip webhook path that inserts the assistant thank-you message.
+- Verification:
+- `npm run test:e2e:api` passed (`28` tests).
+- `npm run test:e2e:ui` passed (`47` tests).
+- `npm run build:ios` passed.

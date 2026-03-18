@@ -141,6 +141,30 @@ async function getIosTipIntent(userId, intentId) {
   return rows[0] || null;
 }
 
+async function isIosTipThankYouReady(userId, intent) {
+  if (!intent || intent.status !== 'completed') return false;
+  if (!intent.companion_id) return true;
+  if (!intent.completed_at) return false;
+
+  const pool = getPool();
+  if (!pool) throw new Error('Database not available');
+
+  const { rows } = await pool.query(
+    `SELECT EXISTS (
+        SELECT 1
+          FROM conversations c
+          JOIN messages m ON m.conversation_id = c.id
+         WHERE c.user_id = $1
+           AND c.companion_id = $2
+           AND m.role = 'assistant'
+           AND m.created_at >= $3
+      ) AS ready`,
+    [userId, intent.companion_id, intent.completed_at]
+  );
+
+  return rows[0]?.ready === true;
+}
+
 async function findPendingIosTipIntent(client, userId, productId) {
   const { rows } = await client.query(
     `SELECT id, companion_id, amount
@@ -661,6 +685,7 @@ module.exports = {
   createPortalSession,
   createIosTipIntent,
   getIosTipIntent,
+  isIosTipThankYouReady,
   handleWebhook,
   handleRevenueCatWebhook,
   getUserSubscription,

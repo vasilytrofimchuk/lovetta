@@ -11,6 +11,7 @@ const {
   createIosTipIntent,
   createPortalSession,
   getIosTipIntent,
+  isIosTipThankYouReady,
   getPaymentProvider,
   getUserSubscription,
   isSubscriptionActive,
@@ -132,6 +133,8 @@ router.get('/ios/tip-intents/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Tip intent not found' });
     }
 
+    const thankYouReady = await isIosTipThankYouReady(req.userId, intent);
+
     res.json({
       intentId: intent.id,
       status: intent.status,
@@ -140,6 +143,7 @@ router.get('/ios/tip-intents/:id', authenticate, async (req, res) => {
       completedAt: intent.completed_at,
       expiresAt: intent.expires_at,
       tipId: intent.tip_id || null,
+      thankYouReady,
     });
   } catch (err) {
     console.error('[billing] ios tip intent status error:', err.message);
