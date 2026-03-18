@@ -58,9 +58,14 @@ export function setupPushListeners(navigateFn) {
   })
 
   PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+    console.log('[push] Tap action:', JSON.stringify(action.notification?.data))
     const data = action.notification?.data
-    if (data?.url) {
-      navigateFn?.(data.url)
+    let url = data?.url
+    // Strip /my prefix — Capacitor router uses basename='/'
+    if (url?.startsWith('/my/')) url = url.slice(3)
+    if (url?.startsWith('/my')) url = url.slice(3) || '/'
+    if (url) {
+      navigateFn?.(url)
     } else if (data?.companionId) {
       navigateFn?.(`/chat/${data.companionId}`)
     }
