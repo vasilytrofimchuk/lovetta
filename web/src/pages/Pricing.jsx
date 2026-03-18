@@ -165,14 +165,18 @@ export default function Pricing() {
   // AppStore plan selection — landing-page style
   if (isAppStore()) {
     return (
-      <div className="min-h-screen bg-brand-bg flex flex-col justify-center px-5 py-8">
-        <div className="text-center mb-5">
+      <div className="bg-brand-bg flex flex-col px-5" style={{
+        minHeight: '100vh',
+        paddingTop: 'max(env(safe-area-inset-top, 0px) + 20px, 40px)',
+        paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 12px, 24px)',
+      }}>
+        <div className="text-center mb-6">
           <h2 className="text-xl font-bold text-brand-text">Start Free Trial</h2>
           <p className="text-brand-text-secondary text-sm mt-1">Meet your AI girlfriend. Cancel anytime.</p>
         </div>
 
         {/* Plan cards */}
-        <div className="grid grid-cols-2 gap-2.5 mb-5">
+        <div className="grid grid-cols-2 gap-2.5 mb-6">
           <button
             onClick={() => setSelectedPlan('monthly')}
             className={`relative rounded-lg p-4 text-center cursor-pointer transition-all border-[1.5px] bg-brand-surface ${
@@ -215,7 +219,7 @@ export default function Pricing() {
         </div>
 
         {/* Trial timeline */}
-        <div className="flex items-start justify-center mb-3.5 px-4">
+        <div className="flex items-start justify-center mb-4 px-4">
           <div className="flex flex-col items-center flex-1">
             <div className="w-2 h-2 rounded-full bg-brand-accent border-2 border-brand-accent shadow-[0_0_8px_rgba(214,51,108,0.3)] mb-1.5" />
             <div className="text-[0.68rem] font-bold text-brand-text leading-none">Today</div>
@@ -236,7 +240,7 @@ export default function Pricing() {
         </div>
 
         {/* Features */}
-        <ul className="list-none p-0 mb-3.5 space-y-1">
+        <ul className="list-none p-0 mb-4 space-y-1.5">
           {['Unlimited messages with your girlfriend', 'Unique personality & memory', 'Voice messages & photos'].map(f => (
             <li key={f} className="flex items-start gap-2 text-[0.82rem] text-brand-text-secondary">
               <span className="text-brand-accent font-bold text-[0.9rem] leading-none mt-px flex-shrink-0">✓</span>
@@ -244,6 +248,9 @@ export default function Pricing() {
             </li>
           ))}
         </ul>
+
+        {/* Spacer pushes buttons to bottom */}
+        <div className="flex-1" />
 
         {/* Trial note + links */}
         <p className="text-[0.72rem] text-brand-muted text-center leading-snug mb-4">
