@@ -1,12 +1,13 @@
 import { isIOS } from './platform'
 
 let currentKeyboardHeight = 0
+let baseHeight = 0
 
 function setViewportHeight() {
   if (typeof window === 'undefined') return
-  const fullHeight = window.innerHeight
-  const availableHeight = fullHeight - currentKeyboardHeight
-  document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(availableHeight)}px`)
+  if (!baseHeight) baseHeight = window.innerHeight
+  const height = baseHeight - currentKeyboardHeight
+  document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(height)}px`)
 }
 
 function setKeyboardScrollLock(isLocked) {
@@ -18,9 +19,8 @@ export async function initIosKeyboard() {
   if (typeof window === 'undefined') return () => {}
   if (!isIOS()) return () => {}
 
+  baseHeight = window.innerHeight
   setViewportHeight()
-
-  window.addEventListener('resize', setViewportHeight)
 
   let handles = []
 
@@ -33,8 +33,7 @@ export async function initIosKeyboard() {
 
     handles = await Promise.all([
       Keyboard.addListener('keyboardDidShow', (info) => {
-        // Add extra for autocomplete/prediction bar not included in keyboardHeight
-        currentKeyboardHeight = (info.keyboardHeight || 0) + 44
+        currentKeyboardHeight = info.keyboardHeight || 0
         setKeyboardScrollLock(true)
         setViewportHeight()
       }),
@@ -49,7 +48,6 @@ export async function initIosKeyboard() {
   }
 
   return () => {
-    window.removeEventListener('resize', setViewportHeight)
     setKeyboardScrollLock(false)
     handles.forEach((handle) => handle?.remove?.())
     handles = []
