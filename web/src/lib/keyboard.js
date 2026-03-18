@@ -55,6 +55,13 @@ export async function initIosKeyboard() {
         keyboardVisible = false
         setKeyboardScrollLock(false)
         handleViewportChange()
+        // Reset viewport offset after keyboard animation completes
+        // to prevent header from shifting down
+        setTimeout(() => {
+          window.scrollTo(0, 0)
+          document.scrollingElement?.scrollTo(0, 0)
+          handleViewportChange()
+        }, 100)
       }),
     ])
   } catch (error) {
