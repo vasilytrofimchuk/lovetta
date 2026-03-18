@@ -9,7 +9,7 @@ function setViewportHeight() {
   // When keyboard is open, visualViewport doesn't account for the
   // autocomplete/prediction bar — subtract extra so input bars clear it
   if (keyboardVisible && nextHeight < window.innerHeight) {
-    nextHeight -= 10
+    nextHeight -= 44
   }
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.round(nextHeight)}px`)
 }
