@@ -930,6 +930,29 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: 'v37_ios_tip_intents',
+    fn: async (pool) => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ios_tip_intents (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          companion_id UUID REFERENCES user_companions(id) ON DELETE SET NULL,
+          product_id TEXT NOT NULL,
+          amount INTEGER NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'expired')),
+          revenuecat_event_id TEXT,
+          tip_id INTEGER REFERENCES tips(id) ON DELETE SET NULL,
+          expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '30 minutes',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          completed_at TIMESTAMPTZ
+        );
+        CREATE INDEX IF NOT EXISTS idx_ios_tip_intents_user ON ios_tip_intents(user_id);
+        CREATE INDEX IF NOT EXISTS idx_ios_tip_intents_pending ON ios_tip_intents(user_id, product_id, created_at DESC) WHERE status = 'pending';
+      `);
+    },
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

@@ -21,7 +21,7 @@ function getGradient(name) {
   return GRADIENT_COLORS[Math.abs(hash) % GRADIENT_COLORS.length];
 }
 
-export default function CompanionSheet({ companion, onClose, onReport, onUpdate, onDelete }) {
+export default function CompanionSheet({ companion, onClose, onReport, onUpdate, onDelete, onTipSuccess }) {
   const [from, to] = getGradient(companion?.name || '');
   const { playingId, play: playVoice } = useVoicePreview();
   const [tipLoading, setTipLoading] = useState(null);
@@ -47,7 +47,11 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
   const handleTip = async (amount) => {
     setTipLoading(amount);
     try {
-      await startTipCheckout(amount, companion.id);
+      const result = await startTipCheckout(amount, companion.id);
+      if (result?.status === 'completed') {
+        onTipSuccess?.(result);
+        onClose?.();
+      }
     } catch (err) {
       alert(getErrorMessage(err));
     } finally {

@@ -89,6 +89,7 @@ export default function ChatPage() {
         scrollTrigger={scrollTrigger}
         tipPromoMessage={tipPromoMessage}
         onDismissTip={dismissTip}
+        onTipSuccess={loadChat}
         companionId={companionId}
         mediaLoading={mediaLoading}
         mediaLoadingType={mediaLoadingType}
@@ -116,6 +117,7 @@ export default function ChatPage() {
           onReport={() => { setShowSheet(false); setShowReport(true); }}
           onUpdate={(updated) => setCompanion(updated)}
           onDelete={() => navigate('/')}
+          onTipSuccess={loadChat}
         />
       )}
 

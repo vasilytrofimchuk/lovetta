@@ -65,9 +65,10 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
           ? (o.annual || o.availablePackages?.find(p => p.identifier?.includes('year') || p.identifier?.includes('annual')))
           : (o.monthly || o.availablePackages?.find(p => p.identifier?.includes('month')))
         if (!pkg) throw new Error('Package not available')
-        const { purchasePackage } = await import('../lib/revenuecat')
+        const { purchasePackage, waitForSubscriptionSync } = await import('../lib/revenuecat')
         await purchasePackage(pkg)
-        onSuccess?.()
+        const synced = await waitForSubscriptionSync()
+        onSuccess?.(synced)
       } else {
         const { data } = await api.post('/api/billing/subscribe', { plan })
         window.location.href = data.url
@@ -83,9 +84,10 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
   const handleRestore = async () => {
     setRestoring(true)
     try {
-      const { restorePurchases } = await import('../lib/revenuecat')
+      const { restorePurchases, waitForSubscriptionSync } = await import('../lib/revenuecat')
       await restorePurchases()
-      onSuccess?.()
+      const synced = await waitForSubscriptionSync()
+      onSuccess?.(synced)
     } catch (err) {
       alert(getErrorMessage(err))
     } finally {

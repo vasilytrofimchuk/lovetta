@@ -591,3 +591,12 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Frequency controls max messages per companion per day: low=1, normal=2, high=3.
 - Added timezone capture via ip-api.com on registration and country-based backfill for existing users.
 - Files: migrate.js (v36), geo.js, auth-api.js, user-api.js, proactive.js, Profile.jsx.
+
+## Real-Device iOS Billing Test Coverage — IN PROGRESS
+- Log the task in `plan.md` and `PROGRESS.md` before code changes and keep both files current through completion.
+- Fix RevenueCat backend parity for iOS billing: replace the broken subscription upsert path, add webhook idempotency, and add native tip-intent persistence so iOS tips can carry `companion_id`.
+- Extend billing APIs with native iOS tip-intent create/poll endpoints and expose `paymentProvider` in billing status so the app can differentiate RevenueCat from Stripe.
+- Update the native iOS subscription and tip flows to wait for backend sync before dismissing the paywall or tip state, and make "Manage Subscription" provider-aware inside the app.
+- Add dedicated Playwright API coverage for RevenueCat webhooks and iOS tip-intent flows in the `api` bucket.
+- Add an iOS `AppUITests` target for real-device navigation coverage of pricing, restore purchases, chat tip promo, companion sheet tips, and profile subscription state.
+- Add a manual sandbox runbook for real-device App Store validation on production, including subscription lifecycle checks, all four tip SKUs, and cleanup guidance for test data.

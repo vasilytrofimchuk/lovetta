@@ -8,7 +8,10 @@ const { authenticate } = require('./auth-middleware');
 const {
   createSubscriptionCheckout,
   createTipCheckout,
+  createIosTipIntent,
   createPortalSession,
+  getIosTipIntent,
+  getPaymentProvider,
   getUserSubscription,
   isSubscriptionActive,
   TIP_AMOUNTS,
@@ -26,6 +29,7 @@ router.get('/status', authenticate, async (req, res) => {
       hasSubscription: active,
       plan: sub?.plan || null,
       status: sub?.status || null,
+      paymentProvider: getPaymentProvider(sub),
       currentPeriodEnd: sub?.current_period_end || null,
       trialEndsAt: sub?.trial_ends_at || null,
       stripeCustomerId: sub?.stripe_customer_id || null,
@@ -74,6 +78,72 @@ router.post('/tip', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[billing] tip error:', err.message);
     res.status(500).json({ error: 'Failed to create tip session' });
+  }
+});
+
+// -- POST /api/billing/ios/tip-intents --------------------
+router.post('/ios/tip-intents', authenticate, async (req, res) => {
+  try {
+    const { productId, amount, companionId } = req.body || {};
+    const amountCents = parseInt(amount, 10);
+
+    if (!productId || typeof productId !== 'string') {
+      return res.status(400).json({ error: 'Missing RevenueCat productId' });
+    }
+    if (!TIP_AMOUNTS.includes(amountCents)) {
+      return res.status(400).json({ error: `Invalid amount. Use: ${TIP_AMOUNTS.join(', ')} (in cents)` });
+    }
+
+    const pool = getPool();
+    if (!pool) return res.status(500).json({ error: 'Database not available' });
+
+    if (companionId) {
+      const { rows } = await pool.query(
+        'SELECT id FROM user_companions WHERE id = $1 AND user_id = $2',
+        [companionId, req.userId]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Companion not found' });
+      }
+    }
+
+    const intent = await createIosTipIntent(req.userId, {
+      productId: productId.trim(),
+      amount: amountCents,
+      companionId: companionId || null,
+    });
+
+    res.json({
+      intentId: intent.id,
+      status: intent.status,
+      expiresAt: intent.expires_at,
+    });
+  } catch (err) {
+    console.error('[billing] ios tip intent create error:', err.message);
+    res.status(500).json({ error: 'Failed to create iOS tip intent' });
+  }
+});
+
+// -- GET /api/billing/ios/tip-intents/:id -----------------
+router.get('/ios/tip-intents/:id', authenticate, async (req, res) => {
+  try {
+    const intent = await getIosTipIntent(req.userId, req.params.id);
+    if (!intent) {
+      return res.status(404).json({ error: 'Tip intent not found' });
+    }
+
+    res.json({
+      intentId: intent.id,
+      status: intent.status,
+      companionId: intent.companion_id,
+      amount: intent.amount,
+      completedAt: intent.completed_at,
+      expiresAt: intent.expires_at,
+      tipId: intent.tip_id || null,
+    });
+  } catch (err) {
+    console.error('[billing] ios tip intent status error:', err.message);
+    res.status(500).json({ error: 'Failed to load iOS tip intent' });
   }
 });
 

@@ -656,3 +656,15 @@
 - [x] Rewrite proactive.js: timezone-aware slots (morning/evening/random), frequency config (low/normal/high), slot-specific prompts
 - [x] Add frequency selector (segmented control) to Profile page below proactive toggle
 - [ ] Run tests
+
+## Real-Device iOS Billing Test Coverage
+- [x] Update `plan.md` and `PROGRESS.md` for the iOS billing test-coverage task
+- [ ] Fix RevenueCat subscription handling and webhook idempotency
+- [ ] Add native iOS tip-intent persistence and billing API endpoints
+- [ ] Update native subscription/tip UI flows to wait for backend sync and use provider-aware management
+- [ ] Add Playwright API coverage for RevenueCat and native tip intents
+- [ ] Add iOS `AppUITests` target for billing entry-point coverage
+- [ ] Add manual sandbox validation runbook for production iOS billing
+- [ ] Run `npm run test:e2e:api`
+- [ ] Run native iOS test/build verification
+- [ ] Update `plan.md` and `PROGRESS.md` with final status and notes

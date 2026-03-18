@@ -166,18 +166,22 @@ function parseCompanionEmailId(address) {
  * Returns the Message-ID for threading.
  */
 async function sendCompanionEmail({ companionName, companionId, toEmail, messageContent, conversationId, inReplyTo }) {
-  // Strip *context text* prefix from message
-  const plainText = (messageContent || '').replace(/^\*[^*]+\*\s*/, '');
+  // Strip all *scene/action text* from message
+  const plainText = (messageContent || '').replace(/\*[^*]+\*\s*/g, '').trim();
   const fromAddr = companionEmailAddress(companionName, companionId);
   const msgId = `<conv-${conversationId}-${Date.now()}@${COMPANION_EMAIL_DOMAIN}>`;
 
   const emailHeaders = { 'Message-ID': msgId };
   if (inReplyTo) emailHeaders['In-Reply-To'] = inReplyTo;
 
+  // Use first few words of message as subject (more engaging than just the name)
+  const words = plainText.split(/\s+/).slice(0, 6).join(' ');
+  const subject = words.length > 3 ? (words.length < plainText.length ? words + '...' : words) : companionName;
+
   await sendEmail({
     from: `${companionName} <${fromAddr}>`,
     to: toEmail,
-    subject: `${companionName}`,
+    subject,
     text: plainText,
     html: `<p>${plainText.replace(/\n/g, '<br>')}</p>`,
     headers: emailHeaders,

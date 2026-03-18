@@ -34,7 +34,7 @@ export default function Pricing() {
   }
 
   const handlePortal = async () => {
-    if (isAppStore()) {
+    if (subscription?.paymentProvider === 'revenuecat') {
       window.location.href = 'https://apps.apple.com/account/subscriptions'
       return
     }

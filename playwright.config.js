@@ -22,7 +22,7 @@ module.exports = defineConfig({
     },
     {
       name: 'api',
-      testMatch: ['tracking.test.js', 'admin.test.js', 'auth.test.js'],
+      testMatch: ['tracking.test.js', 'admin.test.js', 'auth.test.js', 'ios-billing.test.js'],
     },
     {
       name: 'ai',

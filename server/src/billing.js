@@ -24,6 +24,7 @@ const PLANS = {
 };
 
 const TIP_AMOUNTS = [999, 1999, 4999, 9999]; // cents
+const IOS_TIP_INTENT_LIFETIME_MINUTES = 30;
 
 // -- Checkout sessions ------------------------------------
 
@@ -84,6 +85,145 @@ async function createPortalSession(customerId) {
   return session;
 }
 
+function getPaymentProvider(sub) {
+  if (!sub) return null;
+  if (sub.payment_provider) return sub.payment_provider;
+  if (sub.stripe_customer_id || sub.stripe_subscription_id) return 'stripe';
+  return null;
+}
+
+async function createIosTipIntent(userId, { productId, amount, companionId = null }) {
+  const pool = getPool();
+  if (!pool) throw new Error('Database not available');
+
+  await pool.query(
+    `UPDATE ios_tip_intents
+        SET status = 'expired', updated_at = NOW()
+      WHERE user_id = $1
+        AND status = 'pending'
+        AND expires_at <= NOW()`,
+    [userId]
+  );
+
+  const { rows } = await pool.query(
+    `INSERT INTO ios_tip_intents (
+        user_id, companion_id, product_id, amount, expires_at
+      ) VALUES (
+        $1, $2, $3, $4, NOW() + ($5 || ' minutes')::interval
+      )
+      RETURNING id, user_id, companion_id, product_id, amount, status, expires_at, created_at, completed_at`,
+    [userId, companionId, productId, amount, String(IOS_TIP_INTENT_LIFETIME_MINUTES)]
+  );
+
+  return rows[0] || null;
+}
+
+async function getIosTipIntent(userId, intentId) {
+  const pool = getPool();
+  if (!pool) throw new Error('Database not available');
+
+  await pool.query(
+    `UPDATE ios_tip_intents
+        SET status = 'expired', updated_at = NOW()
+      WHERE id = $1
+        AND user_id = $2
+        AND status = 'pending'
+        AND expires_at <= NOW()`,
+    [intentId, userId]
+  );
+
+  const { rows } = await pool.query(
+    `SELECT id, user_id, companion_id, product_id, amount, status, expires_at, created_at, completed_at, tip_id
+       FROM ios_tip_intents
+      WHERE id = $1 AND user_id = $2`,
+    [intentId, userId]
+  );
+  return rows[0] || null;
+}
+
+async function findPendingIosTipIntent(client, userId, productId) {
+  const { rows } = await client.query(
+    `SELECT id, companion_id, amount
+       FROM ios_tip_intents
+      WHERE user_id = $1
+        AND product_id = $2
+        AND status = 'pending'
+        AND expires_at > NOW()
+      ORDER BY created_at DESC
+      LIMIT 1
+      FOR UPDATE`,
+    [userId, productId]
+  );
+  return rows[0] || null;
+}
+
+async function completeIosTipIntent(client, intentId, { revenuecatEventId, tipId }) {
+  await client.query(
+    `UPDATE ios_tip_intents
+        SET status = 'completed',
+            revenuecat_event_id = $2,
+            tip_id = $3,
+            completed_at = NOW(),
+            updated_at = NOW()
+      WHERE id = $1`,
+    [intentId, revenuecatEventId, tipId]
+  );
+}
+
+async function markRevenueCatEventProcessed(pool, eventId, eventType) {
+  if (!eventId) return true;
+  const { rowCount } = await pool.query(
+    `INSERT INTO billing_events (event_id, event_type)
+      VALUES ($1, $2)
+      ON CONFLICT (event_id) DO NOTHING`,
+    [`rc:${eventId}`, `revenuecat:${eventType}`]
+  );
+  return rowCount > 0;
+}
+
+async function getLatestRevenueCatSubscription(pool, userId) {
+  const { rows } = await pool.query(
+    `SELECT *
+       FROM subscriptions
+      WHERE user_id = $1 AND payment_provider = 'revenuecat'
+      ORDER BY updated_at DESC, created_at DESC
+      LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
+}
+
+async function upsertRevenueCatSubscription(pool, { userId, plan, status = 'active', subscriberId = null, expiresAt = null }) {
+  const existing = await getLatestRevenueCatSubscription(pool, userId);
+
+  if (existing) {
+    const { rows } = await pool.query(
+      `UPDATE subscriptions
+          SET plan = $2,
+              status = $3,
+              payment_provider = 'revenuecat',
+              revenuecat_id = COALESCE($4, revenuecat_id),
+              current_period_end = COALESCE($5, current_period_end),
+              updated_at = NOW()
+        WHERE id = $1
+        RETURNING *`,
+      [existing.id, plan, status, subscriberId, expiresAt]
+    );
+    return rows[0] || existing;
+  }
+
+  const { rows } = await pool.query(
+    `INSERT INTO subscriptions (
+        user_id, plan, status, payment_provider, revenuecat_id, current_period_end, updated_at
+      ) VALUES (
+        $1, $2, $3, 'revenuecat', $4, $5, NOW()
+      )
+      RETURNING *`,
+    [userId, plan, status, subscriberId, expiresAt]
+  );
+  return rows[0] || null;
+}
+
 // -- Tip thank-you message (AI-generated in companion's voice) ---
 
 async function insertTipThankYou(pool, userId, companionId) {
@@ -120,16 +260,21 @@ Response format: Always start with a brief action or emotional context in *aster
 
   const moods = ['deeply emotional and grateful', 'flirty and teasing, promising a reward', 'over-the-top excited and playful', 'intimate and whispered, pulling him close', 'sassy and confident, impressed by his generosity', 'warm and loving, reflecting on how special he is'];
   const mood = moods[Math.floor(Math.random() * moods.length)];
+  const fallbackMsg = "*eyes light up with genuine surprise* Oh my god, you're so sweet! That just made my whole day... you have no idea how much this means to me.";
 
   let msg;
-  try {
-    const result = await chatCompletion(systemPrompt, [
-      { role: 'user', content: `[The user just sent you a generous gift to support you. React in your own unique way. Be ${mood}. You MUST start with a brief action in *asterisks* like *throws arms around you* then your message. Write 2-3 sentences max. Thank him warmly in YOUR voice and style. Do NOT mention specific money amounts. Stay fully in character.]` },
-    ], { model: 'thedrummer/rocinante-12b' });
-    msg = result.content;
-  } catch (err) {
-    console.warn('[billing] AI thank-you generation failed, using fallback:', err.message);
-    msg = "*eyes light up with genuine surprise* Oh my god, you're so sweet! That just made my whole day... you have no idea how much this means to me.";
+  if (process.env.NODE_ENV === 'test') {
+    msg = fallbackMsg;
+  } else {
+    try {
+      const result = await chatCompletion(systemPrompt, [
+        { role: 'user', content: `[The user just sent you a generous gift to support you. React in your own unique way. Be ${mood}. You MUST start with a brief action in *asterisks* like *throws arms around you* then your message. Write 2-3 sentences max. Thank him warmly in YOUR voice and style. Do NOT mention specific money amounts. Stay fully in character.]` },
+      ], { model: 'thedrummer/rocinante-12b' });
+      msg = result.content;
+    } catch (err) {
+      console.warn('[billing] AI thank-you generation failed, using fallback:', err.message);
+      msg = fallbackMsg;
+    }
   }
 
   // Parse context text from asterisks
@@ -350,7 +495,7 @@ async function getUserSubscription(userId) {
   if (!pool) return null;
 
   const { rows } = await pool.query(
-    `SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    `SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY updated_at DESC, created_at DESC LIMIT 1`,
     [userId]
   );
   return rows[0] || null;
@@ -388,6 +533,10 @@ async function handleRevenueCatWebhook(body, authHeader) {
   const appUserId = event.app_user_id; // Our user ID (set via Purchases.logIn)
   const productId = event.product_id;
   const subscriberId = event.subscriber_id || event.original_app_user_id;
+  const processed = await markRevenueCatEventProcessed(pool, event.id, rcType);
+  if (!processed) {
+    return { status: 'duplicate', type: rcType };
+  }
 
   if (!appUserId || appUserId.startsWith('$RCAnonymousID')) {
     console.warn('[revenuecat] Skipping anonymous user event:', rcType);
@@ -402,7 +551,7 @@ async function handleRevenueCatWebhook(body, authHeader) {
 
   // Determine period end from event
   const expiresAt = event.expiration_at_ms
-    ? new Date(event.expiration_at_ms)
+    ? new Date(Number(event.expiration_at_ms))
     : null;
 
   switch (rcType) {
@@ -410,15 +559,13 @@ async function handleRevenueCatWebhook(body, authHeader) {
     case 'RENEWAL':
     case 'PRODUCT_CHANGE':
     case 'UNCANCELLATION': {
-      await pool.query(
-        `INSERT INTO subscriptions (user_id, plan, status, payment_provider, revenuecat_id, current_period_end, updated_at)
-         VALUES ($1, $2, 'active', 'revenuecat', $3, $4, NOW())
-         ON CONFLICT ON CONSTRAINT subscriptions_user_id_key DO UPDATE SET
-           plan = $2, status = 'active', payment_provider = 'revenuecat',
-           revenuecat_id = COALESCE($3, subscriptions.revenuecat_id),
-           current_period_end = COALESCE($4, subscriptions.current_period_end), updated_at = NOW()`,
-        [userId, plan, subscriberId, expiresAt]
-      );
+      await upsertRevenueCatSubscription(pool, {
+        userId,
+        plan,
+        status: 'active',
+        subscriberId,
+        expiresAt,
+      });
       console.log(`[revenuecat] ${rcType}: user=${userId} plan=${plan}`);
 
       // Credit referral commission
@@ -430,21 +577,25 @@ async function handleRevenueCatWebhook(body, authHeader) {
     }
 
     case 'CANCELLATION': {
-      await pool.query(
-        `UPDATE subscriptions SET status = 'canceling', updated_at = NOW()
-         WHERE user_id = $1 AND payment_provider = 'revenuecat'`,
-        [userId]
-      );
+      await upsertRevenueCatSubscription(pool, {
+        userId,
+        plan,
+        status: 'canceling',
+        subscriberId,
+        expiresAt,
+      });
       console.log(`[revenuecat] Cancellation: user=${userId}`);
       break;
     }
 
     case 'EXPIRATION': {
-      await pool.query(
-        `UPDATE subscriptions SET status = 'canceled', updated_at = NOW()
-         WHERE user_id = $1 AND payment_provider = 'revenuecat'`,
-        [userId]
-      );
+      await upsertRevenueCatSubscription(pool, {
+        userId,
+        plan,
+        status: 'canceled',
+        subscriberId,
+        expiresAt,
+      });
       console.log(`[revenuecat] Expiration: user=${userId}`);
       break;
     }
@@ -455,10 +606,42 @@ async function handleRevenueCatWebhook(body, authHeader) {
         ? Math.round(event.price_in_purchased_currency * 100)
         : 0;
       if (amount > 0) {
-        await pool.query(
-          'INSERT INTO tips (user_id, amount, stripe_payment_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-          [userId, amount, `rc_${event.id || Date.now()}`]
-        );
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+
+          const intent = await findPendingIosTipIntent(client, userId, productId);
+          const companionId = intent?.companion_id || null;
+          const paymentId = `rc_${event.id || `${subscriberId}_${Date.now()}`}`;
+          const { rows } = await client.query(
+            `INSERT INTO tips (user_id, amount, stripe_payment_id, companion_id)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (stripe_payment_id) DO NOTHING
+             RETURNING id`,
+            [userId, amount, paymentId, companionId]
+          );
+
+          const tipId = rows[0]?.id || null;
+          if (intent?.id && tipId) {
+            await completeIosTipIntent(client, intent.id, {
+              revenuecatEventId: event.id || null,
+              tipId,
+            });
+          }
+
+          await client.query('COMMIT');
+
+          try { await resetTipCounter(userId, companionId); } catch (e) { console.warn('[revenuecat] resetTipCounter error:', e.message); }
+          try { await invalidateThresholdCache(userId); } catch (e) { console.warn('[revenuecat] cache invalidation error:', e.message); }
+          if (companionId) {
+            try { await insertTipThankYou(pool, userId, companionId); } catch (e) { console.warn('[revenuecat] thank-you error:', e.message); }
+          }
+        } catch (err) {
+          await client.query('ROLLBACK');
+          throw err;
+        } finally {
+          client.release();
+        }
         console.log(`[revenuecat] Tip: user=${userId} amount=${amount}`);
         try { await creditReferralCommission(pool, userId, 'tip', `rc_tip_${event.id || Date.now()}`, amount); } catch (e) { console.warn('[revenuecat] referral error:', e.message); }
       }
@@ -476,9 +659,12 @@ module.exports = {
   createSubscriptionCheckout,
   createTipCheckout,
   createPortalSession,
+  createIosTipIntent,
+  getIosTipIntent,
   handleWebhook,
   handleRevenueCatWebhook,
   getUserSubscription,
+  getPaymentProvider,
   isSubscriptionActive,
   TIP_AMOUNTS,
 };

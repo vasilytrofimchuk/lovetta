@@ -258,7 +258,7 @@ export default function Profile() {
               )}
               <button
                 onClick={() => {
-                  if (appStore) {
+                  if (subscription?.paymentProvider === 'revenuecat') {
                     window.location.href = 'https://apps.apple.com/account/subscriptions';
                   } else {
                     navigate('/pricing');

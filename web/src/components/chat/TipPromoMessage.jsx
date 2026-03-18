@@ -3,13 +3,17 @@ import { formatActions } from './MessageBubble';
 import { TIP_AMOUNTS, startTipCheckout } from '../../lib/tipCheckout';
 import { getErrorMessage } from '../../lib/api';
 
-export default function TipPromoMessage({ message, companionId, onDismiss }) {
+export default function TipPromoMessage({ message, companionId, onDismiss, onTipSuccess }) {
   const [tipLoading, setTipLoading] = useState(null);
 
   const handleTip = async (amount) => {
     setTipLoading(amount);
     try {
-      await startTipCheckout(amount, companionId);
+      const result = await startTipCheckout(amount, companionId);
+      if (result?.status === 'completed') {
+        onDismiss?.();
+        onTipSuccess?.(result);
+      }
     } catch (err) {
       alert(getErrorMessage(err));
     } finally {

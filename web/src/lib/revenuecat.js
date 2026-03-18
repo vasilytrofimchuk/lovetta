@@ -2,11 +2,18 @@
  * RevenueCat integration for iOS in-app purchases.
  * Only active inside Capacitor native builds.
  */
+import api from './api'
 import { isCapacitor } from './platform'
 
 let initialized = false
 
 const REVENUECAT_API_KEY = import.meta.env.VITE_REVENUECAT_IOS_KEY || ''
+const SYNC_TIMEOUT_MS = 45_000
+const SYNC_INTERVAL_MS = 1_500
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 /** Initialize RevenueCat — call once after user authenticates. */
 export async function initRevenueCat(userId) {
@@ -68,4 +75,37 @@ export async function hasActiveSubscription() {
   } catch {
     return false
   }
+}
+
+export async function waitForSubscriptionSync({ timeoutMs = SYNC_TIMEOUT_MS, intervalMs = SYNC_INTERVAL_MS } = {}) {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    const { data } = await api.get('/api/billing/status')
+    if (
+      data?.paymentProvider === 'revenuecat'
+      && ['active', 'canceling', 'trialing'].includes(data?.status)
+      && data?.hasSubscription
+    ) {
+      return data
+    }
+    await sleep(intervalMs)
+  }
+
+  throw new Error('Purchase completed, but billing sync is still pending. Please reopen the app or tap Restore Purchases.')
+}
+
+export async function waitForIosTipIntent(intentId, { timeoutMs = SYNC_TIMEOUT_MS, intervalMs = SYNC_INTERVAL_MS } = {}) {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    const { data } = await api.get(`/api/billing/ios/tip-intents/${intentId}`)
+    if (data?.status === 'completed') return data
+    if (data?.status === 'expired') {
+      throw new Error('Tip purchase did not sync in time. Please try again.')
+    }
+    await sleep(intervalMs)
+  }
+
+  throw new Error('Tip purchase completed, but billing sync is still pending. Please try again in a moment.')
 }

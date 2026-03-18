@@ -10,12 +10,18 @@ export const TIP_AMOUNTS = [
 
 export async function startTipCheckout(amount, companionId) {
   if (isAppStore()) {
-    // Use RevenueCat for native IAP
     const tip = TIP_AMOUNTS.find(t => t.amount === amount);
     if (!tip) throw new Error('Invalid tip amount');
-    const { purchaseProduct } = await import('./revenuecat');
+    const amountCents = Math.round(amount * 100);
+    const { data } = await api.post('/api/billing/ios/tip-intents', {
+      productId: tip.rcProductId,
+      amount: amountCents,
+      companionId,
+    });
+    const { purchaseProduct, waitForIosTipIntent } = await import('./revenuecat');
     await purchaseProduct(tip.rcProductId);
-    return; // Purchase handled natively, webhook syncs to server
+    const synced = await waitForIosTipIntent(data.intentId);
+    return { status: 'completed', intentId: data.intentId, tipId: synced.tipId || null };
   }
 
   // Stripe checkout for web
@@ -24,4 +30,5 @@ export async function startTipCheckout(amount, companionId) {
     companionId,
   });
   window.location.href = data.url;
+  return { status: 'redirected' };
 }
