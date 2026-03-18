@@ -61,10 +61,8 @@ export default function RealEmailPrompt() {
           type="email"
           value={email}
           onChange={e => setEmail(e.target.value)}
-          onFocus={e => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
           placeholder="your@email.com"
-          className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-bg border border-brand-border text-brand-text text-sm placeholder:text-brand-muted focus:outline-none focus:border-brand-accent"
-          style={{ fontSize: '16px' }}
+          className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-bg border border-brand-border text-brand-text text-base placeholder:text-brand-muted focus:outline-none focus:border-brand-accent"
         />
         <button
           type="submit"
