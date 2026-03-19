@@ -988,6 +988,10 @@ const MIGRATIONS = [
     name: 'v41_user_soft_delete',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`,
   },
+  {
+    name: 'v42_memory_last_extracted_msg',
+    sql: `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_extracted_message_id UUID`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

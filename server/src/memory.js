@@ -3,7 +3,7 @@
  *
  * Level 1: Recent messages (last 10) — handled in chat-api.js
  * Level 2: Conversation summaries — generated every ~20 messages
- * Level 3: Long-term facts — extracted every ~10 messages
+ * Level 3: Long-term facts — extracted every ~5 messages
  *
  * Memory processing runs fire-and-forget after each assistant message.
  */
@@ -13,13 +13,13 @@ const { trackConsumption } = require('./consumption');
 
 const EXTRACTION_THRESHOLD = 5;
 const SUMMARY_THRESHOLD = 20;
-const MAX_MEMORY_CHARS = 2000; // ~500 tokens hard cap
+const MAX_MEMORY_CHARS = 3000; // ~750 tokens hard cap
 
 // -- Build memory context for system prompt ----------------------
 
 /**
  * Build the memory section to inject into the companion's system prompt.
- * Returns formatted text with facts + summaries, capped at ~500 tokens.
+ * Returns formatted text with facts + summaries, capped at ~750 tokens.
  */
 async function buildMemoryContext(conversationId) {
   const pool = getPool();
@@ -103,7 +103,7 @@ async function processMemory(pool, conversationId, companionId, userId) {
   if (!rows[0]) return;
   const { messages_since_summary, messages_since_extraction } = rows[0];
 
-  // Fact extraction (every 10 messages)
+  // Fact extraction (every 5 messages)
   if (messages_since_extraction >= EXTRACTION_THRESHOLD) {
     try {
       await extractFacts(pool, conversationId, companionId, userId);
@@ -139,38 +139,78 @@ async function extractFacts(pool, conversationId, companionId, userId) {
     [conversationId]
   );
 
-  // Load last 15 messages
-  const { rows: messages } = await pool.query(
-    `SELECT id, role, content FROM messages
-     WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 15`,
+  // Get last_extracted_message_id to only process NEW messages
+  const { rows: convRows } = await pool.query(
+    'SELECT last_extracted_message_id FROM conversations WHERE id = $1',
     [conversationId]
   );
-  messages.reverse();
+  const lastExtractedId = convRows[0]?.last_extracted_message_id;
 
-  if (messages.length < 3) return; // not enough context
+  // Load user messages since last extraction (skip assistant fluff)
+  let messages;
+  if (lastExtractedId) {
+    const { rows } = await pool.query(
+      `SELECT id, content FROM messages
+       WHERE conversation_id = $1 AND role = 'user'
+       AND created_at > (SELECT created_at FROM messages WHERE id = $2)
+       ORDER BY created_at ASC LIMIT 30`,
+      [conversationId, lastExtractedId]
+    );
+    messages = rows;
+  } else {
+    // First extraction — get all user messages
+    const { rows } = await pool.query(
+      `SELECT id, content FROM messages
+       WHERE conversation_id = $1 AND role = 'user'
+       ORDER BY created_at ASC LIMIT 30`,
+      [conversationId]
+    );
+    messages = rows;
+  }
+
+  if (messages.length < 2) return; // not enough user messages
+
+  // Update last_extracted_message_id to the latest message in conversation
+  const { rows: latestMsg } = await pool.query(
+    `SELECT id FROM messages WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [conversationId]
+  );
+  if (latestMsg[0]) {
+    await pool.query(
+      'UPDATE conversations SET last_extracted_message_id = $1 WHERE id = $2',
+      [latestMsg[0].id, conversationId]
+    );
+  }
 
   const existingText = existingFacts.length > 0
-    ? `\nExisting known facts:\n${existingFacts.map(f => `- [${f.category}] ${f.fact}`).join('\n')}`
+    ? `\nAlready known facts (do NOT repeat these — only extract NEW facts):\n${existingFacts.map(f => `- [${f.category}] ${f.fact}`).join('\n')}`
     : '';
 
   // Strip roleplay formatting to reduce model's urge to roleplay
   const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
-  const messagesText = messages.map(m => `${m.role}: ${cleanMsg(m.content)}`).join('\n');
+  const messagesText = messages.map(m => `user: ${cleanMsg(m.content)}`).join('\n');
 
-  const systemPrompt = `You are a data extraction assistant. You are NOT a character — do NOT roleplay. Your ONLY job is to extract facts about the human user from the chat log below.
+  const systemPrompt = `You are a data extraction assistant. You are NOT a character — do NOT roleplay. Your ONLY job is to extract ALL personal facts about the human user from their messages below.
 
 OUTPUT FORMAT: Return a raw JSON array. No explanation, no commentary, no markdown. Just the JSON.
 
-CATEGORIES: identity, preferences, life, relationship, emotional
+CATEGORIES:
+- identity: name, age, gender, birthday, zodiac, nationality, location
+- preferences: favorite food, music, movies, hobbies, colors, seasons
+- life: job, education, pets, family, living situation, daily habits
+- relationship: how they feel about the companion, relationship dynamics
+- emotional: current mood, worries, hopes, dreams
 
 EXAMPLE OUTPUT:
-[{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User works as a teacher"},{"category":"preferences","fact":"User's favorite food is pizza"}]
+[{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User works as a teacher"},{"category":"preferences","fact":"User's favorite food is pizza"},{"category":"life","fact":"User has a cat named Whiskers"}]
 
 RULES:
-- Extract facts about the USER only (the "user:" messages), not the assistant
-- Keep each fact to one short sentence
-- If no facts found, return: []
-- Max 10 facts
+- Extract ALL facts from the user messages — do not skip any personal detail
+- Each fact = one short sentence starting with "User"
+- Include: names, numbers, places, dates, preferences, habits, relationships, jobs, pets, hobbies
+- If a user mentions ANY specific detail about themselves, extract it
+- If no new facts found, return: []
+- Max 15 facts per extraction
 ${existingText}`;
 
   const { plainChatCompletion } = require('./ai');
@@ -216,7 +256,7 @@ ${existingText}`;
 
   const VALID_CATEGORIES = new Set(['identity', 'preferences', 'life', 'relationship', 'emotional']);
 
-  for (const item of factsJson.slice(0, 10)) {
+  for (const item of factsJson.slice(0, 15)) {
     if (!item.category || !item.fact) continue;
     const category = String(item.category).toLowerCase().trim();
     const fact = String(item.fact).trim();
@@ -231,9 +271,9 @@ ${existingText}`;
     );
 
     // Simple dedup: if any existing fact starts with the same key phrase, update it
-    const keyPhrase = fact.split(/\s+(is|are|has|likes|works|prefers|lives|named)\s+/i)[0]?.toLowerCase();
+    const keyPhrase = fact.split(/\s+(is|are|has|likes|works|prefers|lives|named|plays|loves|drinks|studies|wants|moved|used|born)\s+/i)[0]?.toLowerCase();
     const match = existing.find(e => {
-      const eKey = e.fact.split(/\s+(is|are|has|likes|works|prefers|lives|named)\s+/i)[0]?.toLowerCase();
+      const eKey = e.fact.split(/\s+(is|are|has|likes|works|prefers|lives|named|plays|loves|drinks|studies|wants|moved|used|born)\s+/i)[0]?.toLowerCase();
       return eKey && keyPhrase && eKey === keyPhrase;
     });
 
@@ -244,8 +284,8 @@ ${existingText}`;
         [fact, lastMessageId, match.id]
       );
     } else {
-      // Cap facts per conversation to prevent unbounded growth
-      if (existing.length >= 5) {
+      // Cap facts per category — 8 per category (was 5)
+      if (existing.length >= 8) {
         // Remove oldest fact in this category to make room
         await pool.query(
           `DELETE FROM companion_memories WHERE id = (
@@ -287,10 +327,10 @@ async function generateSummary(pool, conversationId, companionId, userId) {
       ORDER BY created_at ASC LIMIT 30`;
     params = [conversationId, lastSummary[0].message_range_end];
   } else {
-    // Get oldest unsummarized messages (skip most recent 10 — those are in L1 context)
+    // First summary — skip the very first assistant message (template greeting noise)
     messagesQuery = `SELECT id, role, content FROM messages
       WHERE conversation_id = $1
-      ORDER BY created_at ASC LIMIT 30`;
+      ORDER BY created_at ASC LIMIT 30 OFFSET 1`;
     params = [conversationId];
   }
 
@@ -301,8 +341,8 @@ async function generateSummary(pool, conversationId, companionId, userId) {
   const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
   const messagesText = messages.map(m => `${m.role}: ${cleanMsg(m.content)}`).join('\n');
 
-  const systemPrompt = `TASK: Write a 2-3 sentence summary of the conversation below.
-RULES: Use third person ("The user", "the companion"). No roleplay. No quotes. No asterisks. Just plain factual sentences.
+  const systemPrompt = `TASK: Write a 2-3 sentence summary of the conversation below. Focus on what the USER shared about themselves and key topics discussed.
+RULES: Use third person ("The user", "the companion"). No roleplay. No quotes. No asterisks. Just plain factual sentences. Focus on USER's personal details and topics, not the companion's reactions.
 FORMAT: Return ONLY the summary text, nothing else.`;
 
   const { plainChatCompletion } = require('./ai');
