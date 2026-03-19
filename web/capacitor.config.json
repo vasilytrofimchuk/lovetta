@@ -3,6 +3,7 @@
   "appName": "Lovetta",
   "webDir": "ios-dist",
   "server": {
+    "url": "https://lovetta.ai/my/",
     "appendUserAgent": "Capacitor lovetta-ios"
   },
   "ios": {
