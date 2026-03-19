@@ -221,6 +221,19 @@ function VisitorTracker() {
 
 function AppRoutes() {
   const { loading } = useAuth()
+  const splashHidden = useRef(false)
+
+  useEffect(() => {
+    if (!loading && !splashHidden.current) {
+      splashHidden.current = true
+      if (isCapacitor()) {
+        import('@capacitor/splash-screen').then(({ SplashScreen }) => {
+          SplashScreen.hide({ fadeOutDuration: 200 })
+        }).catch(() => {})
+      }
+    }
+  }, [loading])
+
   if (loading) return <Loading />
 
   return (

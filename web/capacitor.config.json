@@ -12,6 +12,11 @@
     "backgroundColor": "#0f0a1a"
   },
   "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#0f0a1a",
+      "showSpinner": false
+    },
     "Keyboard": {
       "resize": "none",
       "style": "dark"

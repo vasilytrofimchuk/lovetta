@@ -18,6 +18,8 @@ PODS:
     - Capacitor
   - CapacitorPushNotifications (8.0.2):
     - Capacitor
+  - CapacitorSplashScreen (8.0.1):
+    - Capacitor
   - CapacitorVoiceRecorder (7.0.6):
     - Capacitor
   - CodetrixStudioCapacitorGoogleAuth (0.0.1):
@@ -46,6 +48,7 @@ DEPENDENCIES:
   - "CapacitorCordova (from `../../../node_modules/@capacitor/ios`)"
   - "CapacitorKeyboard (from `../../../node_modules/@capacitor/keyboard`)"
   - "CapacitorPushNotifications (from `../../../node_modules/@capacitor/push-notifications`)"
+  - "CapacitorSplashScreen (from `../../../node_modules/@capacitor/splash-screen`)"
   - CapacitorVoiceRecorder (from `../../../node_modules/capacitor-voice-recorder`)
   - "CodetrixStudioCapacitorGoogleAuth (from `../../../node_modules/@codetrix-studio/capacitor-google-auth`)"
   - "RevenuecatPurchasesCapacitor (from `../../../node_modules/@revenuecat/purchases-capacitor`)"
@@ -74,6 +77,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/@capacitor/keyboard"
   CapacitorPushNotifications:
     :path: "../../../node_modules/@capacitor/push-notifications"
+  CapacitorSplashScreen:
+    :path: "../../../node_modules/@capacitor/splash-screen"
   CapacitorVoiceRecorder:
     :path: "../../../node_modules/capacitor-voice-recorder"
   CodetrixStudioCapacitorGoogleAuth:
@@ -90,6 +95,7 @@ SPEC CHECKSUMS:
   CapacitorCordova: a9ac88d84a1f5280f33b349fe50fce1902683ac0
   CapacitorKeyboard: 867eb4b3c901d9bb5c3d0c93b546185d52484e19
   CapacitorPushNotifications: 5a1de4191a9fdbeacc84907313eede0bd59d2eb0
+  CapacitorSplashScreen: 4b46c72298db552b3c57ce021ef028b6dc7f1fa7
   CapacitorVoiceRecorder: 9158861be982f32d411769723a4d813d6ce46135
   CodetrixStudioCapacitorGoogleAuth: 9dcfabfb7dd804ad6231a1513bc6e81e620cbec6
   GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
@@ -99,6 +105,6 @@ SPEC CHECKSUMS:
   RevenueCat: c7310bad19cb96a1551c68045303e1faaa1942a5
   RevenuecatPurchasesCapacitor: 6b652e6e001224841fbfb9a97322c46f14d32504
 
-PODFILE CHECKSUM: 6da8283c515adc6782f6111d08a305d6e8620d38
+PODFILE CHECKSUM: 7ee4d78d9c9d559f24570fc98a5cbcc158224413
 
 COCOAPODS: 1.16.2
