@@ -33,4 +33,39 @@ post_install do |installer|
       config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
     end
   end
+
+  # Inject privacy manifests for third-party SDKs that don't include them.
+  # GoogleSignIn 6.x, GTMAppAuth 1.x, and GTMSessionFetcher 2.x lack
+  # PrivacyInfo.xcprivacy which Apple requires (ITMS-91061).
+  privacy_manifest = {
+    "NSPrivacyTracking" => false,
+    "NSPrivacyTrackingDomains" => [],
+    "NSPrivacyCollectedDataTypes" => [],
+    "NSPrivacyAccessedAPITypes" => []
+  }
+
+  pods_needing_manifest = ['GoogleSignIn', 'GTMAppAuth', 'GTMSessionFetcher']
+
+  installer.pods_project.targets.each do |target|
+    if pods_needing_manifest.include?(target.name)
+      resource_bundle_target = target.resources_build_phase
+      pod_dir = installer.sandbox.pod_dir(target.name)
+      privacy_file = pod_dir + "PrivacyInfo.xcprivacy"
+
+      unless privacy_file.exist?
+        require 'cfpropertylist'
+        plist = CFPropertyList::List.new
+        plist.value = CFPropertyList.guess(privacy_manifest)
+        plist.save(privacy_file.to_s, CFPropertyList::List::FORMAT_XML)
+        puts "Created PrivacyInfo.xcprivacy for #{target.name}"
+      end
+
+      # Add the file to the resources build phase if not already there
+      file_ref = installer.pods_project.new_file(privacy_file.to_s)
+      unless resource_bundle_target.files_references.include?(file_ref)
+        resource_bundle_target.add_file_reference(file_ref)
+        puts "Added PrivacyInfo.xcprivacy to #{target.name} resources"
+      end
+    end
+  end
 end
