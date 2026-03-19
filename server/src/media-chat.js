@@ -4,7 +4,7 @@
  */
 
 const { getPool } = require('./db');
-const { generateCharacterImage, generateVideo } = require('./ai');
+const ai = require('./ai');
 
 // -- Tag vocabulary for reuse matching ----------------------------
 
@@ -16,6 +16,37 @@ const TAG_VOCABULARY = [
   'restaurant', 'shirt', 'pajamas', 'towel', 'sporty', 'elegant',
   'playful', 'seductive', 'shy', 'flirty', 'confident', 'lazy',
 ];
+
+// Synonyms: tag → related tags to add (bidirectional groups)
+const TAG_SYNONYMS = {
+  bed:       ['bedroom'],
+  bedroom:   ['bed'],
+  beach:     ['pool', 'outdoor', 'bikini'],
+  pool:      ['beach', 'outdoor', 'bikini'],
+  bikini:    ['beach', 'pool'],
+  bath:      ['towel'],
+  towel:     ['bath'],
+  lingerie:  ['nightgown', 'seductive'],
+  nightgown: ['lingerie', 'bed', 'bedroom'],
+  couch:     ['bed', 'lazy'],
+  lazy:      ['couch', 'bed', 'morning'],
+  morning:   ['bed', 'bedroom', 'lazy'],
+  evening:   ['sunset', 'bar'],
+  sunset:    ['evening', 'outdoor'],
+  garden:    ['outdoor'],
+  outdoor:   ['garden'],
+  gym:       ['sporty'],
+  sporty:    ['gym'],
+  seductive: ['lingerie', 'flirty'],
+  flirty:    ['playful', 'seductive'],
+  playful:   ['flirty', 'smile'],
+  smile:     ['playful', 'selfie'],
+  selfie:    ['closeup', 'smile'],
+  closeup:   ['selfie'],
+  shy:       ['smile'],
+  elegant:   ['dress'],
+  dress:     ['elegant'],
+};
 
 // -- Tag parsing --------------------------------------------------
 
@@ -44,7 +75,7 @@ function parseMediaTags(text) {
 // -- Tag extraction -----------------------------------------------
 
 /**
- * Extract matching tags from a scene description.
+ * Extract matching tags from a scene description, then expand with synonyms.
  */
 function extractTags(description) {
   const lower = description.toLowerCase();
@@ -53,25 +84,34 @@ function extractTags(description) {
   if (/look(ing|s)?\s*(at\s*)?camera/i.test(lower)) matched.push('selfie');
   if (/lying|laying|stretched/i.test(lower)) matched.push('bed');
   if (/swim|water/i.test(lower) && !matched.includes('pool') && !matched.includes('beach')) matched.push('pool');
-  // Deduplicate
-  return [...new Set(matched)].slice(0, 5);
+  // Expand with synonyms for better reuse matching
+  const expanded = new Set(matched);
+  for (const tag of matched) {
+    const syns = TAG_SYNONYMS[tag];
+    if (syns) syns.forEach(s => expanded.add(s));
+  }
+  return [...expanded].slice(0, 8);
 }
 
 // -- Reuse lookup -------------------------------------------------
 
 /**
  * Find existing media that matches the requested context.
- * Requires at least 2 overlapping tags to reuse.
+ * Looks across ALL companions that share the same avatar_url (same girl),
+ * not just the current companion. Requires at least 2 overlapping tags.
  */
 async function findReusableMedia(pool, companionId, type, tags) {
   if (!tags.length) return null;
 
+  // Find all companions that share the same avatar (same base image = same girl)
   const { rows } = await pool.query(
-    `SELECT id, media_url, media_type, tags,
-       (SELECT COUNT(*) FROM unnest(tags) t WHERE t = ANY($3)) AS overlap
-     FROM companion_media
-     WHERE companion_id = $1 AND media_type = $2 AND tags && $3
-     ORDER BY overlap DESC, created_at DESC
+    `SELECT cm.id, cm.media_url, cm.media_type, cm.tags,
+       (SELECT COUNT(*) FROM unnest(cm.tags) t WHERE t = ANY($3)) AS overlap
+     FROM companion_media cm
+     JOIN user_companions uc_media ON uc_media.id = cm.companion_id
+     JOIN user_companions uc_self  ON uc_self.avatar_url = uc_media.avatar_url
+     WHERE uc_self.id = $1 AND cm.media_type = $2 AND cm.tags && $3
+     ORDER BY overlap DESC, cm.created_at DESC
      LIMIT 1`,
     [companionId, type, tags]
   );
@@ -142,7 +182,7 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
 
   // Generate new
   if (type === 'image') {
-    const result = await generateCharacterImage(companion.avatar_url, description, {
+    const result = await ai.generateCharacterImage(companion.avatar_url, description, {
       userId: opts.userId,
       companionId: companion.id,
       platform: opts.platform,
@@ -170,7 +210,7 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
       sourceImageUrl = sourceImage.media_url;
     } else {
       // Generate source image first
-      const imgResult = await generateCharacterImage(companion.avatar_url, description, {
+      const imgResult = await ai.generateCharacterImage(companion.avatar_url, description, {
         userId: opts.userId,
         companionId: companion.id,
         platform: opts.platform,
@@ -187,7 +227,7 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
     }
 
     // Step 2: Generate video from image
-    const videoResult = await generateVideo(sourceImageUrl, description, {
+    const videoResult = await ai.generateVideo(sourceImageUrl, description, {
       userId: opts.userId,
       companionId: companion.id,
       platform: opts.platform,
@@ -211,5 +251,7 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
 module.exports = {
   parseMediaTags,
   extractTags,
+  findReusableMedia,
+  checkRateLimit,
   generateOrReuseMedia,
 };

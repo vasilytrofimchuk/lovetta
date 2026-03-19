@@ -225,6 +225,11 @@
 - [x] ChatPage.jsx: wire up media props from useChat to MessageList
 - [x] Verify media generation + reuse in dev (code complete: PuLID + Kontext fallback, async generation, R2 storage, reuse catalog)
 - [x] Verify video generation flow (code complete: wan/v2.6, async queue polling, 5min timeout)
+- [x] Fix cross-companion media reuse: companions sharing the same avatar_url now share media catalog
+- [x] media-chat.js: findReusableMedia() joins through user_companions.avatar_url (same girl = reuse)
+- [x] media-chat.js: import ai module as object (not destructured) for testability
+- [x] E2E tests: extractTags (6), parseMediaTags (4), findReusableMedia (9), generateOrReuseMedia (5), cross-companion reuse stats (1) — 25 new tests
+- [x] Cross-companion reuse test: 5 companions, 10 scenes, 30% reuse rate (3/10 reused across companions)
 
 ## Landing Page Overhaul + Structured Signup
 

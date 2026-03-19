@@ -1,10 +1,13 @@
 /**
  * Tests for AI integration: content levels, age guard, consumption tracking,
- * tip threshold, admin economics, and image generation constraints.
+ * tip threshold, admin economics, image generation constraints, and media reuse.
  *
  * External APIs (OpenRouter, fal.ai) are NOT called — we test the modules
  * directly and the admin/billing integration end-to-end.
  */
+
+// Ensure test env before any module requires getPool()
+process.env.NODE_ENV = 'test';
 
 const { test, expect } = require('@playwright/test');
 const { BASE, adminHeaders, createTestUser } = require('./helpers');
@@ -678,5 +681,480 @@ test.describe('Age Guard — regeneration prompt', () => {
     expect(STRICT_REGENERATE_PROMPT).toContain('adult woman');
     expect(STRICT_REGENERATE_PROMPT).toContain('NEVER mention any age below 18');
     expect(STRICT_REGENERATE_PROMPT).toContain('NEVER reference school');
+  });
+});
+
+// ============================================================
+// Media Tags — extractTags
+// ============================================================
+
+test.describe('Media Tags — extractTags', () => {
+  const { extractTags } = require('../server/src/media-chat');
+
+  test('extracts known tags from description', () => {
+    const tags = extractTags('a selfie in the bedroom with a smile');
+    expect(tags).toContain('selfie');
+    expect(tags).toContain('bedroom');
+    expect(tags).toContain('smile');
+  });
+
+  test('extracts beach and bikini tags', () => {
+    const tags = extractTags('wearing a bikini at the beach, sunset');
+    expect(tags).toContain('bikini');
+    expect(tags).toContain('beach');
+    expect(tags).toContain('sunset');
+  });
+
+  test('detects "looking at camera" as selfie', () => {
+    const tags = extractTags('looking at camera in the kitchen');
+    expect(tags).toContain('selfie');
+    expect(tags).toContain('kitchen');
+  });
+
+  test('detects "lying" as bed', () => {
+    const tags = extractTags('lying on a couch in lingerie');
+    expect(tags).toContain('bed');
+    expect(tags).toContain('couch');
+    expect(tags).toContain('lingerie');
+  });
+
+  test('caps at 8 tags (with synonym expansion) and deduplicates', () => {
+    const tags = extractTags('selfie bedroom beach pool gym lingerie dress casual closeup smile');
+    expect(tags.length).toBeLessThanOrEqual(8);
+    expect(new Set(tags).size).toBe(tags.length);
+  });
+
+  test('expands tags with synonyms', () => {
+    const tags = extractTags('lying in bed');
+    expect(tags).toContain('bed');
+    expect(tags).toContain('bedroom'); // synonym of bed
+  });
+
+  test('beach expands to pool and outdoor', () => {
+    const tags = extractTags('at the beach');
+    expect(tags).toContain('beach');
+    expect(tags).toContain('pool');    // synonym
+    expect(tags).toContain('outdoor'); // synonym
+  });
+
+  test('returns empty array for unrecognized input', () => {
+    const tags = extractTags('something completely unrelated to any vocabulary');
+    expect(tags).toEqual([]);
+  });
+});
+
+// ============================================================
+// Media Tags — parseMediaTags
+// ============================================================
+
+test.describe('Media Tags — parseMediaTags', () => {
+  const { parseMediaTags } = require('../server/src/media-chat');
+
+  test('parses SEND_IMAGE tag', () => {
+    const { cleanText, mediaRequest } = parseMediaTags('Here is a photo for you! [SEND_IMAGE: selfie in bedroom]');
+    expect(cleanText).toBe('Here is a photo for you!');
+    expect(mediaRequest).toEqual({ type: 'image', description: 'selfie in bedroom' });
+  });
+
+  test('parses SEND_VIDEO tag', () => {
+    const { cleanText, mediaRequest } = parseMediaTags('Watch this! [SEND_VIDEO: dancing at the beach]');
+    expect(cleanText).toBe('Watch this!');
+    expect(mediaRequest).toEqual({ type: 'video', description: 'dancing at the beach' });
+  });
+
+  test('returns null when no media tags', () => {
+    const { cleanText, mediaRequest } = parseMediaTags('Just a normal message, no images here.');
+    expect(cleanText).toBe('Just a normal message, no images here.');
+    expect(mediaRequest).toBeNull();
+  });
+
+  test('is case insensitive', () => {
+    const { mediaRequest } = parseMediaTags('[send_image: casual outfit]');
+    expect(mediaRequest).toEqual({ type: 'image', description: 'casual outfit' });
+  });
+});
+
+// ============================================================
+// Media Reuse — findReusableMedia (DB-backed)
+// ============================================================
+
+test.describe('Media Reuse — findReusableMedia', () => {
+  const { Pool } = require('pg');
+  const { findReusableMedia } = require('../server/src/media-chat');
+
+  let pool;
+  let testUserId;
+  let companionAId;
+  let companionBId; // same avatar as A (same girl)
+  let companionCId; // different avatar (different girl)
+
+  test.beforeAll(async () => {
+    pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL || 'postgres://localhost:5432/lovetta_test' });
+
+    // Create test user
+    const userRes = await pool.query(
+      `INSERT INTO users (email, password_hash, display_name, email_verified, birth_month, birth_year)
+       VALUES ($1, 'hash', 'MediaTestUser', true, 1, 2000) RETURNING id`,
+      [`conativer+media_reuse_${Date.now()}@gmail.com`]
+    );
+    testUserId = userRes.rows[0].id;
+
+    // Companion A — the original
+    const compARes = await pool.query(
+      `INSERT INTO user_companions (user_id, name, personality, avatar_url, age)
+       VALUES ($1, 'Luna A', 'flirty', 'https://example.com/avatar-shared.jpg', 22) RETURNING id`,
+      [testUserId]
+    );
+    companionAId = compARes.rows[0].id;
+
+    // Companion B — SAME avatar as A (same girl, different chat)
+    const compBRes = await pool.query(
+      `INSERT INTO user_companions (user_id, name, personality, avatar_url, age)
+       VALUES ($1, 'Luna B', 'flirty', 'https://example.com/avatar-shared.jpg', 22) RETURNING id`,
+      [testUserId]
+    );
+    companionBId = compBRes.rows[0].id;
+
+    // Companion C — DIFFERENT avatar (different girl)
+    const compCRes = await pool.query(
+      `INSERT INTO user_companions (user_id, name, personality, avatar_url, age)
+       VALUES ($1, 'Mia', 'sweet', 'https://example.com/avatar-different.jpg', 24) RETURNING id`,
+      [testUserId]
+    );
+    companionCId = compCRes.rows[0].id;
+
+    // Seed media for companion A
+    await pool.query(
+      `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd) VALUES
+       ($1, 'https://cdn.test/img1.jpg', 'image', 'selfie in bedroom', '{selfie,bedroom,smile}', 0.025),
+       ($1, 'https://cdn.test/img2.jpg', 'image', 'bikini at beach', '{bikini,beach,outdoor}', 0.025),
+       ($1, 'https://cdn.test/vid1.mp4', 'video', 'dancing in bedroom', '{bedroom,playful,lingerie}', 0.25)`,
+      [companionAId]
+    );
+  });
+
+  test.afterAll(async () => {
+    await pool.query('DELETE FROM companion_media WHERE companion_id = ANY($1)', [[companionAId, companionBId, companionCId]]);
+    await pool.query('DELETE FROM user_companions WHERE user_id = $1', [testUserId]);
+    await pool.query('DELETE FROM users WHERE id = $1', [testUserId]);
+    await pool.end();
+  });
+
+  test('reuses image with 2+ tag overlap', async () => {
+    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'bedroom']);
+    expect(result).not.toBeNull();
+    expect(result.media_url).toBe('https://cdn.test/img1.jpg');
+  });
+
+  test('reuses image with 3 tag overlap (picks highest)', async () => {
+    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'bedroom', 'smile', 'garden']);
+    expect(result).not.toBeNull();
+    expect(result.media_url).toBe('https://cdn.test/img1.jpg');
+  });
+
+  test('does NOT reuse with only 1 tag overlap', async () => {
+    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'pool']);
+    expect(result).toBeNull();
+  });
+
+  test('does NOT reuse with 0 tag overlap', async () => {
+    const result = await findReusableMedia(pool, companionAId, 'image', ['garden', 'rain']);
+    expect(result).toBeNull();
+  });
+
+  test('REUSES across companions with same avatar (same girl)', async () => {
+    const result = await findReusableMedia(pool, companionBId, 'image', ['selfie', 'bedroom']);
+    expect(result).not.toBeNull();
+    expect(result.media_url).toBe('https://cdn.test/img1.jpg');
+  });
+
+  test('does NOT reuse across companions with different avatar', async () => {
+    const result = await findReusableMedia(pool, companionCId, 'image', ['selfie', 'bedroom']);
+    expect(result).toBeNull();
+  });
+
+  test('type isolation — image request does not match video', async () => {
+    const result = await findReusableMedia(pool, companionAId, 'image', ['bedroom', 'playful', 'lingerie']);
+    // Should NOT return the video (vid1.mp4), only images
+    if (result) {
+      expect(result.media_type).toBe('image');
+    }
+  });
+
+  test('reuses video with 2+ tag overlap', async () => {
+    const result = await findReusableMedia(pool, companionAId, 'video', ['bedroom', 'playful']);
+    expect(result).not.toBeNull();
+    expect(result.media_url).toBe('https://cdn.test/vid1.mp4');
+    expect(result.media_type).toBe('video');
+  });
+
+  test('returns null for empty tags', async () => {
+    const result = await findReusableMedia(pool, companionAId, 'image', []);
+    expect(result).toBeNull();
+  });
+});
+
+// ============================================================
+// Media Reuse — generateOrReuseMedia (mocked AI)
+// ============================================================
+
+test.describe('Media Reuse — generateOrReuseMedia', () => {
+  const { Pool } = require('pg');
+  const ai = require('../server/src/ai');
+  const { generateOrReuseMedia } = require('../server/src/media-chat');
+
+  let pool;
+  let testUserId;
+  let companionId;
+  let origGenImage;
+  let origGenVideo;
+  let genImageCalls;
+  let genVideoCalls;
+
+  test.beforeAll(async () => {
+    pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL || 'postgres://localhost:5432/lovetta_test' });
+
+    // Create test user
+    const userRes = await pool.query(
+      `INSERT INTO users (email, password_hash, display_name, email_verified, birth_month, birth_year)
+       VALUES ($1, 'hash', 'MediaGenTestUser', true, 1, 2000) RETURNING id`,
+      [`conativer+media_gen_${Date.now()}@gmail.com`]
+    );
+    testUserId = userRes.rows[0].id;
+
+    // Create companion
+    const compRes = await pool.query(
+      `INSERT INTO user_companions (user_id, name, personality, avatar_url, age)
+       VALUES ($1, 'GenLuna', 'flirty', 'https://example.com/avatar-gen.jpg', 22) RETURNING id`,
+      [testUserId]
+    );
+    companionId = compRes.rows[0].id;
+
+    // Save originals
+    origGenImage = ai.generateCharacterImage;
+    origGenVideo = ai.generateVideo;
+  });
+
+  test.beforeEach(() => {
+    genImageCalls = 0;
+    genVideoCalls = 0;
+
+    ai.generateCharacterImage = async () => {
+      genImageCalls++;
+      return { url: `https://cdn.test/gen-img-${genImageCalls}.jpg`, cost: 0.025, shouldRequestTip: false };
+    };
+    ai.generateVideo = async () => {
+      genVideoCalls++;
+      return { url: `https://cdn.test/gen-vid-${genVideoCalls}.mp4`, cost: 0.25, shouldRequestTip: false };
+    };
+  });
+
+  test.afterAll(async () => {
+    // Restore originals
+    ai.generateCharacterImage = origGenImage;
+    ai.generateVideo = origGenVideo;
+
+    await pool.query('DELETE FROM companion_media WHERE companion_id = $1', [companionId]);
+    await pool.query('DELETE FROM user_companions WHERE user_id = $1', [testUserId]);
+    await pool.query('DELETE FROM users WHERE id = $1', [testUserId]);
+    await pool.end();
+  });
+
+  test('generates new image when no reusable media exists', async () => {
+    const companion = { id: companionId, avatar_url: 'https://example.com/avatar-gen.jpg' };
+    const result = await generateOrReuseMedia(companion, { type: 'image', description: 'selfie in bedroom with a smile' }, { userId: testUserId });
+
+    expect(result).not.toBeNull();
+    expect(result.reused).toBe(false);
+    expect(result.type).toBe('image');
+    expect(result.url).toContain('gen-img');
+    expect(genImageCalls).toBe(1);
+
+    // Verify saved to DB
+    const { rows } = await pool.query(
+      'SELECT * FROM companion_media WHERE companion_id = $1 AND media_type = $2 ORDER BY created_at DESC LIMIT 1',
+      [companionId, 'image']
+    );
+    expect(rows.length).toBe(1);
+    expect(rows[0].tags).toContain('selfie');
+    expect(rows[0].tags).toContain('bedroom');
+  });
+
+  test('reuses existing image when tags match (no AI call)', async () => {
+    // Previous test already inserted a selfie+bedroom+smile image
+    const companion = { id: companionId, avatar_url: 'https://example.com/avatar-gen.jpg' };
+    const result = await generateOrReuseMedia(companion, { type: 'image', description: 'cute selfie from bedroom' }, { userId: testUserId });
+
+    expect(result).not.toBeNull();
+    expect(result.reused).toBe(true);
+    expect(genImageCalls).toBe(0); // No AI call
+  });
+
+  test('generates new when tags do not overlap enough', async () => {
+    const companion = { id: companionId, avatar_url: 'https://example.com/avatar-gen.jpg' };
+    const result = await generateOrReuseMedia(companion, { type: 'image', description: 'bikini at the beach with sunset' }, { userId: testUserId });
+
+    expect(result).not.toBeNull();
+    expect(result.reused).toBe(false);
+    expect(genImageCalls).toBe(1);
+  });
+
+  test('video generation uses existing source image', async () => {
+    // We have beach+bikini+sunset image from previous test
+    const companion = { id: companionId, avatar_url: 'https://example.com/avatar-gen.jpg' };
+    const result = await generateOrReuseMedia(companion, { type: 'video', description: 'dancing at the beach in bikini' }, { userId: testUserId });
+
+    expect(result).not.toBeNull();
+    expect(result.type).toBe('video');
+    expect(result.reused).toBe(false);
+    // Should reuse existing image as source, so 0 image gen calls, 1 video gen call
+    expect(genImageCalls).toBe(0);
+    expect(genVideoCalls).toBe(1);
+  });
+
+  test('returns null when image rate limit hit', async () => {
+    // Insert 10 images in last 24h to hit limit
+    for (let i = 0; i < 10; i++) {
+      await pool.query(
+        `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd)
+         VALUES ($1, $2, 'image', 'ratelimit test', '{ratelimit}', 0.025)`,
+        [companionId, `https://cdn.test/ratelimit-${i}.jpg`]
+      );
+    }
+
+    const companion = { id: companionId, avatar_url: 'https://example.com/avatar-gen.jpg' };
+    const result = await generateOrReuseMedia(companion, { type: 'image', description: 'something in the garden with rain' }, { userId: testUserId });
+
+    expect(result).toBeNull();
+    expect(genImageCalls).toBe(0);
+  });
+});
+
+// ============================================================
+// Media Reuse — real multi-companion reuse stats
+// ============================================================
+
+test.describe('Media Reuse — cross-companion reuse with same avatar', () => {
+  const { Pool } = require('pg');
+  const ai = require('../server/src/ai');
+  const { generateOrReuseMedia } = require('../server/src/media-chat');
+
+  let pool;
+  let testUserId;
+  const companionIds = [];
+  let origGenImage;
+  let origGenVideo;
+  let totalGenCalls = 0;
+
+  const SHARED_AVATAR = 'https://example.com/shared-girl-avatar.jpg';
+  const NUM_COMPANIONS = 5;
+
+  // Scene descriptions — some overlap, some unique
+  const SCENES = [
+    'selfie in bedroom with a smile',          // tags: selfie, bedroom, smile
+    'cute selfie from bedroom looking at camera', // tags: selfie, bedroom (should reuse #1)
+    'bikini at the beach with sunset',          // tags: bikini, beach, sunset
+    'walking on the beach in bikini',           // tags: beach, bikini (should reuse #3)
+    'lingerie on the couch, seductive pose',    // tags: lingerie, couch, seductive
+    'playful selfie in the kitchen',            // tags: selfie, kitchen, playful (1 overlap with #1 — NO reuse)
+    'bedroom selfie with a wink',              // tags: bedroom, selfie, wink (should reuse #1)
+    'elegant dress in a garden',               // tags: elegant, dress, garden — unique
+    'lying in bed, lazy morning',              // tags: bed, lazy, morning — unique
+    'pool bikini selfie',                       // tags: pool, bikini, selfie (2 overlap with #3 — reuse)
+  ];
+
+  test.beforeAll(async () => {
+    pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL || 'postgres://localhost:5432/lovetta_test' });
+
+    const userRes = await pool.query(
+      `INSERT INTO users (email, password_hash, display_name, email_verified, birth_month, birth_year)
+       VALUES ($1, 'hash', 'MultiCompTest', true, 1, 2000) RETURNING id`,
+      [`conativer+multi_comp_${Date.now()}@gmail.com`]
+    );
+    testUserId = userRes.rows[0].id;
+
+    // Create N companions all sharing the same avatar
+    for (let i = 0; i < NUM_COMPANIONS; i++) {
+      const res = await pool.query(
+        `INSERT INTO user_companions (user_id, name, personality, avatar_url, age)
+         VALUES ($1, $2, 'flirty', $3, 22) RETURNING id`,
+        [testUserId, `TestGirl-${i}`, SHARED_AVATAR]
+      );
+      companionIds.push(res.rows[0].id);
+    }
+
+    origGenImage = ai.generateCharacterImage;
+    origGenVideo = ai.generateVideo;
+
+    ai.generateCharacterImage = async () => {
+      totalGenCalls++;
+      return { url: `https://cdn.test/multi-img-${totalGenCalls}.jpg`, cost: 0.025, shouldRequestTip: false };
+    };
+    ai.generateVideo = async () => {
+      totalGenCalls++;
+      return { url: `https://cdn.test/multi-vid-${totalGenCalls}.mp4`, cost: 0.25, shouldRequestTip: false };
+    };
+  });
+
+  test.afterAll(async () => {
+    ai.generateCharacterImage = origGenImage;
+    ai.generateVideo = origGenVideo;
+
+    await pool.query('DELETE FROM companion_media WHERE companion_id = ANY($1)', [companionIds]);
+    await pool.query('DELETE FROM user_companions WHERE user_id = $1', [testUserId]);
+    await pool.query('DELETE FROM users WHERE id = $1', [testUserId]);
+    await pool.end();
+  });
+
+  test('generates images across multiple companions and reports reuse stats', async () => {
+    const results = [];
+
+    // Distribute scenes across companions round-robin
+    for (let i = 0; i < SCENES.length; i++) {
+      const companionIdx = i % NUM_COMPANIONS;
+      const companion = { id: companionIds[companionIdx], avatar_url: SHARED_AVATAR };
+      const result = await generateOrReuseMedia(
+        companion,
+        { type: 'image', description: SCENES[i] },
+        { userId: testUserId }
+      );
+      results.push({
+        scene: SCENES[i],
+        companion: `Girl-${companionIdx}`,
+        reused: result?.reused || false,
+        url: result?.url || null,
+      });
+    }
+
+    const reusedCount = results.filter(r => r.reused).length;
+    const generatedCount = results.filter(r => !r.reused).length;
+
+    // Log stats
+    console.log('\n=== MEDIA REUSE STATS ===');
+    console.log(`Total requests: ${SCENES.length}`);
+    console.log(`Generated new:  ${generatedCount} ($${(generatedCount * 0.025).toFixed(3)})`);
+    console.log(`Reused:         ${reusedCount} (saved $${(reusedCount * 0.025).toFixed(3)})`);
+    console.log(`Reuse rate:     ${((reusedCount / SCENES.length) * 100).toFixed(0)}%`);
+    console.log('--- Detail ---');
+    for (const r of results) {
+      console.log(`  ${r.reused ? 'REUSED' : 'NEW   '} [${r.companion}] ${r.scene}`);
+    }
+    console.log('=========================\n');
+
+    // With synonym expansion, many more scenes should reuse:
+    // Scene 1 (bedroom selfie) → reuses scene 0 (selfie+bedroom overlap)
+    // Scene 3 (beach bikini) → reuses scene 2 (beach+bikini overlap)
+    // Scene 5 (kitchen selfie) → selfie expands to smile+closeup, may now reuse scene 0
+    // Scene 6 (bedroom selfie wink) → reuses scene 0
+    // Scene 8 (bed lazy morning) → bed expands to bedroom, may reuse scene 0
+    // Scene 9 (pool bikini) → pool expands to beach, reuses scene 2
+    expect(reusedCount).toBeGreaterThanOrEqual(5);
+
+    // Verify cross-companion reuse actually happened:
+    // Scene 1 (Girl-1) should reuse scene 0 (Girl-0) because same avatar + same tags
+    expect(results[1].reused).toBe(true);
+
+    // Verify AI was NOT called for reused items
+    expect(totalGenCalls).toBe(generatedCount);
   });
 });

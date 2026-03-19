@@ -185,6 +185,7 @@ Text and image levels are independent, configurable per platform in admin settin
 - Character consistency via PuLID reference image (id_weight 0.9)
 - Content level enforced server-side, R2 CDN storage
 - Media reuse catalog with tag-based matching (companion_media table)
+- Cross-companion reuse: companions sharing the same avatar_url share media catalog (same girl = same images)
 - Rate limits: 10 images/24h, 1 video/24h per companion
 - Tip threshold blocks media generation when exceeded
 
