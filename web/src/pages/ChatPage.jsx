@@ -27,6 +27,10 @@ export default function ChatPage() {
   const [scrollTrigger, setScrollTrigger] = useState(0);
   const [tipSent, setTipSent] = useState(null); // { amount }
 
+  const scrollToBottom = useCallback(() => {
+    setScrollTrigger(n => n + 1);
+  }, []);
+
   const handleTipSuccess = useCallback((result) => {
     if (result?.amount) setTipSent({ amount: result.amount });
     loadChat();
@@ -47,10 +51,6 @@ export default function ChatPage() {
       }
     }
   }, [searchParams, setSearchParams, loadChat]);
-
-  const scrollToBottom = useCallback(() => {
-    setScrollTrigger(n => n + 1);
-  }, []);
 
   const handleSend = useCallback((content) => {
     sendMessage(content);

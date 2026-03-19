@@ -391,7 +391,13 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
 
     if (!aborted && aiResult) {
       // Parse media tags before sending text to client
-      const { cleanText, mediaRequest } = parseMediaTags(aiResult.content);
+      let { cleanText, mediaRequest } = parseMediaTags(aiResult.content);
+
+      // Strip actions before sending to client if user disabled them
+      if (!actionsEnabled) {
+        cleanText = cleanText.replace(/\*[^*]+\*\s*/g, '').trim();
+      }
+
       fullText = cleanText;
       res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
 
@@ -401,7 +407,6 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       if (!actionsEnabled) {
         parsed.contextText = null;
         parsed.sceneText = null;
-        parsed.content = parsed.content.replace(/\*[^*]+\*\s*/g, '').trim();
       }
 
       // ~30% chance to generate a scene description
@@ -450,6 +455,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       res.write(`data: ${JSON.stringify({
         type: 'done',
         messageId: savedMsg.id,
+        content: parsed.content,
         contextText: parsed.contextText,
         sceneText: parsed.sceneText,
         mediaUrl: null,
@@ -564,14 +570,19 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
 
     if (!aborted && doneData) {
       // Parse media tags from the full assembled text
-      const { cleanText, mediaRequest } = parseMediaTags(doneData.fullText);
+      let { cleanText, mediaRequest } = parseMediaTags(doneData.fullText);
+
+      // Strip actions before parsing if user disabled them
+      if (!actionsEnabled) {
+        cleanText = cleanText.replace(/\*[^*]+\*\s*/g, '').trim();
+      }
+
       const parsed = parseContextText(cleanText);
 
       // Strip actions/scenes if user disabled them
       if (!actionsEnabled) {
         parsed.contextText = null;
         parsed.sceneText = null;
-        parsed.content = parsed.content.replace(/\*[^*]+\*\s*/g, '').trim();
       }
 
       // ~30% chance to generate a scene description
@@ -608,6 +619,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       res.write(`data: ${JSON.stringify({
         type: 'done',
         messageId: savedMsg.id,
+        content: parsed.content,
         contextText: parsed.contextText,
         sceneText: parsed.sceneText,
         mediaUrl: null,
@@ -719,16 +731,21 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     }
 
     if (!aborted && aiResult) {
-      const { cleanText, mediaRequest } = parseMediaTags(aiResult.content);
+      let { cleanText, mediaRequest } = parseMediaTags(aiResult.content);
+
+      // Strip actions before sending to client if user disabled them
+      if (!actionsEnabled) {
+        cleanText = cleanText.replace(/\*[^*]+\*\s*/g, '').trim();
+      }
+
       res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
 
       const parsed = parseContextText(cleanText);
 
-      // Strip actions/scenes if user disabled them
+      // Strip context/scene if user disabled actions
       if (!actionsEnabled) {
         parsed.contextText = null;
         parsed.sceneText = null;
-        parsed.content = parsed.content.replace(/\*[^*]+\*\s*/g, '').trim();
       }
 
       // Force image generation even if LLM didn't include the tag
@@ -754,6 +771,7 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       res.write(`data: ${JSON.stringify({
         type: 'done',
         messageId: savedMsg.id,
+        content: parsed.content,
         contextText: parsed.contextText,
         sceneText: parsed.sceneText || null,
         mediaUrl: null,

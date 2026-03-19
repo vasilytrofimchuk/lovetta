@@ -11,6 +11,9 @@ export default defineConfig({
       : path.resolve(__dirname, '..', 'public', 'my'),
     emptyOutDir: true,
     sourcemap: 'hidden',
+    rollupOptions: process.env.CAPACITOR_BUILD ? {} : {
+      external: ['@capacitor/app'],
+    },
   },
   server: {
     port: 5173,

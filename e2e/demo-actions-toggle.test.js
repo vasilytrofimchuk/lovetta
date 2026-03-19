@@ -1,70 +1,50 @@
 /**
  * Demo: Actions toggle in Profile — all states.
- * Signs up, creates a companion, chats (actions ON by default),
- * goes to Profile, toggles actions OFF, returns to chat,
- * sends another message (should get no *actions* in response),
- * then toggles back ON and verifies actions return.
+ * Creates user + companion via API, logs in via UI,
+ * chats with actions ON, toggles OFF, chats again, toggles back ON.
  */
 
 const { test, expect } = require('@playwright/test');
-const { BASE, saveNamedDemoVideo } = require('./helpers');
+const { BASE, saveNamedDemoVideo, createTestUser } = require('./helpers');
 
 try { process.loadEnvFile('.env'); } catch {}
 
-const TEST_PASSWORD = 'Test1234!';
+test('demo: actions toggle ON → chat → OFF → chat → ON → chat', async ({ page, request }) => {
+  test.setTimeout(300000);
 
-async function signupViaUI(page) {
-  const email = `conativer+demo_actions_${Date.now()}@gmail.com`;
-
-  // Block Google GSI to prevent React DOM crash
+  // Block Google GSI
   await page.route('**/accounts.google.com/**', route => route.abort());
 
-  await page.goto(`${BASE}/my/signup`);
+  // Capture console errors
+  page.on('pageerror', err => console.log(`[pageerror] ${err.stack}`));
 
-  // Step 1: Age gate + consent
-  await page.waitForSelector('text=Verify your age', { timeout: 10000 });
-  const monthBtn = page.locator('label:has-text("Birth Month")').locator('..').locator('button').first();
-  await monthBtn.click();
-  await page.locator('button:has-text("June")').click();
-  const yearBtn = page.locator('label:has-text("Birth Year")').locator('..').locator('button').first();
-  await yearBtn.click();
-  await page.locator('button:has-text("1995")').click();
-  const checkboxes = page.locator('input[type="checkbox"]');
-  const count = await checkboxes.count();
-  for (let i = 0; i < count; i++) await checkboxes.nth(i).check();
-  await page.locator('button:has-text("Continue")').click();
+  // Create user + companion via API
+  const user = await createTestUser(request);
+  const templatesRes = await request.get(`${BASE}/api/companions/templates`, {
+    headers: user.authHeaders,
+  });
+  const { templates } = await templatesRes.json();
+  const template = templates.find(t => t.name === 'Luna') || templates[0];
 
-  // Step 2: Email + password
+  const createRes = await request.post(`${BASE}/api/companions`, {
+    headers: user.authHeaders,
+    data: { templateId: template.id },
+  });
+  const { companion } = await createRes.json();
+
+  // Log in via UI
+  await page.goto(`${BASE}/my/login`);
   await page.waitForSelector('input[type="email"]', { timeout: 10000 });
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', TEST_PASSWORD);
+  await page.fill('input[type="email"]', user.email);
+  await page.fill('input[type="password"]', 'Test1234!');
   await page.locator('button[type="submit"]').click();
-
-  // Pricing page — skip trial
-  await page.waitForSelector('text=Skip for now', { timeout: 15000 });
-  await page.locator('text=Skip for now').click();
   await page.waitForSelector('button[title="Profile"]', { timeout: 15000 });
-  return email;
-}
-
-test('demo: actions toggle ON → chat → OFF → chat → ON → chat', async ({ page }) => {
-  test.setTimeout(300000); // 5 min — real AI calls are slow
-
-  await signupViaUI(page);
   await page.waitForTimeout(1000);
 
-  // Create companion from template
-  await page.click('text=Get Started');
-  await page.waitForTimeout(500);
-  await page.click('text=Choose a Soul');
-  await page.waitForTimeout(500);
-  await page.locator('button:has-text("Luna")').click();
-  await page.click('button:has-text("Awaken Luna")');
-
-  // Wait for chat to load
-  await page.waitForURL('**/my/chat/**', { timeout: 30000 });
-  await expect(page.locator('.font-semibold:has-text("Luna")')).toBeVisible();
-  await page.waitForTimeout(3000);
+  // Navigate to chat
+  await page.goto(`${BASE}/my/chat/${companion.id}`);
+  await page.waitForSelector('textarea[placeholder="Type a message..."]', { timeout: 15000 });
+  await page.waitForTimeout(2000);
 
   // === STATE 1: Actions ON (default) ===
   const input1 = page.locator('textarea[placeholder="Type a message..."]');
@@ -75,17 +55,15 @@ test('demo: actions toggle ON → chat → OFF → chat → ON → chat', async 
   await page.keyboard.press('Enter');
   await page.waitForTimeout(15000);
 
-  // Save chat URL
   const chatUrl = page.url();
 
   // Navigate to Profile
   await page.goto(`${BASE}/my/profile`);
   await page.waitForSelector('text=Content Preferences', { timeout: 15000 });
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1500);
 
-  // Scroll to Content Preferences section
+  // Scroll to Content Preferences
   await page.evaluate(() => {
-    const el = document.querySelector('h3')
     const sections = [...document.querySelectorAll('h3')];
     const content = sections.find(h => h.textContent.includes('Content'));
     if (content) content.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -97,18 +75,16 @@ test('demo: actions toggle ON → chat → OFF → chat → ON → chat', async 
   await page.waitForTimeout(1000);
 
   // === STATE 2: Toggle actions OFF ===
-  // The actions toggle row: p "Actions in messages" → div.pr-4 → div.flex → button
   const actionsToggle = page.locator('p:has-text("Actions in messages")').locator('..').locator('..').locator('button');
   await actionsToggle.click();
   await page.waitForTimeout(2000);
 
   // Navigate back to chat
   await page.goto(chatUrl);
-  await page.waitForURL('**/my/chat/**', { timeout: 15000 });
-  await expect(page.locator('.font-semibold:has-text("Luna")')).toBeVisible();
+  await page.waitForSelector('textarea[placeholder="Type a message..."]', { timeout: 15000 });
   await page.waitForTimeout(2000);
 
-  // Send message with actions OFF — should get no *actions*
+  // Send message with actions OFF
   const input2 = page.locator('textarea[placeholder="Type a message..."]');
   await input2.click();
   await page.waitForTimeout(300);
@@ -122,7 +98,6 @@ test('demo: actions toggle ON → chat → OFF → chat → ON → chat', async 
   await page.waitForSelector('text=Content Preferences', { timeout: 15000 });
   await page.waitForTimeout(1000);
 
-  // Scroll to actions toggle
   await page.evaluate(() => {
     const sections = [...document.querySelectorAll('h3')];
     const content = sections.find(h => h.textContent.includes('Content'));
@@ -134,10 +109,9 @@ test('demo: actions toggle ON → chat → OFF → chat → ON → chat', async 
   await actionsToggle2.click();
   await page.waitForTimeout(2000);
 
-  // Navigate back to chat and send one more message with actions ON
+  // Navigate back to chat
   await page.goto(chatUrl);
-  await page.waitForURL('**/my/chat/**', { timeout: 15000 });
-  await expect(page.locator('.font-semibold:has-text("Luna")')).toBeVisible();
+  await page.waitForSelector('textarea[placeholder="Type a message..."]', { timeout: 15000 });
   await page.waitForTimeout(2000);
 
   const input3 = page.locator('textarea[placeholder="Type a message..."]');

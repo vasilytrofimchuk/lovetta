@@ -1,13 +1,14 @@
 /**
  * Native push notifications via Capacitor (iOS APNs).
  * Used instead of web push when running inside Capacitor.
+ * All Capacitor imports are dynamic to avoid crashes in browser context.
  */
-import { PushNotifications } from '@capacitor/push-notifications'
-import { App } from '@capacitor/app'
 import api from './api'
 
 /** Request permissions and register for native push. Returns the device token. */
 export async function registerNativePush() {
+  const { PushNotifications } = await import('@capacitor/push-notifications')
+
   // Set up listeners BEFORE requesting permissions (iOS may auto-register on grant)
   const tokenPromise = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -53,7 +54,9 @@ export async function unregisterNativePush() {
 }
 
 /** Set up listeners for incoming notifications and taps. */
-export function setupPushListeners(navigateFn) {
+export async function setupPushListeners(navigateFn) {
+  const { PushNotifications } = await import('@capacitor/push-notifications')
+
   PushNotifications.addListener('pushNotificationReceived', (notification) => {
     console.log('[push] Received:', notification)
   })
@@ -75,9 +78,12 @@ export function setupPushListeners(navigateFn) {
   })
 
   // Clear delivered notifications when app resumes (badge cleared natively in AppDelegate)
-  App.addListener('appStateChange', ({ isActive }) => {
-    if (isActive) {
-      PushNotifications.removeAllDeliveredNotifications()
-    }
-  })
+  try {
+    const { App } = await import('@capacitor/app')
+    App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        PushNotifications.removeAllDeliveredNotifications()
+      }
+    })
+  } catch {}
 }
