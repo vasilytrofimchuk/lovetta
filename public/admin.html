@@ -265,6 +265,20 @@
     .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
     .settings-col { display: flex; flex-direction: column; gap: 10px; }
     .settings-col .setting-row { margin-bottom: 0; }
+
+    /* Custom modal */
+    .modal-overlay { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.6); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
+    .modal-overlay.show { display:flex; }
+    .modal-box { background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:28px 32px; max-width:420px; width:90%; }
+    .modal-msg { color:var(--text); font-size:15px; line-height:1.5; margin-bottom:20px; white-space:pre-line; }
+    .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+    .modal-btn { padding:8px 20px; border-radius:8px; border:1px solid var(--border); font-size:14px; font-weight:600; cursor:pointer; }
+    .modal-btn-cancel { background:var(--bg2); color:var(--text2); }
+    .modal-btn-cancel:hover { background:var(--bg); }
+    .modal-btn-ok { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .modal-btn-ok:hover { opacity:.85; }
+    .modal-btn-danger { background:var(--error); color:#fff; border-color:var(--error); }
+    .modal-btn-danger:hover { opacity:.85; }
   </style>
 </head>
 <body>
@@ -493,6 +507,35 @@
   </div>
 
   <script>
+    // Custom modal helpers
+    function showModal(msg, buttons) {
+      return new Promise(function(resolve) {
+        var overlay = document.getElementById('admin-modal');
+        var msgEl = document.getElementById('admin-modal-msg');
+        var actionsEl = document.getElementById('admin-modal-actions');
+        msgEl.textContent = msg;
+        actionsEl.innerHTML = '';
+        buttons.forEach(function(b) {
+          var btn = document.createElement('button');
+          btn.className = 'modal-btn ' + (b.cls || 'modal-btn-ok');
+          btn.textContent = b.label;
+          btn.onclick = function() { overlay.classList.remove('show'); resolve(b.value); };
+          actionsEl.appendChild(btn);
+        });
+        overlay.classList.add('show');
+        function onKey(e) { if (e.key === 'Escape') { overlay.classList.remove('show'); document.removeEventListener('keydown', onKey); resolve(false); } }
+        document.addEventListener('keydown', onKey);
+        overlay.onclick = function(e) { if (e.target === overlay) { overlay.classList.remove('show'); document.removeEventListener('keydown', onKey); resolve(false); } };
+      });
+    }
+    function showAlert(msg) { return showModal(msg, [{ label: 'OK', value: true, cls: 'modal-btn-ok' }]); }
+    function showConfirm(msg, confirmLabel, danger) {
+      return showModal(msg, [
+        { label: 'Cancel', value: false, cls: 'modal-btn-cancel' },
+        { label: confirmLabel || 'OK', value: true, cls: danger ? 'modal-btn-danger' : 'modal-btn-ok' }
+      ]);
+    }
+
     var TOKEN = localStorage.getItem('lovetta-admin-token') || '';
     var visitorPage = 1;
     var userPage = 1;
@@ -868,10 +911,12 @@
     }
 
     function deleteUser(id, email) {
-      if (!confirm('Delete user ' + email + '?\nThey will not be able to log in, but messages are preserved.')) return;
-      fetch('/api/admin/users/' + id, { method: 'DELETE', headers: headers() })
-        .then(function(r) { return r.json(); })
-        .then(function() { loadUsers(); });
+      showConfirm('Delete user ' + email + '?\nThey will not be able to log in, but messages are preserved.', 'Delete', true).then(function(ok) {
+        if (!ok) return;
+        fetch('/api/admin/users/' + id, { method: 'DELETE', headers: headers() })
+          .then(function(r) { return r.json(); })
+          .then(function() { loadUsers(); });
+      });
     }
 
     // Settings
@@ -1629,7 +1674,7 @@
       var subject = document.getElementById('compose-subject').value.trim();
       var text = document.getElementById('compose-body').value;
       var inReplyTo = document.getElementById('compose-reply-to').value || undefined;
-      if (!to || !subject) { alert('To and Subject are required'); return; }
+      if (!to || !subject) { showAlert('To and Subject are required'); return; }
 
       var el = document.getElementById('compose-status');
       el.innerHTML = '<span style="color:var(--muted);">Sending...</span>';
@@ -1717,5 +1762,11 @@
       }).catch(function() {});
     }
   </script>
+  <div id="admin-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-msg" id="admin-modal-msg"></div>
+      <div class="modal-actions" id="admin-modal-actions"></div>
+    </div>
+  </div>
 </body>
 </html>
