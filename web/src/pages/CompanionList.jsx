@@ -20,6 +20,8 @@ export default function CompanionList() {
   const [loading, setLoading] = useState(true);
   const [supportUnread, setSupportUnread] = useState(0);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [pushBannerVisible, setPushBannerVisible] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
   const unreadPollRef = useRef(null);
 
   useEffect(() => {
@@ -35,6 +37,17 @@ export default function CompanionList() {
         }
       }),
     ]).catch(() => {}).finally(() => setLoading(false));
+
+    // Check if push banner should show (Capacitor only, not dismissed, not yet granted)
+    if (isCapacitor() && !localStorage.getItem('push_prompt_dismissed')) {
+      import('@capacitor/push-notifications').then(({ PushNotifications }) => {
+        PushNotifications.checkPermissions().then(({ receive }) => {
+          if (receive !== 'granted' && receive !== 'denied') {
+            setPushBannerVisible(true);
+          }
+        });
+      }).catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -117,6 +130,42 @@ export default function CompanionList() {
                 View Plans
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Push notification banner */}
+        {pushBannerVisible && (
+          <div className="mb-4 bg-gradient-to-br from-brand-accent/10 to-transparent border border-brand-accent/20 rounded-xl p-4 relative">
+            <button
+              onClick={() => { setPushBannerVisible(false); localStorage.setItem('push_prompt_dismissed', '1'); }}
+              className="absolute top-3 right-3 text-brand-muted hover:text-brand-text transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <p className="text-sm font-semibold text-brand-text mb-1">Don't miss her messages</p>
+            <p className="text-xs text-brand-text-secondary mb-3">
+              Enable notifications so your girls can reach out to you anytime.
+            </p>
+            <button
+              onClick={async () => {
+                setPushLoading(true);
+                try {
+                  const { PushNotifications } = await import('@capacitor/push-notifications');
+                  const perm = await PushNotifications.requestPermissions();
+                  if (perm.receive === 'granted') {
+                    const { registerNativePush } = await import('../lib/push-native');
+                    registerNativePush().catch(() => {});
+                  }
+                  setPushBannerVisible(false);
+                } catch {} finally { setPushLoading(false); }
+              }}
+              disabled={pushLoading}
+              className="px-4 py-2 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-50"
+            >
+              {pushLoading ? 'Enabling...' : 'Allow Notifications'}
+            </button>
           </div>
         )}
 
