@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import api from '../lib/api'
 
 const AUTO_SCROLL_SPEED = 0.4
-const AUTO_SCROLL_RESUME_DELAY = 5000
+const AUTO_SCROLL_RESUME_DELAY = 2000
 const ACTIVE_INIT_DELAY = 300
 const CARD_GAP_PX = 12
 
