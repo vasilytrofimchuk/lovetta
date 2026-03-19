@@ -728,27 +728,37 @@
     function renderOnlineChart(snapshots) {
       var container = document.getElementById('online-chart-container');
       if (!snapshots.length) {
-        container.innerHTML = '<div class="online-chart"><div class="online-summary"><div class="online-summary-item"><div class="online-label">Active users in last 30 minutes</div><div class="online-value">0</div></div><div class="online-summary-item"><div class="online-label">Active users in last 5 minutes</div><div class="online-value">0</div></div></div><div style="text-align:center;color:var(--muted);padding:20px 0;font-size:0.85rem;">No data yet — snapshots taken every 5 min</div></div>';
+        container.innerHTML = '<div class="online-chart"><div class="online-summary"><div class="online-summary-item"><div class="online-label">Online users (30 min)</div><div class="online-value">0</div></div><div class="online-summary-item"><div class="online-label">Online users (5 min)</div><div class="online-value">0</div></div></div><div style="text-align:center;color:var(--muted);padding:20px 0;font-size:0.85rem;">No data yet — snapshots taken every 5 min</div></div>';
         return;
       }
 
-      // Use last 30 min of snapshots (6 bars at 5-min intervals)
+      // Filter to last 30 min only (6 bars at 5-min intervals)
       var now = Date.now();
-      var last30 = snapshots.filter(function(s) {
+      var recent = snapshots.filter(function(s) {
         return now - new Date(s.ts).getTime() <= 31 * 60 * 1000;
       });
-      if (!last30.length) last30 = snapshots.slice(-6);
+      if (!recent.length) recent = snapshots.slice(-6);
 
-      // Summary numbers: max visitors in 30min, latest 5min
-      var active30 = 0;
-      last30.forEach(function(s) { active30 += parseInt(s.visitors_online) || 0; });
-      var latest = last30[last30.length - 1];
-      var active5 = parseInt(latest.visitors_online) || 0;
+      // Summary: peak users in 30min, latest 5min snapshot
+      var peak30 = 0;
+      recent.forEach(function(s) {
+        var u = parseInt(s.users_online) || 0;
+        if (u > peak30) peak30 = u;
+      });
+      var latest = recent[recent.length - 1];
+      var online5 = parseInt(latest.users_online) || 0;
+      var web5 = parseInt(latest.users_web) || 0;
+      var ios5 = parseInt(latest.users_ios) || 0;
+      var vis5 = parseInt(latest.visitors_online) || 0;
+      var sub5 = [];
+      if (web5) sub5.push(web5 + ' web');
+      if (ios5) sub5.push(ios5 + ' ios');
+      var sub5Str = sub5.length ? ' (' + sub5.join(' · ') + ')' : '';
 
-      // Use all snapshots for chart bars
+      // Chart bars — use only recent snapshots, show users_online as bar height
       var maxVal = 1;
-      snapshots.forEach(function(s) {
-        var v = parseInt(s.visitors_online) || 0;
+      recent.forEach(function(s) {
+        var v = (parseInt(s.users_online) || 0) + (parseInt(s.visitors_online) || 0);
         if (v > maxVal) maxVal = v;
       });
       if (maxVal <= 5) maxVal = 5;
@@ -756,14 +766,16 @@
       else maxVal = Math.ceil(maxVal / 5) * 5;
 
       var bars = '';
-      snapshots.forEach(function(s) {
+      recent.forEach(function(s) {
+        var users = parseInt(s.users_online) || 0;
         var vis = parseInt(s.visitors_online) || 0;
-        var hPx = Math.max(vis > 0 ? 2 : 0, Math.round((vis / maxVal) * 80));
+        var total = users + vis;
+        var hPx = Math.max(total > 0 ? 2 : 0, Math.round((total / maxVal) * 80));
         var minsAgo = Math.round((now - new Date(s.ts).getTime()) / 60000);
         var web = parseInt(s.users_web) || 0;
         var ios = parseInt(s.users_ios) || 0;
         bars += '<div class="chart-bar-group">' +
-          '<div class="chart-tip">-' + minsAgo + ' min — ' + vis + ' visitors, ' + web + ' web, ' + ios + ' ios</div>' +
+          '<div class="chart-tip">-' + minsAgo + ' min — ' + users + ' users (' + web + ' web, ' + ios + ' ios), ' + vis + ' visitors</div>' +
           '<div class="chart-bar" style="height:' + hPx + 'px"></div>' +
           '</div>';
       });
@@ -774,18 +786,19 @@
         '<span style="top:50%">' + Math.round(maxVal / 2) + '</span>' +
         '</div>';
 
-      // Time axis: relative minutes ago
-      var firstMins = Math.round((now - new Date(snapshots[0].ts).getTime()) / 60000);
-      var lastMins = Math.round((now - new Date(snapshots[snapshots.length - 1].ts).getTime()) / 60000);
+      // Time axis
+      var firstMins = Math.round((now - new Date(recent[0].ts).getTime()) / 60000);
+      var lastMins = Math.round((now - new Date(recent[recent.length - 1].ts).getTime()) / 60000);
       var midMins = Math.round((firstMins + lastMins) / 2);
 
       container.innerHTML =
         '<div class="online-chart">' +
         '<div class="online-summary">' +
-        '<div class="online-summary-item"><div class="online-label">Active users in last 30 minutes</div><div class="online-value">' + active30 + '</div></div>' +
-        '<div class="online-summary-item"><div class="online-label">Active users in last 5 minutes</div><div class="online-value">' + active5 + '</div></div>' +
+        '<div class="online-summary-item"><div class="online-label">Online users (30 min peak)</div><div class="online-value">' + peak30 + '</div></div>' +
+        '<div class="online-summary-item"><div class="online-label">Online now' + sub5Str + '</div><div class="online-value">' + online5 + '</div></div>' +
+        '<div class="online-summary-item"><div class="online-label">Visitors now</div><div class="online-value">' + vis5 + '</div></div>' +
         '</div>' +
-        '<div class="online-chart-subtitle">Active users per minute</div>' +
+        '<div class="online-chart-subtitle">Users + visitors per 5 min</div>' +
         '<div class="chart-area" style="padding-right:24px">' + bars + yLabels + '</div>' +
         '<div class="chart-time-axis" style="padding-right:24px"><span>-' + firstMins + ' min</span><span>-' + midMins + ' min</span><span>-' + lastMins + ' min</span></div>' +
         '</div>';

@@ -19,9 +19,10 @@ function updateActivity(userId, req) {
   if (!pool) return;
 
   const ip = req.ip || '';
+  const ua = req.get('User-Agent') || null;
   pool.query(
-    'UPDATE users SET last_activity = NOW(), ip_address = COALESCE($2, ip_address) WHERE id = $1',
-    [userId, ip]
+    'UPDATE users SET last_activity = NOW(), ip_address = COALESCE($2, ip_address), user_agent = COALESCE($3, user_agent) WHERE id = $1',
+    [userId, ip, ua]
   ).catch(() => {});
 }
 

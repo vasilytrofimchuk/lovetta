@@ -1,5 +1,77 @@
 # Lovetta — Progress
 
+> Completed work is in the [Archive](#archive) section below.
+
+## Fix iOS users not showing in admin stats chart
+- [x] Update `updateActivity()` in auth-middleware.js to also update `user_agent` on each API call
+- [x] Run `npm run test:e2e:api` — 28/28 passed
+- [x] Fix online chart: show only last 30 min (not 24h), use users_online instead of visitors_online
+- [x] Add web/ios breakdown and visitors count to summary cards
+- [x] Run `npm run test:e2e:ui` — 48/48 passed
+
+## Show Actions Toggle in Profile Settings
+- [x] Add `v39_show_actions_pref` migration — `show_actions BOOLEAN DEFAULT true` on `user_preferences`
+- [x] Add `show_actions` to GET/PUT `/api/user/preferences` in `user-api.js`
+- [x] Add `actionsEnabled` option to `buildCompanionSystemPrompt()` — prompt instructs AI to skip actions when disabled
+- [x] Add server-side strip in all 3 chat routes — remove `*actions*`, `contextText`, `sceneText` after AI generation
+- [x] Add `actionsEnabled` to `buildProactivePrompt()` + server-side strip in proactive.js
+- [x] Add "Actions in messages" toggle in Profile.jsx Content Preferences section
+- [ ] Run `npm run test:e2e:api`
+- [ ] Run `npm run test:e2e:ui`
+
+## RevenueCat Offerings Refactor
+- [x] Add `getSubscriptionOfferings()` and `getTipOfferings()` to `revenuecat.js` with module-level caching
+- [x] Add `FALLBACK_SUBSCRIPTION_PRICES` and `FALLBACK_TIP_AMOUNTS` constants for offline fallback
+- [x] Refactor `PlanModal.jsx` — dynamic prices from offerings, `purchasePackage` instead of `purchaseStoreProduct`
+- [x] Refactor `tipCheckout.js` — offerings-based purchase with `getProducts` fallback
+- [x] Add `getTipAmountsWithPrices()` helper for localized tip price display
+- [x] Update `TipPromoMessage.jsx` — localized `priceString` from offerings
+- [x] Update `CompanionSheet.jsx` — localized `priceString` from offerings
+- [x] Configure default offering in RevenueCat dashboard (subs only — tips use getProducts fallback)
+- [x] Test on iOS device with StoreKit sandbox — both subs and tips use offerings path
+- [ ] Verify experiments work end-to-end
+
+## Admin Page Improvements
+- [x] Breakdown tables in 4 columns layout
+- [x] Tab badges smaller + compact tab padding
+- [x] Online Now card — API: visitors + users (web/ios) with 5min window
+- [x] Online Now card — frontend rendering with platform sub-text
+- [x] Online chart — v40 migration: `online_snapshots` table
+- [x] Online chart — scheduler: snapshot every 5 min, purge after 48h
+- [x] Online chart — API: `GET /api/admin/online-history?hours=24`
+- [x] Online chart — visual bar chart (visitors + web/ios stacked) with tooltips
+
+## Admin: Delete User Button
+- [x] v41 migration: `deleted_at` column on users table
+- [x] DELETE `/api/admin/users/:id` — soft delete (null unique fields + set deleted_at)
+- [x] Filter soft-deleted users from admin users listing
+- [x] Delete button in Users tab with confirmation dialog
+- [x] Auth guard: block deleted users from `/me` and token refresh
+
+---
+
+## Open Items (from older work)
+
+### iOS App Store — Manual TODOs
+- [ ] TODO (manual): Create RevenueCat project + App Store Connect products
+- [ ] TODO (manual): Add Apple Developer credentials (APPLE_CLIENT_ID, APPLE_TEAM_ID, etc.) to .env and Heroku
+- [ ] TODO (manual): Add APNs credentials (APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY) to .env and Heroku
+- [ ] TODO (manual): Add RevenueCat API key + webhook secret to .env and Heroku
+- [ ] TODO (manual): Enable Sign in with Apple + Push Notifications capabilities in Xcode
+- [ ] TODO (manual): Configure provisioning profiles and signing
+- [ ] TODO (manual): Generate App Store screenshots and metadata
+- [ ] TODO (manual): Replace REVENUECAT_API_KEY placeholder in web/src/lib/revenuecat.js
+
+### iOS Keyboard — Top Shift Fix
+- **CURRENT STATE (input WORKS, top BROKEN):** `KeyboardResize.None` + `baseHeight - keyboardHeight` — input fully visible above keyboard, but top header shifts down because keyboardHeight includes safe area bottom (~34px) that innerHeight doesn't
+- [ ] Fix top shift (separate task — needs to account for safe area bottom difference between keyboardHeight and innerHeight)
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Run `npm run build:ios` + manual device test
+
+---
+
+## Archive
+
 ## Phase 1: Landing + Admin + Lead Capture
 
 ### Project Scaffolding
@@ -437,14 +509,6 @@
 - [x] Verified web build succeeds with all new imports
 - [x] iOS project synced with all 3 Capacitor plugins (apple-sign-in, push-notifications, purchases-capacitor)
 - [x] Added ios build artifacts to .gitignore (Pods/, public/, DerivedData/)
-- [ ] TODO (manual): Create RevenueCat project + App Store Connect products
-- [ ] TODO (manual): Add Apple Developer credentials (APPLE_CLIENT_ID, APPLE_TEAM_ID, etc.) to .env and Heroku
-- [ ] TODO (manual): Add APNs credentials (APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY) to .env and Heroku
-- [ ] TODO (manual): Add RevenueCat API key + webhook secret to .env and Heroku
-- [ ] TODO (manual): Enable Sign in with Apple + Push Notifications capabilities in Xcode
-- [ ] TODO (manual): Configure provisioning profiles and signing
-- [ ] TODO (manual): Generate App Store screenshots and metadata
-- [ ] TODO (manual): Replace REVENUECAT_API_KEY placeholder in web/src/lib/revenuecat.js
 
 ## Google Ads Compliance — Safe-by-Default
 - [x] Migration v30: force all content levels to 0 (strict), new toggle settings, template cleanup, explicit_content default false
@@ -673,9 +737,6 @@
 - [x] Run `npm run test:e2e:api`
 - [x] Run native iOS test/build verification
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
-- Verification notes:
-- `npm run test:e2e:api` passed.
-- Workspace-native verification passed with `build-for-testing` and `test-without-building` on the `AppUITests` scheme for `iPhone 16` simulator (`8` tests executed, `3` skipped until `UITEST_EMAIL` and `UITEST_PASSWORD` are configured for prepared-account billing flows).
 
 ## Fix AI Hallucination — Discovery Mode
 - [x] Add `temperature: 0.7` to OpenRouter chat requests (ai.js)
@@ -691,13 +752,6 @@
 - [x] Fix scene generation root cause: `max_tokens: 25` + `plainChatCompletion` + simplified prompt (ai.js, chat-api.js, companion-api.js)
 - [x] Scene quality: 100% clean (11/11) vs 23% before — no heavy regex cleanup needed
 - [x] New E2E test suite: `e2e/chat-scenarios.test.js` — 20 tests (18 pass, 2 skip)
-  - Basic chat flow: SSE streaming, done events, error handling, message persistence
-  - Discovery mode: questions on first chat, no hallucinated details
-  - Sexual content: web allows flirty, appstore blocks explicit, user pref override, age guard
-  - Media: selfie triggers media fields, request-media blocks free users
-  - /next endpoint: generates response, discovery mode in /next
-  - Memory: facts extracted after 5+ messages, counter increments, AI recalls user name
-  - Free limits: skipped (settings cache timing in test env)
 
 ## iOS Sandbox Setup Hardening
 - [x] Update `plan.md` and `PROGRESS.md` for the iOS sandbox setup follow-up
@@ -705,8 +759,6 @@
 - [x] Add a Lovetta-specific iOS sandbox setup guide for Xcode, App Store Connect, device login, and reset flows
 - [x] Re-run native iOS build verification after the Xcode project change
 - [x] Update `plan.md` and `PROGRESS.md` with final sandbox-setup status and notes
-- Verification notes:
-- `xcodebuild build-for-testing -workspace web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO` passed after adding the Xcode capability metadata.
 
 ## iOS Subscribe Tap Debugging
 - [x] Update `plan.md` and `PROGRESS.md` for the subscribe-tap debugging follow-up
@@ -714,35 +766,24 @@
 - [x] Add visible logging/error state for native subscribe failures
 - [x] Re-run relevant iOS verification after the paywall handler change
 - [x] Update `plan.md` and `PROGRESS.md` with final subscribe-debugging status and notes
-- Verification notes:
-- `npm run test:e2e:ui` passed.
-- `npm run build:ios` passed.
 
 ## iOS StoreKit Product Probe
 - [x] Update `plan.md` and `PROGRESS.md` for the native StoreKit probe follow-up
 - [x] Add a temporary direct StoreKit product fetch on iOS launch for Lovetta subscription/tip product IDs
 - [x] Rebuild the iOS app after adding the native StoreKit probe
 - [x] Update `plan.md` and `PROGRESS.md` with final StoreKit-probe status and notes
-- Verification notes:
-- `npm run build:ios` passed after adding the temporary StoreKit product probe.
 
 ## RevenueCat Apple Key Swap
 - [x] Update `plan.md` and `PROGRESS.md` for the RevenueCat Apple key swap
 - [x] Replace the local iOS RevenueCat public key with the real Apple `appl_...` key
 - [x] Rebuild the iOS app after the RevenueCat key change
 - [x] Update `plan.md` and `PROGRESS.md` with final key-swap status and notes
-- Verification notes:
-- `npm run build:ios` passed after the RevenueCat Apple key swap.
 
 ## RevenueCat Apple Key Heroku Sync
 - [x] Update `plan.md` and `PROGRESS.md` for the Heroku RevenueCat key sync
 - [x] Set `VITE_REVENUECAT_IOS_KEY` on the active Heroku app for this repo
 - [x] Verify the Heroku config value is updated
 - [x] Update `plan.md` and `PROGRESS.md` with final Heroku-sync status and notes
-- Verification notes:
-- `lovetta-ai` was not found for the current Heroku account, but the repo's Heroku remote points to app `lovetta`.
-- `heroku config:set VITE_REVENUECAT_IOS_KEY=... -a lovetta` succeeded and restarted the app on release `v116`.
-- `heroku config:get VITE_REVENUECAT_IOS_KEY -a lovetta` matched the expected Apple RevenueCat key.
 
 ## RevenueCat Local Env Source Fix
 - [x] Update `plan.md` and `PROGRESS.md` for the local-build RevenueCat key fix
@@ -751,10 +792,6 @@
 - [x] Expand the temporary StoreKit probe to check both possible subscription ID sets
 - [x] Rebuild iOS and verify the generated bundle no longer contains the old Test Store key
 - [x] Update `plan.md` and `PROGRESS.md` with final local-build fix status and notes
-- Verification notes:
-- `npm run build:ios` passed.
-- The synced iOS bundle now embeds the Apple `appl_...` key instead of the old RevenueCat Test Store key.
-- `npm run test:e2e:ui` passed (`47` tests).
 
 ## Local StoreKit Config Like Auto
 - [x] Update `plan.md` and `PROGRESS.md` for the local StoreKit config task
@@ -763,11 +800,6 @@
 - [x] Update the native StoreKit debug messaging for local StoreKit mode
 - [x] Rebuild iOS and verify the app scheme still builds
 - [x] Update `plan.md` and `PROGRESS.md` with final local StoreKit status and notes
-- Verification notes:
-- `python3 -m json.tool web/ios/App/App/Lovetta.storekit` passed.
-- `npm run build:ios` passed after adding the local StoreKit catalog.
-- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
-- Added the missing `project.pbxproj` file-reference/resource wiring for `Lovetta.storekit`, matching the `auto` repo so the scheme catalog is no longer a red/missing file in Xcode.
 
 ## RevenueCat Offerings Race Fix
 - [x] Update `plan.md` and `PROGRESS.md` for the RevenueCat offerings bugfix
@@ -775,9 +807,6 @@
 - [x] Fix `getOfferings()` to handle the Capacitor plugin response shape correctly
 - [x] Re-run the relevant frontend/iOS verification
 - [x] Update `plan.md` and `PROGRESS.md` with final offerings-fix status and notes
-- Verification notes:
-- `npm run build:ios` passed after the RevenueCat wrapper fix.
-- `npm run test:e2e:ui` passed (`47` tests).
 
 ## Final iOS Billing Fix via Auto-Style Direct Products
 - [x] Update `plan.md` and `PROGRESS.md` for the final direct-product subscription fix
@@ -788,10 +817,6 @@
 - [x] Run `npm run test:e2e:ui`
 - [x] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
-- Verification notes:
-- `npm run build:ios` passed.
-- `npm run test:e2e:ui` passed (`47` tests).
-- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
 
 ## iOS Subscription Timeout Root-Cause Fix
 - [x] Update `plan.md` and `PROGRESS.md` for the iOS subscription-timeout follow-up
@@ -801,10 +826,6 @@
 - [ ] Re-run `npm run test:e2e:ui`
 - [x] Re-run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
-- Verification notes:
-- `npm run build:ios` passed after switching subscriptions to direct identifier purchase and bypassing stale configure promises.
-- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
-- `npm run test:e2e:ui` was rerun twice but hit unrelated flaky navigation/signup timeouts in `e2e/companion-chat.test.js` and `e2e/wizard-nav.test.js`, so that bucket is still not clean for this follow-up.
 
 ## iOS RevenueCat Init Serialization Fix
 - [x] Update `plan.md` and `PROGRESS.md` for the RevenueCat init-serialization follow-up
@@ -815,10 +836,6 @@
 - [x] Re-run `npm run test:e2e:ui`
 - [x] Re-run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
-- Verification notes:
-- `npm run build:ios` passed after serializing RevenueCat init and caching the Capacitor Purchases client.
-- `npm run test:e2e:ui` passed (`47` tests) after the init-serialization change.
-- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
 
 ## iOS Profile App Icon Picker
 - [x] Update `plan.md` and `PROGRESS.md` for the iOS app-icon picker task
@@ -829,12 +846,6 @@
 - [x] Run `npm run build:ios`
 - [x] Run `npm run test:e2e:ui`
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
-- Verification notes:
-- `node scripts/export_logos.js` passed after the neutral icon pipeline changes.
-- `npm run build:ios` passed.
-- `npm run build` passed.
-- `npm run test:e2e:ui` passed (`47` tests). The earlier failed run was a setup flake that rendered `App not built yet`; rerunning after a clean web build produced a full pass.
-- `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed after the final asset-catalog cleanup.
 
 ## iOS App Icon Variant Refresh
 - [x] Update `plan.md` and `PROGRESS.md` for the icon-variant refresh follow-up
@@ -858,10 +869,6 @@
 - [x] Run `npm run test:e2e:ui`
 - [x] Run `xcodebuild -workspace web/ios/App/App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
-- Verification notes:
-- `npm run build:ios` passed.
-- `npm run test:e2e:ui` passed (`47` tests).
-- Equivalent native verification passed from `web/ios/App` with `xcodebuild -workspace App.xcworkspace -scheme App -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`.
 
 ## iOS App Icon Variant Correction
 - [x] Update `plan.md` and `PROGRESS.md` for the icon-correction follow-up
@@ -928,8 +935,6 @@
 - [x] Populate `/Users/vasily/.codex/AGENTS.md` with the same global operator preference
 - [x] Skip tests because this is instruction-only work
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
-- Verification notes:
-- No tests run because this task only updates instruction files and does not change runtime behavior.
 
 ## Restore App Icon Placement In Profile
 - [x] Update `plan.md` and `PROGRESS.md` for the placement follow-up
@@ -953,10 +958,6 @@
 - [x] Run `npm run test:e2e:ui`
 - [x] Run `npm run build:ios`
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
-- Verification notes:
-- `npm run test:e2e:api` passed (`28` tests), including new iOS tip-intent readiness coverage and Stripe companion-tip webhook coverage.
-- `npm run test:e2e:ui` passed (`47` tests).
-- `npm run build:ios` passed.
 - [x] Run `npm run test:e2e:ui`
 - [x] Update `plan.md` and `PROGRESS.md` with final status and notes
 
@@ -984,9 +985,6 @@
 - FAILED: KeyboardResize.None + kbHeight - measured safeAreaBottom — measurement off, both still broken
 - FAILED: KeyboardResize.None + vv.height with resize listener — causes jumping during animation
 - **CURRENT STATE (input WORKS, top BROKEN):** `KeyboardResize.None` + `baseHeight - keyboardHeight` — input fully visible above keyboard, but top header shifts down because keyboardHeight includes safe area bottom (~34px) that innerHeight doesn't
-- [ ] Fix top shift (separate task — needs to account for safe area bottom difference between keyboardHeight and innerHeight)
-- [ ] Run `npm run test:e2e:ui`
-- [ ] Run `npm run build:ios` + manual device test
 
 ## iOS Keyboard Offset Refactor (Chat, Support, Add Email)
 - [x] Update `plan.md` and `PROGRESS.md` with the shared keyboard-offset refactor scope before code changes
@@ -998,15 +996,6 @@
 - [x] Run `npm run build:ios`
 - [x] Run `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
 - [x] Update `plan.md` and `PROGRESS.md` with final status, what worked, and what failed
-- WORKED: keep `KeyboardResize.None`, stop shrinking `--app-viewport-height`, and lift only the bottom input bars with `--app-keyboard-offset = keyboardHeight - safeAreaBottom`.
-- WORKED: enable native `Keyboard.setScroll({ isDisabled: true })` only while the keyboard is open, paired with the temporary DOM `ios-keyboard-open` class, then clear both on hide.
-- WORKED: subtract `env(safe-area-inset-top)` from the three full-screen page heights because the app shell already applies top safe-area padding globally.
-- COVERAGE: chat and support native keyboard tests now compile and run in the `AppUITests` target; add-email coverage is implemented and skips unless `UITEST_RELAY_EMAIL` / `UITEST_RELAY_PASSWORD` are provided.
-- Verification notes:
-- `npm run test:e2e:ui` passed (`47` tests).
-- `npm run build:ios` passed.
-- `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
-- Manual real-iPhone verification is still pending for repeated focus/blur on chat, support, and add-email.
 
 ## iOS Companion List Overscroll Clamp
 - [x] Update `plan.md` and `PROGRESS.md` with the companion-list overscroll follow-up before code changes
@@ -1015,11 +1004,6 @@
 - [x] Run `npm run test:e2e:ui`
 - [x] Run `npm run build:ios`
 - [x] Commit only the task-related files
-- WORKED: switch the companion-list root to the same safe-area-adjusted fixed-height pattern used on the iOS keyboard-fixed pages.
-- WORKED: keep the header outside the scroll region and make the list body the only scrollable area.
-- Verification notes:
-- `npm run test:e2e:ui` passed (`47` tests).
-- `npm run build:ios` passed.
 
 ## Global iOS Pull-Down Clamp
 - [x] Update `plan.md` and `PROGRESS.md` with the global iOS shell-clamp scope before code changes
@@ -1033,55 +1017,3 @@
 - [x] Run `npm run build:ios`
 - [x] Run `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
 - [x] Update `plan.md` and `PROGRESS.md` with final status, root cause, and verification notes
-- WORKED: add a dedicated native-shell clamp on `html`, `body`, `#root`, and the app shell so the outer document stops being vertically movable on iPhone.
-- WORKED: replace the remaining routed `min-h-screen` pages with fixed-height shells plus inner `app-scroll-region` containers, preserving scrollability on long pages.
-- WORKED: keep the keyboard-offset refactor intact while aligning chat/support/add-email/list with the shared page-height helper.
-- WORKED: `PlanModal` full-screen mode now follows the same shell rules, so onboarding/pricing no longer remain a separate overscroll path.
-- COVERAGE: browser UI coverage now checks that representative full-screen routes keep `document.scrollingElement` clamped while long content scrolls inside route-owned regions.
-- COVERAGE: native `AppUITests` now include non-keyboard pull-down regression checks for a public screen and a protected screen, and the target compiles successfully.
-- Root cause: the previous companion-list-only change fixed one page, but the native document shell still had its own movable height; the global shell had to be clamped, not just individual routes.
-- Verification notes:
-- `npm run test:e2e:ui` passed (`48` tests).
-- `npm run build:ios` passed.
-- `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
-- Manual real-iPhone pull-down validation is still pending across the affected routed screens.
-
-
-## Show Actions Toggle in Profile Settings
-- [x] Add `v39_show_actions_pref` migration — `show_actions BOOLEAN DEFAULT true` on `user_preferences`
-- [x] Add `show_actions` to GET/PUT `/api/user/preferences` in `user-api.js`
-- [x] Add `actionsEnabled` option to `buildCompanionSystemPrompt()` — prompt instructs AI to skip actions when disabled
-- [x] Add server-side strip in all 3 chat routes — remove `*actions*`, `contextText`, `sceneText` after AI generation
-- [x] Add `actionsEnabled` to `buildProactivePrompt()` + server-side strip in proactive.js
-- [x] Add "Actions in messages" toggle in Profile.jsx Content Preferences section
-- [ ] Run `npm run test:e2e:api`
-- [ ] Run `npm run test:e2e:ui`
-
-## RevenueCat Offerings Refactor
-- [x] Add `getSubscriptionOfferings()` and `getTipOfferings()` to `revenuecat.js` with module-level caching
-- [x] Add `FALLBACK_SUBSCRIPTION_PRICES` and `FALLBACK_TIP_AMOUNTS` constants for offline fallback
-- [x] Refactor `PlanModal.jsx` — dynamic prices from offerings, `purchasePackage` instead of `purchaseStoreProduct`
-- [x] Refactor `tipCheckout.js` — offerings-based purchase with `getProducts` fallback
-- [x] Add `getTipAmountsWithPrices()` helper for localized tip price display
-- [x] Update `TipPromoMessage.jsx` — localized `priceString` from offerings
-- [x] Update `CompanionSheet.jsx` — localized `priceString` from offerings
-- [x] Configure default offering in RevenueCat dashboard (subs only — tips use getProducts fallback)
-- [x] Test on iOS device with StoreKit sandbox — both subs and tips use offerings path
-- [ ] Verify experiments work end-to-end
-
-## Admin Page Improvements
-- [x] Breakdown tables in 4 columns layout
-- [x] Tab badges smaller + compact tab padding
-- [x] Online Now card — API: visitors + users (web/ios) with 5min window
-- [x] Online Now card — frontend rendering with platform sub-text
-- [x] Online chart — v40 migration: `online_snapshots` table
-- [x] Online chart — scheduler: snapshot every 5 min, purge after 48h
-- [x] Online chart — API: `GET /api/admin/online-history?hours=24`
-- [x] Online chart — visual bar chart (visitors + web/ios stacked) with tooltips
-
-## Admin: Delete User Button
-- [x] v41 migration: `deleted_at` column on users table
-- [x] DELETE `/api/admin/users/:id` — soft delete (null unique fields + set deleted_at)
-- [x] Filter soft-deleted users from admin users listing
-- [x] Delete button in Users tab with confirmation dialog
-- [x] Auth guard: block deleted users from `/me` and token refresh
