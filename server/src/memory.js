@@ -11,9 +11,10 @@
 const { getPool } = require('./db');
 const { trackConsumption } = require('./consumption');
 
-const EXTRACTION_THRESHOLD = 5;
+const EXTRACTION_THRESHOLD = 3;
 const SUMMARY_THRESHOLD = 20;
 const MAX_MEMORY_CHARS = 3000; // ~750 tokens hard cap
+const EXTRACTION_CHUNK_SIZE = 5; // process user messages in small batches
 
 // -- Build memory context for system prompt ----------------------
 
@@ -133,12 +134,6 @@ async function processMemory(pool, conversationId, companionId, userId) {
 // -- Fact extraction ---------------------------------------------
 
 async function extractFacts(pool, conversationId, companionId, userId) {
-  // Load existing facts
-  const { rows: existingFacts } = await pool.query(
-    'SELECT category, fact FROM companion_memories WHERE conversation_id = $1',
-    [conversationId]
-  );
-
   // Get last_extracted_message_id to only process NEW messages
   const { rows: convRows } = await pool.query(
     'SELECT last_extracted_message_id FROM conversations WHERE id = $1',
@@ -153,22 +148,21 @@ async function extractFacts(pool, conversationId, companionId, userId) {
       `SELECT id, content FROM messages
        WHERE conversation_id = $1 AND role = 'user'
        AND created_at > (SELECT created_at FROM messages WHERE id = $2)
-       ORDER BY created_at ASC LIMIT 30`,
+       ORDER BY created_at ASC LIMIT 50`,
       [conversationId, lastExtractedId]
     );
     messages = rows;
   } else {
-    // First extraction — get all user messages
     const { rows } = await pool.query(
       `SELECT id, content FROM messages
        WHERE conversation_id = $1 AND role = 'user'
-       ORDER BY created_at ASC LIMIT 30`,
+       ORDER BY created_at ASC LIMIT 50`,
       [conversationId]
     );
     messages = rows;
   }
 
-  if (messages.length < 2) return; // not enough user messages
+  if (messages.length === 0) return;
 
   // Update last_extracted_message_id to the latest message in conversation
   const { rows: latestMsg } = await pool.query(
@@ -182,63 +176,73 @@ async function extractFacts(pool, conversationId, companionId, userId) {
     );
   }
 
+  // Process in small chunks so the model focuses on each batch and misses nothing
+  const chunks = [];
+  for (let i = 0; i < messages.length; i += EXTRACTION_CHUNK_SIZE) {
+    chunks.push(messages.slice(i, i + EXTRACTION_CHUNK_SIZE));
+  }
+
+  let totalExtracted = 0;
+  for (const chunk of chunks) {
+    const count = await extractFactsFromChunk(pool, conversationId, companionId, userId, chunk);
+    totalExtracted += count;
+  }
+
+  if (totalExtracted > 0) {
+    console.log(`[memory] extracted ${totalExtracted} facts (${chunks.length} chunks) for conversation ${conversationId}`);
+  }
+}
+
+async function extractFactsFromChunk(pool, conversationId, companionId, userId, messages) {
+  // Load existing facts (refresh each chunk so dedup stays current)
+  const { rows: existingFacts } = await pool.query(
+    'SELECT category, fact FROM companion_memories WHERE conversation_id = $1',
+    [conversationId]
+  );
+
   const existingText = existingFacts.length > 0
-    ? `\nAlready known facts (do NOT repeat these — only extract NEW facts):\n${existingFacts.map(f => `- [${f.category}] ${f.fact}`).join('\n')}`
+    ? `\nAlready known facts (do NOT repeat these — only extract NEW facts not in this list):\n${existingFacts.map(f => `- [${f.category}] ${f.fact}`).join('\n')}`
     : '';
 
-  // Strip roleplay formatting to reduce model's urge to roleplay
   const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
-  const messagesText = messages.map(m => `user: ${cleanMsg(m.content)}`).join('\n');
+  const messagesText = messages.map(m => `- ${cleanMsg(m.content)}`).join('\n');
 
-  const systemPrompt = `You are a data extraction assistant. You are NOT a character — do NOT roleplay. Your ONLY job is to extract ALL personal facts about the human user from their messages below.
+  const systemPrompt = `You are a data extraction assistant. Extract ALL personal facts about the user from the messages below. Be thorough — every detail matters.
 
-OUTPUT FORMAT: Return a raw JSON array. No explanation, no commentary, no markdown. Just the JSON.
+OUTPUT: Raw JSON array only. No explanation.
 
-CATEGORIES:
-- identity: name, age, gender, birthday, zodiac, nationality, location
-- preferences: favorite food, music, movies, hobbies, colors, seasons
-- life: job, education, pets, family, living situation, daily habits
-- relationship: how they feel about the companion, relationship dynamics
-- emotional: current mood, worries, hopes, dreams
-
-EXAMPLE OUTPUT:
-[{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User works as a teacher"},{"category":"preferences","fact":"User's favorite food is pizza"},{"category":"life","fact":"User has a cat named Whiskers"}]
+CATEGORIES: identity (name, age, birthday, zodiac, nationality, location, gender), preferences (food, music, movies, hobbies, colors, seasons, books, shows), life (job, education, pets, family, friends, living situation, habits, health, sports, skills), relationship, emotional (mood, dreams, goals, worries)
 
 RULES:
-- Extract ALL facts from the user messages — do not skip any personal detail
-- Each fact = one short sentence starting with "User"
-- Include: names, numbers, places, dates, preferences, habits, relationships, jobs, pets, hobbies
-- If a user mentions ANY specific detail about themselves, extract it
-- If no new facts found, return: []
-- Max 15 facts per extraction
+- One fact per detail. If a message contains 3 details, output 3 facts.
+- Each fact = short sentence starting with "User"
+- Extract: names, numbers, places, dates, habits, allergies, routines, plans, relationships
+- Do NOT skip minor details — "drinks 4 cups of coffee" is a fact, "runs 5 miles" is a fact
+- If no NEW facts, return: []
 ${existingText}`;
 
   const { plainChatCompletion } = require('./ai');
   const result = await plainChatCompletion(systemPrompt, [
-    { role: 'user', content: messagesText },
+    { role: 'user', content: `USER MESSAGES:\n${messagesText}` },
   ]);
 
-  if (!result || !result.content) return;
+  if (!result || !result.content) return 0;
 
-  // Parse JSON from response (handle markdown code blocks, prose wrapping)
   let factsJson;
   try {
     let text = result.content.trim();
-    // Strip markdown code fence if present
     const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (fenceMatch) text = fenceMatch[1].trim();
-    // Try to find JSON array in the response (model may wrap in prose)
     const arrayMatch = text.match(/\[[\s\S]*\]/);
     if (arrayMatch) text = arrayMatch[0];
     factsJson = JSON.parse(text);
   } catch {
     console.warn('[memory] failed to parse facts JSON:', result.content.slice(0, 200));
-    return;
+    return 0;
   }
 
-  if (!Array.isArray(factsJson) || factsJson.length === 0) return;
+  if (!Array.isArray(factsJson) || factsJson.length === 0) return 0;
 
-  // Track consumption
   await trackConsumption({
     userId,
     companionId,
@@ -251,42 +255,36 @@ ${existingText}`;
     metadata: { type: 'fact_extraction', factsCount: factsJson.length },
   });
 
-  // Upsert facts — for each category+fact pair, replace if similar exists
   const lastMessageId = messages[messages.length - 1]?.id;
-
   const VALID_CATEGORIES = new Set(['identity', 'preferences', 'life', 'relationship', 'emotional']);
+  let saved = 0;
 
   for (const item of factsJson.slice(0, 15)) {
     if (!item.category || !item.fact) continue;
     const category = String(item.category).toLowerCase().trim();
     const fact = String(item.fact).trim();
-    if (!VALID_CATEGORIES.has(category)) continue; // skip garbage categories
+    if (!VALID_CATEGORIES.has(category)) continue;
     if (!fact || fact.length > 500) continue;
 
-    // Check for existing fact in same category with similar content
     const { rows: existing } = await pool.query(
       `SELECT id, fact FROM companion_memories
        WHERE conversation_id = $1 AND category = $2`,
       [conversationId, category]
     );
 
-    // Simple dedup: if any existing fact starts with the same key phrase, update it
-    const keyPhrase = fact.split(/\s+(is|are|has|likes|works|prefers|lives|named|plays|loves|drinks|studies|wants|moved|used|born)\s+/i)[0]?.toLowerCase();
+    const keyPhrase = fact.split(/\s+(is|are|has|likes|works|prefers|lives|named|plays|loves|drinks|studies|wants|moved|used|born|enjoys|runs|wakes|reads|cooks|watches)\s+/i)[0]?.toLowerCase();
     const match = existing.find(e => {
-      const eKey = e.fact.split(/\s+(is|are|has|likes|works|prefers|lives|named|plays|loves|drinks|studies|wants|moved|used|born)\s+/i)[0]?.toLowerCase();
+      const eKey = e.fact.split(/\s+(is|are|has|likes|works|prefers|lives|named|plays|loves|drinks|studies|wants|moved|used|born|enjoys|runs|wakes|reads|cooks|watches)\s+/i)[0]?.toLowerCase();
       return eKey && keyPhrase && eKey === keyPhrase;
     });
 
     if (match) {
       await pool.query(
-        `UPDATE companion_memories SET fact = $1, updated_at = NOW(), source_message_id = $2
-         WHERE id = $3`,
+        `UPDATE companion_memories SET fact = $1, updated_at = NOW(), source_message_id = $2 WHERE id = $3`,
         [fact, lastMessageId, match.id]
       );
     } else {
-      // Cap facts per category — 8 per category (was 5)
       if (existing.length >= 8) {
-        // Remove oldest fact in this category to make room
         await pool.query(
           `DELETE FROM companion_memories WHERE id = (
             SELECT id FROM companion_memories
@@ -301,10 +299,11 @@ ${existingText}`;
          VALUES ($1, $2, $3, $4)`,
         [conversationId, category, fact, lastMessageId]
       );
+      saved++;
     }
   }
 
-  console.log(`[memory] extracted ${factsJson.length} facts for conversation ${conversationId}`);
+  return saved;
 }
 
 // -- Summary generation ------------------------------------------
