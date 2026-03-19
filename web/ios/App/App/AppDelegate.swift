@@ -47,7 +47,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         overlay.tag = 9999
 
         // App icon
-        if let iconImage = UIImage(named: "AppIcon") {
+        if let iconImage = UIImage(named: "LaunchIcon") {
             let iconView = UIImageView(image: iconImage)
             iconView.contentMode = .scaleAspectFit
             iconView.translatesAutoresizingMaskIntoConstraints = false
