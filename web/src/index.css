@@ -44,6 +44,26 @@ html, body {
   width: 100%;
 }
 
+html.ios-native-shell,
+html.ios-native-shell body,
+html.ios-native-shell #root {
+  height: var(--app-viewport-height, 100vh);
+  min-height: var(--app-viewport-height, 100vh);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html.ios-native-shell body {
+  position: relative;
+}
+
+html.ios-native-shell .app-desktop-shell,
+html.ios-native-shell .app-shell-column {
+  height: var(--app-viewport-height, 100vh);
+  min-height: var(--app-viewport-height, 100vh);
+  overflow: hidden;
+}
+
 html.ios-keyboard-open,
 body.ios-keyboard-open {
   overflow: hidden;
@@ -69,6 +89,15 @@ body {
 
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.app-scroll-region {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+html.ios-native-shell .app-scroll-region {
+  overscroll-behavior-y: none;
 }
 
 /* Desktop background decorations */

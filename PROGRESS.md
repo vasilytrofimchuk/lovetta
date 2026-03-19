@@ -1016,6 +1016,31 @@
 - `npm run test:e2e:ui` passed (`47` tests).
 - `npm run build:ios` passed.
 
+## Global iOS Pull-Down Clamp
+- [x] Update `plan.md` and `PROGRESS.md` with the global iOS shell-clamp scope before code changes
+- [x] Add a shared native iOS shell class in `App.jsx` / `index.css` that clamps the outer document and app shell height
+- [x] Add a shared page-height helper and switch the remaining full-screen routes away from raw `min-h-screen`
+- [x] Keep long-page scrolling inside route-owned `flex-1 min-h-0 overflow-y-auto` regions instead of document scroll
+- [x] Align existing iOS fixed-height pages and `PlanModal` full-screen mode with the same shell contract
+- [x] Extend UI regression coverage for the shared shell contract
+- [x] Extend `web/ios/App/AppUITests/AppUITests.swift` with non-keyboard pull-down regression coverage
+- [x] Run `npm run test:e2e:ui`
+- [x] Run `npm run build:ios`
+- [x] Run `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Update `plan.md` and `PROGRESS.md` with final status, root cause, and verification notes
+- WORKED: add a dedicated native-shell clamp on `html`, `body`, `#root`, and the app shell so the outer document stops being vertically movable on iPhone.
+- WORKED: replace the remaining routed `min-h-screen` pages with fixed-height shells plus inner `app-scroll-region` containers, preserving scrollability on long pages.
+- WORKED: keep the keyboard-offset refactor intact while aligning chat/support/add-email/list with the shared page-height helper.
+- WORKED: `PlanModal` full-screen mode now follows the same shell rules, so onboarding/pricing no longer remain a separate overscroll path.
+- COVERAGE: browser UI coverage now checks that representative full-screen routes keep `document.scrollingElement` clamped while long content scrolls inside route-owned regions.
+- COVERAGE: native `AppUITests` now include non-keyboard pull-down regression checks for a public screen and a protected screen, and the target compiles successfully.
+- Root cause: the previous companion-list-only change fixed one page, but the native document shell still had its own movable height; the global shell had to be clamped, not just individual routes.
+- Verification notes:
+- `npm run test:e2e:ui` passed (`48` tests).
+- `npm run build:ios` passed.
+- `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- Manual real-iPhone pull-down validation is still pending across the affected routed screens.
+
 
 ## Show Actions Toggle in Profile Settings
 - [x] Add `v39_show_actions_pref` migration — `show_actions BOOLEAN DEFAULT true` on `user_preferences`
@@ -1026,6 +1051,18 @@
 - [x] Add "Actions in messages" toggle in Profile.jsx Content Preferences section
 - [ ] Run `npm run test:e2e:api`
 - [ ] Run `npm run test:e2e:ui`
+
+## RevenueCat Offerings Refactor
+- [x] Add `getSubscriptionOfferings()` and `getTipOfferings()` to `revenuecat.js` with module-level caching
+- [x] Add `FALLBACK_SUBSCRIPTION_PRICES` and `FALLBACK_TIP_AMOUNTS` constants for offline fallback
+- [x] Refactor `PlanModal.jsx` — dynamic prices from offerings, `purchasePackage` instead of `purchaseStoreProduct`
+- [x] Refactor `tipCheckout.js` — offerings-based purchase with `getProducts` fallback
+- [x] Add `getTipAmountsWithPrices()` helper for localized tip price display
+- [x] Update `TipPromoMessage.jsx` — localized `priceString` from offerings
+- [x] Update `CompanionSheet.jsx` — localized `priceString` from offerings
+- [x] Configure default offering in RevenueCat dashboard (subs only — tips use getProducts fallback)
+- [ ] Test on iOS device with StoreKit sandbox
+- [ ] Verify experiments work end-to-end
 
 ## Admin Page Improvements
 - [x] Breakdown tables in 4 columns layout

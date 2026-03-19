@@ -5,8 +5,11 @@ import api, { getErrorMessage } from '../lib/api'
 import { isAppStore } from '../lib/platform'
 import { Browser } from '@capacitor/browser'
 import { isCapacitor } from '../lib/platform'
+import { getAppPageHeight } from '../lib/layout'
 import {
   getRevenueCatErrorMessage,
+  getSubscriptionOfferings,
+  FALLBACK_SUBSCRIPTION_PRICES,
   IOS_SUBSCRIPTION_PRODUCT_IDS,
   IOS_SUBSCRIPTION_PRODUCTS,
   isRevenueCatCancelError,
@@ -38,6 +41,7 @@ function openLink(url) {
  *   fullScreen  — when true, renders without overlay wrapper (used by Pricing.jsx as a full page)
  */
 export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = false }) {
+  const pageHeight = getAppPageHeight()
   const { user } = useAuth()
   const toast = useToast()
   const [loading, setLoading] = useState(null)
@@ -45,12 +49,22 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
   const [selectedPlan, setSelectedPlan] = useState('yearly')
   const [error, setError] = useState('')
   const [loadingMessage, setLoadingMessage] = useState('')
+  const [offerings, setOfferings] = useState(null)
 
   useEffect(() => {
     if (!isOpen) return
     setError('')
     setLoadingMessage('')
+    if (isAppStore()) {
+      getSubscriptionOfferings().then(setOfferings).catch(() => {})
+    }
   }, [isOpen])
+
+  const sub = (plan) => offerings?.[plan] || FALLBACK_SUBSCRIPTION_PRICES[plan]
+  const monthlyPrice = sub('monthly')?.price || 19.99
+  const yearlyPrice = sub('yearly')?.price || 99.99
+  const yearlyPerMonth = (yearlyPrice / 12).toFixed(2)
+  const savingsPercent = Math.round((1 - yearlyPrice / 12 / monthlyPrice) * 100)
 
   const handleSubscribe = async (plan) => {
     setError('')
@@ -63,42 +77,38 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
         }
 
         const { Purchases } = await import('@revenuecat/purchases-capacitor')
-        const productIdentifier = IOS_SUBSCRIPTION_PRODUCTS[plan]
+        const offeringPkg = offerings?.[plan]?.package
 
         console.log('[billing] subscribe tapped', {
           plan,
-          productIdentifier,
+          useOffering: !!offeringPkg,
         })
-
-        console.log('[billing] products requested', {
-          plan,
-          productIdentifiers: IOS_SUBSCRIPTION_PRODUCT_IDS,
-        })
-        const productsResult = await withTimeout(
-          Purchases.getProducts({ productIdentifiers: IOS_SUBSCRIPTION_PRODUCT_IDS }),
-          PRODUCT_TIMEOUT_MS,
-          IOS_PURCHASE_ERROR_MESSAGE
-        )
-        const products = productsResult?.products || []
-        console.log('[billing] products received', {
-          plan,
-          productIdentifiers: products.map((product) => product.identifier),
-        })
-        if (!products.length) {
-          throw new Error('No iOS subscription products were returned. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account and product status in App Store Connect.')
-        }
-
-        const product = products.find((entry) => entry.identifier === productIdentifier)
-        if (!product) {
-          throw new Error(`StoreKit did not return the expected subscription product: ${productIdentifier}`)
-        }
 
         setLoadingMessage('Opening App Store…')
-        console.log('[billing] purchase submitted', {
-          plan,
-          productIdentifier,
-        })
-        await Purchases.purchaseStoreProduct({ product })
+
+        if (offeringPkg) {
+          // Use offerings-based purchase (enables experiments/A/B tests)
+          console.log('[billing] purchasePackage', { plan, productId: offeringPkg.product?.identifier })
+          await Purchases.purchasePackage({ aPackage: offeringPkg })
+        } else {
+          // Fallback: fetch products directly by ID
+          const productIdentifier = IOS_SUBSCRIPTION_PRODUCTS[plan]
+          console.log('[billing] fallback getProducts', { plan, productIdentifier })
+          const productsResult = await withTimeout(
+            Purchases.getProducts({ productIdentifiers: IOS_SUBSCRIPTION_PRODUCT_IDS }),
+            PRODUCT_TIMEOUT_MS,
+            IOS_PURCHASE_ERROR_MESSAGE
+          )
+          const products = productsResult?.products || []
+          if (!products.length) {
+            throw new Error('No iOS subscription products were returned. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account and product status in App Store Connect.')
+          }
+          const product = products.find((entry) => entry.identifier === productIdentifier)
+          if (!product) {
+            throw new Error(`StoreKit did not return the expected subscription product: ${productIdentifier}`)
+          }
+          await Purchases.purchaseStoreProduct({ product })
+        }
         console.log('[billing] purchase resolved', {
           plan,
           productIdentifier,
@@ -189,7 +199,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
               : 'border-brand-border'
           }`} />
           <div className="text-[0.75rem] text-brand-muted uppercase tracking-wide font-semibold mb-1">Monthly</div>
-          <div className="text-3xl font-extrabold text-brand-text leading-tight">$19.99</div>
+          <div className="text-3xl font-extrabold text-brand-text leading-tight">{sub('monthly')?.priceString || '$19.99'}</div>
           <div className="text-[0.78rem] text-brand-text-secondary mt-0.5">per month</div>
         </button>
 
@@ -210,9 +220,9 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
               : 'border-brand-border'
           }`} />
           <div className="text-[0.75rem] text-brand-muted uppercase tracking-wide font-semibold mb-1">Yearly</div>
-          <div className="text-3xl font-extrabold text-brand-text leading-tight">$99.99</div>
+          <div className="text-3xl font-extrabold text-brand-text leading-tight">{sub('yearly')?.priceString || '$99.99'}</div>
           <div className="text-[0.78rem] text-brand-text-secondary mt-0.5">per year</div>
-          <div className="text-[0.7rem] text-green-400 font-semibold mt-1.5">$8.33/mo — save 58%</div>
+          <div className="text-[0.7rem] text-green-400 font-semibold mt-1.5">${yearlyPerMonth}/mo — save {savingsPercent}%</div>
         </button>
       </div>
 
@@ -292,8 +302,12 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
   )
 
   if (fullScreen) return (
-    <div className="min-h-screen bg-brand-bg flex flex-col">
-      {content}
+    <div className="bg-brand-bg" style={{ height: pageHeight }}>
+      <div className="app-scroll-region h-full overflow-y-auto">
+        <div className="min-h-full flex flex-col">
+          {content}
+        </div>
+      </div>
     </div>
   )
 

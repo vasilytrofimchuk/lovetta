@@ -233,6 +233,50 @@ test.describe('Companion List', () => {
     expect(Math.abs(desktopChatMetrics.chatWidth - desktopChatMetrics.shellWidth)).toBeLessThanOrEqual(2);
   });
 
+  test('full-screen routes clamp document height and keep scrolling inside page regions', async ({ page, request }) => {
+    await page.goto(`${BASE}/my/welcome`);
+    await page.waitForSelector('[data-testid="welcome-screen"]', { timeout: 10000 });
+
+    const welcomeMetrics = await page.evaluate(() => {
+      const screen = document.querySelector('[data-testid="welcome-screen"]');
+      const scrollRegion = document.querySelector('[data-testid="welcome-scroll-region"]');
+      if (!screen || !scrollRegion || !document.scrollingElement) return null;
+
+      return {
+        screenHeight: screen.getBoundingClientRect().height,
+        docOverflow: document.scrollingElement.scrollHeight - window.innerHeight,
+        scrollClientHeight: scrollRegion.clientHeight,
+      };
+    });
+
+    expect(welcomeMetrics).toBeTruthy();
+    expect(Math.abs(welcomeMetrics.screenHeight - page.viewportSize().height)).toBeLessThanOrEqual(2);
+    expect(welcomeMetrics.docOverflow).toBeLessThanOrEqual(2);
+    expect(welcomeMetrics.scrollClientHeight).toBeGreaterThan(0);
+
+    await seedAuthenticatedUser(page, request);
+    await page.goto(`${BASE}/my/create`);
+    await page.waitForSelector('[data-testid="companion-create-page"]', { timeout: 10000 });
+    await page.getByRole('button', { name: 'Be the Creator' }).click();
+
+    const createMetrics = await page.evaluate(() => {
+      const screen = document.querySelector('[data-testid="companion-create-page"]');
+      const scrollRegion = document.querySelector('[data-testid="companion-create-scroll-region"]');
+      if (!screen || !scrollRegion || !document.scrollingElement) return null;
+
+      return {
+        screenHeight: screen.getBoundingClientRect().height,
+        docOverflow: document.scrollingElement.scrollHeight - window.innerHeight,
+        scrollOverflow: scrollRegion.scrollHeight - scrollRegion.clientHeight,
+      };
+    });
+
+    expect(createMetrics).toBeTruthy();
+    expect(Math.abs(createMetrics.screenHeight - page.viewportSize().height)).toBeLessThanOrEqual(2);
+    expect(createMetrics.docOverflow).toBeLessThanOrEqual(2);
+    expect(createMetrics.scrollOverflow).toBeGreaterThan(0);
+  });
+
   test('shows empty state for new user', async ({ page }) => {
     await signupViaUI(page);
     await expect(page.locator('text=Bring someone special to life')).toBeVisible({ timeout: 5000 });

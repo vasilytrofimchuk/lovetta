@@ -6,15 +6,14 @@ import api from '../lib/api';
 import CompanionCard from '../components/CompanionCard';
 import PlanModal from '../components/PlanModal';
 import { isCapacitor } from '../lib/platform';
+import { getAppPageHeight } from '../lib/layout';
 
 export default function CompanionList() {
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const nativePlatform = isCapacitor();
-  const pageHeight = nativePlatform
-    ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))'
-    : 'var(--app-viewport-height, 100vh)';
+  const pageHeight = getAppPageHeight(nativePlatform);
   const [searchParams] = useSearchParams();
   const [companions, setCompanions] = useState([]);
   const [subscription, setSubscription] = useState(null);
@@ -100,7 +99,7 @@ export default function CompanionList() {
 
       <div
         data-testid="companion-list-content"
-        className="flex-1 min-h-0 overflow-y-auto app-page-gutter py-4"
+        className="app-scroll-region flex-1 min-h-0 overflow-y-auto app-page-gutter py-4"
         style={{ overscrollBehaviorY: 'none' }}
       >
         {/* Subscription banner */}

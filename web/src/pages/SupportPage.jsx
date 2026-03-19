@@ -2,13 +2,12 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { isCapacitor } from '../lib/platform';
+import { getAppPageHeight } from '../lib/layout';
 
 export default function SupportPage() {
   const navigate = useNavigate();
   const nativePlatform = isCapacitor();
-  const pageHeight = nativePlatform
-    ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))'
-    : 'var(--app-viewport-height, 100vh)';
+  const pageHeight = getAppPageHeight(nativePlatform);
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -104,7 +103,7 @@ export default function SupportPage() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto app-page-gutter py-4 space-y-3">
+      <div ref={scrollRef} className="app-scroll-region flex-1 min-h-0 overflow-y-auto app-page-gutter py-4 space-y-3">
         {loading && <div className="text-center text-brand-muted text-sm mt-12">Connecting...</div>}
         {!loading && error && (
           <div className="text-center mt-12">

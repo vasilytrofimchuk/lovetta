@@ -120,6 +120,20 @@ final class AppUITests: XCTestCase {
         XCTAssertEqual(backButton.frame.minY, initialHeaderY, accuracy: 6)
     }
 
+    func testWelcomePullDownDoesNotShiftScreen() throws {
+        let continueButton = app.buttons["Continue"]
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 20))
+        assertPullDownKeepsAnchorStable(continueButton)
+    }
+
+    func testCompanionListPullDownDoesNotShiftScreen() throws {
+        try loginWithPreparedAccount()
+
+        let profileButton = app.buttons["Profile"]
+        XCTAssertTrue(profileButton.waitForExistence(timeout: 20))
+        assertPullDownKeepsAnchorStable(profileButton)
+    }
+
     private func loginWithPreparedAccount() throws {
         if app.buttons["Profile"].waitForExistence(timeout: 5) {
             return
@@ -217,6 +231,19 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(keyboard.frame.height, 0)
         XCTAssertLessThan(input.frame.maxY, keyboard.frame.minY)
+    }
+
+    private func assertPullDownKeepsAnchorStable(_ anchor: XCUIElement, accuracy: CGFloat = 6) {
+        let initialY = anchor.frame.minY
+        performTopPullDown()
+        XCTAssertEqual(anchor.frame.minY, initialY, accuracy: accuracy)
+    }
+
+    private func performTopPullDown() {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.18))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.52))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.2))
     }
 
     private func dismissKeyboardIfNeeded() {

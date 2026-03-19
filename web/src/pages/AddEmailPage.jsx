@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import api from '../lib/api';
 import { isCapacitor } from '../lib/platform';
+import { getAppPageHeight } from '../lib/layout';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -12,9 +13,7 @@ export default function AddEmailPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const nativePlatform = isCapacitor();
-  const pageHeight = nativePlatform
-    ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))'
-    : 'var(--app-viewport-height, 100vh)';
+  const pageHeight = getAppPageHeight(nativePlatform);
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -69,7 +68,7 @@ export default function AddEmailPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto app-page-gutter py-4 space-y-3">
+      <div className="app-scroll-region flex-1 min-h-0 overflow-y-auto app-page-gutter py-4 space-y-3">
         <div className="text-center text-brand-muted text-sm mt-12 leading-relaxed">
           Your Apple account uses a private relay email.<br />
           Add your real email to receive messages from your girlfriends and account recovery.

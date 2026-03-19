@@ -982,9 +982,37 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - `npm run test:e2e:ui` passed (`47` tests).
 - `npm run build:ios` passed.
 
+## Global iOS Pull-Down Clamp — DONE
+- Log this broader follow-up in `plan.md` and `PROGRESS.md` before changing code.
+- Keep the recent keyboard-offset behavior intact; this task only removes the remaining document-level pull-down/rubber-band on native iPhone screens.
+- Add a shared native iOS shell class in `web/src/App.jsx` / `web/src/index.css` so `html`, `body`, `#root`, and the desktop shell are clamped to `var(--app-viewport-height)` with `overflow: hidden`.
+- Add one shared page-height helper in `web/src/lib/layout.js`, then convert the remaining routed full-screen pages away from raw `min-h-screen` so each page owns its own inner scroll region instead of relying on document scroll.
+- Apply the fixed-height shell pattern to auth/onboarding/loading, Profile, CompanionCreate, Pricing, and `PlanModal` full-screen mode while keeping Chat, Support, Add Email, and Companion List aligned with the same helper.
+- Extend UI coverage for the shared shell contract and native `AppUITests` coverage for pull-down regression behavior on one public screen and one protected screen.
+- Re-run `npm run test:e2e:ui`, `npm run build:ios`, and `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- The companion-list-only fix was incomplete because the native document shell itself still had room to move; clamping only one routed page did not stop pull-down on the rest of the app.
+- `web/src/App.jsx` now toggles a dedicated `ios-native-shell` class, while `web/src/index.css` clamps `html`, `body`, `#root`, and the app shell to `var(--app-viewport-height)` with `overflow: hidden`.
+- Added `web/src/lib/layout.js` so routed full-screen screens share one `getAppPageHeight()` contract instead of repeating ad hoc `min-h-screen` or inline viewport math.
+- Auth, onboarding, pricing, profile, create, welcome, and the loading state now use fixed-height shells with inner `app-scroll-region` containers; existing chat/support/add-email/list pages were aligned with the same helper without changing keyboard-offset behavior.
+- `PlanModal` full-screen mode now uses the same fixed-height shell, and UI/native regression coverage was extended for both the shared shell contract and non-keyboard pull-down behavior.
+- Verification:
+- `npm run test:e2e:ui` passed (`48` tests).
+- `npm run build:ios` passed.
+- `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- Manual real-iPhone verification is still pending for the actual pull-down gesture across welcome, auth, list, profile, create, pricing, chat, support, and add-email.
+
 ## Show Actions Toggle — DONE
 - New `show_actions` preference (default `true`) in `user_preferences` table.
 - When disabled: AI is prompted not to use `*actions*`, and server strips any that slip through.
 - Scenes are also suppressed when actions are off.
 - Toggle in Profile > Content Preferences.
 - Affects chat, opener, media-request, and proactive message routes.
+
+## RevenueCat Offerings Refactor — IN PROGRESS
+- Switch iOS IAP from hardcoded product IDs (`getProducts`) to RevenueCat Offerings API (`getOfferings`).
+- Enables RevenueCat Experiments (A/B pricing tests), localized prices, dashboard-controlled products.
+- Prerequisite: configure default offering in RevenueCat dashboard (subs only — tips use getProducts fallback).
+- Client-side only — no server changes needed (webhook handler already generic).
+- Files: `revenuecat.js`, `PlanModal.jsx`, `tipCheckout.js`, `TipPromoMessage.jsx`, `CompanionSheet.jsx`.
+- Fallback: if offerings API fails, falls back to existing `getProducts` flow with hardcoded prices.

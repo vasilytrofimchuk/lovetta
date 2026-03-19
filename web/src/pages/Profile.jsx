@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import api from '../lib/api';
 import { APP_ICON_OPTIONS, getCurrentAppIcon, getSavedAppIcon, saveAppIcon, setCurrentAppIcon } from '../lib/app-icon';
 import { isAppStore, isCapacitor, isIOS } from '../lib/platform';
+import { getAppPageHeight } from '../lib/layout';
 import RealEmailPrompt from '../components/RealEmailPrompt';
 
 export default function Profile() {
@@ -54,6 +55,7 @@ export default function Profile() {
   const [referralExpanded, setReferralExpanded] = useState(false);
   const ios = isIOS();
   const appStore = isAppStore();
+  const pageHeight = getAppPageHeight(isCapacitor());
 
   // Navigate to support if there are unread messages
   useEffect(() => {
@@ -347,7 +349,11 @@ export default function Profile() {
   const showPushToggle = isCapacitor() || ('PushManager' in window);
 
   return (
-    <div className="min-h-screen bg-brand-bg pb-8">
+    <div
+      data-testid="profile-page"
+      className="bg-brand-bg flex flex-col w-full overflow-hidden"
+      style={{ height: pageHeight }}
+    >
       {/* Header */}
       <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
         <div className="w-full flex items-center gap-3">
@@ -364,8 +370,8 @@ export default function Profile() {
           <h1 className="text-xl font-bold text-brand-text">Profile</h1>
         </div>
       </div>
-      <div className="app-page-gutter">
-      <div className="w-full">
+      <div data-testid="profile-scroll-region" className="app-scroll-region flex-1 min-h-0 overflow-y-auto app-page-gutter pb-8">
+      <div className="w-full py-4">
 
         {/* User info */}
         <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
@@ -381,57 +387,6 @@ export default function Profile() {
             </div>
           </div>
         </div>
-
-        {ios && (
-          <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
-            <h3 className="text-sm font-semibold text-brand-text mb-1">App Icon</h3>
-            <p className="text-xs text-brand-muted mb-4">
-              Choose how Lovetta looks on your Home Screen.
-            </p>
-
-            {appIconLoading ? (
-              <p className="text-sm text-brand-muted">Loading...</p>
-            ) : (
-              <div className="grid grid-cols-3 gap-3">
-                {APP_ICON_OPTIONS.map((option) => {
-                  const selected = appIcon === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => handleAppIconSelect(option.id)}
-                      disabled={appIconSaving}
-                      className={`rounded-xl border p-2.5 text-left transition-all ${
-                        selected
-                          ? 'border-brand-accent bg-brand-accent/10 ring-1 ring-brand-accent/30'
-                          : 'border-brand-border bg-brand-surface hover:border-brand-accent/50'
-                      } ${appIconSaving ? 'disabled:opacity-80' : ''}`}
-                    >
-                      <img
-                        src={option.preview}
-                        alt={`${option.label} icon preview`}
-                        className="w-full rounded-[18px] mb-2 border border-black/5"
-                      />
-                      <div className="flex flex-col items-start gap-1">
-                        <span className="text-sm font-semibold text-brand-text leading-tight">{option.label}</span>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold leading-none ${
-                            selected
-                              ? 'bg-brand-accent/15 text-brand-accent border border-brand-accent/30'
-                              : 'bg-brand-bg/30 text-brand-muted border border-brand-border'
-                          }`}
-                        >
-                          {selected ? 'Selected' : 'Use'}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Real email prompt for Apple relay/synthetic users */}
         <RealEmailPrompt />
@@ -627,56 +582,54 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Content Preferences — hidden on App Store (server enforces level 0) */}
-        {!appStore && (
-          <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
-            <h3 className="text-sm font-semibold text-brand-text mb-3">Content Preferences</h3>
-            <div className="flex items-center justify-between">
-              <div className="pr-4">
-                <p className="text-sm text-brand-text">Explicit content</p>
-                <p className="text-xs text-brand-muted mt-0.5">
-                  Allow mature content in conversations and images
-                </p>
-              </div>
-              <button
-                onClick={toggleExplicit}
-                disabled={prefLoading || savingExplicit}
-                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                  explicitContent ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                    explicitContent ? 'translate-x-5.5 left-0.5' : 'left-0.5'
-                  }`}
-                  style={{ transform: explicitContent ? 'translateX(20px)' : 'translateX(0)' }}
-                />
-              </button>
+        {/* Content Preferences */}
+        <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
+          <h3 className="text-sm font-semibold text-brand-text mb-3">Content Preferences</h3>
+          <div className="flex items-center justify-between">
+            <div className="pr-4">
+              <p className="text-sm text-brand-text">Mature content</p>
+              <p className="text-xs text-brand-muted mt-0.5">
+                Allow mature themes in conversations and images
+              </p>
             </div>
-            <div className="flex items-center justify-between mt-4">
-              <div className="pr-4">
-                <p className="text-sm text-brand-text">Actions in messages</p>
-                <p className="text-xs text-brand-muted mt-0.5">
-                  Show roleplay actions like *smiles softly* in messages
-                </p>
-              </div>
-              <button
-                onClick={toggleActions}
-                disabled={prefLoading || savingActions}
-                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                  showActions ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
+            <button
+              onClick={toggleExplicit}
+              disabled={prefLoading || savingExplicit}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                explicitContent ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  explicitContent ? 'translate-x-5.5 left-0.5' : 'left-0.5'
                 }`}
-              >
-                <span
-                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                    showActions ? 'translate-x-5.5 left-0.5' : 'left-0.5'
-                  }`}
-                  style={{ transform: showActions ? 'translateX(20px)' : 'translateX(0)' }}
-                />
-              </button>
-            </div>
+                style={{ transform: explicitContent ? 'translateX(20px)' : 'translateX(0)' }}
+              />
+            </button>
           </div>
-        )}
+          <div className="flex items-center justify-between mt-4">
+            <div className="pr-4">
+              <p className="text-sm text-brand-text">Actions in messages</p>
+              <p className="text-xs text-brand-muted mt-0.5">
+                Show roleplay actions like *smiles softly* in messages
+              </p>
+            </div>
+            <button
+              onClick={toggleActions}
+              disabled={prefLoading || savingActions}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                showActions ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  showActions ? 'translate-x-5.5 left-0.5' : 'left-0.5'
+                }`}
+                style={{ transform: showActions ? 'translateX(20px)' : 'translateX(0)' }}
+              />
+            </button>
+          </div>
+        </div>
 
         {/* Referral Program — hidden on App Store (Apple doesn't allow external payment incentives) */}
         {!appStore && (
@@ -858,6 +811,57 @@ export default function Profile() {
             Contact Support
           </button>
         </div>
+
+        {ios && (
+          <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
+            <h3 className="text-sm font-semibold text-brand-text mb-1">App Icon</h3>
+            <p className="text-xs text-brand-muted mb-4">
+              Choose how Lovetta looks on your Home Screen.
+            </p>
+
+            {appIconLoading ? (
+              <p className="text-sm text-brand-muted">Loading...</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {APP_ICON_OPTIONS.map((option) => {
+                  const selected = appIcon === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => handleAppIconSelect(option.id)}
+                      disabled={appIconSaving}
+                      className={`rounded-xl border p-2.5 text-left transition-all ${
+                        selected
+                          ? 'border-brand-accent bg-brand-accent/10 ring-1 ring-brand-accent/30'
+                          : 'border-brand-border bg-brand-surface hover:border-brand-accent/50'
+                      } ${appIconSaving ? 'disabled:opacity-80' : ''}`}
+                    >
+                      <img
+                        src={option.preview}
+                        alt={`${option.label} icon preview`}
+                        className="w-full rounded-[18px] mb-2 border border-black/5"
+                      />
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="text-sm font-semibold text-brand-text leading-tight">{option.label}</span>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold leading-none ${
+                            selected
+                              ? 'bg-brand-accent/15 text-brand-accent border border-brand-accent/30'
+                              : 'bg-brand-bg/30 text-brand-muted border border-brand-border'
+                          }`}
+                        >
+                          {selected ? 'Selected' : 'Use'}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Sign out */}
         <button

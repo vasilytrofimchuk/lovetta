@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Toast';
 import api, { getErrorMessage } from '../../lib/api';
-import { TIP_AMOUNTS, startTipCheckout } from '../../lib/tipCheckout';
+import { TIP_AMOUNTS, getTipAmountsWithPrices, startTipCheckout } from '../../lib/tipCheckout';
+import { isAppStore } from '../../lib/platform';
 import { VOICES } from '../../lib/voices';
 import useVoicePreview from '../../hooks/useVoicePreview';
 
@@ -29,6 +30,7 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
   const [from, to] = getGradient(companion?.name || '');
   const { playingId, play: playVoice } = useVoicePreview();
   const [tipLoading, setTipLoading] = useState(null);
+  const [tipAmounts, setTipAmounts] = useState(TIP_AMOUNTS);
   const [editing, setEditing] = useState(false);
   const [editPersonality, setEditPersonality] = useState('');
   const [editTraits, setEditTraits] = useState([]);
@@ -36,6 +38,12 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (isAppStore()) {
+      getTipAmountsWithPrices().then(setTipAmounts).catch(() => {})
+    }
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -315,14 +323,14 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
             Send {companion.name} a tip
           </p>
           <div className="grid grid-cols-4 gap-2">
-            {TIP_AMOUNTS.map(({ amount }) => (
+            {tipAmounts.map(({ amount, priceString }) => (
               <button
                 key={amount}
                 onClick={() => handleTip(amount)}
                 disabled={tipLoading !== null}
                 className="py-2.5 px-1 rounded-lg border border-brand-accent/30 bg-brand-card text-brand-text hover:bg-brand-accent/15 hover:border-brand-accent/50 transition-colors disabled:opacity-50 font-medium"
               >
-                <span className="block text-sm">{tipLoading === amount ? '...' : `$${amount}`}</span>
+                <span className="block text-sm">{tipLoading === amount ? '...' : (priceString || `$${amount}`)}</span>
               </button>
             ))}
           </div>

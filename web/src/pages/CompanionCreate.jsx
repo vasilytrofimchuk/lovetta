@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { VOICES } from '../lib/voices';
 import useVoicePreview from '../hooks/useVoicePreview';
+import { getAppPageHeight } from '../lib/layout';
 
 const GRADIENT_COLORS = [
   ['#ec4899', '#8040e0'], ['#f06060', '#ec4899'], ['#6060f0', '#40a0e0'],
@@ -111,6 +112,7 @@ function TemplateCard({ t, onSelect }) {
 }
 
 export default function CompanionCreate() {
+  const pageHeight = getAppPageHeight();
   const navigate = useNavigate();
   const { playingId, play: playVoice } = useVoicePreview();
   const [step, setStep] = useState('choose'); // choose, templates, custom, confirm
@@ -224,7 +226,11 @@ export default function CompanionCreate() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-bg">
+    <div
+      data-testid="companion-create-page"
+      className="bg-brand-bg flex flex-col w-full overflow-hidden"
+      style={{ height: pageHeight }}
+    >
       {/* Header */}
       <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
         <div className="w-full flex items-center gap-3">
@@ -250,7 +256,7 @@ export default function CompanionCreate() {
         </div>
       </div>
 
-      <div className="app-page-gutter py-6">
+      <div data-testid="companion-create-scroll-region" className="app-scroll-region flex-1 min-h-0 overflow-y-auto app-page-gutter py-6">
         {/* Step: Choose path */}
         {step === 'choose' && (
           <div className="space-y-3">

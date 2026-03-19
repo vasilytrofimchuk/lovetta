@@ -8,14 +8,13 @@ import CompanionSheet from '../components/chat/CompanionSheet';
 import ReportModal from '../components/chat/ReportModal';
 import PlanModal from '../components/PlanModal';
 import { isCapacitor } from '../lib/platform';
+import { getAppPageHeight } from '../lib/layout';
 
 export default function ChatPage() {
   const { companionId } = useParams();
   const navigate = useNavigate();
   const nativePlatform = isCapacitor();
-  const pageHeight = nativePlatform
-    ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))'
-    : 'var(--app-viewport-height, 100vh)';
+  const pageHeight = getAppPageHeight(nativePlatform);
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     messages, companion, setCompanion, loading, streaming, streamingText,
@@ -67,7 +66,7 @@ export default function ChatPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+      <div className="bg-brand-bg flex items-center justify-center" style={{ height: pageHeight }}>
         <div className="text-brand-muted">Loading chat...</div>
       </div>
     );

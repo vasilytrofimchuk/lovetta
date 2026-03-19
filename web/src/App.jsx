@@ -4,7 +4,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ToastProvider } from './components/Toast'
 import usePwaInstall from './hooks/usePwaInstall'
 import { initIosKeyboard } from './lib/keyboard'
-import { isCapacitor } from './lib/platform'
+import { isCapacitor, isIOS } from './lib/platform'
+import { getAppPageHeight } from './lib/layout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
@@ -21,8 +22,10 @@ import WelcomeScreen from './pages/WelcomeScreen'
 import DesktopShell from './components/DesktopShell'
 
 function Loading() {
+  const pageHeight = getAppPageHeight(isCapacitor())
+
   return (
-    <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+    <div className="bg-brand-bg flex items-center justify-center" style={{ height: pageHeight }}>
       <div className="w-8 h-8 border-2 border-brand-accent border-t-transparent rounded-full animate-spin" />
     </div>
   )
@@ -181,6 +184,19 @@ function AppRoutes() {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const enableNativeShell = isIOS()
+    document.documentElement.classList.toggle('ios-native-shell', enableNativeShell)
+    document.body.classList.toggle('ios-native-shell', enableNativeShell)
+
+    return () => {
+      document.documentElement.classList.remove('ios-native-shell')
+      document.body.classList.remove('ios-native-shell')
+    }
+  }, [])
+
   useEffect(() => {
     let dispose = () => {}
     let active = true

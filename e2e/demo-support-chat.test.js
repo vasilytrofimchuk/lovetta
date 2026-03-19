@@ -14,26 +14,29 @@ async function signupViaUI(page) {
   const email = `conativer+demo_support_${Date.now()}@gmail.com`;
   await page.route('**/accounts.google.com/**', route => route.abort());
   await page.goto(`${BASE}/my/signup`);
-  await page.waitForSelector('input[type="email"]', { timeout: 10000 });
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', TEST_PASSWORD);
 
-  // Birth Month — custom dropdown: click to open, then pick June
+  // Step 1: Age gate + consent
+  await page.waitForSelector('text=Verify your age', { timeout: 10000 });
   const monthBtn = page.locator('label:has-text("Birth Month")').locator('..').locator('button').first();
   await monthBtn.click();
   await page.locator('button:has-text("June")').click();
-
-  // Birth Year — custom dropdown: click to open, then pick 1995
   const yearBtn = page.locator('label:has-text("Birth Year")').locator('..').locator('button').first();
   await yearBtn.click();
   await page.locator('button:has-text("1995")').click();
-
-  await page.locator('button[type="submit"]').click();
-  await page.waitForSelector('text=Before we continue', { timeout: 5000 });
   const checkboxes = page.locator('input[type="checkbox"]');
   const count = await checkboxes.count();
   for (let i = 0; i < count; i++) await checkboxes.nth(i).check();
-  await page.locator('button:has-text("Continue")').last().click();
+  await page.locator('button:has-text("Continue")').click();
+
+  // Step 2: Email + password
+  await page.waitForSelector('input[type="email"]', { timeout: 10000 });
+  await page.fill('input[type="email"]', email);
+  await page.fill('input[type="password"]', TEST_PASSWORD);
+  await page.locator('button[type="submit"]').click();
+
+  // Pricing page — skip trial
+  await page.waitForSelector('text=Skip for now', { timeout: 15000 });
+  await page.locator('text=Skip for now').click();
   await page.waitForSelector('button[title="Profile"]', { timeout: 15000 });
   return email;
 }

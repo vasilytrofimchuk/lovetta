@@ -19,6 +19,77 @@ export const IOS_TIP_PRODUCTS = {
 
 export const IOS_TIP_PRODUCT_IDS = Object.values(IOS_TIP_PRODUCTS)
 
+// Fallback prices when offerings API is unavailable
+export const FALLBACK_SUBSCRIPTION_PRICES = {
+  monthly: { priceString: '$19.99', price: 19.99, productId: 'lovetta_monthly' },
+  yearly: { priceString: '$99.99', price: 99.99, productId: 'lovetta_yearly' },
+}
+
+export const FALLBACK_TIP_AMOUNTS = [
+  { amount: 9.99, priceString: '$9.99', productId: 'lovetta_tip_999' },
+  { amount: 19.99, priceString: '$19.99', productId: 'lovetta_tip_1999' },
+  { amount: 49.99, priceString: '$49.99', productId: 'lovetta_tip_4999' },
+  { amount: 99.99, priceString: '$99.99', productId: 'lovetta_tip_9999' },
+]
+
+let _offeringsCache = null
+
+async function fetchOfferings() {
+  if (_offeringsCache) return _offeringsCache
+  const { Purchases } = await import('@revenuecat/purchases-capacitor')
+  const result = await Purchases.getOfferings()
+  _offeringsCache = result
+  return result
+}
+
+export async function getSubscriptionOfferings() {
+  try {
+    const result = await fetchOfferings()
+    const current = result?.current
+    if (!current) return null
+
+    const monthly = current.monthly || current.availablePackages?.find(p => p.packageType === 'MONTHLY')
+    const annual = current.annual || current.availablePackages?.find(p => p.packageType === 'ANNUAL')
+    if (!monthly && !annual) return null
+
+    const extract = (pkg) => pkg ? {
+      package: pkg,
+      priceString: pkg.product?.priceString || pkg.product?.price_string,
+      price: pkg.product?.price,
+      productId: pkg.product?.identifier,
+    } : null
+
+    return {
+      monthly: extract(monthly),
+      yearly: extract(annual),
+    }
+  } catch (err) {
+    console.warn('[revenuecat] getSubscriptionOfferings failed, using fallback', err)
+    return null
+  }
+}
+
+export async function getTipOfferings() {
+  try {
+    const result = await fetchOfferings()
+    const tips = result?.all?.tips
+    if (!tips?.availablePackages?.length) return null
+
+    return tips.availablePackages
+      .map(pkg => ({
+        package: pkg,
+        priceString: pkg.product?.priceString || pkg.product?.price_string,
+        price: pkg.product?.price,
+        productId: pkg.product?.identifier,
+        amount: pkg.product?.price,
+      }))
+      .sort((a, b) => (a.price || 0) - (b.price || 0))
+  } catch (err) {
+    console.warn('[revenuecat] getTipOfferings failed, using fallback', err)
+    return null
+  }
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
