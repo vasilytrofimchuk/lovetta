@@ -174,12 +174,12 @@ router.get('/users', async (req, res) => {
     const offset = (page - 1) * limit;
     const search = (req.query.search || '').trim().toLowerCase();
 
-    let where = '';
+    let where = 'WHERE u.deleted_at IS NULL';
     const params = [];
 
     if (search) {
       params.push(`%${search}%`);
-      where = `WHERE LOWER(u.email) LIKE $1 OR LOWER(u.display_name) LIKE $1`;
+      where += ` AND (LOWER(u.email) LIKE $1 OR LOWER(u.display_name) LIKE $1)`;
     }
 
     const countQuery = `SELECT COUNT(*) AS total FROM users u ${where}`;
@@ -216,6 +216,24 @@ router.get('/users', async (req, res) => {
   } catch (err) {
     console.error('[admin] users error:', err.message);
     res.status(500).json({ error: 'Failed to load users' });
+  }
+});
+
+// -- DELETE /api/admin/users/:id (soft delete) ------------
+router.delete('/users/:id', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'No database' });
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET email = NULL, google_id = NULL, apple_id = NULL, telegram_id = NULL,
+       deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+      [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[admin] delete user error:', err.message);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 

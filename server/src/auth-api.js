@@ -226,6 +226,14 @@ router.post('/refresh', async (req, res) => {
     const decoded = verifyRefreshToken(refreshToken);
     const hash = hashToken(refreshToken);
 
+    // Check user not deleted
+    const { rows: userRows } = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL', [decoded.userId]
+    );
+    if (userRows.length === 0) {
+      return res.status(401).json({ error: 'Account deleted' });
+    }
+
     // Verify token exists in DB
     const { rows } = await pool.query(
       'SELECT id FROM refresh_tokens WHERE token_hash = $1 AND user_id = $2 AND expires_at > NOW()',
@@ -266,7 +274,7 @@ router.get('/me', authenticate, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'Service unavailable' });
 
   try {
-    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL', [req.userId]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }

@@ -331,7 +331,7 @@
       <table>
         <thead><tr>
           <th>ID</th><th>Email</th><th>Name</th><th>Auth</th><th>Country</th><th>City</th>
-          <th>Device</th><th>Subscription</th><th>Refs</th><th>Ref $</th><th>Created</th><th>Last Active</th>
+          <th>Device</th><th>Subscription</th><th>Refs</th><th>Ref $</th><th>Created</th><th>Last Active</th><th></th>
         </tr></thead>
         <tbody id="user-rows"></tbody>
       </table>
@@ -845,12 +845,20 @@
             '<td>' + refEarn + '</td>' +
             '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
             '<td class="mono">' + timeAgo(r.last_activity) + '</td>' +
+            '<td><button onclick="deleteUser(\'' + esc(r.id) + '\', \'' + esc(r.email || '') + '\')" style="padding:3px 8px;background:var(--bg3);color:var(--error);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:12px;">Delete</button></td>' +
           '</tr>';
         }).join('');
         document.getElementById('user-rows').innerHTML = rows ||
-          '<tr><td colspan="12" class="empty-row">No users yet</td></tr>';
+          '<tr><td colspan="13" class="empty-row">No users yet</td></tr>';
         renderPagination('user-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadUsers');
       });
+    }
+
+    function deleteUser(id, email) {
+      if (!confirm('Delete user ' + email + '?\nThey will not be able to log in, but messages are preserved.')) return;
+      fetch('/api/admin/users/' + id, { method: 'DELETE', headers: headers() })
+        .then(function(r) { return r.json(); })
+        .then(function() { loadUsers(); });
     }
 
     // Settings

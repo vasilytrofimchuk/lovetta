@@ -984,6 +984,10 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_online_snapshots_ts ON online_snapshots (ts DESC);
     `,
   },
+  {
+    name: 'v41_user_soft_delete',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

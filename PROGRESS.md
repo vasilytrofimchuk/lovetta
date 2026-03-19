@@ -1078,3 +1078,10 @@
 - [x] Online chart — scheduler: snapshot every 5 min, purge after 48h
 - [x] Online chart — API: `GET /api/admin/online-history?hours=24`
 - [x] Online chart — visual bar chart (visitors + web/ios stacked) with tooltips
+
+## Admin: Delete User Button
+- [x] v41 migration: `deleted_at` column on users table
+- [x] DELETE `/api/admin/users/:id` — soft delete (null unique fields + set deleted_at)
+- [x] Filter soft-deleted users from admin users listing
+- [x] Delete button in Users tab with confirmation dialog
+- [x] Auth guard: block deleted users from `/me` and token refresh
