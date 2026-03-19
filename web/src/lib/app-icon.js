@@ -1,9 +1,9 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 
 export const APP_ICON_OPTIONS = [
-  { id: 'default', label: 'Default', preview: '/assets/app-icons/ios/default.png' },
-  { id: 'black', label: 'Black', preview: '/assets/app-icons/ios/black.png' },
-  { id: 'silver', label: 'Silver', preview: '/assets/app-icons/ios/silver.png' },
+  { id: 'default', label: 'Default', preview: '/my/assets/app-icons/ios/default.png' },
+  { id: 'black', label: 'Black', preview: '/my/assets/app-icons/ios/black.png' },
+  { id: 'silver', label: 'Silver', preview: '/my/assets/app-icons/ios/silver.png' },
 ]
 
 const APP_ICON_STORAGE_KEY = 'lovetta.appIcon'
