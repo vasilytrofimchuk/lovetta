@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lovetta App Store Screenshot Editor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #0a0a0f; color: #aaa; display: flex; height: 100vh; overflow: hidden; }
+  #sidebar { width: 360px; background: #101018; padding: 20px; overflow-y: auto; border-right: 1px solid #1a1a2e; flex-shrink: 0; }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .preview-area { flex: 1; display: flex; align-items: center; justify-content: center; gap: 16px; padding: 20px; overflow: auto; }
+  h2 { color: #d6336c; margin-bottom: 4px; font-size: 16px; letter-spacing: 2px; }
+  .subtitle { color: #444; font-size: 11px; margin-bottom: 16px; }
+  h3 { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid #1a1a2e; }
+  label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+  label span { min-width: 100px; color: #777; }
+  input[type="text"], input[type="number"], select, textarea {
+    background: #16161e; border: 1px solid #2a2a3a; color: #ddd; padding: 5px 8px;
+    border-radius: 4px; width: 160px; font-size: 12px; outline: none; font-family: inherit;
+  }
+  textarea { width: 100%; height: 28px; resize: vertical; margin-bottom: 4px; }
+  input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus { border-color: #d6336c; }
+  input[type="color"] { width: 32px; height: 26px; border: 1px solid #2a2a3a; background: #16161e; cursor: pointer; border-radius: 3px; padding: 1px; }
+  .color-pair { display: flex; align-items: center; gap: 4px; width: 160px; }
+  .color-pair input[type="text"] { width: 100px; }
+  input[type="range"] { width: 90px; accent-color: #d6336c; }
+  .range-wrap { display: flex; align-items: center; gap: 6px; width: 160px; }
+  .range-wrap .rv { font-size: 11px; min-width: 30px; text-align: right; color: #d6336c; font-family: monospace; }
+  .headline-group { margin-bottom: 8px; }
+  .headline-group .hl-label { font-size: 10px; color: #555; margin-bottom: 2px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+  .presets button {
+    padding: 5px 10px; font-size: 11px; border: 1px solid #2a2a3a; background: #16161e;
+    color: #888; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  }
+  .presets button:hover { background: #1e1e2e; color: #d6336c; border-color: #d6336c; }
+  .btn-row { display: flex; gap: 6px; margin-top: 18px; flex-wrap: wrap; }
+  .btn-row button {
+    flex: 1; min-width: 70px; padding: 11px 8px; background: linear-gradient(135deg, #d6336c, #f43f5e);
+    color: #fff; border: none; border-radius: 6px; font-size: 11px; font-weight: 600;
+    cursor: pointer; letter-spacing: 1px; transition: all 0.2s;
+  }
+  .btn-row button:hover { background: linear-gradient(135deg, #e8437a, #f472b6); transform: translateY(-1px); }
+  .card { position: relative; flex-shrink: 0; }
+  .card canvas { border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+  .card-label { text-align: center; font-size: 10px; color: #444; margin-top: 6px; }
+  .loading { color: #555; font-size: 14px; text-align: center; padding: 40px; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=Tangerine:wght@400;700&family=Dancing+Script:wght@400;700&family=Kaushan+Script&family=Playfair+Display:wght@400;500;600;700;800;900&family=Cormorant+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800;900&family=Raleway:wght@400;500;600;700;800;900&family=Nunito:wght@400;500;600;700;800;900&family=Quicksand:wght@400;500;600;700&family=Josefin+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Lovetta</h2>
+  <div class="subtitle">APP STORE SCREENSHOTS</div>
+
+  <h3>Presets</h3>
+  <div class="presets" id="presetBtns"></div>
+
+  <h3>Background</h3>
+  <label><span>Color 1</span><div class="color-pair"><input type="color" id="bg1Pick" value="#1a0a2e"><input type="text" id="bg1" value="#1a0a2e"></div></label>
+  <label><span>Color 2</span><div class="color-pair"><input type="color" id="bg2Pick" value="#0f0a1a"><input type="text" id="bg2" value="#0f0a1a"></div></label>
+  <label><span>Gradient Angle</span><div class="range-wrap"><input type="range" id="bgAngle" min="0" max="360" value="160"><span class="rv" id="bgAngleVal">160°</span></div></label>
+
+  <h3>Phone</h3>
+  <label><span>Scale %</span><div class="range-wrap"><input type="range" id="phoneScale" min="55" max="90" value="68"><span class="rv" id="phoneScaleVal">68%</span></div></label>
+  <label><span>Offset Y %</span><div class="range-wrap"><input type="range" id="phoneOffY" min="-10" max="30" value="10"><span class="rv" id="phoneOffYVal">10%</span></div></label>
+  <label><span>Frame Color</span>
+    <select id="frameStyle">
+      <option value="titanium">Natural Titanium</option>
+      <option value="black" selected>Black Titanium</option>
+      <option value="white">White Titanium</option>
+      <option value="blue">Blue Titanium</option>
+    </select>
+  </label>
+  <label><span>Shadow</span><div class="range-wrap"><input type="range" id="phoneShadow" min="0" max="80" value="40"><span class="rv" id="phoneShadowVal">40</span></div></label>
+
+  <h3>Headline Text</h3>
+  <label><span>Font</span>
+    <select id="headlineFont">
+      <optgroup label="Modern Sans">
+        <option value="Plus Jakarta Sans" selected>Plus Jakarta Sans</option>
+        <option value="Outfit">Outfit</option>
+        <option value="Sora">Sora</option>
+        <option value="Space Grotesk">Space Grotesk</option>
+        <option value="Manrope">Manrope</option>
+        <option value="DM Sans">DM Sans</option>
+        <option value="Montserrat">Montserrat</option>
+        <option value="Raleway">Raleway</option>
+        <option value="Nunito">Nunito</option>
+        <option value="Quicksand">Quicksand</option>
+        <option value="Josefin Sans">Josefin Sans</option>
+      </optgroup>
+      <optgroup label="Serif / Elegant">
+        <option value="Playfair Display">Playfair Display</option>
+        <option value="Cormorant Garamond">Cormorant Garamond</option>
+        <option value="Lora">Lora</option>
+        <option value="Libre Baskerville">Libre Baskerville</option>
+      </optgroup>
+      <optgroup label="Script (Logo fonts)">
+        <option value="Tangerine">Tangerine (Logo)</option>
+        <option value="Dancing Script">Dancing Script</option>
+        <option value="Kaushan Script">Kaushan Script</option>
+      </optgroup>
+    </select>
+  </label>
+  <label><span>Font Size</span><input type="number" id="headlineFontSize" value="120" min="30" max="300"></label>
+  <label><span>Font Weight</span>
+    <select id="headlineWeight">
+      <option value="600">Semibold (600)</option>
+      <option value="700" selected>Bold (700)</option>
+      <option value="800">Extra Bold (800)</option>
+      <option value="900">Black (900)</option>
+    </select>
+  </label>
+  <label><span>Color</span><div class="color-pair"><input type="color" id="headlineColorPick" value="#ffffff"><input type="text" id="headlineColor" value="#ffffff"></div></label>
+  <label><span>Line Height</span><div class="range-wrap"><input type="range" id="headlineLineH" min="0.8" max="1.6" step="0.05" value="1.15"><span class="rv" id="headlineLineHVal">1.15</span></div></label>
+  <label><span>Text Y %</span><div class="range-wrap"><input type="range" id="headlineY" min="2" max="25" value="5"><span class="rv" id="headlineYVal">5%</span></div></label>
+
+  <h3>Text Effects</h3>
+  <label><span>Effect</span>
+    <select id="textEffect">
+      <option value="none">None</option>
+      <option value="glow" selected>Glow</option>
+      <option value="shadow">Drop Shadow</option>
+      <option value="gradient">Gradient Text</option>
+      <option value="outline">Outline</option>
+    </select>
+  </label>
+  <label><span>Glow Color</span><div class="color-pair"><input type="color" id="glowColorPick" value="#d6336c"><input type="text" id="glowColor" value="#d6336c"></div></label>
+  <label><span>Glow Strength</span><div class="range-wrap"><input type="range" id="glowStrength" min="0" max="80" value="30"><span class="rv" id="glowStrengthVal">30</span></div></label>
+  <label><span>Gradient Color 2</span><div class="color-pair"><input type="color" id="textGrad2Pick" value="#d6336c"><input type="text" id="textGrad2" value="#d6336c"></div></label>
+  <label><span>Accent Line</span>
+    <select id="accentLine">
+      <option value="none">None</option>
+      <option value="underline">Underline</option>
+      <option value="overline">Overline</option>
+    </select>
+  </label>
+  <label><span>Line Color</span><div class="color-pair"><input type="color" id="accentLineColorPick" value="#d6336c"><input type="text" id="accentLineColor" value="#d6336c"></div></label>
+
+  <h3>Headlines</h3>
+  <div id="headlineInputs"></div>
+
+  <div class="btn-row">
+    <button onclick="exportOne(0)">1</button>
+    <button onclick="exportOne(1)">2</button>
+    <button onclick="exportOne(2)">3</button>
+    <button onclick="exportOne(3)">4</button>
+    <button onclick="exportAll()">ALL</button>
+  </div>
+</div>
+
+<div id="main">
+  <div class="preview-area" id="previewArea">
+    <div class="loading" id="loadingMsg">Loading screenshots...</div>
+  </div>
+</div>
+
+<script>
+const CANVAS_W = 1320;
+const CANVAS_H = 2868;
+
+const SCREENSHOTS = [
+  { file: '1-gallery.png', headline: 'Design Your\nDream Girlfriend' },
+  { file: '3-chat.png', headline: 'Unlimited Chat\n& Selfies' },
+  { file: '2-profile.png', headline: 'Unique Personality\n& Roleplay' },
+  { file: '4-home.png', headline: 'Companions\nFor Every Mood' },
+];
+
+// iPhone frame color palettes
+const FRAME_COLORS = {
+  titanium:  { body: '#8a8580', edge: '#a09a95', highlight: '#c5bfb8', inner: '#3a3835', shadow: 'rgba(0,0,0,0.5)' },
+  black:     { body: '#2c2c2e', edge: '#3a3a3c', highlight: '#555558', inner: '#1a1a1c', shadow: 'rgba(0,0,0,0.6)' },
+  white:     { body: '#e8e4df', edge: '#f0ece7', highlight: '#ffffff', inner: '#c8c4bf', shadow: 'rgba(0,0,0,0.3)' },
+  blue:      { body: '#394f6a', edge: '#4a6080', highlight: '#6882a0', inner: '#283848', shadow: 'rgba(0,0,0,0.5)' },
+};
+
+// ========== PRESETS ==========
+const PRESETS = {
+  brand_glow: {
+    bg1: '#1a0a2e', bg2: '#0a0618', bgAngle: 170,
+    headlineFont: 'Outfit', headlineWeight: '700', headlineFontSize: 120,
+    headlineColor: '#ffffff', headlineLineH: 1.12, headlineY: 5,
+    textEffect: 'glow', glowColor: '#d6336c', glowStrength: 35, textGrad2: '#d6336c',
+    accentLine: 'none', accentLineColor: '#d6336c',
+    phoneScale: 68, phoneOffY: 10, frameStyle: 'titanium', phoneShadow: 40,
+  },
+  hot_pink: {
+    bg1: '#200818', bg2: '#0a0208', bgAngle: 180,
+    headlineFont: 'Plus Jakarta Sans', headlineWeight: '800', headlineFontSize: 120,
+    headlineColor: '#ffffff', headlineLineH: 1.1, headlineY: 5,
+    textEffect: 'glow', glowColor: '#d6336c', glowStrength: 50, textGrad2: '#f43f5e',
+    accentLine: 'underline', accentLineColor: '#d6336c',
+    phoneScale: 70, phoneOffY: 10, frameStyle: 'black', phoneShadow: 50,
+  },
+  elegant: {
+    bg1: '#140e28', bg2: '#080414', bgAngle: 160,
+    headlineFont: 'Sora', headlineWeight: '600', headlineFontSize: 120,
+    headlineColor: '#e8d5ff', headlineLineH: 1.2, headlineY: 6,
+    textEffect: 'gradient', glowColor: '#a855f7', glowStrength: 25, textGrad2: '#d6336c',
+    accentLine: 'underline', accentLineColor: '#a855f7',
+    phoneScale: 66, phoneOffY: 12, frameStyle: 'black', phoneShadow: 35,
+  },
+  clean_white: {
+    bg1: '#18122e', bg2: '#0e0a1e', bgAngle: 180,
+    headlineFont: 'Space Grotesk', headlineWeight: '700', headlineFontSize: 120,
+    headlineColor: '#ffffff', headlineLineH: 1.15, headlineY: 5,
+    textEffect: 'none', glowColor: '#d6336c', glowStrength: 0, textGrad2: '#d6336c',
+    accentLine: 'none', accentLineColor: '#d6336c',
+    phoneScale: 68, phoneOffY: 10, frameStyle: 'white', phoneShadow: 30,
+  },
+  neon: {
+    bg1: '#0f0015', bg2: '#050008', bgAngle: 150,
+    headlineFont: 'Manrope', headlineWeight: '800', headlineFontSize: 120,
+    headlineColor: '#ffd6e8', headlineLineH: 1.1, headlineY: 5,
+    textEffect: 'glow', glowColor: '#ff2d7b', glowStrength: 60, textGrad2: '#ff2d7b',
+    accentLine: 'overline', accentLineColor: '#ff2d7b',
+    phoneScale: 70, phoneOffY: 8, frameStyle: 'black', phoneShadow: 50,
+  },
+  soft_rose: {
+    bg1: '#1e0e30', bg2: '#100820', bgAngle: 165,
+    headlineFont: 'DM Sans', headlineWeight: '700', headlineFontSize: 120,
+    headlineColor: '#f5e6ff', headlineLineH: 1.15, headlineY: 6,
+    textEffect: 'gradient', glowColor: '#d6336c', glowStrength: 20, textGrad2: '#f472b6',
+    accentLine: 'underline', accentLineColor: '#d6336c',
+    phoneScale: 66, phoneOffY: 12, frameStyle: 'blue', phoneShadow: 35,
+  },
+};
+
+// Build preset buttons
+const presetContainer = document.getElementById('presetBtns');
+Object.keys(PRESETS).forEach(name => {
+  const btn = document.createElement('button');
+  btn.textContent = name.replace(/_/g, ' ');
+  btn.onclick = () => applyPreset(PRESETS[name]);
+  presetContainer.appendChild(btn);
+});
+
+function applyPreset(p) {
+  Object.keys(p).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = p[id];
+    const pick = document.getElementById(id + 'Pick');
+    if (pick && /^#[0-9a-f]{6}$/i.test(String(p[id]))) pick.value = p[id];
+    const valEl = document.getElementById(id + 'Val');
+    if (valEl) {
+      let suffix = '';
+      if (id === 'bgAngle') suffix = '°';
+      else if (['phoneScale', 'phoneOffY', 'headlineY'].includes(id)) suffix = '%';
+      valEl.textContent = p[id] + suffix;
+    }
+  });
+  renderAll();
+}
+
+const images = [];
+let loaded = 0;
+
+// Build headline inputs
+const headlineInputsDiv = document.getElementById('headlineInputs');
+SCREENSHOTS.forEach((s, i) => {
+  const div = document.createElement('div');
+  div.className = 'headline-group';
+  div.innerHTML = `<div class="hl-label">Screen ${i + 1}</div>
+    <textarea id="headline${i}" oninput="renderAll()">${s.headline}</textarea>`;
+  headlineInputsDiv.appendChild(div);
+});
+
+// Load images — try blob URL (untainted, works on http) then fall back to direct (file://)
+function loadImageClean(url) {
+  return new Promise(resolve => {
+    // Try fetch+blob first for untainted canvas
+    fetch(url).then(r => r.blob()).then(blob => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = URL.createObjectURL(blob);
+    }).catch(() => {
+      // Fallback for file:// — direct load (preview works, export needs http)
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  });
+}
+
+Promise.all(SCREENSHOTS.map((s, i) =>
+  loadImageClean('../public/assets/appsotre/' + encodeURIComponent(s.file))
+    .then(img => { images[i] = img; if (!img) console.error('Failed to load:', s.file); })
+)).then(() => init());
+
+function getVal(id) { return document.getElementById(id).value; }
+function getNum(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#', '');
+  return `rgba(${parseInt(h.substring(0,2),16)},${parseInt(h.substring(2,4),16)},${parseInt(h.substring(4,6),16)},${alpha})`;
+}
+
+// Sync color pickers
+['bg1', 'bg2', 'headlineColor', 'glowColor', 'textGrad2', 'accentLineColor'].forEach(id => {
+  const pick = document.getElementById(id + 'Pick');
+  const txt = document.getElementById(id);
+  if (!pick || !txt) return;
+  pick.addEventListener('input', () => { txt.value = pick.value; renderAll(); });
+  txt.addEventListener('input', () => { if (/^#[0-9a-f]{6}$/i.test(txt.value)) pick.value = txt.value; renderAll(); });
+});
+
+// Range display sync
+['bgAngle', 'phoneScale', 'phoneOffY', 'phoneShadow', 'headlineLineH', 'headlineY', 'glowStrength'].forEach(id => {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(id + 'Val');
+  if (!el || !valEl) return;
+  el.addEventListener('input', () => {
+    let suffix = '';
+    if (id === 'bgAngle') suffix = '°';
+    else if (['phoneScale', 'phoneOffY', 'headlineY'].includes(id)) suffix = '%';
+    valEl.textContent = el.value + suffix;
+    renderAll();
+  });
+});
+
+// Bind all inputs
+document.querySelectorAll('#sidebar input, #sidebar select').forEach(el => {
+  el.addEventListener('input', renderAll);
+  el.addEventListener('change', renderAll);
+});
+
+const canvases = [];
+const previewArea = document.getElementById('previewArea');
+
+function init() {
+  document.getElementById('loadingMsg').style.display = 'none';
+  for (let i = 0; i < SCREENSHOTS.length; i++) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const canvas = document.createElement('canvas');
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
+    canvas.style.width = '240px';
+    canvas.style.height = Math.round(240 * CANVAS_H / CANVAS_W) + 'px';
+    card.appendChild(canvas);
+    const label = document.createElement('div');
+    label.className = 'card-label';
+    label.textContent = `Screen ${i + 1}`;
+    card.appendChild(label);
+    previewArea.appendChild(card);
+    canvases.push(canvas);
+  }
+  applyPreset(PRESETS['elegant']);
+}
+
+// ========== REALISTIC iPHONE FRAME ==========
+function drawIPhoneFrame(ctx, screenImg, phoneX, phoneY, phoneW, phoneH) {
+  const style = getVal('frameStyle');
+  const colors = FRAME_COLORS[style] || FRAME_COLORS.titanium;
+  const shadowBlur = getNum('phoneShadow');
+
+  // iPhone Pro Max proportions
+  // Frame thickness relative to phone width
+  const frameT = phoneW * 0.022; // frame thickness
+  const outerR = phoneW * 0.095; // outer corner radius
+  const innerR = outerR - frameT * 0.8; // screen corner radius
+  const totalW = phoneW + frameT * 2;
+  const totalH = phoneH + frameT * 2;
+  const fx = phoneX - frameT; // frame x
+  const fy = phoneY - frameT; // frame y
+
+  // --- Drop shadow ---
+  if (shadowBlur > 0) {
+    ctx.save();
+    ctx.shadowColor = colors.shadow;
+    ctx.shadowBlur = shadowBlur;
+    ctx.shadowOffsetY = shadowBlur * 0.25;
+    ctx.beginPath();
+    ctx.roundRect(fx, fy, totalW, totalH, outerR);
+    ctx.fillStyle = colors.body;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // --- Outer frame body ---
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(fx, fy, totalW, totalH, outerR);
+  // Metallic gradient for the frame body
+  const frameGrad = ctx.createLinearGradient(fx, fy, fx + totalW, fy + totalH);
+  frameGrad.addColorStop(0, colors.edge);
+  frameGrad.addColorStop(0.3, colors.body);
+  frameGrad.addColorStop(0.5, colors.highlight);
+  frameGrad.addColorStop(0.7, colors.body);
+  frameGrad.addColorStop(1, colors.edge);
+  ctx.fillStyle = frameGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // --- Highlight edge on top-left (light reflection) ---
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(fx, fy, totalW, totalH, outerR);
+  ctx.clip();
+  // Top edge highlight
+  const edgeGrad = ctx.createLinearGradient(fx, fy, fx, fy + frameT * 3);
+  edgeGrad.addColorStop(0, hexToRgba(colors.highlight, 0.6));
+  edgeGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = edgeGrad;
+  ctx.fillRect(fx, fy, totalW, frameT * 3);
+  // Left edge highlight
+  const leftGrad = ctx.createLinearGradient(fx, fy, fx + frameT * 2, fy);
+  leftGrad.addColorStop(0, hexToRgba(colors.highlight, 0.3));
+  leftGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = leftGrad;
+  ctx.fillRect(fx, fy, frameT * 2, totalH);
+  ctx.restore();
+
+  // --- Thin dark inset line around screen ---
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(phoneX - 1.5, phoneY - 1.5, phoneW + 3, phoneH + 3, innerR + 1);
+  ctx.strokeStyle = colors.inner;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // --- Screen area (clip and draw screenshot) ---
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(phoneX, phoneY, phoneW, phoneH, innerR);
+  ctx.clip();
+  ctx.drawImage(screenImg, phoneX, phoneY, phoneW, phoneH);
+  ctx.restore();
+
+  // --- Side buttons ---
+  // Power button (right side)
+  const btnW = frameT * 0.5;
+  const btnH = phoneH * 0.06;
+  const powerX = fx + totalW - 0.5;
+  const powerY = fy + totalH * 0.22;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(powerX, powerY, btnW, btnH, 2);
+  const powerGrad = ctx.createLinearGradient(powerX, powerY, powerX + btnW, powerY);
+  powerGrad.addColorStop(0, colors.body);
+  powerGrad.addColorStop(0.5, colors.highlight);
+  powerGrad.addColorStop(1, colors.edge);
+  ctx.fillStyle = powerGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // Volume up (left side)
+  const volUpY = fy + totalH * 0.18;
+  const volH = phoneH * 0.04;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(fx - btnW + 0.5, volUpY, btnW, volH, 2);
+  const volGrad = ctx.createLinearGradient(fx - btnW, volUpY, fx, volUpY);
+  volGrad.addColorStop(0, colors.edge);
+  volGrad.addColorStop(0.5, colors.highlight);
+  volGrad.addColorStop(1, colors.body);
+  ctx.fillStyle = volGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // Volume down (left side)
+  const volDownY = volUpY + volH + phoneH * 0.015;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(fx - btnW + 0.5, volDownY, btnW, volH, 2);
+  ctx.fillStyle = volGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // --- Dynamic Island ---
+  const islandW = phoneW * 0.26;
+  const islandH = phoneH * 0.012;
+  const islandX = phoneX + (phoneW - islandW) / 2;
+  const islandY = phoneY + phoneH * 0.012;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(islandX, islandY, islandW, islandH, islandH / 2);
+  ctx.fillStyle = '#000000';
+  ctx.fill();
+  // Subtle shine on dynamic island
+  const islandShine = ctx.createLinearGradient(islandX, islandY, islandX, islandY + islandH);
+  islandShine.addColorStop(0, 'rgba(255,255,255,0.08)');
+  islandShine.addColorStop(0.5, 'rgba(255,255,255,0)');
+  ctx.fillStyle = islandShine;
+  ctx.fill();
+  ctx.restore();
+
+  // --- Screen edge reflection (subtle) ---
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(phoneX, phoneY, phoneW, phoneH, innerR);
+  ctx.clip();
+  const screenShine = ctx.createLinearGradient(phoneX, phoneY, phoneX + phoneW * 0.6, phoneY + phoneH * 0.3);
+  screenShine.addColorStop(0, 'rgba(255,255,255,0.03)');
+  screenShine.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = screenShine;
+  ctx.fillRect(phoneX, phoneY, phoneW, phoneH);
+  ctx.restore();
+}
+
+// ========== HEADLINE TEXT ==========
+function drawHeadlineText(ctx, text, fontSize, fontWeight, fontFamily, lineHeight, startY) {
+  const lines = text.split('\n');
+  const lineH = fontSize * lineHeight;
+  const effect = getVal('textEffect');
+  const glowColor = getVal('glowColor');
+  const glowStrength = getNum('glowStrength');
+  const headlineColor = getVal('headlineColor');
+  const textGrad2 = getVal('textGrad2');
+
+  ctx.save();
+  ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", -apple-system, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+
+  const totalH = lines.length * lineH;
+
+  if (effect === 'glow') {
+    // Wide soft glow
+    ctx.save();
+    ctx.shadowColor = hexToRgba(glowColor, 0.7);
+    ctx.shadowBlur = glowStrength * 2.5;
+    ctx.fillStyle = hexToRgba(glowColor, 0.12);
+    lines.forEach((line, li) => ctx.fillText(line, CANVAS_W / 2, startY + li * lineH));
+    ctx.restore();
+    // Tight glow
+    ctx.save();
+    ctx.shadowColor = hexToRgba(glowColor, 0.5);
+    ctx.shadowBlur = glowStrength;
+    ctx.fillStyle = headlineColor;
+    lines.forEach((line, li) => ctx.fillText(line, CANVAS_W / 2, startY + li * lineH));
+    ctx.restore();
+  }
+
+  if (effect === 'shadow') {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = glowStrength * 0.8;
+    ctx.shadowOffsetX = glowStrength * 0.15;
+    ctx.shadowOffsetY = glowStrength * 0.3;
+    ctx.fillStyle = headlineColor;
+    lines.forEach((line, li) => ctx.fillText(line, CANVAS_W / 2, startY + li * lineH));
+    ctx.restore();
+  }
+
+  if (effect === 'gradient') {
+    const grad = ctx.createLinearGradient(0, startY, 0, startY + totalH);
+    grad.addColorStop(0, headlineColor);
+    grad.addColorStop(1, textGrad2);
+    ctx.save();
+    ctx.shadowColor = hexToRgba(textGrad2, 0.35);
+    ctx.shadowBlur = glowStrength;
+    ctx.fillStyle = grad;
+    lines.forEach((line, li) => ctx.fillText(line, CANVAS_W / 2, startY + li * lineH));
+    ctx.restore();
+  }
+
+  if (effect === 'outline') {
+    ctx.save();
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    lines.forEach((line, li) => ctx.strokeText(line, CANVAS_W / 2, startY + li * lineH));
+    ctx.fillStyle = headlineColor;
+    lines.forEach((line, li) => ctx.fillText(line, CANVAS_W / 2, startY + li * lineH));
+    ctx.restore();
+  }
+
+  if (effect === 'none') {
+    ctx.fillStyle = headlineColor;
+    lines.forEach((line, li) => ctx.fillText(line, CANVAS_W / 2, startY + li * lineH));
+  }
+
+  ctx.restore();
+
+  // Accent line
+  const accentLine = getVal('accentLine');
+  if (accentLine !== 'none') {
+    const accentColor = getVal('accentLineColor');
+    const lineW = CANVAS_W * 0.12;
+    const lineThickness = 5;
+    let lineY = accentLine === 'underline'
+      ? startY + totalH + fontSize * 0.3
+      : startY - fontSize * 0.4;
+
+    ctx.save();
+    ctx.shadowColor = hexToRgba(accentColor, 0.6);
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.roundRect(CANVAS_W / 2 - lineW / 2, lineY, lineW, lineThickness, lineThickness / 2);
+    ctx.fillStyle = accentColor;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  return totalH;
+}
+
+// ========== RENDER ==========
+function renderOne(index, forExport) {
+  const canvas = forExport ? document.createElement('canvas') : canvases[index];
+  if (!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  canvas.width = CANVAS_W;
+  canvas.height = CANVAS_H;
+
+  const img = images[index];
+  if (!img || !img.complete) return canvas;
+
+  // --- Background gradient ---
+  const bg1 = getVal('bg1');
+  const bg2 = getVal('bg2');
+  const angle = getNum('bgAngle');
+  const rad = (angle - 90) * Math.PI / 180;
+  const cx = CANVAS_W / 2, cy = CANVAS_H / 2;
+  const len = Math.max(CANVAS_W, CANVAS_H) * 0.7;
+  const grad = ctx.createLinearGradient(
+    cx - Math.cos(rad) * len, cy - Math.sin(rad) * len,
+    cx + Math.cos(rad) * len, cy + Math.sin(rad) * len
+  );
+  grad.addColorStop(0, bg1);
+  grad.addColorStop(1, bg2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Subtle radial ambient from brand color
+  const vignette = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H * 0.35, 0, CANVAS_W / 2, CANVAS_H * 0.35, CANVAS_H * 0.6);
+  vignette.addColorStop(0, hexToRgba(getVal('glowColor'), 0.05));
+  vignette.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // --- Headline text ---
+  const headlineText = document.getElementById('headline' + index).value;
+  const fontSize = getNum('headlineFontSize');
+  const fontWeight = getVal('headlineWeight');
+  const fontFamily = getVal('headlineFont');
+  const lineHeight = parseFloat(getVal('headlineLineH')) || 1.15;
+  const headlineYPct = getNum('headlineY') / 100;
+  const startY = CANVAS_H * headlineYPct;
+
+  drawHeadlineText(ctx, headlineText, fontSize, fontWeight, fontFamily, lineHeight, startY);
+
+  // --- iPhone frame ---
+  const phoneScale = getNum('phoneScale') / 100;
+  const phoneOffY = getNum('phoneOffY') / 100;
+
+  // Screen dimensions (what the screenshot fills)
+  const screenW = CANVAS_W * phoneScale;
+  const screenH = CANVAS_H * phoneScale;
+
+  // Center horizontally, position vertically based on offset
+  const screenX = (CANVAS_W - screenW) / 2;
+  const screenY = CANVAS_H * phoneOffY + (CANVAS_H * (1 - phoneOffY) - screenH) / 2 + CANVAS_H * headlineYPct * 0.4;
+
+  drawIPhoneFrame(ctx, img, screenX, screenY, screenW, screenH);
+
+  return canvas;
+}
+
+function renderAll() {
+  for (let i = 0; i < SCREENSHOTS.length; i++) {
+    renderOne(i);
+  }
+}
+
+function exportOne(index) {
+  try {
+    const canvas = renderOne(index, true);
+    if (!canvas) return;
+    canvas.toBlob(blob => {
+      if (!blob) { alert('Export failed — canvas is empty'); return; }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `lovetta_appstore_${index + 1}.png`;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  } catch (e) {
+    if (e.message.includes('ainted')) {
+      alert('Export requires HTTP server. Run from project root:\n\npython3 -m http.server 8111\n\nThen open:\nhttp://localhost:8111/scripts/appstore_editor.html');
+    } else {
+      alert('Export error: ' + e.message);
+    }
+  }
+}
+
+function exportAll() {
+  for (let i = 0; i < SCREENSHOTS.length; i++) {
+    setTimeout(() => exportOne(i), i * 200);
+  }
+}
+
+// Force-load fonts
+const loader = document.createElement('div');
+loader.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;';
+['Plus Jakarta Sans', 'Outfit', 'Sora', 'Space Grotesk', 'Manrope', 'DM Sans', 'Montserrat', 'Raleway', 'Nunito', 'Quicksand', 'Josefin Sans', 'Playfair Display', 'Cormorant Garamond', 'Lora', 'Libre Baskerville', 'Tangerine', 'Dancing Script', 'Kaushan Script'].forEach(f => {
+  ['400', '600', '700', '800', '900'].forEach(wt => {
+    const span = document.createElement('span');
+    span.style.fontFamily = `"${f}", sans-serif`;
+    span.style.fontWeight = wt;
+    span.style.fontSize = '48px';
+    span.textContent = 'Test headline text';
+    loader.appendChild(span);
+  });
+});
+document.body.appendChild(loader);
+</script>
+</body>
+</html>
