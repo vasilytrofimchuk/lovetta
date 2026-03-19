@@ -135,7 +135,7 @@ export default function Pricing() {
           <button onClick={() => navigate('/')} className="text-sm text-brand-muted hover:text-brand-text transition-colors">Back</button>
         </div>
 
-        <p className="text-brand-text-secondary text-center mb-6">Start your 3-day free trial. Cancel anytime.</p>
+        <p className="text-brand-text-secondary text-center mb-6">3 days free, then auto-renews. Cancel anytime.</p>
 
         <div className="space-y-4">
           <div className="bg-brand-card border border-brand-border rounded-xl p-5">
@@ -146,7 +146,7 @@ export default function Pricing() {
             <p className="text-sm text-brand-muted mb-4">Unlimited conversations, images, girlfriends</p>
             <button onClick={() => handleSubscribe('monthly')} disabled={!!loading}
               className="w-full py-2.5 rounded-lg bg-brand-accent text-white font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-50">
-              {loading === 'monthly' ? 'Redirecting...' : 'Start Free Trial'}
+              {loading === 'monthly' ? 'Redirecting...' : '3 Days Free · Then $19.99/mo'}
             </button>
           </div>
 
@@ -162,7 +162,7 @@ export default function Pricing() {
             <p className="text-sm text-brand-muted mb-4">Same features, best value</p>
             <button onClick={() => handleSubscribe('yearly')} disabled={!!loading}
               className="w-full py-2.5 rounded-lg bg-brand-accent text-white font-semibold hover:bg-brand-accent-hover transition-colors disabled:opacity-50">
-              {loading === 'yearly' ? 'Redirecting...' : 'Start Free Trial'}
+              {loading === 'yearly' ? 'Redirecting...' : '3 Days Free · Then $99.99/yr'}
             </button>
           </div>
         </div>
