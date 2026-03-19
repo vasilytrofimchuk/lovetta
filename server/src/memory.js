@@ -14,7 +14,7 @@ const { trackConsumption } = require('./consumption');
 const EXTRACTION_THRESHOLD = 3;
 const SUMMARY_THRESHOLD = 20;
 const MAX_MEMORY_CHARS = 3000; // ~750 tokens hard cap
-const EXTRACTION_CHUNK_SIZE = 5; // process user messages in small batches
+const EXTRACTION_CHUNK_SIZE = 7; // process user messages in small batches
 
 // -- Build memory context for system prompt ----------------------
 
@@ -177,12 +177,12 @@ async function extractFacts(pool, conversationId, companionId, userId) {
   }
 
   // Process in small chunks so the model focuses on each batch and misses nothing
-  // Cap at 3 chunks max to avoid timeouts (15 user messages per extraction cycle)
+  // Cap at 5 chunks max (35 user messages per extraction cycle)
   const chunks = [];
   for (let i = 0; i < messages.length; i += EXTRACTION_CHUNK_SIZE) {
     chunks.push(messages.slice(i, i + EXTRACTION_CHUNK_SIZE));
   }
-  const chunksToProcess = chunks.slice(0, 3);
+  const chunksToProcess = chunks.slice(0, 5);
 
   // Process chunks sequentially (dedup needs previous chunk's results)
   let totalExtracted = 0;
