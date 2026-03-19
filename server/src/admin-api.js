@@ -113,6 +113,27 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// -- GET /api/admin/online-history ------------------------
+router.get('/online-history', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ snapshots: [] });
+
+  try {
+    const hours = Math.min(48, Math.max(1, parseInt(req.query.hours, 10) || 24));
+    const { rows } = await pool.query(
+      `SELECT ts, visitors_online, users_online, users_web, users_ios
+       FROM online_snapshots
+       WHERE ts >= NOW() - INTERVAL '1 hour' * $1
+       ORDER BY ts ASC`,
+      [hours]
+    );
+    res.json({ snapshots: rows });
+  } catch (err) {
+    console.error('[admin] online-history error:', err.message);
+    res.status(500).json({ error: 'Failed to load online history' });
+  }
+});
+
 // -- GET /api/admin/visitors (paginated) ------------------
 router.get('/visitors', async (req, res) => {
   const pool = getPool();

@@ -13,6 +13,7 @@ const { runProactiveMessages } = require('./proactive');
 
 const ONE_HOUR = 60 * 60 * 1000;
 const THIRTY_MINUTES = 30 * 60 * 1000;
+const FIVE_MINUTES = 5 * 60 * 1000;
 
 // -- Email frequency cap (max 2 notification emails per user per day) --
 
@@ -223,6 +224,31 @@ async function runRenewalReminders() {
   }
 }
 
+// -- Online snapshots (every 5 min) ---------------------------------
+
+async function runOnlineSnapshot() {
+  const pool = getPool();
+  if (!pool) return;
+
+  try {
+    await pool.query(`
+      INSERT INTO online_snapshots (visitors_online, users_online, users_web, users_ios)
+      SELECT
+        (SELECT COUNT(*) FROM visitors WHERE last_activity >= NOW() - INTERVAL '5 minutes'),
+        COUNT(*),
+        COUNT(*) FILTER (WHERE LOWER(user_agent) NOT LIKE '%capacitor%' AND LOWER(user_agent) NOT LIKE '%lovetta-ios%'),
+        COUNT(*) FILTER (WHERE LOWER(user_agent) LIKE '%capacitor%' OR LOWER(user_agent) LIKE '%lovetta-ios%')
+      FROM users
+      WHERE last_activity >= NOW() - INTERVAL '5 minutes'
+    `);
+
+    // Purge snapshots older than 48h
+    await pool.query(`DELETE FROM online_snapshots WHERE ts < NOW() - INTERVAL '48 hours'`);
+  } catch (err) {
+    console.error('[scheduler] runOnlineSnapshot error:', err.message);
+  }
+}
+
 // -- Scheduler startup --------------------------------------------
 
 function startScheduler() {
@@ -245,6 +271,10 @@ function startScheduler() {
   // Proactive companion messages — every 30 min
   setInterval(runProactiveMessages, THIRTY_MINUTES);
   setTimeout(runProactiveMessages, 2 * 60 * 1000);
+
+  // Online user snapshots — every 5 min
+  setInterval(runOnlineSnapshot, FIVE_MINUTES);
+  setTimeout(runOnlineSnapshot, 15 * 1000);
 }
 
 module.exports = { startScheduler };

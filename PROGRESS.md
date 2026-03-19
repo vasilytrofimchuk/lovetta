@@ -1032,3 +1032,7 @@
 - [x] Tab badges smaller + compact tab padding
 - [x] Online Now card — API: visitors + users (web/ios) with 5min window
 - [x] Online Now card — frontend rendering with platform sub-text
+- [x] Online chart — v40 migration: `online_snapshots` table
+- [x] Online chart — scheduler: snapshot every 5 min, purge after 48h
+- [x] Online chart — API: `GET /api/admin/online-history?hours=24`
+- [x] Online chart — visual bar chart (visitors + web/ios stacked) with tooltips

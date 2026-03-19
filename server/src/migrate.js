@@ -970,6 +970,20 @@ const MIGRATIONS = [
     name: 'v39_show_actions_pref',
     sql: `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS show_actions BOOLEAN DEFAULT true`,
   },
+  {
+    name: 'v40_online_snapshots',
+    sql: `
+      CREATE TABLE IF NOT EXISTS online_snapshots (
+        id SERIAL PRIMARY KEY,
+        ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        visitors_online INT NOT NULL DEFAULT 0,
+        users_online INT NOT NULL DEFAULT 0,
+        users_web INT NOT NULL DEFAULT 0,
+        users_ios INT NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_online_snapshots_ts ON online_snapshots (ts DESC);
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
