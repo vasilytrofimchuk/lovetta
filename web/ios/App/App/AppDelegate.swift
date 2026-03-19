@@ -9,6 +9,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Keep launch screen visible while remote URL loads
+        // The web app will call SplashScreen.hide() when ready
+        if let vc = window?.rootViewController as? CAPBridgeViewController {
+            vc.view.backgroundColor = UIColor(red: 0.059, green: 0.039, blue: 0.102, alpha: 1.0) // #0f0a1a
+            vc.webView?.isOpaque = false
+            vc.webView?.backgroundColor = UIColor(red: 0.059, green: 0.039, blue: 0.102, alpha: 1.0)
+            vc.webView?.scrollView.backgroundColor = UIColor(red: 0.059, green: 0.039, blue: 0.102, alpha: 1.0)
+        }
+
         #if DEBUG
         if #available(iOS 15.0, *) {
             Task {
