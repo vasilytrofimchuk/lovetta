@@ -99,11 +99,24 @@ function extractTags(description) {
  * Find existing media that matches the requested context.
  * Looks across ALL companions that share the same avatar_url (same girl),
  * not just the current companion. Requires at least 2 overlapping tags.
+ * Excludes images the user has already seen in their chat messages.
  */
-async function findReusableMedia(pool, companionId, type, tags) {
+async function findReusableMedia(pool, companionId, type, tags, userId) {
   if (!tags.length) return null;
 
   // Find all companions that share the same avatar (same base image = same girl)
+  // Exclude images already in this user's conversation messages
+  const params = [companionId, type, tags];
+  let userExclude = '';
+  if (userId) {
+    params.push(userId);
+    userExclude = `AND cm.media_url NOT IN (
+      SELECT m.media_url FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      WHERE c.user_id = $4 AND m.media_url IS NOT NULL
+    )`;
+  }
+
   const { rows } = await pool.query(
     `SELECT cm.id, cm.media_url, cm.media_type, cm.tags,
        (SELECT COUNT(*) FROM unnest(cm.tags) t WHERE t = ANY($3)) AS overlap
@@ -111,9 +124,10 @@ async function findReusableMedia(pool, companionId, type, tags) {
      JOIN user_companions uc_media ON uc_media.id = cm.companion_id
      JOIN user_companions uc_self  ON uc_self.avatar_url = uc_media.avatar_url
      WHERE uc_self.id = $1 AND cm.media_type = $2 AND cm.tags && $3
+     ${userExclude}
      ORDER BY overlap DESC, cm.created_at DESC
      LIMIT 1`,
-    [companionId, type, tags]
+    params
   );
 
   // Require at least 2 tag overlap for reuse
@@ -173,8 +187,8 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
     }
   }
 
-  // Try reuse
-  const existing = await findReusableMedia(pool, companion.id, type, tags);
+  // Try reuse (exclude images user already has in chat)
+  const existing = await findReusableMedia(pool, companion.id, type, tags, opts.userId);
   if (existing) {
     console.log(`[media] reusing existing ${type}: ${existing.media_url} (tags: ${existing.tags})`);
     return { url: existing.media_url, type: existing.media_type, reused: true };
@@ -202,7 +216,7 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
   }
 
   if (type === 'video') {
-    // Step 1: Find or generate a source image
+    // Step 1: Find or generate a source image (source images can be reused even if user saw them)
     let sourceImage = await findReusableMedia(pool, companion.id, 'image', tags);
     let sourceImageUrl;
 

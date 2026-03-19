@@ -2,6 +2,21 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Image Dedup + Tip Reward Images
+- [x] Fix `findReusableMedia` in media-chat.js — exclude images user already has in chat (per-user dedup)
+- [x] Add reward image constants: 20 scene prompts, 8 flirty captions, image count mapping ($10→1, $20→2, $50→3, $100→4)
+- [x] Implement `generateTipRewardImages` in billing.js — reuses unseen catalog images, generates new for rest
+- [x] Extend `insertTipThankYou` to accept amountCents and trigger reward images
+- [x] Update Stripe + RevenueCat webhook call sites to pass tip amount
+- [x] Run `npm run test:e2e:api` — 28/28 passed
+- [x] Run `npm run test:e2e:ai` — 97/97 passed
+
+## Admin Chart: 1-Minute Bars (GA Realtime Style)
+- [x] Backend: snapshot interval from 5 min to 1 min (scheduler.js)
+- [x] Frontend: GA-style bars (full-width, no gaps, 100px height)
+- [x] Frontend: 30 bars at 1-min intervals, "now" on right axis
+- [x] Run `npm run test:e2e:ui` — 48/48 passed
+
 ## Fix iOS users not showing in admin stats chart
 - [x] Update `updateActivity()` in auth-middleware.js to also update `user_agent` on each API call
 - [x] Run `npm run test:e2e:api` — 28/28 passed

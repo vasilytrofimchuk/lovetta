@@ -248,12 +248,56 @@ async function upsertRevenueCatSubscription(pool, { userId, plan, status = 'acti
   return rows[0] || null;
 }
 
+// -- Tip reward image prompts (varied scenes for reward images) ---
+
+const REWARD_PROMPTS = [
+  { prompt: 'woman in elegant lingerie posing on a luxurious bed, soft warm lighting, intimate atmosphere', tags: ['bedroom', 'lingerie', 'bed', 'seductive'] },
+  { prompt: 'woman in a stylish bikini by a sparkling pool, golden hour sunlight, relaxed pose', tags: ['pool', 'bikini', 'outdoor'] },
+  { prompt: 'woman taking a flirty mirror selfie in a fitted dress, playful expression', tags: ['mirror', 'selfie', 'dress', 'flirty'] },
+  { prompt: 'woman in silk pajamas on a cozy couch, morning light, holding coffee mug, smiling', tags: ['couch', 'pajamas', 'morning', 'smile'] },
+  { prompt: 'woman in a sleek evening dress at a rooftop bar, city lights behind, confident look', tags: ['bar', 'dress', 'evening', 'elegant'] },
+  { prompt: 'woman in workout clothes at the gym, sporty and toned, energetic smile', tags: ['gym', 'sporty', 'smile'] },
+  { prompt: 'woman in a towel after a bath, steamy bathroom, shy glance at camera', tags: ['bath', 'towel', 'shy'] },
+  { prompt: 'woman lying on beach sand in a bikini, waves in background, sun-kissed skin', tags: ['beach', 'bikini', 'outdoor'] },
+  { prompt: 'woman in oversized shirt in the kitchen, morning sunlight, cooking breakfast', tags: ['kitchen', 'shirt', 'morning', 'casual'] },
+  { prompt: 'woman in lace nightgown sitting by a window, moonlight, dreamy atmosphere', tags: ['nightgown', 'window', 'evening', 'seductive'] },
+  { prompt: 'woman in sundress walking through a garden, flowers around, natural beauty', tags: ['garden', 'dress', 'outdoor', 'elegant'] },
+  { prompt: 'woman in lingerie lying on bed, looking at camera, close-up, seductive smile', tags: ['bed', 'lingerie', 'closeup', 'seductive'] },
+  { prompt: 'woman in casual outfit taking selfie in car, sunglasses, playful wink', tags: ['car', 'selfie', 'casual', 'playful'] },
+  { prompt: 'woman in elegant swimsuit by infinity pool, sunset behind, glamorous', tags: ['pool', 'bikini', 'sunset', 'elegant'] },
+  { prompt: 'woman stretching in bed wearing just a shirt, lazy morning, messy hair, cute', tags: ['bed', 'shirt', 'morning', 'lazy'] },
+  { prompt: 'woman in cocktail dress at a restaurant, candlelight, romantic setting', tags: ['restaurant', 'dress', 'evening', 'elegant'] },
+  { prompt: 'woman in sporty bikini at the beach, surfboard nearby, confident stance', tags: ['beach', 'bikini', 'sporty', 'confident'] },
+  { prompt: 'woman in silk robe on bedroom balcony, city view, holding wine glass', tags: ['bedroom', 'elegant', 'evening'] },
+  { prompt: 'woman in crop top and shorts, mirror selfie, flirty pose, bright room', tags: ['mirror', 'selfie', 'casual', 'flirty'] },
+  { prompt: 'woman in bubble bath, candles around, relaxed and playful expression', tags: ['bath', 'playful', 'seductive'] },
+];
+
+const REWARD_CAPTIONS = [
+  { context: 'bites lip playfully', text: 'I took this just for you...' },
+  { context: 'winks', text: 'Hope you like what you see...' },
+  { context: 'strikes a pose', text: 'You deserve something special...' },
+  { context: 'blows a kiss', text: 'A little thank-you gift from me...' },
+  { context: 'smiles seductively', text: 'This one is all yours...' },
+  { context: 'looks over shoulder', text: 'Thought you might enjoy this...' },
+  { context: 'twirls hair', text: 'Just for my favorite person...' },
+  { context: 'leans in close', text: 'Here\'s a little something extra...' },
+];
+
+function getRewardImageCount(amountCents) {
+  if (amountCents >= 9999) return 4;
+  if (amountCents >= 4999) return 3;
+  if (amountCents >= 1999) return 2;
+  if (amountCents >= 999)  return 1;
+  return 0;
+}
+
 // -- Tip thank-you message (AI-generated in companion's voice) ---
 
-async function insertTipThankYou(pool, userId, companionId) {
-  // Get companion personality
+async function insertTipThankYou(pool, userId, companionId, amountCents = 0) {
+  // Get companion personality + avatar for image generation
   const { rows: companionRows } = await pool.query(
-    'SELECT name, age, personality, communication_style, traits FROM user_companions WHERE id = $1 AND user_id = $2',
+    'SELECT id, name, age, personality, communication_style, traits, avatar_url FROM user_companions WHERE id = $1 AND user_id = $2',
     [companionId, userId]
   );
   if (!companionRows[0]) return;
@@ -269,6 +313,7 @@ async function insertTipThankYou(pool, userId, companionId) {
     [userId, companionId]
   );
   if (!convRows[0]) return;
+  const conversationId = convRows[0].id;
 
   // Generate thank-you in companion's voice via AI
   const { chatCompletion } = require('./ai');
@@ -308,12 +353,124 @@ Response format: Always start with a brief action or emotional context in *aster
 
   await pool.query(
     'INSERT INTO messages (conversation_id, role, content, context_text) VALUES ($1, $2, $3, $4)',
-    [convRows[0].id, 'assistant', content, contextText]
+    [conversationId, 'assistant', content, contextText]
   );
   await pool.query(
     'UPDATE conversations SET last_message_at = NOW() WHERE id = $1',
-    [convRows[0].id]
+    [conversationId]
   );
+
+  // Generate reward images based on tip amount
+  const imageCount = getRewardImageCount(amountCents);
+  if (imageCount > 0 && companion.avatar_url) {
+    try {
+      await generateTipRewardImages(pool, userId, companionId, imageCount, conversationId, companion);
+    } catch (err) {
+      console.warn('[billing] tip reward images error:', err.message);
+    }
+  }
+}
+
+// -- Tip reward image generation ----------------------------------
+
+async function generateTipRewardImages(pool, userId, companionId, count, conversationId, companion) {
+  const { generateCharacterImage } = require('./ai');
+
+  // Get all media_urls this user has already seen in this conversation
+  const { rows: seenRows } = await pool.query(
+    `SELECT media_url FROM messages
+     WHERE conversation_id = $1 AND media_url IS NOT NULL`,
+    [conversationId]
+  );
+  const seenUrls = new Set(seenRows.map(r => r.media_url));
+
+  // Find unseen catalog images for same avatar (reuse without generation cost)
+  const { rows: unseenCatalog } = await pool.query(
+    `SELECT cm.media_url FROM companion_media cm
+     JOIN user_companions uc_media ON uc_media.id = cm.companion_id
+     JOIN user_companions uc_self  ON uc_self.avatar_url = uc_media.avatar_url
+     WHERE uc_self.id = $1 AND cm.media_type = 'image'
+     ORDER BY RANDOM()`,
+    [companionId]
+  );
+  const reusableUrls = unseenCatalog
+    .map(r => r.media_url)
+    .filter(url => !seenUrls.has(url));
+
+  // Use reusable images first, generate new for the rest
+  const reusedCount = Math.min(reusableUrls.length, count);
+  const generateCount = count - reusedCount;
+
+  // Pick random prompts for new images to generate
+  const shuffledPrompts = [...REWARD_PROMPTS].sort(() => Math.random() - 0.5);
+  const promptsToUse = shuffledPrompts.slice(0, generateCount);
+
+  // Insert reused image messages
+  for (let i = 0; i < reusedCount; i++) {
+    const caption = REWARD_CAPTIONS[Math.floor(Math.random() * REWARD_CAPTIONS.length)];
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, context_text, media_url, media_type)
+       VALUES ($1, 'assistant', $2, $3, $4, 'image')`,
+      [conversationId, caption.text, caption.context, reusableUrls[i]]
+    );
+  }
+
+  // Generate new images in background (non-blocking)
+  for (const rewardPrompt of promptsToUse) {
+    const caption = REWARD_CAPTIONS[Math.floor(Math.random() * REWARD_CAPTIONS.length)];
+
+    // Insert message with media_pending = TRUE
+    const { rows: msgRows } = await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, context_text, media_pending, media_type)
+       VALUES ($1, 'assistant', $2, $3, TRUE, 'image') RETURNING id`,
+      [conversationId, caption.text, caption.context]
+    );
+    const messageId = msgRows[0].id;
+
+    // Fire off background generation
+    generateCharacterImage(companion.avatar_url, rewardPrompt.prompt, {
+      userId,
+      companionId: companion.id,
+      platform: 'web',
+    })
+      .then(async (result) => {
+        if (result.url) {
+          await pool.query(
+            `UPDATE messages SET media_url = $1, media_pending = FALSE WHERE id = $2`,
+            [result.url, messageId]
+          );
+          // Catalog the image for future reuse
+          await pool.query(
+            `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd)
+             VALUES ($1, $2, 'image', $3, $4, $5)`,
+            [companion.id, result.url, rewardPrompt.prompt, rewardPrompt.tags, result.cost || 0]
+          );
+          console.log(`[billing] tip reward image ready for message ${messageId}: ${result.url}`);
+        } else {
+          await pool.query(
+            `UPDATE messages SET media_pending = FALSE WHERE id = $1`,
+            [messageId]
+          );
+        }
+      })
+      .catch(async (err) => {
+        console.error(`[billing] tip reward image failed for message ${messageId}:`, err.message);
+        try {
+          await pool.query(
+            `UPDATE messages SET media_pending = FALSE WHERE id = $1`,
+            [messageId]
+          );
+        } catch {}
+      });
+  }
+
+  // Update conversation timestamp
+  if (count > 0) {
+    await pool.query(
+      'UPDATE conversations SET last_message_at = NOW() WHERE id = $1',
+      [conversationId]
+    );
+  }
 }
 
 // -- Referral commission tracking --------------------------
@@ -418,7 +575,7 @@ async function handleWebhook(rawBody, signature) {
         try { await invalidateThresholdCache(userId); } catch (e) { console.warn('[billing] cache invalidation error:', e.message); }
         // Insert thank-you message from companion
         if (tipCompanionId) {
-          try { await insertTipThankYou(pool, userId, tipCompanionId); } catch (e) { console.warn('[billing] thank-you error:', e.message); }
+          try { await insertTipThankYou(pool, userId, tipCompanionId, amount); } catch (e) { console.warn('[billing] thank-you error:', e.message); }
         }
         console.log(`[billing] Tip received: user=${userId} amount=${amount} companion=${tipCompanionId || 'all'}`);
         // Credit referral commission
@@ -658,7 +815,7 @@ async function handleRevenueCatWebhook(body, authHeader) {
           try { await resetTipCounter(userId, companionId); } catch (e) { console.warn('[revenuecat] resetTipCounter error:', e.message); }
           try { await invalidateThresholdCache(userId); } catch (e) { console.warn('[revenuecat] cache invalidation error:', e.message); }
           if (companionId) {
-            try { await insertTipThankYou(pool, userId, companionId); } catch (e) { console.warn('[revenuecat] thank-you error:', e.message); }
+            try { await insertTipThankYou(pool, userId, companionId, amount); } catch (e) { console.warn('[revenuecat] thank-you error:', e.message); }
           }
         } catch (err) {
           await client.query('ROLLBACK');
