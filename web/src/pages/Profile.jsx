@@ -798,20 +798,6 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Support */}
-        <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
-          <h3 className="text-sm font-semibold text-brand-text mb-1">Support</h3>
-          <p className="text-xs text-brand-muted mb-3">
-            Have a question or need help? Chat with our support team.
-          </p>
-          <button
-            onClick={() => navigate('/support')}
-            className="w-full py-2.5 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors"
-          >
-            Contact Support
-          </button>
-        </div>
-
         {ios && (
           <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
             <h3 className="text-sm font-semibold text-brand-text mb-1">App Icon</h3>
@@ -832,29 +818,17 @@ export default function Profile() {
                       aria-pressed={selected}
                       onClick={() => handleAppIconSelect(option.id)}
                       disabled={appIconSaving}
-                      className={`rounded-xl border p-2.5 text-left transition-all ${
+                      className={`rounded-xl border p-1 transition-all ${
                         selected
-                          ? 'border-brand-accent bg-brand-accent/10 ring-1 ring-brand-accent/30'
-                          : 'border-brand-border bg-brand-surface hover:border-brand-accent/50'
+                          ? 'border-brand-accent ring-1 ring-brand-accent/30'
+                          : 'border-transparent hover:border-brand-accent/50'
                       } ${appIconSaving ? 'disabled:opacity-80' : ''}`}
                     >
                       <img
                         src={option.preview}
                         alt={`${option.label} icon preview`}
-                        className="w-full rounded-[18px] mb-2 border border-black/5"
+                        className="w-full rounded-[18px] border border-black/5"
                       />
-                      <div className="flex flex-col items-start gap-1">
-                        <span className="text-sm font-semibold text-brand-text leading-tight">{option.label}</span>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold leading-none ${
-                            selected
-                              ? 'bg-brand-accent/15 text-brand-accent border border-brand-accent/30'
-                              : 'bg-brand-bg/30 text-brand-muted border border-brand-border'
-                          }`}
-                        >
-                          {selected ? 'Selected' : 'Use'}
-                        </span>
-                      </div>
                     </button>
                   );
                 })}
@@ -862,6 +836,20 @@ export default function Profile() {
             )}
           </div>
         )}
+
+        {/* Support */}
+        <div className="bg-brand-card border border-brand-border rounded-xl p-5 mb-4">
+          <h3 className="text-sm font-semibold text-brand-text mb-1">Support</h3>
+          <p className="text-xs text-brand-muted mb-3">
+            Have a question or need help? Chat with our support team.
+          </p>
+          <button
+            onClick={() => navigate('/support')}
+            className="w-full py-2.5 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors"
+          >
+            Contact Support
+          </button>
+        </div>
 
         {/* Sign out */}
         <button
