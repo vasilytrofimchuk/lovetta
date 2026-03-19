@@ -77,16 +77,16 @@
 
     /* Cards */
     .stat-cards {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px; margin-bottom: 24px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 8px; margin-bottom: 24px;
     }
     .stat-card {
       background: var(--bg3); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px;
+      border-radius: var(--radius); padding: 12px;
     }
-    .stat-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-card .value { font-size: 2rem; font-weight: 700; margin-top: 4px; }
-    .stat-card .sub { font-size: 0.8rem; color: var(--text2); margin-top: 4px; }
+    .stat-card .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 2px; }
+    .stat-card .sub { font-size: 0.7rem; color: var(--text2); margin-top: 2px; }
 
     /* Tables */
     .section { margin-bottom: 32px; }
@@ -672,12 +672,15 @@
         var margin = tips - cost;
 
         allCards.innerHTML =
-          card('Visitors', v.total || 0, (v.today || 0) + ' today') +
+          card('Total Visitors', v.total || 0) +
+          card('Today', v.today || 0) +
+          card('Active Now', v.active || 0) +
           card('Online (5m)', o.visitors_online || 0, onlineSub) +
-          card('Users', u.total || 0, (u.today || 0) + ' today') +
-          card('API Cost', '$' + cost.toFixed(2), '7 days') +
-          card('Tips', '$' + tips.toFixed(2), '7 days') +
-          card('Net', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>', '7 days');
+          card('Total Users', u.total || 0) +
+          card('Today', u.today || 0) +
+          card('API Cost (7d)', '$' + cost.toFixed(2)) +
+          card('Tips (7d)', '$' + tips.toFixed(2)) +
+          card('Net (7d)', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>');
 
         var breakdowns = '';
         breakdowns += breakdownTable('Countries', 'country', data.countries || []);
