@@ -304,14 +304,20 @@ ${existingText}`;
         [fact, lastMessageId, match.id]
       );
     } else {
-      if (existing.length >= 8) {
+      // Global cap: 30 total facts per conversation (across all categories)
+      const { rows: totalCount } = await pool.query(
+        `SELECT COUNT(*) as cnt FROM companion_memories WHERE conversation_id = $1`,
+        [conversationId]
+      );
+      if (parseInt(totalCount[0].cnt) >= 30) {
+        // Remove oldest fact across all categories to make room
         await pool.query(
           `DELETE FROM companion_memories WHERE id = (
             SELECT id FROM companion_memories
-            WHERE conversation_id = $1 AND category = $2
+            WHERE conversation_id = $1
             ORDER BY updated_at ASC LIMIT 1
           )`,
-          [conversationId, category]
+          [conversationId]
         );
       }
       await pool.query(
