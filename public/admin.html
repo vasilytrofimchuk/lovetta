@@ -754,12 +754,19 @@
       var mid = new Date((first.getTime() + last.getTime()) / 2);
       function fmtTime(d) { return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'); }
 
+      // Y-axis labels
+      var yLabels = '<div class="chart-y">' +
+        '<span style="top:0">' + maxVal + '</span>' +
+        '<span style="top:50%">' + Math.round(maxVal / 2) + '</span>' +
+        '<span style="top:100%">0</span>' +
+        '</div>';
+
       container.innerHTML =
         '<div class="online-chart">' +
         '<div class="online-chart-header"><h3>Online (24h)</h3>' +
         '<div class="chart-legend"><span class="leg-visitors">Visitors</span><span class="leg-web">Web</span><span class="leg-ios">iOS</span></div></div>' +
-        '<div class="chart-area">' + bars + '</div>' +
-        '<div class="chart-time-axis"><span>' + fmtTime(first) + '</span><span>' + fmtTime(mid) + '</span><span>' + fmtTime(last) + '</span></div>' +
+        '<div class="chart-area" style="padding-left:28px">' + yLabels + bars + '</div>' +
+        '<div class="chart-time-axis" style="padding-left:28px"><span>' + fmtTime(first) + '</span><span>' + fmtTime(mid) + '</span><span>' + fmtTime(last) + '</span></div>' +
         '</div>';
     }
 
