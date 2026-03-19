@@ -216,7 +216,7 @@ export default function App() {
   }, [])
 
   return (
-    <BrowserRouter basename={isCapacitor() ? '/' : '/my'}>
+    <BrowserRouter basename="/my">
       <AuthProvider>
         <ToastProvider>
           <RevenueCatInitializer />

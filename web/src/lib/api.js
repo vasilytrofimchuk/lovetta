@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const isNative = !!(window.Capacitor?.isNativePlatform?.())
-const LOGIN_PATH = isNative ? '/login' : '/my/login'
+const LOGIN_PATH = '/my/login'
 
 function isLoopbackHost(hostname) {
   return hostname === 'localhost' || hostname === '127.0.0.1'

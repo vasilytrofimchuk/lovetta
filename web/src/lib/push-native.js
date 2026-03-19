@@ -65,7 +65,7 @@ export async function setupPushListeners(navigateFn) {
     console.log('[push] Tap action:', JSON.stringify(action.notification?.data))
     const data = action.notification?.data
     let url = data?.url
-    // Strip /my prefix — Capacitor router uses basename='/'
+    // Strip /my prefix — React Router basename='/my' handles it
     if (url?.startsWith('/my/')) url = url.slice(3)
     if (url?.startsWith('/my')) url = url.slice(3) || '/'
     if (url) {
