@@ -61,6 +61,10 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
       // The iOS native sheet can report back-out as AuthorizationError 1000/1001.
       if (isAppleUserCancel(err)) return
       const serverErr = err?.response?.data?.error || ''
+      if (serverErr === 'age_consent_required') {
+        window.location.href = '/my/signup'
+        return
+      }
       const msg = serverErr || getErrorMessage(err) || 'Apple sign-in failed'
       onError?.(msg)
     } finally {

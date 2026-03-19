@@ -53,6 +53,11 @@ export default function Login() {
     try {
       await login(email, password)
     } catch (err) {
+      const serverErr = err?.response?.data?.error || ''
+      if (serverErr === 'age_consent_required') {
+        window.location.href = '/my/signup'
+        return
+      }
       setError(getErrorMessage(err))
     } finally {
       setLoading(false)
