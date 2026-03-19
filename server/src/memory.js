@@ -14,7 +14,7 @@ const { trackConsumption } = require('./consumption');
 const EXTRACTION_THRESHOLD = 3;
 const SUMMARY_THRESHOLD = 20;
 const MAX_MEMORY_CHARS = 3000; // ~750 tokens hard cap
-const EXTRACTION_CHUNK_SIZE = 7; // process user messages in small batches
+const EXTRACTION_CHUNK_SIZE = 10; // process user messages in focused batches
 
 // -- Build memory context for system prompt ----------------------
 
@@ -177,12 +177,12 @@ async function extractFacts(pool, conversationId, companionId, userId) {
   }
 
   // Process in small chunks so the model focuses on each batch and misses nothing
-  // Cap at 5 chunks max (35 user messages per extraction cycle)
+  // Cap at 3 chunks max (30 user messages per extraction cycle)
   const chunks = [];
   for (let i = 0; i < messages.length; i += EXTRACTION_CHUNK_SIZE) {
     chunks.push(messages.slice(i, i + EXTRACTION_CHUNK_SIZE));
   }
-  const chunksToProcess = chunks.slice(0, 5);
+  const chunksToProcess = chunks.slice(0, 3);
 
   // Process chunks sequentially (dedup needs previous chunk's results)
   let totalExtracted = 0;
@@ -214,15 +214,15 @@ async function extractFactsFromChunk(pool, conversationId, companionId, userId, 
   const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
   const messagesText = messages.map(m => `- ${cleanMsg(m.content)}`).join('\n');
 
-  const systemPrompt = `Extract ALL personal facts from the messages below. Return a JSON array where each element has "category" and "fact" keys.
+  const systemPrompt = `Extract ALL personal facts about the user from the messages below. Return a JSON array with "category" and "fact" keys.
 
 CATEGORIES: identity, preferences, life, relationship, emotional
 
-EXAMPLE:
 [{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User has a cat named Whiskers"},{"category":"preferences","fact":"User drinks 4 cups of coffee daily"}]
 
-Extract EVERY detail: names, ages, places, dates, jobs, pets, food, music, movies, hobbies, habits, family, friends, plans, allergies, routines.
-Do NOT skip anything. One fact per detail. Return [] if no facts.
+Extract EVERY detail the user explicitly mentions: names, ages, places, dates, jobs, pets, food, music, movies, hobbies, habits, family, friends, plans, allergies, routines.
+CRITICAL: Only extract facts the user EXPLICITLY stated. Do NOT infer, assume, or hallucinate details.
+One fact per detail. Return [] if no facts.
 ${existingText}`;
 
   const { plainChatCompletion } = require('./ai');
