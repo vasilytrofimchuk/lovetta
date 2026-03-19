@@ -1061,7 +1061,7 @@
 - [x] Update `TipPromoMessage.jsx` — localized `priceString` from offerings
 - [x] Update `CompanionSheet.jsx` — localized `priceString` from offerings
 - [x] Configure default offering in RevenueCat dashboard (subs only — tips use getProducts fallback)
-- [ ] Test on iOS device with StoreKit sandbox
+- [x] Test on iOS device with StoreKit sandbox — both subs and tips use offerings path
 - [ ] Verify experiments work end-to-end
 
 ## Admin Page Improvements

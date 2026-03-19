@@ -153,7 +153,7 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
         {/* Delete button — next to report */}
         <button
           onClick={() => setConfirmDelete(true)}
-          className="absolute top-5 left-14 p-2 rounded-lg text-brand-muted hover:text-red-400 hover:bg-brand-surface transition-colors"
+          className="absolute top-5 left-[3.75rem] p-2 rounded-lg text-brand-muted hover:text-red-400 hover:bg-brand-surface transition-colors"
           title="Delete"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -178,7 +178,7 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
         {!editing && (
           <button
             onClick={startEdit}
-            className="absolute top-5 right-14 p-2 rounded-lg text-brand-muted hover:text-brand-accent hover:bg-brand-surface transition-colors"
+            className="absolute top-5 right-[3.75rem] p-2 rounded-lg text-brand-muted hover:text-brand-accent hover:bg-brand-surface transition-colors"
             title="Edit"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -318,17 +318,20 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
         )}
 
         {/* Tips */}
-        <div className="rounded-xl border border-brand-accent/20 bg-brand-accent/5 p-4">
-          <p className="text-sm font-medium text-brand-accent text-center mb-3">
-            Send {companion.name} a tip
-          </p>
+        <div className="rounded-xl bg-gradient-to-br from-brand-accent/8 to-brand-surface border border-brand-border p-4">
+          <div className="flex items-center justify-center gap-1.5 mb-3">
+            <span className="text-brand-accent text-sm">♥</span>
+            <p className="text-sm font-medium text-brand-text-secondary">
+              Show {companion.name} some love
+            </p>
+          </div>
           <div className="grid grid-cols-4 gap-2">
             {tipAmounts.map(({ amount, priceString }) => (
               <button
                 key={amount}
                 onClick={() => handleTip(amount)}
                 disabled={tipLoading !== null}
-                className="py-2.5 px-1 rounded-lg border border-brand-accent/30 bg-brand-card text-brand-text hover:bg-brand-accent/15 hover:border-brand-accent/50 transition-colors disabled:opacity-50 font-medium"
+                className="py-2.5 px-1 rounded-lg border border-brand-border bg-brand-card text-brand-text hover:bg-brand-accent/10 hover:border-brand-accent/30 transition-colors disabled:opacity-50 font-medium"
               >
                 <span className="block text-sm">{tipLoading === amount ? '...' : (priceString || `$${amount}`)}</span>
               </button>

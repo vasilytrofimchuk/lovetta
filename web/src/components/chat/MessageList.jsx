@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import MessageBubble from './MessageBubble';
 import StreamingMessage from './StreamingMessage';
 import TipPromoMessage from './TipPromoMessage';
+import TipSentCard from './TipSentCard';
 
-export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, onTipSuccess, companionId, mediaLoading, mediaLoadingType, showMediaButton, onRequestMedia, companionAvatarUrl }) {
+export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, onTipSuccess, companionId, mediaLoading, mediaLoadingType, showMediaButton, onRequestMedia, companionAvatarUrl, tipSent, companionName }) {
   const bottomRef = useRef(null);
   const containerRef = useRef(null);
   const sentinelRef = useRef(null);
@@ -52,9 +53,17 @@ export default function MessageList({ messages, streaming, streamingText, hasMor
         {/* Load more sentinel */}
         {hasMore && <div ref={sentinelRef} className="text-center text-brand-muted text-xs py-2">Loading earlier messages...</div>}
 
-        {messages.map(msg => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
+        {messages.map((msg, i) => {
+          // Show tip card right before the last assistant message (the thank-you)
+          const isLastMsg = i === messages.length - 1;
+          const showTipCard = tipSent && isLastMsg && msg.role === 'assistant';
+          return (
+            <div key={msg.id}>
+              {showTipCard && <TipSentCard amount={tipSent.amount} companionName={companionName} />}
+              <MessageBubble message={msg} />
+            </div>
+          );
+        })}
 
         {/* Tip promo message */}
         {tipPromoMessage && (

@@ -51,8 +51,6 @@ export async function startTipCheckout(amount, companionId, userId) {
 
     // Try offerings-based purchase first (enables experiments)
     const tipOfferings = await getTipOfferings()
-    console.log('[billing] tipOfferings', tipOfferings?.map(t => ({ productId: t.productId, price: t.price })))
-    console.log('[billing] looking for', tip.rcProductId)
     const offeringPkg = tipOfferings?.find(t => t.productId === tip.rcProductId)?.package
 
     if (offeringPkg) {
@@ -93,7 +91,7 @@ export async function startTipCheckout(amount, companionId, userId) {
       await Purchases.purchaseStoreProduct({ product })
     }
     const synced = await waitForIosTipIntent(data.intentId)
-    return { status: 'completed', intentId: data.intentId, tipId: synced.tipId || null }
+    return { status: 'completed', intentId: data.intentId, tipId: synced.tipId || null, amount }
   }
 
   // Stripe checkout for web

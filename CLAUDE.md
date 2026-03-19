@@ -273,6 +273,14 @@ Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
 
 **Entitlements** (`web/ios/App/App/App.entitlements`): must have `com.apple.developer.applesignin = [Default]`.
 
+### iOS Build — MANDATORY
+
+**NEVER** use `npm run build` + `cap sync ios` for iOS. The web build outputs to `public/my/`, but the iOS app reads from `web/ios-dist/`.
+
+**ALWAYS** use `npm run build:ios` from the project root. This sets `CAPACITOR_BUILD=1`, builds to `web/ios-dist/`, and runs `cap sync ios` in one command.
+
+After ANY web code change that needs iOS testing: `npm run build:ios`, then rebuild in Xcode.
+
 ### Ports
 
 - **3900** — Dev server

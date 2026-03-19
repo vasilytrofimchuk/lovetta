@@ -1009,7 +1009,7 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Toggle in Profile > Content Preferences.
 - Affects chat, opener, media-request, and proactive message routes.
 
-## RevenueCat Offerings Refactor — IN PROGRESS
+## RevenueCat Offerings Refactor — DONE
 - Switch iOS IAP from hardcoded product IDs (`getProducts`) to RevenueCat Offerings API (`getOfferings`).
 - Enables RevenueCat Experiments (A/B pricing tests), localized prices, dashboard-controlled products.
 - Prerequisite: configure default offering in RevenueCat dashboard (subs only — tips use getProducts fallback).

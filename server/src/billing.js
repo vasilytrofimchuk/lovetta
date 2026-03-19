@@ -68,7 +68,7 @@ async function createTipCheckout(userId, amount, email, companionId) {
       },
       quantity: 1,
     }],
-    success_url: companionId ? `${SITE_URL}/my/chat/${companionId}?tip=success` : `${SITE_URL}/my/?tip=success`,
+    success_url: companionId ? `${SITE_URL}/my/chat/${companionId}?tip=success&tip_amount=${(amount / 100).toFixed(2)}` : `${SITE_URL}/my/?tip=success`,
     cancel_url: companionId ? `${SITE_URL}/my/chat/${companionId}?tip=cancel` : `${SITE_URL}/my/?tip=cancel`,
     metadata,
   });

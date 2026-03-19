@@ -25,14 +25,26 @@ export default function ChatPage() {
   const [showSheet, setShowSheet] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [scrollTrigger, setScrollTrigger] = useState(0);
+  const [tipSent, setTipSent] = useState(null); // { amount }
+
+  const handleTipSuccess = useCallback((result) => {
+    if (result?.amount) setTipSent({ amount: result.amount });
+    loadChat();
+    setTimeout(scrollToBottom, 100);
+  }, [loadChat, scrollToBottom]);
 
   // Handle tip=success/cancel query param — reload chat to show server-inserted thank-you message
   useEffect(() => {
     const tip = searchParams.get('tip');
     if (tip) {
+      const tipAmount = parseFloat(searchParams.get('tip_amount'));
       searchParams.delete('tip');
+      searchParams.delete('tip_amount');
       setSearchParams(searchParams, { replace: true });
-      if (tip === 'success') loadChat();
+      if (tip === 'success') {
+        if (tipAmount > 0) setTipSent({ amount: tipAmount });
+        loadChat();
+      }
     }
   }, [searchParams, setSearchParams, loadChat]);
 
@@ -92,8 +104,10 @@ export default function ChatPage() {
         scrollTrigger={scrollTrigger}
         tipPromoMessage={tipPromoMessage}
         onDismissTip={dismissTip}
-        onTipSuccess={loadChat}
+        onTipSuccess={handleTipSuccess}
         companionId={companionId}
+        tipSent={tipSent}
+        companionName={companion?.name}
         mediaLoading={mediaLoading}
         mediaLoadingType={mediaLoadingType}
         showMediaButton={showMediaButton}
@@ -120,7 +134,7 @@ export default function ChatPage() {
           onReport={() => { setShowSheet(false); setShowReport(true); }}
           onUpdate={(updated) => setCompanion(updated)}
           onDelete={() => navigate('/')}
-          onTipSuccess={loadChat}
+          onTipSuccess={handleTipSuccess}
         />
       )}
 
