@@ -746,13 +746,13 @@
       var bars = '';
       snapshots.forEach(function(s) {
         var vis = parseInt(s.visitors_online) || 0;
-        var h = Math.max(vis > 0 ? 2 : 0, (vis / maxVal) * 100);
+        var hPx = Math.max(vis > 0 ? 2 : 0, Math.round((vis / maxVal) * 80));
         var minsAgo = Math.round((now - new Date(s.ts).getTime()) / 60000);
         var web = parseInt(s.users_web) || 0;
         var ios = parseInt(s.users_ios) || 0;
         bars += '<div class="chart-bar-group">' +
           '<div class="chart-tip">-' + minsAgo + ' min — ' + vis + ' visitors, ' + web + ' web, ' + ios + ' ios</div>' +
-          '<div class="chart-bar" style="height:' + h + '%"></div>' +
+          '<div class="chart-bar" style="height:' + hPx + 'px"></div>' +
           '</div>';
       });
 
