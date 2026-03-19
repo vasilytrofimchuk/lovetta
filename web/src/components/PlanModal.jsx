@@ -176,7 +176,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
   const content = (
     <div className={`flex-1 flex flex-col justify-center px-5 md:px-6 lg:px-8 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] ${safeTop}`}>
       <div className="text-center mb-5">
-        <h2 className="text-xl font-bold text-brand-text">Meet Her for Free</h2>
+        <h2 className="text-xl font-bold text-brand-text">Unlock Everything</h2>
         <p className="text-brand-text-secondary text-sm mt-1">Meet your AI girlfriend. Cancel anytime.</p>
       </div>
 

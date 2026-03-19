@@ -116,7 +116,7 @@ test.describe('Companion List', () => {
     await page.getByRole('button', { name: 'Create Account' }).click();
 
     await page.waitForSelector('[data-testid="onboarding-plan-screen"]', { timeout: 15000 });
-    await expect(page.getByRole('heading', { name: 'Meet Her for Free' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Unlock Everything' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Skip for now' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Skip for now' }).click();
