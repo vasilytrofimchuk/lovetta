@@ -3,6 +3,7 @@
  * Used instead of web push when running inside Capacitor.
  */
 import { PushNotifications } from '@capacitor/push-notifications'
+import { App } from '@capacitor/app'
 import api from './api'
 
 /** Request permissions and register for native push. Returns the device token. */
@@ -68,6 +69,15 @@ export function setupPushListeners(navigateFn) {
       navigateFn?.(url)
     } else if (data?.companionId) {
       navigateFn?.(`/chat/${data.companionId}`)
+    }
+    // Clear badge and delivered notifications on tap
+    PushNotifications.removeAllDeliveredNotifications()
+  })
+
+  // Clear delivered notifications when app resumes (badge cleared natively in AppDelegate)
+  App.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) {
+      PushNotifications.removeAllDeliveredNotifications()
     }
   })
 }
