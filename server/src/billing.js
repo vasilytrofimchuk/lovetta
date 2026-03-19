@@ -376,11 +376,12 @@ Response format: Always start with a brief action or emotional context in *aster
 async function generateTipRewardImages(pool, userId, companionId, count, conversationId, companion) {
   const { generateCharacterImage } = require('./ai');
 
-  // Get all media_urls this user has already seen in this conversation
+  // Get all media_urls this user has already seen across ALL conversations
   const { rows: seenRows } = await pool.query(
-    `SELECT media_url FROM messages
-     WHERE conversation_id = $1 AND media_url IS NOT NULL`,
-    [conversationId]
+    `SELECT DISTINCT m.media_url FROM messages m
+     JOIN conversations c ON c.id = m.conversation_id
+     WHERE c.user_id = $1 AND m.media_url IS NOT NULL`,
+    [userId]
   );
   const seenUrls = new Set(seenRows.map(r => r.media_url));
 
