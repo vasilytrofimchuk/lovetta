@@ -148,10 +148,18 @@ function PushInitializer() {
     if (!user || initedRef.current) return
     initedRef.current = true
 
-    // Only set up tap-to-navigate listeners for native (no permission needed)
+    // Set up tap-to-navigate listeners and auto-register push if already granted
     if (isCapacitor()) {
-      import('./lib/push-native').then(({ setupPushListeners }) => {
+      import('./lib/push-native').then(({ registerNativePush, setupPushListeners }) => {
         setupPushListeners((url) => navigate(url))
+        // Auto-register token if permission already granted (no prompt shown)
+        import('@capacitor/push-notifications').then(({ PushNotifications }) => {
+          PushNotifications.checkPermissions().then(({ receive }) => {
+            if (receive === 'granted') {
+              registerNativePush().catch(err => console.error('[push] auto-register:', err.message))
+            }
+          })
+        }).catch(() => {})
       }).catch(() => {})
     }
   }, [user])
