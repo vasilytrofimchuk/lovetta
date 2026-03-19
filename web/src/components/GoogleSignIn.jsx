@@ -45,7 +45,7 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
       if (err?.message?.includes('cancel') || err?.message?.includes('Cancel')) return
       const serverErr = err?.response?.data?.error || ''
       if (serverErr === 'age_consent_required' || serverErr.includes('Birth date') || serverErr.includes('Consent required')) {
-        window.location.href = '/signup'
+        window.location.href = '/my/signup'
         return
       }
       setError(serverErr || getErrorMessage(err) || 'Google sign-in failed')
