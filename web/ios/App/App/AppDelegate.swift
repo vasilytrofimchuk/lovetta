@@ -1,21 +1,21 @@
 import UIKit
 import Capacitor
+import WebKit
 import StoreKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private var loadingOverlay: UIView?
+    private var webViewObservation: NSKeyValueObservation?
 
-    
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Keep launch screen visible while remote URL loads
-        // The web app will call SplashScreen.hide() when ready
-        if let vc = window?.rootViewController as? CAPBridgeViewController {
-            vc.view.backgroundColor = UIColor(red: 0.059, green: 0.039, blue: 0.102, alpha: 1.0) // #0f0a1a
-            vc.webView?.isOpaque = false
-            vc.webView?.backgroundColor = UIColor(red: 0.059, green: 0.039, blue: 0.102, alpha: 1.0)
-            vc.webView?.scrollView.backgroundColor = UIColor(red: 0.059, green: 0.039, blue: 0.102, alpha: 1.0)
+
+        // Schedule overlay addition after the root VC is set up
+        DispatchQueue.main.async { [weak self] in
+            self?.addLoadingOverlay()
+            self?.observeWebView()
         }
 
         #if DEBUG
@@ -26,6 +26,83 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         #endif
         return true
+    }
+
+    private func addLoadingOverlay() {
+        guard let rootView = window?.rootViewController?.view else { return }
+
+        let brandBg = UIColor(red: 0.059, green: 0.039, blue: 0.102, alpha: 1.0) // #0f0a1a
+
+        // Set WebView background
+        if let vc = window?.rootViewController as? CAPBridgeViewController {
+            vc.view.backgroundColor = brandBg
+            vc.webView?.isOpaque = false
+            vc.webView?.backgroundColor = brandBg
+            vc.webView?.scrollView.backgroundColor = brandBg
+        }
+
+        let overlay = UIView(frame: rootView.bounds)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlay.backgroundColor = brandBg
+        overlay.tag = 9999
+
+        // App icon
+        if let iconImage = UIImage(named: "AppIcon") {
+            let iconView = UIImageView(image: iconImage)
+            iconView.contentMode = .scaleAspectFit
+            iconView.translatesAutoresizingMaskIntoConstraints = false
+            iconView.layer.cornerRadius = 18
+            iconView.clipsToBounds = true
+            overlay.addSubview(iconView)
+
+            NSLayoutConstraint.activate([
+                iconView.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+                iconView.centerYAnchor.constraint(equalTo: overlay.centerYAnchor, constant: -20),
+                iconView.widthAnchor.constraint(equalToConstant: 80),
+                iconView.heightAnchor.constraint(equalToConstant: 80),
+            ])
+        }
+
+        // Spinner
+        let spinner = UIActivityIndicatorView(style: .medium)
+        spinner.color = UIColor(red: 0.839, green: 0.200, blue: 0.424, alpha: 1.0) // #d6336c
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        spinner.startAnimating()
+        overlay.addSubview(spinner)
+
+        NSLayoutConstraint.activate([
+            spinner.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            spinner.topAnchor.constraint(equalTo: overlay.centerYAnchor, constant: 50),
+        ])
+
+        rootView.addSubview(overlay)
+        loadingOverlay = overlay
+    }
+
+    private func observeWebView() {
+        guard let vc = window?.rootViewController as? CAPBridgeViewController,
+              let webView = vc.webView else { return }
+
+        webViewObservation = webView.observe(\.isLoading, options: [.new]) { [weak self] webView, change in
+            if let isLoading = change.newValue, !isLoading {
+                DispatchQueue.main.async {
+                    self?.hideLoadingOverlay()
+                }
+            }
+        }
+    }
+
+    private func hideLoadingOverlay() {
+        guard let overlay = loadingOverlay else { return }
+        webViewObservation?.invalidate()
+        webViewObservation = nil
+
+        UIView.animate(withDuration: 0.3, animations: {
+            overlay.alpha = 0
+        }) { _ in
+            overlay.removeFromSuperview()
+        }
+        loadingOverlay = nil
     }
 
     @available(iOS 15.0, *)
