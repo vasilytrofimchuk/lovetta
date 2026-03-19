@@ -214,18 +214,15 @@ async function extractFactsFromChunk(pool, conversationId, companionId, userId, 
   const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
   const messagesText = messages.map(m => `- ${cleanMsg(m.content)}`).join('\n');
 
-  const systemPrompt = `You are a data extraction assistant. Extract ALL personal facts about the user from the messages below. Be thorough — every detail matters.
+  const systemPrompt = `Extract ALL personal facts from the messages below. Return a JSON array where each element has "category" and "fact" keys.
 
-OUTPUT: Raw JSON array only. No explanation.
+CATEGORIES: identity, preferences, life, relationship, emotional
 
-CATEGORIES: identity (name, age, birthday, zodiac, nationality, location, gender), preferences (food, music, movies, hobbies, colors, seasons, books, shows), life (job, education, pets, family, friends, living situation, habits, health, sports, skills), relationship, emotional (mood, dreams, goals, worries)
+EXAMPLE:
+[{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User has a cat named Whiskers"},{"category":"preferences","fact":"User drinks 4 cups of coffee daily"}]
 
-RULES:
-- One fact per detail. If a message contains 3 details, output 3 facts.
-- Each fact = short sentence starting with "User"
-- Extract: names, numbers, places, dates, habits, allergies, routines, plans, relationships
-- Do NOT skip minor details — "drinks 4 cups of coffee" is a fact, "runs 5 miles" is a fact
-- If no NEW facts, return: []
+Extract EVERY detail: names, ages, places, dates, jobs, pets, food, music, movies, hobbies, habits, family, friends, plans, allergies, routines.
+Do NOT skip anything. One fact per detail. Return [] if no facts.
 ${existingText}`;
 
   const { plainChatCompletion } = require('./ai');
@@ -244,8 +241,24 @@ ${existingText}`;
     if (arrayMatch) text = arrayMatch[0];
     factsJson = JSON.parse(text);
   } catch {
-    console.warn('[memory] failed to parse facts JSON:', result.content.slice(0, 200));
-    return 0;
+    // Fallback: try to extract facts from malformed JSON or plain text
+    // Handle: [{"User is 34"}, ...] or "- User is 34\n- User likes..."
+    const factStrings = result.content.match(/["']([^"']{5,200})["']/g);
+    if (factStrings && factStrings.length > 0) {
+      factsJson = factStrings.map(s => {
+        const fact = s.replace(/^["']|["']$/g, '').trim();
+        // Auto-categorize based on keywords
+        let category = 'life';
+        if (/\b(name|age|birthday|born|zodiac|capricorn|years old|nationality|from )\b/i.test(fact)) category = 'identity';
+        else if (/\b(favorite|loves|likes|prefers|enjoys|into |hobby|food|music|movie|season|book)\b/i.test(fact)) category = 'preferences';
+        else if (/\b(feel|mood|dream|hope|wish|worry|excit|miss)\b/i.test(fact)) category = 'emotional';
+        return { category, fact };
+      });
+      console.log(`[memory] recovered ${factsJson.length} facts from malformed JSON`);
+    } else {
+      console.warn('[memory] failed to parse facts JSON:', result.content.slice(0, 200));
+      return 0;
+    }
   }
 
   if (!Array.isArray(factsJson) || factsJson.length === 0) return 0;
