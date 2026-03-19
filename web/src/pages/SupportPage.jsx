@@ -5,6 +5,10 @@ import { isCapacitor } from '../lib/platform';
 
 export default function SupportPage() {
   const navigate = useNavigate();
+  const nativePlatform = isCapacitor();
+  const pageHeight = nativePlatform
+    ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))'
+    : 'var(--app-viewport-height, 100vh)';
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -14,8 +18,8 @@ export default function SupportPage() {
   const scrollRef = useRef(null);
   const pollRef = useRef(null);
   const inputRef = useRef(null);
-  const safeAreaBottom = isCapacitor()
-    ? 'max(0.75rem, env(safe-area-inset-bottom, 0px))'
+  const safeAreaBottom = nativePlatform
+    ? 'calc(max(0.75rem, env(safe-area-inset-bottom, 0px)) + var(--app-keyboard-offset, 0px))'
     : '0.75rem';
 
   const loadChat = useCallback(async () => {
@@ -75,15 +79,16 @@ export default function SupportPage() {
 
   return (
     <div
+      data-testid="support-page"
       className="bg-brand-bg flex flex-col w-full overflow-hidden"
-      style={{ height: 'var(--app-viewport-height, 100vh)' }}
+      style={{ height: pageHeight }}
     >
       {/* Header */}
       <div className="flex items-center gap-3 app-page-gutter py-3 border-b border-brand-border flex-shrink-0 bg-brand-bg">
         <button
           onClick={() => navigate('/profile')}
-          aria-label="Back"
-          title="Back"
+          aria-label="Back to profile"
+          title="Back to profile"
           className="text-brand-muted hover:text-brand-text transition-colors"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -139,6 +144,7 @@ export default function SupportPage() {
             ref={inputRef}
             type="text"
             placeholder={loading ? 'Connecting...' : error ? 'Connection failed' : 'Type a message...'}
+            aria-label="Support message input"
             value={input}
             onChange={e => setInput(e.target.value)}
             disabled={loading || !!error || !chat}
@@ -147,6 +153,8 @@ export default function SupportPage() {
           <button
             type="submit"
             disabled={sending || !input.trim() || !chat || loading || !!error}
+            aria-label="Send support message"
+            title="Send support message"
             className="flex-shrink-0 p-2.5 rounded-full bg-brand-accent text-white disabled:opacity-30 hover:bg-brand-accent-hover transition-colors"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

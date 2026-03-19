@@ -27,6 +27,8 @@ export default function Profile() {
   const [savingProactive, setSavingProactive] = useState(false);
   const [savingFrequency, setSavingFrequency] = useState(false);
   const [savingExplicit, setSavingExplicit] = useState(false);
+  const [showActions, setShowActions] = useState(true);
+  const [savingActions, setSavingActions] = useState(false);
   const [pushPromptVisible, setPushPromptVisible] = useState(false);
   const [pushPermissionDenied, setPushPermissionDenied] = useState(false);
 
@@ -74,6 +76,7 @@ export default function Profile() {
         setExplicitContent(data.explicit_content);
         setProactiveMessages(data.proactive_messages ?? true);
         setProactiveFrequency(data.proactive_frequency ?? 'normal');
+        setShowActions(data.show_actions ?? true);
       })
       .catch(() => {})
       .finally(() => setPrefLoading(false));
@@ -258,6 +261,19 @@ export default function Profile() {
       setExplicitContent(!newVal);
     } finally {
       setSavingExplicit(false);
+    }
+  };
+
+  const toggleActions = async () => {
+    const newVal = !showActions;
+    setShowActions(newVal);
+    setSavingActions(true);
+    try {
+      await api.put('/api/user/preferences', { show_actions: newVal });
+    } catch {
+      setShowActions(!newVal);
+    } finally {
+      setSavingActions(false);
     }
   };
 
@@ -634,6 +650,28 @@ export default function Profile() {
                     explicitContent ? 'translate-x-5.5 left-0.5' : 'left-0.5'
                   }`}
                   style={{ transform: explicitContent ? 'translateX(20px)' : 'translateX(0)' }}
+                />
+              </button>
+            </div>
+            <div className="flex items-center justify-between mt-4">
+              <div className="pr-4">
+                <p className="text-sm text-brand-text">Actions in messages</p>
+                <p className="text-xs text-brand-muted mt-0.5">
+                  Show roleplay actions like *smiles softly* in messages
+                </p>
+              </div>
+              <button
+                onClick={toggleActions}
+                disabled={prefLoading || savingActions}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                  showActions ? 'bg-brand-accent' : 'bg-brand-surface border border-brand-border'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                    showActions ? 'translate-x-5.5 left-0.5' : 'left-0.5'
+                  }`}
+                  style={{ transform: showActions ? 'translateX(20px)' : 'translateX(0)' }}
                 />
               </button>
             </div>

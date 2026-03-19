@@ -83,6 +83,15 @@ router.get('/stats', async (req, res) => {
             COUNT(*) AS total,
             COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS today
           FROM users
+        ),
+        online_stats AS (
+          SELECT
+            (SELECT COUNT(*) FROM visitors WHERE last_activity >= NOW() - INTERVAL '5 minutes') AS visitors_online,
+            COUNT(*) AS users_online,
+            COUNT(*) FILTER (WHERE LOWER(user_agent) LIKE '%capacitor%' OR LOWER(user_agent) LIKE '%lovetta-ios%') AS users_ios,
+            COUNT(*) FILTER (WHERE LOWER(user_agent) NOT LIKE '%capacitor%' AND LOWER(user_agent) NOT LIKE '%lovetta-ios%') AS users_web
+          FROM users
+          WHERE last_activity >= NOW() - INTERVAL '5 minutes'
         )
       SELECT
         (SELECT row_to_json(visitor_stats) FROM visitor_stats) AS visitors,
@@ -93,7 +102,8 @@ router.get('/stats', async (req, res) => {
         (SELECT COALESCE(json_agg(sources), '[]') FROM sources) AS sources,
         (SELECT COALESCE(json_agg(mediums), '[]') FROM mediums) AS mediums,
         (SELECT COALESCE(json_agg(campaigns), '[]') FROM campaigns) AS campaigns,
-        (SELECT COALESCE(json_agg(referrers), '[]') FROM referrers) AS referrers
+        (SELECT COALESCE(json_agg(referrers), '[]') FROM referrers) AS referrers,
+        (SELECT row_to_json(online_stats) FROM online_stats) AS online
     `);
 
     res.json(stats);

@@ -22,7 +22,7 @@ router.get('/preferences', authenticate, async (req, res) => {
   try {
     const pool = getPool();
     const { rows } = await pool.query(
-      'SELECT notify_new_messages, explicit_content, proactive_messages, proactive_frequency FROM user_preferences WHERE user_id = $1',
+      'SELECT notify_new_messages, explicit_content, proactive_messages, proactive_frequency, show_actions FROM user_preferences WHERE user_id = $1',
       [req.userId]
     );
 
@@ -34,6 +34,7 @@ router.get('/preferences', authenticate, async (req, res) => {
       explicit_content: rows[0]?.explicit_content ?? defaultExplicit,
       proactive_messages: rows[0]?.proactive_messages ?? true,
       proactive_frequency: rows[0]?.proactive_frequency ?? 'normal',
+      show_actions: rows[0]?.show_actions ?? true,
     });
   } catch (err) {
     console.error('[user] preferences error:', err.message);
@@ -44,7 +45,7 @@ router.get('/preferences', authenticate, async (req, res) => {
 // -- PUT /api/user/preferences --------------------------------
 router.put('/preferences', authenticate, async (req, res) => {
   try {
-    const { notify_new_messages, explicit_content, proactive_messages, proactive_frequency } = req.body || {};
+    const { notify_new_messages, explicit_content, proactive_messages, proactive_frequency, show_actions } = req.body || {};
     const pool = getPool();
 
     // Build dynamic SET clause — only update fields that are provided
@@ -55,6 +56,7 @@ router.put('/preferences', authenticate, async (req, res) => {
     if (proactive_frequency !== undefined && ['low', 'normal', 'high'].includes(proactive_frequency)) {
       updates.proactive_frequency = proactive_frequency;
     }
+    if (show_actions !== undefined) updates.show_actions = Boolean(show_actions);
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No preferences to update' });

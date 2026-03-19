@@ -966,6 +966,10 @@ const MIGRATIONS = [
       await pool.query(`UPDATE users SET email_type = 'synthetic' WHERE email LIKE '%@apple.lovetta.ai' OR email LIKE '%@telegram.lovetta.ai'`);
     },
   },
+  {
+    name: 'v39_show_actions_pref',
+    sql: `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS show_actions BOOLEAN DEFAULT true`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

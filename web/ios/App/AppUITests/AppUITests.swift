@@ -57,6 +57,69 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["$99.99"].exists)
     }
 
+    func testChatKeyboardKeepsHeaderAnchoredAndInputVisible() throws {
+        try openPreparedChat()
+
+        let backButton = app.buttons["Back to companions"]
+        XCTAssertTrue(backButton.waitForExistence(timeout: 20))
+        let initialHeaderY = backButton.frame.minY
+
+        let input = app.textViews["Chat message input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 20))
+        input.tap()
+
+        try assertInputVisibleAboveKeyboard(input)
+        dismissKeyboardIfNeeded()
+        XCTAssertTrue(waitForKeyboardToHide())
+        XCTAssertEqual(backButton.frame.minY, initialHeaderY, accuracy: 6)
+    }
+
+    func testSupportKeyboardKeepsHeaderAnchoredAndInputVisible() throws {
+        try loginWithPreparedAccount()
+        try openProfile()
+
+        let supportButton = app.buttons["Contact Support"]
+        XCTAssertTrue(supportButton.waitForExistence(timeout: 20))
+        supportButton.tap()
+
+        let backButton = app.buttons["Back to profile"]
+        XCTAssertTrue(backButton.waitForExistence(timeout: 20))
+        let initialHeaderY = backButton.frame.minY
+
+        let input = app.textFields["Support message input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 20))
+        input.tap()
+
+        try assertInputVisibleAboveKeyboard(input)
+        dismissKeyboardIfNeeded()
+        XCTAssertTrue(waitForKeyboardToHide())
+        XCTAssertEqual(backButton.frame.minY, initialHeaderY, accuracy: 6)
+    }
+
+    func testAddEmailKeyboardKeepsHeaderAnchoredAndInputVisible() throws {
+        try loginWithRelayPreparedAccount()
+        try openProfile()
+
+        let addEmailButton = app.buttons["Open add email page"]
+        guard addEmailButton.waitForExistence(timeout: 20) else {
+            throw XCTSkip("Relay test account must show the add-email prompt on Profile.")
+        }
+        addEmailButton.tap()
+
+        let backButton = app.buttons["Back to profile"]
+        XCTAssertTrue(backButton.waitForExistence(timeout: 20))
+        let initialHeaderY = backButton.frame.minY
+
+        let input = app.textFields["Email address"]
+        XCTAssertTrue(input.waitForExistence(timeout: 20))
+        input.tap()
+
+        try assertInputVisibleAboveKeyboard(input)
+        dismissKeyboardIfNeeded()
+        XCTAssertTrue(waitForKeyboardToHide())
+        XCTAssertEqual(backButton.frame.minY, initialHeaderY, accuracy: 6)
+    }
+
     private func loginWithPreparedAccount() throws {
         if app.buttons["Profile"].waitForExistence(timeout: 5) {
             return
@@ -68,6 +131,21 @@ final class AppUITests: XCTestCase {
             throw XCTSkip("Set UITEST_EMAIL and UITEST_PASSWORD in the test scheme to run billing UI tests.")
         }
 
+        try login(email: email, password: password)
+    }
+
+    private func loginWithRelayPreparedAccount() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let email = env["UITEST_RELAY_EMAIL"], !email.isEmpty,
+              let password = env["UITEST_RELAY_PASSWORD"], !password.isEmpty else {
+            throw XCTSkip("Set UITEST_RELAY_EMAIL and UITEST_RELAY_PASSWORD in the test scheme to run add-email keyboard coverage.")
+        }
+
+        try logoutIfNeeded()
+        try login(email: email, password: password)
+    }
+
+    private func login(email: String, password: String) throws {
         if app.buttons["Continue"].waitForExistence(timeout: 10) {
             app.buttons["Continue"].tap()
         }
@@ -93,6 +171,22 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Profile"].waitForExistence(timeout: 30))
     }
 
+    private func logoutIfNeeded() throws {
+        if app.buttons["Profile"].waitForExistence(timeout: 5) {
+            try openProfile()
+        } else if !app.staticTexts["Profile"].waitForExistence(timeout: 5) {
+            return
+        }
+
+        let signOutButton = app.buttons["Sign out"]
+        guard signOutButton.waitForExistence(timeout: 10) else {
+            return
+        }
+
+        signOutButton.tap()
+        XCTAssertTrue(app.buttons["Continue"].waitForExistence(timeout: 20) || app.buttons["Sign in"].waitForExistence(timeout: 20))
+    }
+
     private func openProfile() throws {
         let profileButton = app.buttons["Profile"]
         XCTAssertTrue(profileButton.waitForExistence(timeout: 20))
@@ -116,5 +210,38 @@ final class AppUITests: XCTestCase {
     private func preparedCompanionName() -> String {
         let value = ProcessInfo.processInfo.environment["UITEST_COMPANION_NAME"] ?? "Luna"
         return value.isEmpty ? "Luna" : value
+    }
+
+    private func assertInputVisibleAboveKeyboard(_ input: XCUIElement) throws {
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(keyboard.frame.height, 0)
+        XCTAssertLessThan(input.frame.maxY, keyboard.frame.minY)
+    }
+
+    private func dismissKeyboardIfNeeded() {
+        let keyboard = app.keyboards.firstMatch
+        guard keyboard.exists else { return }
+
+        if app.toolbars.buttons["Done"].exists {
+            app.toolbars.buttons["Done"].tap()
+            return
+        }
+
+        let appTop = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12))
+        appTop.tap()
+
+        if keyboard.exists, keyboard.buttons["Return"].exists {
+            keyboard.buttons["Return"].tap()
+        } else if keyboard.exists, keyboard.buttons["return"].exists {
+            keyboard.buttons["return"].tap()
+        }
+    }
+
+    private func waitForKeyboardToHide(timeout: TimeInterval = 10) -> Bool {
+        let keyboard = app.keyboards.firstMatch
+        let predicate = NSPredicate(format: "exists == false")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: keyboard)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 }

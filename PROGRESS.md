@@ -982,3 +982,48 @@
 - [ ] Fix top shift (separate task — needs to account for safe area bottom difference between keyboardHeight and innerHeight)
 - [ ] Run `npm run test:e2e:ui`
 - [ ] Run `npm run build:ios` + manual device test
+
+## iOS Keyboard Offset Refactor (Chat, Support, Add Email)
+- [x] Update `plan.md` and `PROGRESS.md` with the shared keyboard-offset refactor scope before code changes
+- [x] Refactor `web/src/lib/keyboard.js` to keep a stable viewport height and a separate `--app-keyboard-offset` value
+- [x] Apply the bottom-offset-only layout fix to chat, support, and add-email without moving the header/top area
+- [x] Add or tighten iOS-testable labels/identifiers on the affected headers and inputs
+- [x] Extend `web/ios/App/AppUITests/AppUITests.swift` with native keyboard regression coverage for chat, support, and add-email
+- [x] Run `npm run test:e2e:ui`
+- [x] Run `npm run build:ios`
+- [x] Run `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
+- [x] Update `plan.md` and `PROGRESS.md` with final status, what worked, and what failed
+- WORKED: keep `KeyboardResize.None`, stop shrinking `--app-viewport-height`, and lift only the bottom input bars with `--app-keyboard-offset = keyboardHeight - safeAreaBottom`.
+- WORKED: enable native `Keyboard.setScroll({ isDisabled: true })` only while the keyboard is open, paired with the temporary DOM `ios-keyboard-open` class, then clear both on hide.
+- WORKED: subtract `env(safe-area-inset-top)` from the three full-screen page heights because the app shell already applies top safe-area padding globally.
+- COVERAGE: chat and support native keyboard tests now compile and run in the `AppUITests` target; add-email coverage is implemented and skips unless `UITEST_RELAY_EMAIL` / `UITEST_RELAY_PASSWORD` are provided.
+- Verification notes:
+- `npm run test:e2e:ui` passed (`47` tests).
+- `npm run build:ios` passed.
+- `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- Manual real-iPhone verification is still pending for repeated focus/blur on chat, support, and add-email.
+
+## iOS Companion List Overscroll Clamp
+- [ ] Update `plan.md` and `PROGRESS.md` with the companion-list overscroll follow-up before code changes
+- [ ] Replace the companion-list root `min-h-screen` shell with a safe-area-adjusted fixed-height layout
+- [ ] Keep list scrolling inside the page content instead of the outer document so the screen cannot be dragged down slightly
+- [ ] Run `npm run test:e2e:ui`
+- [ ] Run `npm run build:ios`
+- [ ] Commit only the task-related files
+
+
+## Show Actions Toggle in Profile Settings
+- [x] Add `v39_show_actions_pref` migration — `show_actions BOOLEAN DEFAULT true` on `user_preferences`
+- [x] Add `show_actions` to GET/PUT `/api/user/preferences` in `user-api.js`
+- [x] Add `actionsEnabled` option to `buildCompanionSystemPrompt()` — prompt instructs AI to skip actions when disabled
+- [x] Add server-side strip in all 3 chat routes — remove `*actions*`, `contextText`, `sceneText` after AI generation
+- [x] Add `actionsEnabled` to `buildProactivePrompt()` + server-side strip in proactive.js
+- [x] Add "Actions in messages" toggle in Profile.jsx Content Preferences section
+- [ ] Run `npm run test:e2e:api`
+- [ ] Run `npm run test:e2e:ui`
+
+## Admin Page Improvements
+- [x] Breakdown tables in 4 columns layout
+- [x] Tab badges smaller + compact tab padding
+- [x] Online Now card — API: visitors + users (web/ios) with 5min window
+- [x] Online Now card — frontend rendering with platform sub-text

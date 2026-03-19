@@ -38,6 +38,7 @@ export default function RealEmailPrompt() {
         </div>
         <button
           type="button"
+          aria-label="Open add email page"
           className="px-4 py-2.5 bg-brand-accent text-white text-sm font-medium rounded-xl hover:bg-brand-accent-hover flex-shrink-0"
         >
           Save

@@ -127,7 +127,7 @@ async function maybeNotifyUser(pool, userId, companion, conversationId, messageC
 
 // -- Helpers --------------------------------------------------
 
-function buildCompanionSystemPrompt(companion, { mediaEnabled = true, videoEnabled = false } = {}) {
+function buildCompanionSystemPrompt(companion, { mediaEnabled = true, videoEnabled = false, actionsEnabled = true } = {}) {
   const traits = Array.isArray(companion.traits) ? companion.traits.join(', ') : '';
   let prompt = `You are ${companion.name}, a ${companion.age}-year-old woman.
 
@@ -136,9 +136,11 @@ ${companion.personality}
 ${companion.backstory ? companion.backstory + '\n' : ''}Communication style: ${companion.communication_style}
 ${traits ? 'Traits: ' + traits : ''}
 
-Response format: Start with a short action in *asterisks* (max 8 words, one simple action — NO narration, NO scene-setting, NO describing your appearance), then your spoken message.
+${actionsEnabled
+    ? `Response format: Start with a short action in *asterisks* (max 8 words, one simple action — NO narration, NO scene-setting, NO describing your appearance), then your spoken message.
 Example: *leans closer with a playful smile* Hey, I was just thinking about you...
-BAD (too long): *She slowly walks across the room, her eyes sparkling as she settles onto the couch and looks up at him with a warm smile*
+BAD (too long): *She slowly walks across the room, her eyes sparkling as she settles onto the couch and looks up at him with a warm smile*`
+    : `Response format: Write your spoken message directly. Do NOT use asterisks, action descriptions, or narration of any kind. No *actions*, no stage directions — just speak naturally as yourself.`}
 
 Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares. Never invent or assume details the user hasn't explicitly mentioned.`;
 
@@ -346,8 +348,12 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     const aiMessages = recentMessages.map(m => ({ role: m.role, content: m.content }));
 
     // Build system prompt with memory context
-    const [mediaEnabled, videoEnabled] = await Promise.all([getMediaEnabled(), getVideoEnabled()]);
-    const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled, videoEnabled });
+    const [mediaEnabled, videoEnabled, actionsPref] = await Promise.all([
+      getMediaEnabled(), getVideoEnabled(),
+      pool.query('SELECT show_actions FROM user_preferences WHERE user_id = $1', [req.userId]),
+    ]);
+    const actionsEnabled = actionsPref.rows[0]?.show_actions ?? true;
+    const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled, videoEnabled, actionsEnabled });
     const memoryContext = await buildMemoryContext(conversation.id);
     let systemPrompt = basePrompt + memoryContext;
 
@@ -391,8 +397,15 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
 
       const parsed = parseContextText(cleanText);
 
+      // Server-side strip: remove actions/scenes if user disabled them
+      if (!actionsEnabled) {
+        parsed.contextText = null;
+        parsed.sceneText = null;
+        parsed.content = parsed.content.replace(/\*[^*]+\*\s*/g, '').trim();
+      }
+
       // ~30% chance to generate a scene description
-      if (!parsed.sceneText && Math.random() < 0.3) {
+      if (actionsEnabled && !parsed.sceneText && Math.random() < 0.3) {
         parsed.sceneText = await generateScene(companion, parsed.content);
       }
 
@@ -507,7 +520,9 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
     );
     recentMessages.reverse();
 
-    const basePrompt = buildCompanionSystemPrompt(companion);
+    const { rows: actionsPrefRows } = await pool.query('SELECT show_actions FROM user_preferences WHERE user_id = $1', [req.userId]);
+    const actionsEnabled = actionsPrefRows[0]?.show_actions ?? true;
+    const basePrompt = buildCompanionSystemPrompt(companion, { actionsEnabled });
     const memoryContext = await buildMemoryContext(conversation.id);
     let systemPrompt = basePrompt + memoryContext;
 
@@ -552,8 +567,15 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       const { cleanText, mediaRequest } = parseMediaTags(doneData.fullText);
       const parsed = parseContextText(cleanText);
 
+      // Strip actions/scenes if user disabled them
+      if (!actionsEnabled) {
+        parsed.contextText = null;
+        parsed.sceneText = null;
+        parsed.content = parsed.content.replace(/\*[^*]+\*\s*/g, '').trim();
+      }
+
       // ~30% chance to generate a scene description
-      if (!parsed.sceneText && Math.random() < 0.3) {
+      if (actionsEnabled && !parsed.sceneText && Math.random() < 0.3) {
         parsed.sceneText = await generateScene(companion, parsed.content);
       }
 
@@ -670,7 +692,9 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     ];
 
     const videoEnabledForMedia = await getVideoEnabled();
-    const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled: true, videoEnabled: videoEnabledForMedia });
+    const { rows: actionsPrefRows3 } = await pool.query('SELECT show_actions FROM user_preferences WHERE user_id = $1', [req.userId]);
+    const actionsEnabled = actionsPrefRows3[0]?.show_actions ?? true;
+    const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled: true, videoEnabled: videoEnabledForMedia, actionsEnabled });
     const memoryContext = await buildMemoryContext(conversation.id);
     const systemPrompt = basePrompt + memoryContext;
     const platform = detectPlatform(req);
@@ -699,6 +723,13 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
 
       const parsed = parseContextText(cleanText);
+
+      // Strip actions/scenes if user disabled them
+      if (!actionsEnabled) {
+        parsed.contextText = null;
+        parsed.sceneText = null;
+        parsed.content = parsed.content.replace(/\*[^*]+\*\s*/g, '').trim();
+      }
 
       // Force image generation even if LLM didn't include the tag
       // Build a contextual description from the AI's response text

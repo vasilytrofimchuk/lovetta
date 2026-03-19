@@ -19,12 +19,18 @@ export default function ChatHeader({ companion, onCompanionTap }) {
     <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
       <div className="w-full flex items-center gap-3">
         <button onClick={() => navigate('/')}
+          aria-label="Back to companions"
+          title="Back to companions"
           className="text-brand-muted hover:text-brand-text transition-colors flex-shrink-0">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
-        <button onClick={onCompanionTap} className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={onCompanionTap}
+          aria-label={`${companion?.name || 'Companion'} header`}
+          className="flex items-center gap-3 min-w-0"
+        >
           {companion?.avatar_url ? (
             <img src={companion.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
           ) : (

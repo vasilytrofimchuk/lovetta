@@ -61,12 +61,17 @@ function getCurrentSlot(timezone) {
 /**
  * Build a prompt for generating a proactive companion message.
  */
-function buildProactivePrompt(companion, memoryContext, slot) {
+function buildProactivePrompt(companion, memoryContext, slot, { actionsEnabled = true } = {}) {
   const slotInstructions = {
     morning: `It's morning. Send a sweet "good morning" message — like you just woke up and he's the first thing on your mind. Be cozy and warm.`,
     evening: `It's evening. Send a relaxed message — like you're winding down and thinking of him. Be flirty and intimate.`,
     random: `You haven't heard from your boyfriend in a while. Send him a short, natural message — like you're thinking of him.`,
   };
+
+  const actionInstruction = actionsEnabled
+    ? `Start with a brief action in *asterisks*, then your message.
+Example: *curls up on the couch and texts you* Hey... I was just thinking about you. How's your day going?`
+    : `Write your message directly. Do NOT use asterisks or action descriptions.`;
 
   return `You are ${companion.name}, a ${companion.age || 22}-year-old woman.
 ${companion.personality || ''}
@@ -77,8 +82,7 @@ ${slotInstructions[slot] || slotInstructions.random}
 Keep it 1-3 sentences. Be warm and in-character. Don't ask too many questions. Just reach out naturally.
 Only reference topics actually discussed — never invent or assume details about their life.
 
-Start with a brief action in *asterisks*, then your message.
-Example: *curls up on the couch and texts you* Hey... I was just thinking about you. How's your day going?
+${actionInstruction}
 
 ${memoryContext || ''}`;
 }
@@ -105,7 +109,8 @@ async function runProactiveMessages() {
         uc.name AS companion_name, uc.personality, uc.backstory,
         uc.traits, uc.communication_style, uc.age,
         tu.telegram_id,
-        up.proactive_frequency
+        up.proactive_frequency,
+        up.show_actions
       FROM users u
       JOIN user_preferences up ON up.user_id = u.id
       JOIN subscriptions s ON s.user_id = u.id
@@ -177,11 +182,18 @@ async function runProactiveMessages() {
         if (blocked) continue;
 
         // Generate proactive message
+        const actionsEnabled = row.show_actions ?? true;
         const memoryContext = await buildMemoryContext(row.conversation_id);
-        const prompt = buildProactivePrompt(row, memoryContext, slot);
+        const prompt = buildProactivePrompt(row, memoryContext, slot, { actionsEnabled });
         const result = await plainChatCompletion(prompt, []);
 
         if (!result.content || result.content.length < 5) continue;
+
+        // Strip actions if user disabled them (safety net)
+        if (!actionsEnabled) {
+          result.content = result.content.replace(/\*[^*]+\*\s*/g, '').trim();
+          if (result.content.length < 5) continue;
+        }
 
         // Insert message with slot
         await pool.query(

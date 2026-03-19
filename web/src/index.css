@@ -4,6 +4,7 @@
 
 :root {
   --app-viewport-height: 100vh;
+  --app-keyboard-offset: 0px;
   --app-shell-max-width: 100%;
   --app-page-padding-x: 1rem;
   --app-chat-media-max-width: 280px;

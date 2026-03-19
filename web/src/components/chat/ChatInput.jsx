@@ -13,7 +13,7 @@ export default function ChatInput({ onSend, disabled }) {
   const chunksRef = useRef([]);
   const nativePlatform = isCapacitor();
   const safeAreaBottom = nativePlatform
-    ? 'max(0.75rem, env(safe-area-inset-bottom, 0px))'
+    ? 'calc(max(0.75rem, env(safe-area-inset-bottom, 0px)) + var(--app-keyboard-offset, 0px))'
     : '0.75rem';
   const canRequestMic = typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function';
   const canRecordAudio = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined';
@@ -250,6 +250,7 @@ export default function ChatInput({ onSend, disabled }) {
             onChange={handleInput}
             onKeyDown={handleKeyDown}
             placeholder={listening ? 'Listening...' : 'Type a message...'}
+            aria-label="Chat message input"
             rows={1}
             disabled={disabled}
             className="flex-1 resize-none py-2.5 px-4 rounded-2xl bg-brand-surface border border-brand-border text-brand-text placeholder:text-brand-muted focus:outline-none focus:border-brand-accent text-base leading-relaxed disabled:opacity-50"
@@ -259,6 +260,8 @@ export default function ChatInput({ onSend, disabled }) {
           <button
             onClick={handleSend}
             disabled={!text.trim() || disabled}
+            aria-label="Send message"
+            title="Send message"
             className="flex-shrink-0 p-2.5 rounded-full bg-brand-accent text-white disabled:opacity-30 hover:bg-brand-accent-hover transition-colors"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

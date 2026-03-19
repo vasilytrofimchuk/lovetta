@@ -68,8 +68,8 @@
       border-bottom: 1px solid var(--border); padding-bottom: 0;
     }
     .tab {
-      padding: 10px 20px; background: none; border: none; border-bottom: 2px solid transparent;
-      color: var(--muted); cursor: pointer; font-size: 0.95rem; font-weight: 500;
+      padding: 8px 12px; background: none; border: none; border-bottom: 2px solid transparent;
+      color: var(--muted); cursor: pointer; font-size: 0.85rem; font-weight: 500;
     }
     .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .tab-content { display: none; }
@@ -132,7 +132,7 @@
     .save-msg { color: var(--success); font-size: 0.85rem; margin-left: 12px; opacity: 0; transition: opacity 0.3s; }
     .save-msg.show { opacity: 1; }
 
-    .breakdown-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .breakdown-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     @media (max-width: 768px) { .breakdown-grid { grid-template-columns: 1fr; } }
 
     /* Mono & truncate */
@@ -246,12 +246,12 @@
       <button class="tab" data-tab="users" onclick="switchTab('users')">Users</button>
       <button class="tab" data-tab="economics" onclick="switchTab('economics')">Economics</button>
       <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
-      <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
-      <button class="tab" data-tab="sentry" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
-      <button class="tab" data-tab="email" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
+      <button class="tab" data-tab="sentry" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
+      <button class="tab" data-tab="email" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
       <button class="tab" data-tab="companion-emails" onclick="switchTab('companion-emails')">Girl Emails</button>
-      <button class="tab" data-tab="cashouts" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
-      <button class="tab" data-tab="support" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.75rem;padding:2px 6px;border-radius:10px;margin-left:4px;"></span></button>
+      <button class="tab" data-tab="cashouts" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
+      <button class="tab" data-tab="support" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
     </div>
 
     <!-- Overview Tab -->
@@ -614,10 +614,13 @@
     function loadOverview() {
       apiFetch('/api/admin/stats').then(function(data) {
         var v = data.visitors || {};
+        var o = data.online || {};
+        var onlineSub = (o.users_online || 0) + ' users (' + (o.users_web || 0) + ' web · ' + (o.users_ios || 0) + ' ios)';
         document.getElementById('overview-visitor-cards').innerHTML =
           card('Total Visitors', v.total || 0) +
           card('Today', v.today || 0) +
-          card('Active Now', v.active || 0);
+          card('Active Now', v.active || 0) +
+          card('Online (5m)', o.visitors_online || 0, onlineSub);
 
         var u = data.users || {};
         document.getElementById('overview-user-cards').innerHTML =

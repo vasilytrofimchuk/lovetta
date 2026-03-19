@@ -941,3 +941,44 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - `npm run test:e2e:api` passed (`28` tests).
 - `npm run test:e2e:ui` passed (`47` tests).
 - `npm run build:ios` passed.
+
+## Remove App Icon Helper Copy — DONE
+- Log this small Profile copy cleanup in `plan.md` and `PROGRESS.md` before changing files.
+- Remove the `Saved on this iPhone only.` helper line from the iOS app-icon card in Profile.
+- Skip tests because this is a copy-only UI change.
+- Implementation notes:
+- Removed the helper/status line below the app-icon choices in `Profile.jsx`, including the transient `Updating icon...` text that shared the same slot.
+- Verification:
+- No tests run because this was a copy-only UI change.
+
+## iOS Keyboard Offset Refactor — DONE
+- Log this follow-up in `plan.md` and `PROGRESS.md` before changing code.
+- Keep `KeyboardResize.None`, but stop shrinking `--app-viewport-height` while the keyboard is visible.
+- Refactor `web/src/lib/keyboard.js` to keep a stable app viewport height plus a separate `--app-keyboard-offset` CSS var derived from `keyboardHeight - safeAreaBottom`.
+- Apply the shared bottom-offset pattern to chat, support, and add-email so the header stays anchored while the composer lifts above the keyboard.
+- Add stable labels needed for iOS UI coverage, then extend the native UI test suite to verify header position + input visibility through focus/blur on all three surfaces.
+- Re-run `npm run test:e2e:ui` and `npm run build:ios`, then update `plan.md` and `PROGRESS.md` with final notes.
+- Implementation notes:
+- `web/src/lib/keyboard.js` now keeps `--app-viewport-height` stable, measures the iPhone bottom safe area with a hidden env-backed probe, and applies only `--app-keyboard-offset = keyboardHeight - safeAreaBottom` while the keyboard is visible.
+- The helper now toggles both the temporary DOM scroll lock and native `Keyboard.setScroll({ isDisabled: true })` only during the active keyboard session, then fully clears the offset and scroll lock on hide.
+- Chat, support, and add-email no longer resize the whole page for keyboard avoidance; each page keeps a stable height and lifts only the bottom composer/form padding with `var(--app-keyboard-offset)`.
+- Added accessibility labels needed for native iOS keyboard regression coverage, including chat/support/add-email inputs and the relevant back buttons.
+- Extended `web/ios/App/AppUITests/AppUITests.swift` with native checks for chat and support plus relay-account coverage for add-email when `UITEST_RELAY_EMAIL` / `UITEST_RELAY_PASSWORD` are configured.
+- Verification:
+- `npm run test:e2e:ui` passed (`47` tests).
+- `npm run build:ios` passed.
+- `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
+- Manual real-iPhone verification is still pending for the exact focus/blur behavior on chat, support, and add-email.
+
+## iOS Companion List Overscroll Clamp — IN PROGRESS
+- Log this small follow-up in `plan.md` and `PROGRESS.md` before changing code.
+- Keep the recent keyboard changes intact; only fix the companion-list root layout so the page cannot be dragged down slightly on iPhone.
+- Replace the raw `min-h-screen` list shell with the same safe-area-adjusted viewport sizing used on the keyboard-fixed pages, and keep scrolling inside the page content instead of the outer document.
+- Re-run the relevant UI and iOS build verification, then commit only the task-related files without including unrelated server/admin work already present in the tree.
+
+## Show Actions Toggle — DONE
+- New `show_actions` preference (default `true`) in `user_preferences` table.
+- When disabled: AI is prompted not to use `*actions*`, and server strips any that slip through.
+- Scenes are also suppressed when actions are off.
+- Toggle in Profile > Content Preferences.
+- Affects chat, opener, media-request, and proactive message routes.

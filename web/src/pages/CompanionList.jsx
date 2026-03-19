@@ -5,11 +5,16 @@ import { useToast } from '../components/Toast';
 import api from '../lib/api';
 import CompanionCard from '../components/CompanionCard';
 import PlanModal from '../components/PlanModal';
+import { isCapacitor } from '../lib/platform';
 
 export default function CompanionList() {
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+  const nativePlatform = isCapacitor();
+  const pageHeight = nativePlatform
+    ? 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px))'
+    : 'var(--app-viewport-height, 100vh)';
   const [searchParams] = useSearchParams();
   const [companions, setCompanions] = useState([]);
   const [subscription, setSubscription] = useState(null);
@@ -57,9 +62,12 @@ export default function CompanionList() {
   }, [searchParams]);
 
   return (
-    <div className="min-h-screen bg-brand-bg">
+    <div
+      className="bg-brand-bg flex flex-col w-full overflow-hidden"
+      style={{ height: pageHeight, overscrollBehaviorY: 'none' }}
+    >
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
+      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3 flex-shrink-0">
         <div className="w-full flex items-center justify-between">
           <div className="flex items-center gap-1">
             <img src="/assets/brand/logo_l.png" alt="Lovetta" className="h-8 w-8 rounded-lg" />
@@ -90,7 +98,11 @@ export default function CompanionList() {
         </div>
       </div>
 
-      <div data-testid="companion-list-content" className="app-page-gutter py-4">
+      <div
+        data-testid="companion-list-content"
+        className="flex-1 min-h-0 overflow-y-auto app-page-gutter py-4"
+        style={{ overscrollBehaviorY: 'none' }}
+      >
         {/* Subscription banner */}
         {!loading && subscription && !subscription.hasSubscription && (
           <div className="mb-4 bg-brand-card border border-brand-border rounded-xl p-4">
