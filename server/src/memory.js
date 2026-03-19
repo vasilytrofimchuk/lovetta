@@ -177,15 +177,20 @@ async function extractFacts(pool, conversationId, companionId, userId) {
   }
 
   // Process in small chunks so the model focuses on each batch and misses nothing
+  // Cap at 3 chunks max to avoid timeouts (15 user messages per extraction cycle)
   const chunks = [];
   for (let i = 0; i < messages.length; i += EXTRACTION_CHUNK_SIZE) {
     chunks.push(messages.slice(i, i + EXTRACTION_CHUNK_SIZE));
   }
+  const chunksToProcess = chunks.slice(0, 3);
 
+  // Run chunks in parallel for speed
+  const results = await Promise.allSettled(
+    chunksToProcess.map(chunk => extractFactsFromChunk(pool, conversationId, companionId, userId, chunk))
+  );
   let totalExtracted = 0;
-  for (const chunk of chunks) {
-    const count = await extractFactsFromChunk(pool, conversationId, companionId, userId, chunk);
-    totalExtracted += count;
+  for (const r of results) {
+    if (r.status === 'fulfilled') totalExtracted += r.value;
   }
 
   if (totalExtracted > 0) {
