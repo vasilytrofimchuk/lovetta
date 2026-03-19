@@ -19,9 +19,8 @@ export default function WelcomeScreen() {
       <div data-testid="welcome-scroll-region" className="app-scroll-region h-full overflow-y-auto">
         <div className="min-h-full flex flex-col app-page-gutter py-8">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <img src="/assets/brand/logo_l.png" alt="Lovetta" className="h-9 w-9 rounded-xl" />
-            <span className="text-xl font-bold text-brand-text">Lovetta</span>
+          <div className="flex justify-center mb-6">
+            <img src="/assets/brand/logo_text.png" alt="Lovetta" className="h-9" />
           </div>
 
           {/* Tagline */}
