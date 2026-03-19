@@ -184,13 +184,15 @@ async function extractFacts(pool, conversationId, companionId, userId) {
   }
   const chunksToProcess = chunks.slice(0, 3);
 
-  // Run chunks in parallel for speed
-  const results = await Promise.allSettled(
-    chunksToProcess.map(chunk => extractFactsFromChunk(pool, conversationId, companionId, userId, chunk))
-  );
+  // Process chunks sequentially (dedup needs previous chunk's results)
   let totalExtracted = 0;
-  for (const r of results) {
-    if (r.status === 'fulfilled') totalExtracted += r.value;
+  for (const chunk of chunksToProcess) {
+    try {
+      const count = await extractFactsFromChunk(pool, conversationId, companionId, userId, chunk);
+      totalExtracted += count;
+    } catch (err) {
+      console.warn('[memory] chunk extraction error:', err.message);
+    }
   }
 
   if (totalExtracted > 0) {
@@ -228,7 +230,7 @@ ${existingText}`;
 
   const { plainChatCompletion } = require('./ai');
   const result = await plainChatCompletion(systemPrompt, [
-    { role: 'user', content: `USER MESSAGES:\n${messagesText}` },
+    { role: 'user', content: `Chat messages to analyze:\n${messagesText}` },
   ]);
 
   if (!result || !result.content) return 0;
