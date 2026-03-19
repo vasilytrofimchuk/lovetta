@@ -109,10 +109,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
           }
           await Purchases.purchaseStoreProduct({ product })
         }
-        console.log('[billing] purchase resolved', {
-          plan,
-          productIdentifier,
-        })
+        console.log('[billing] purchase resolved', { plan })
 
         setLoadingMessage('Syncing subscription…')
         const synced = await waitForSubscriptionSync()
