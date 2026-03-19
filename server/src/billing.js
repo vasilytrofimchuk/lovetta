@@ -848,5 +848,6 @@ module.exports = {
   getUserSubscription,
   getPaymentProvider,
   isSubscriptionActive,
+  insertTipThankYou,
   TIP_AMOUNTS,
 };
