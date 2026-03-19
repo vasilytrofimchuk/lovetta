@@ -14,8 +14,11 @@
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": false,
+      "launchShowDuration": 0,
       "backgroundColor": "#0f0a1a",
-      "showSpinner": false
+      "showSpinner": false,
+      "splashImmersive": true,
+      "splashFullScreen": true
     },
     "Keyboard": {
       "resize": "none",
@@ -37,6 +40,7 @@
     "KeyboardPlugin",
     "PushNotificationsPlugin",
     "GoogleAuth",
-    "PurchasesPlugin"
+    "PurchasesPlugin",
+    "SplashScreenPlugin"
   ]
 }

@@ -214,13 +214,20 @@ export default function WelcomeCarousel() {
     function pauseAutoScroll() {
       pausedRef.current = true
       window.clearTimeout(pauseTimeoutRef.current)
+    }
+
+    function scheduleResume() {
+      window.clearTimeout(pauseTimeoutRef.current)
       pauseTimeoutRef.current = window.setTimeout(() => {
         pausedRef.current = false
       }, AUTO_SCROLL_RESUME_DELAY)
     }
 
     viewport.addEventListener('touchstart', pauseAutoScroll, { passive: true })
+    viewport.addEventListener('touchend', scheduleResume, { passive: true })
+    viewport.addEventListener('touchcancel', scheduleResume, { passive: true })
     viewport.addEventListener('mousedown', pauseAutoScroll)
+    viewport.addEventListener('mouseup', scheduleResume)
     window.addEventListener('resize', measureLoopWidth)
 
     initTimeoutRef.current = window.setTimeout(() => {
@@ -235,7 +242,10 @@ export default function WelcomeCarousel() {
       window.clearTimeout(pauseTimeoutRef.current)
       window.clearTimeout(initTimeoutRef.current)
       viewport.removeEventListener('touchstart', pauseAutoScroll)
+      viewport.removeEventListener('touchend', scheduleResume)
+      viewport.removeEventListener('touchcancel', scheduleResume)
       viewport.removeEventListener('mousedown', pauseAutoScroll)
+      viewport.removeEventListener('mouseup', scheduleResume)
       window.removeEventListener('resize', measureLoopWidth)
     }
   }, [templates])
