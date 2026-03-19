@@ -666,7 +666,8 @@
         var v = data.visitors || {};
         var o = data.online || {};
         var u = data.users || {};
-        var onlineSub = (o.users_online || 0) + ' users (' + (o.users_web || 0) + ' web · ' + (o.users_ios || 0) + ' ios)';
+        var uo = o.users_online || 0;
+        var onlineSub = uo > 0 ? uo + ' users (' + (o.users_web || 0) + ' web · ' + (o.users_ios || 0) + ' ios)' : '';
         var cost = parseFloat(econ.totalCostUsd) || 0;
         var tips = parseFloat(econ.totalTips) || 0;
         var margin = tips - cost;
