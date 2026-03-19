@@ -6,6 +6,7 @@ import usePwaInstall from './hooks/usePwaInstall'
 import { initIosKeyboard } from './lib/keyboard'
 import { isCapacitor, isIOS } from './lib/platform'
 import { getAppPageHeight } from './lib/layout'
+import { apiUrl } from './lib/api'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
@@ -167,6 +168,57 @@ function PushInitializer() {
   return null
 }
 
+const VISITOR_SESSION_KEY = 'lovetta-session-id'
+
+function getVisitorSessionId() {
+  let id = sessionStorage.getItem(VISITOR_SESSION_KEY)
+  if (!id) {
+    id = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    sessionStorage.setItem(VISITOR_SESSION_KEY, id)
+  }
+  return id
+}
+
+function getDeviceType() {
+  const ua = navigator.userAgent || ''
+  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return 'Tablet'
+  if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Opera Mini/i.test(ua)) return 'Mobile'
+  return 'Desktop'
+}
+
+function VisitorTracker() {
+  const { user, loading } = useAuth()
+  const sentRef = useRef(false)
+
+  useEffect(() => {
+    if (loading || user || sentRef.current) return
+    sentRef.current = true
+
+    const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return null } })()
+    const params = new URLSearchParams(window.location.search)
+
+    fetch(apiUrl('/api/track-visitor'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: getVisitorSessionId(),
+        page: window.location.pathname,
+        deviceType: getDeviceType(),
+        screenResolution: screen.width + 'x' + screen.height,
+        language: navigator.language || null,
+        timezone: tz,
+        referrer: document.referrer || null,
+        utmSource: params.get('utm_source') || null,
+        utmMedium: params.get('utm_medium') || null,
+        utmCampaign: params.get('utm_campaign') || null,
+        gclid: params.get('gclid') || null,
+      }),
+    }).catch(() => {})
+  }, [user, loading])
+
+  return null
+}
+
 function AppRoutes() {
   const { loading } = useAuth()
   if (loading) return <Loading />
@@ -227,6 +279,7 @@ export default function App() {
     <BrowserRouter basename="/my">
       <AuthProvider>
         <ToastProvider>
+          <VisitorTracker />
           <RevenueCatInitializer />
           <PushInitializer />
           <DesktopShell>

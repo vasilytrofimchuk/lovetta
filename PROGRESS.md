@@ -8,6 +8,8 @@
 - [x] Fix online chart: show only last 30 min (not 24h), use users_online instead of visitors_online
 - [x] Add web/ios breakdown and visitors count to summary cards
 - [x] Run `npm run test:e2e:ui` — 48/48 passed
+- [x] Add VisitorTracker component in App.jsx — tracks anonymous users in React app (pre-signup)
+- [x] Run `npm run test:e2e:ui` — 48/48 passed (1 flaky retry)
 
 ## Show Actions Toggle in Profile Settings
 - [x] Add `v39_show_actions_pref` migration — `show_actions BOOLEAN DEFAULT true` on `user_preferences`
