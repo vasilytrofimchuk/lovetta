@@ -64,12 +64,12 @@
 
     /* Tabs */
     .tabs {
-      display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 24px;
+      display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 24px;
       border-bottom: 1px solid var(--border); padding-bottom: 0;
     }
     .tab {
-      padding: 8px 12px; background: none; border: none; border-bottom: 2px solid transparent;
-      color: var(--muted); cursor: pointer; font-size: 0.85rem; font-weight: 500;
+      padding: 6px 8px; background: none; border: none; border-bottom: 2px solid transparent;
+      color: var(--muted); cursor: pointer; font-size: 0.8rem; font-weight: 500;
     }
     .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .tab-content { display: none; }
@@ -292,12 +292,12 @@
       <button class="tab" data-tab="users" onclick="switchTab('users')">Users</button>
       <button class="tab" data-tab="economics" onclick="switchTab('economics')">Economics</button>
       <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
-      <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
-      <button class="tab" data-tab="sentry" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
-      <button class="tab" data-tab="email" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
+      <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
+      <button class="tab" data-tab="sentry" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
+      <button class="tab" data-tab="email" onclick="switchTab('email')">Email <span class="badge" id="email-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="companion-emails" onclick="switchTab('companion-emails')">Girl Emails</button>
-      <button class="tab" data-tab="cashouts" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
-      <button class="tab" data-tab="support" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.65rem;padding:1px 5px;border-radius:8px;margin-left:3px;"></span></button>
+      <button class="tab" data-tab="cashouts" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
+      <button class="tab" data-tab="support" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
     </div>
 
     <!-- Overview Tab -->
@@ -513,6 +513,7 @@
     var supportActiveChatId = null;
     var supportChatData = null;
     var supportPollInterval = null;
+    var overviewPollInterval = null;
 
     // Auth
     function headers() {
@@ -566,7 +567,8 @@
       document.getElementById('tab-' + name).classList.add('active');
       window.location.hash = name;
       if (supportPollInterval) { clearInterval(supportPollInterval); supportPollInterval = null; }
-      if (name === 'overview') loadOverview();
+      if (overviewPollInterval) { clearInterval(overviewPollInterval); overviewPollInterval = null; }
+      if (name === 'overview') { loadOverview(); overviewPollInterval = setInterval(loadOverview, 30000); }
       else if (name === 'visitors') loadVisitors();
       else if (name === 'users') loadUsers();
       else if (name === 'settings') loadSettings();
