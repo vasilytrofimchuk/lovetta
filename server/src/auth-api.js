@@ -190,6 +190,10 @@ router.post('/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    if (!user.ai_consent_at) {
+      return res.status(400).json({ error: 'age_consent_required' });
+    }
+
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id);
     await storeRefreshToken(pool, user.id, refreshToken);
@@ -472,6 +476,9 @@ router.get('/google/callback', async (req, res) => {
 
     if (existingByGoogle.length > 0) {
       user = existingByGoogle[0];
+      if (!user.ai_consent_at) {
+        return res.redirect(`/my/signup?provider=google&email=${encodeURIComponent(email)}`);
+      }
       if (picture && picture !== user.avatar_url) {
         pool.query('UPDATE users SET avatar_url = $1, last_activity = NOW() WHERE id = $2', [picture, user.id]).catch(() => {});
       }
@@ -482,6 +489,9 @@ router.get('/google/callback', async (req, res) => {
 
       if (existingByEmail.length > 0) {
         user = existingByEmail[0];
+        if (!user.ai_consent_at) {
+          return res.redirect(`/my/signup?provider=google&email=${encodeURIComponent(email)}`);
+        }
         await pool.query(
           'UPDATE users SET google_id = $1, email_verified = TRUE, avatar_url = COALESCE(avatar_url, $2), display_name = COALESCE(display_name, $3) WHERE id = $4',
           [googleId, picture, name, user.id]
@@ -584,6 +594,9 @@ router.post('/google/token', async (req, res) => {
 
     if (existingByGoogle.length > 0) {
       user = existingByGoogle[0];
+      if (!user.ai_consent_at) {
+        return res.status(400).json({ error: 'age_consent_required' });
+      }
       if (picture && picture !== user.avatar_url) {
         pool.query('UPDATE users SET avatar_url = $1, last_activity = NOW() WHERE id = $2', [picture, user.id]).catch(() => {});
       }
@@ -592,6 +605,9 @@ router.post('/google/token', async (req, res) => {
 
       if (existingByEmail.length > 0) {
         user = existingByEmail[0];
+        if (!user.ai_consent_at) {
+          return res.status(400).json({ error: 'age_consent_required' });
+        }
         await pool.query(
           'UPDATE users SET google_id = $1, email_verified = TRUE, avatar_url = COALESCE(avatar_url, $2), display_name = COALESCE(display_name, $3) WHERE id = $4',
           [googleId, picture, name, user.id]
@@ -711,6 +727,9 @@ router.post('/apple', authLimiter, async (req, res) => {
 
     if (existingByApple.length > 0) {
       user = existingByApple[0];
+      if (!user.ai_consent_at) {
+        return res.status(400).json({ error: 'age_consent_required' });
+      }
     } else if (email) {
       // Check by email
       const { rows: existingByEmail } = await pool.query(
@@ -719,6 +738,9 @@ router.post('/apple', authLimiter, async (req, res) => {
 
       if (existingByEmail.length > 0) {
         user = existingByEmail[0];
+        if (!user.ai_consent_at) {
+          return res.status(400).json({ error: 'age_consent_required' });
+        }
         // Link Apple ID to existing account
         const displayName = fullName
           ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ')
@@ -841,6 +863,9 @@ router.post('/telegram', authLimiter, async (req, res) => {
 
     if (existingTg.length > 0) {
       user = existingTg[0];
+      if (!user.ai_consent_at) {
+        return res.status(400).json({ error: 'age_consent_required' });
+      }
       // Update telegram info
       pool.query(
         'UPDATE telegram_users SET telegram_username = $2, telegram_first_name = $3, telegram_photo_url = $4 WHERE telegram_id = $1',
@@ -854,6 +879,9 @@ router.post('/telegram', authLimiter, async (req, res) => {
 
       if (existingById.length > 0) {
         user = existingById[0];
+        if (!user.ai_consent_at) {
+          return res.status(400).json({ error: 'age_consent_required' });
+        }
         // Create telegram_users record
         await pool.query(
           'INSERT INTO telegram_users (telegram_id, user_id, telegram_username, telegram_first_name, telegram_photo_url) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING',
