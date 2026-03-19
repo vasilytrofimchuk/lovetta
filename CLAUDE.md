@@ -275,11 +275,18 @@ Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
 
 ### iOS Build — MANDATORY
 
-**NEVER** use `npm run build` + `cap sync ios` for iOS. The web build outputs to `public/my/`, but the iOS app reads from `web/ios-dist/`.
+**iOS app loads from remote URL** (`https://lovetta.ai/my/`). Web deploys update iOS automatically — no rebuild needed for JS/CSS changes.
+
+**Rebuild required ONLY for native changes:**
+- `web/ios/App/App/AppDelegate.swift` or any Swift file
+- `web/ios/App/Podfile` or pod changes
+- `web/ios/App/App/Info.plist`
+- `web/capacitor.config.json`
+- Capacitor plugin additions/removals
 
 **ALWAYS** use `npm run build:ios` from the project root. This sets `CAPACITOR_BUILD=1`, builds to `web/ios-dist/`, and runs `cap sync ios` in one command.
 
-After ANY web code change that needs iOS testing: `npm run build:ios`, then rebuild in Xcode.
+**CRITICAL:** After ANY native file change, **run `npm run build:ios` immediately** before telling the user to test. Never skip this step.
 
 ### Ports
 
