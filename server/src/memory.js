@@ -134,6 +134,12 @@ async function processMemory(pool, conversationId, companionId, userId) {
 // -- Fact extraction ---------------------------------------------
 
 async function extractFacts(pool, conversationId, companionId, userId) {
+  // Get companion name so extraction model doesn't confuse it with user
+  const { rows: compRows } = await pool.query(
+    'SELECT name FROM user_companions WHERE id = $1', [companionId]
+  );
+  const companionName = compRows[0]?.name || 'the companion';
+
   // Get last_extracted_message_id to only process NEW messages
   const { rows: convRows } = await pool.query(
     'SELECT last_extracted_message_id FROM conversations WHERE id = $1',
@@ -188,7 +194,7 @@ async function extractFacts(pool, conversationId, companionId, userId) {
   let totalExtracted = 0;
   for (const chunk of chunksToProcess) {
     try {
-      const count = await extractFactsFromChunk(pool, conversationId, companionId, userId, chunk);
+      const count = await extractFactsFromChunk(pool, conversationId, companionId, userId, chunk, companionName);
       totalExtracted += count;
     } catch (err) {
       console.warn('[memory] chunk extraction error:', err.message);
@@ -200,7 +206,7 @@ async function extractFacts(pool, conversationId, companionId, userId) {
   }
 }
 
-async function extractFactsFromChunk(pool, conversationId, companionId, userId, messages) {
+async function extractFactsFromChunk(pool, conversationId, companionId, userId, messages, companionName) {
   // Load existing facts (refresh each chunk so dedup stays current)
   const { rows: existingFacts } = await pool.query(
     'SELECT category, fact FROM companion_memories WHERE conversation_id = $1',
@@ -214,15 +220,16 @@ async function extractFactsFromChunk(pool, conversationId, companionId, userId, 
   const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
   const messagesText = messages.map(m => `- ${cleanMsg(m.content)}`).join('\n');
 
-  const systemPrompt = `Extract ALL personal facts about the user from the messages below. Return a JSON array with "category" and "fact" keys.
+  const systemPrompt = `Extract ALL personal facts about the USER (human) from the messages below. The companion's name is "${companionName}" — do NOT extract facts about ${companionName}, only about the human user.
 
+Return a JSON array with "category" and "fact" keys.
 CATEGORIES: identity, preferences, life, relationship, emotional
 
 [{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User has a cat named Whiskers"},{"category":"preferences","fact":"User drinks 4 cups of coffee daily"}]
 
 Extract EVERY detail the user explicitly mentions: names, ages, places, dates, jobs, pets, food, music, movies, hobbies, habits, family, friends, plans, allergies, routines.
-CRITICAL: Only extract facts the user EXPLICITLY stated. Do NOT infer, assume, or hallucinate details.
-One fact per detail. Return [] if no facts.
+CRITICAL: Only extract facts the user EXPLICITLY stated. Do NOT infer or guess. "${companionName}" is the AI companion, NOT the user.
+One fact per detail. Return [] if no new facts.
 ${existingText}`;
 
   const { plainChatCompletion } = require('./ai');
