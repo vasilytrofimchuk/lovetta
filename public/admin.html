@@ -303,14 +303,9 @@
     <!-- Overview Tab -->
     <div id="tab-overview" class="tab-content active">
       <div class="tab-header"><h2>Overview</h2><button class="refresh-btn" onclick="loadOverview()">↻ Refresh</button></div>
-      <h3 class="section-title" style="margin-top:0;">Visitors</h3>
-      <div class="stat-cards" id="overview-visitor-cards"></div>
+      <div class="stat-cards" id="overview-all-cards"></div>
       <div class="breakdown-grid" id="overview-visitor-breakdowns"></div>
       <div id="online-chart-container"></div>
-      <h3 class="section-title">Users</h3>
-      <div class="stat-cards" id="overview-user-cards"></div>
-      <h3 class="section-title">Economics</h3>
-      <div class="stat-cards" id="overview-econ-cards"></div>
     </div>
 
     <!-- Visitors Tab -->
@@ -661,20 +656,28 @@
 
     // --- Overview ---
     function loadOverview() {
-      apiFetch('/api/admin/stats').then(function(data) {
+      var allCards = document.getElementById('overview-all-cards');
+      var statsP = apiFetch('/api/admin/stats');
+      var econP = apiFetch('/api/admin/consumption/summary?period=7d');
+
+      Promise.all([statsP, econP]).then(function(results) {
+        var data = results[0];
+        var econ = results[1];
         var v = data.visitors || {};
         var o = data.online || {};
-        var onlineSub = (o.users_online || 0) + ' users (' + (o.users_web || 0) + ' web · ' + (o.users_ios || 0) + ' ios)';
-        document.getElementById('overview-visitor-cards').innerHTML =
-          card('Total Visitors', v.total || 0) +
-          card('Today', v.today || 0) +
-          card('Active Now', v.active || 0) +
-          card('Online (5m)', o.visitors_online || 0, onlineSub);
-
         var u = data.users || {};
-        document.getElementById('overview-user-cards').innerHTML =
-          card('Total Users', u.total || 0) +
-          card('Today', u.today || 0);
+        var onlineSub = (o.users_online || 0) + ' users (' + (o.users_web || 0) + ' web · ' + (o.users_ios || 0) + ' ios)';
+        var cost = parseFloat(econ.totalCostUsd) || 0;
+        var tips = parseFloat(econ.totalTips) || 0;
+        var margin = tips - cost;
+
+        allCards.innerHTML =
+          card('Visitors', v.total || 0, (v.today || 0) + ' today') +
+          card('Online (5m)', o.visitors_online || 0, onlineSub) +
+          card('Users', u.total || 0, (u.today || 0) + ' today') +
+          card('API Cost', '$' + cost.toFixed(2), '7 days') +
+          card('Tips', '$' + tips.toFixed(2), '7 days') +
+          card('Net', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>', '7 days');
 
         var breakdowns = '';
         breakdowns += breakdownTable('Countries', 'country', data.countries || []);
@@ -689,16 +692,6 @@
 
       apiFetch('/api/admin/online-history?hours=24').then(function(data) {
         renderOnlineChart(data.snapshots || []);
-      });
-
-      apiFetch('/api/admin/consumption/summary?period=7d').then(function(data) {
-        var cost = parseFloat(data.totalCostUsd) || 0;
-        var tips = parseFloat(data.totalTips) || 0;
-        var margin = tips - cost;
-        document.getElementById('overview-econ-cards').innerHTML =
-          card('API Cost (7d)', '$' + cost.toFixed(2)) +
-          card('Tips (7d)', '$' + tips.toFixed(2)) +
-          card('Net (7d)', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>');
       });
     }
 
