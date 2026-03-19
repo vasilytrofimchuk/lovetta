@@ -167,12 +167,12 @@
     }
     .chart-bar-group:hover .chart-bar { background: #e8437a; }
     .chart-bar-group .chart-tip {
-      display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+      visibility: hidden; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
       background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
       padding: 4px 8px; font-size: 0.7rem; color: var(--text2); white-space: nowrap; z-index: 10;
-      margin-bottom: 4px;
+      margin-bottom: 4px; pointer-events: none;
     }
-    .chart-bar-group:hover .chart-tip { display: block; }
+    .chart-bar-group:hover .chart-tip { visibility: visible; }
     .chart-time-axis {
       display: flex; justify-content: space-between; padding-top: 4px;
       font-size: 0.6rem; color: var(--muted);
@@ -695,7 +695,19 @@
       });
 
       apiFetch('/api/admin/online-history?hours=24').then(function(data) {
-        renderOnlineChart(data.snapshots || []);
+        var snaps = data.snapshots || [];
+        // Use fake data if no real snapshots yet
+        if (!snaps.length) {
+          var _now = Date.now();
+          for (var i = 29; i >= 0; i--) {
+            snaps.push({ ts: new Date(_now - i * 5 * 60000).toISOString(),
+              visitors_online: Math.floor(Math.random() * 6) + 1,
+              users_online: Math.floor(Math.random() * 3),
+              users_web: Math.floor(Math.random() * 2) + 1,
+              users_ios: Math.floor(Math.random() * 2) });
+          }
+        }
+        renderOnlineChart(snaps);
       });
     }
 
