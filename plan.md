@@ -970,11 +970,17 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build` passed.
 - Manual real-iPhone verification is still pending for the exact focus/blur behavior on chat, support, and add-email.
 
-## iOS Companion List Overscroll Clamp — IN PROGRESS
+## iOS Companion List Overscroll Clamp — DONE
 - Log this small follow-up in `plan.md` and `PROGRESS.md` before changing code.
 - Keep the recent keyboard changes intact; only fix the companion-list root layout so the page cannot be dragged down slightly on iPhone.
 - Replace the raw `min-h-screen` list shell with the same safe-area-adjusted viewport sizing used on the keyboard-fixed pages, and keep scrolling inside the page content instead of the outer document.
 - Re-run the relevant UI and iOS build verification, then commit only the task-related files without including unrelated server/admin work already present in the tree.
+- Implementation notes:
+- `web/src/pages/CompanionList.jsx` now uses a safe-area-adjusted fixed-height shell on Capacitor iOS instead of raw `min-h-screen`, matching the chat/support/add-email layout model.
+- The companion list content now scrolls inside a `flex-1 min-h-0 overflow-y-auto` region, while the outer page is `overflow-hidden`, which removes the small downward drag on short lists.
+- Verification:
+- `npm run test:e2e:ui` passed (`47` tests).
+- `npm run build:ios` passed.
 
 ## Show Actions Toggle — DONE
 - New `show_actions` preference (default `true`) in `user_preferences` table.

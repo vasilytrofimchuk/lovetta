@@ -1004,12 +1004,17 @@
 - Manual real-iPhone verification is still pending for repeated focus/blur on chat, support, and add-email.
 
 ## iOS Companion List Overscroll Clamp
-- [ ] Update `plan.md` and `PROGRESS.md` with the companion-list overscroll follow-up before code changes
-- [ ] Replace the companion-list root `min-h-screen` shell with a safe-area-adjusted fixed-height layout
-- [ ] Keep list scrolling inside the page content instead of the outer document so the screen cannot be dragged down slightly
-- [ ] Run `npm run test:e2e:ui`
-- [ ] Run `npm run build:ios`
-- [ ] Commit only the task-related files
+- [x] Update `plan.md` and `PROGRESS.md` with the companion-list overscroll follow-up before code changes
+- [x] Replace the companion-list root `min-h-screen` shell with a safe-area-adjusted fixed-height layout
+- [x] Keep list scrolling inside the page content instead of the outer document so the screen cannot be dragged down slightly
+- [x] Run `npm run test:e2e:ui`
+- [x] Run `npm run build:ios`
+- [x] Commit only the task-related files
+- WORKED: switch the companion-list root to the same safe-area-adjusted fixed-height pattern used on the iOS keyboard-fixed pages.
+- WORKED: keep the header outside the scroll region and make the list body the only scrollable area.
+- Verification notes:
+- `npm run test:e2e:ui` passed (`47` tests).
+- `npm run build:ios` passed.
 
 
 ## Show Actions Toggle in Profile Settings
