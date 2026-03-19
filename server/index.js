@@ -316,6 +316,7 @@ app.post('/api/email-events', async (req, res) => {
     if (type === 'email.bounced' || type === 'email.complained') {
       const recipientEmail = (Array.isArray(data?.to) ? data.to[0] : data?.to) || '';
       if (recipientEmail) {
+        const { getPool } = require('./src/db');
         const pool = getPool();
         if (pool) {
           await pool.query(
