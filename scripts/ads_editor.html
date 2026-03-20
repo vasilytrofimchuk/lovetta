@@ -101,31 +101,20 @@
   <h3>Video Banner (300x250)</h3>
   <label><span>Girl</span>
     <select id="videoGirl">
+      <option value="sophia" selected>Sophia</option>
       <option value="lily">Lily</option>
       <option value="chloe">Chloe</option>
       <option value="jade">Jade</option>
-      <option value="sophia" selected>Sophia</option>
       <option value="ruby">Ruby</option>
       <option value="aria">Aria</option>
-      <option value="zara">Zara</option>
-      <option value="luna">Luna</option>
-      <option value="mia">Mia</option>
-      <option value="emma">Emma</option>
-      <option value="isabella">Isabella</option>
-      <option value="violet">Violet</option>
-      <option value="rei">Rei</option>
-      <option value="hana">Hana</option>
-      <option value="sakura">Sakura</option>
-      <option value="yuki">Yuki</option>
-      <option value="mei">Mei</option>
-      <option value="aiko">Aiko</option>
     </select>
   </label>
   <label><span>Duration (s)</span><input type="number" id="videoDuration" value="6" min="2" max="15"></label>
   <div class="btn-row">
     <button onclick="loadVideo()">Load</button>
-    <button onclick="recordVideo()">Record WebM</button>
+    <button onclick="recordVideo()">Record</button>
   </div>
+  <div style="color:#555;font-size:10px;margin-top:4px;">Saves as WebM. To get MP4 run:<br><code style="color:#777;font-size:9px;">ffmpeg -i file.webm -c:v libx264 -pix_fmt yuv420p out.mp4</code></div>
 </div>
 
 <div id="main">
@@ -565,25 +554,14 @@ function exportBanner(key) {
 }
 
 // ========== VIDEO BANNER ==========
+// Local video files (in public/assets/ads/videos/)
 const VIDEO_URLS = {
-  lily: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/8/b7679f09-8b60-4336-a4e5-acd13825a2b8.mp4',
-  chloe: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/7/dab0cffa-a969-44ee-8d10-460d7b52868a.mp4',
-  jade: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/11/fadff26a-f026-4e9f-8c8b-fd760a0f8dca.mp4',
-  sophia: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/2/a3836f1b-3d60-4ffb-9f1b-29ba9b3799a1.mp4',
-  ruby: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/10/cee890d3-e0e9-4997-88fc-5af9bbd6a31f.mp4',
-  aria: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/3/38002ba0-7f30-4b11-b89d-83a598c97e0d.mp4',
-  zara: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/9/4e693a86-af99-4d8f-b340-aa7e5c204aea.mp4',
-  luna: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/1/a96e011f-a0ca-4567-b8d9-35e84b332d96.mp4',
-  mia: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/5/7c8a4fae-d5a1-4309-ab55-5cc570718078.mp4',
-  emma: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/4/fc72be74-f82a-47e7-b9dd-82ab347c3a00.mp4',
-  isabella: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/6/08a95c0a-eb57-4349-9e34-f2be427232f5.mp4',
-  violet: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/12/b339544a-cf01-4863-b69d-9ab15075bc56.mp4',
-  rei: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/40/eb2ff94f-865d-4334-8d7b-81b6b41b6fc5.mp4',
-  hana: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/39/a70ab942-c287-4cea-a25f-c24992c3e1e1.mp4',
-  sakura: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/37/07d46a08-f69b-4c06-b7c6-95861d325197.mp4',
-  yuki: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/38/add15ce1-b9c1-4289-bafc-89afbbff9dbc.mp4',
-  mei: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/42/4488dca4-ddc5-44f1-a07f-f52b544df717.mp4',
-  aiko: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/41/86e556b1-7db7-4608-aebf-2803c5e61bad.mp4',
+  sophia: '../public/assets/ads/videos/sophia.mp4',
+  lily: '../public/assets/ads/videos/lily.mp4',
+  chloe: '../public/assets/ads/videos/chloe.mp4',
+  jade: '../public/assets/ads/videos/jade.mp4',
+  ruby: '../public/assets/ads/videos/ruby.mp4',
+  aria: '../public/assets/ads/videos/aria.mp4',
 };
 
 let videoEl = null;
@@ -620,18 +598,15 @@ function loadVideo() {
   if (videoAnimId) cancelAnimationFrame(videoAnimId);
   if (videoEl) { videoEl.pause(); videoEl.remove(); }
 
-  // Create video element
+  document.getElementById('videoLabel').textContent = '300x250 — Video: ' + girl + ' (loading...)';
+
   videoEl = document.createElement('video');
-  videoEl.crossOrigin = 'anonymous';
   videoEl.muted = true;
   videoEl.loop = true;
   videoEl.playsInline = true;
   videoEl.src = url;
   videoEl.style.display = 'none';
   document.body.appendChild(videoEl);
-
-  document.getElementById('videoLabel').textContent = '300x250 — Video: ' + girl + ' (loading...)';
-
   videoEl.addEventListener('canplay', () => {
     videoEl.play();
     document.getElementById('videoLabel').textContent = '300x250 — Video: ' + girl;
