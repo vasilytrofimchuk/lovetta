@@ -592,7 +592,7 @@ function exportBanner(key) {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    }, 'image/jpeg', 0.88);
+    }, 'image/jpeg', 0.99);
   } catch (e) {
     if (e.message.includes('ainted'))
       alert('Export needs HTTP server.\n\npython3 -m http.server 8111\n\nThen open:\nhttp://localhost:8111/scripts/ads_editor.html');
