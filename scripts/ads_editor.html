@@ -117,12 +117,22 @@
   <h3>Video Banner (300x250)</h3>
   <label><span>Girl</span>
     <select id="videoGirl">
-      <option value="sophia" selected>Sophia</option>
-      <option value="lily">Lily</option>
-      <option value="chloe">Chloe</option>
-      <option value="jade">Jade</option>
-      <option value="ruby">Ruby</option>
-      <option value="aria">Aria</option>
+      <optgroup label="Realistic">
+        <option value="sophia" selected>Sophia</option>
+        <option value="lily">Lily</option>
+        <option value="chloe">Chloe</option>
+        <option value="jade">Jade</option>
+        <option value="ruby">Ruby</option>
+        <option value="aria">Aria</option>
+      </optgroup>
+      <optgroup label="Anime">
+        <option value="rei">Rei</option>
+        <option value="hana">Hana</option>
+        <option value="sakura">Sakura</option>
+        <option value="yuki">Yuki</option>
+        <option value="mei">Mei</option>
+        <option value="aiko">Aiko</option>
+      </optgroup>
     </select>
   </label>
   <label><span>Duration (s)</span><input type="number" id="videoDuration" value="5" min="2" max="15"></label>
@@ -670,6 +680,12 @@ const VIDEO_URLS = {
   jade: '../public/assets/ads/videos/jade.mp4',
   ruby: '../public/assets/ads/videos/ruby.mp4',
   aria: '../public/assets/ads/videos/aria.mp4',
+  rei: '../public/assets/ads/videos/rei.mp4',
+  hana: '../public/assets/ads/videos/hana.mp4',
+  sakura: '../public/assets/ads/videos/sakura.mp4',
+  yuki: '../public/assets/ads/videos/yuki.mp4',
+  mei: '../public/assets/ads/videos/mei.mp4',
+  aiko: '../public/assets/ads/videos/aiko.mp4',
 };
 
 let videoEl = null;
