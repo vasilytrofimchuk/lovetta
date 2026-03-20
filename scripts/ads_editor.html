@@ -114,7 +114,7 @@
     <button onclick="loadVideo()">Load</button>
     <button onclick="recordVideo()">Record</button>
   </div>
-  <div style="color:#555;font-size:10px;margin-top:4px;">Auto-converts to MP4 in browser</div>
+  <div style="color:#555;font-size:10px;margin-top:4px;">Start with: <code style="color:#d6336c;">node scripts/ads_server.js</code></div>
 </div>
 
 <div id="main">
@@ -742,37 +742,23 @@ function recordVideo() {
     const girl = v('videoGirl');
     document.getElementById('videoLabel').textContent = '300x250 — Converting to MP4...';
 
-    // Try FFmpeg WASM for in-browser MP4 conversion
     try {
-      if (!window.FFmpeg) {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js';
-        document.head.appendChild(s);
-        await new Promise((res, rej) => { s.onload = res; s.onerror = rej; });
-      }
-      const { FFmpeg } = window.FFmpegWASM || FFmpeg;
-      const ffmpeg = new FFmpeg();
-      if (!ffmpeg.loaded) {
-        await ffmpeg.load({ coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js' });
-      }
-      const webmData = new Uint8Array(await webmBlob.arrayBuffer());
-      await ffmpeg.writeFile('input.webm', webmData);
-      await ffmpeg.exec(['-i', 'input.webm', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'fast', '-crf', '23', 'output.mp4']);
-      const mp4Data = await ffmpeg.readFile('output.mp4');
-      const mp4Blob = new Blob([mp4Data], { type: 'video/mp4' });
+      // Send to local server for ffmpeg conversion
+      const resp = await fetch('/convert', { method: 'POST', body: webmBlob });
+      if (!resp.ok) throw new Error(await resp.text());
+      const mp4Blob = await resp.blob();
       const a = document.createElement('a');
       a.download = `lovetta_ad_300x250_${girl}.mp4`;
       a.href = URL.createObjectURL(mp4Blob);
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      document.getElementById('videoLabel').textContent = '300x250 — Video: ' + girl + ' (MP4 saved!)';
+      document.getElementById('videoLabel').textContent = '300x250 — ' + girl + ' (MP4 saved!)';
     } catch (e) {
-      console.log('FFmpeg WASM failed, saving as WebM:', e);
-      // Fallback: save as WebM
+      console.log('MP4 conversion failed, saving WebM:', e);
       const a = document.createElement('a');
       a.download = `lovetta_ad_300x250_${girl}.webm`;
       a.href = URL.createObjectURL(webmBlob);
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      document.getElementById('videoLabel').textContent = '300x250 — Video: ' + girl + ' (WebM saved)';
+      document.getElementById('videoLabel').textContent = '300x250 — ' + girl + ' (WebM saved — start with: node scripts/ads_server.js)';
     }
   };
   // Restart video from beginning
