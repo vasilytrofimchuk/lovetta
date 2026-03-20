@@ -323,10 +323,12 @@ Example: [{"category":"identity","fact":"User's name is Alex"},{"category":"life
 Extract EVERY detail explicitly mentioned. Do NOT infer or guess.
 ${existingText}`;
 
-  const { plainChatCompletion } = require('./ai');
+  const { plainChatCompletion, getAISettings } = require('./ai');
+  const settings = await getAISettings();
+  const extractionModel = settings.memory_extraction_model || 'google/gemini-2.0-flash-001';
   const result = await plainChatCompletion(systemPrompt, [
     { role: 'user', content: `Chat messages:\n${messagesText}` },
-  ]);
+  ], { model: extractionModel });
 
   if (!result || !result.content) return 0;
 
@@ -454,10 +456,12 @@ async function generateSummary(pool, conversationId, companionId, userId) {
 RULES: Use third person ("The user", "the companion"). No roleplay. No quotes. No asterisks. Just plain factual sentences.
 FORMAT: Return ONLY the summary text, nothing else.`;
 
-  const { plainChatCompletion } = require('./ai');
+  const { plainChatCompletion, getAISettings } = require('./ai');
+  const settings = await getAISettings();
+  const extractionModel = settings.memory_extraction_model || 'google/gemini-2.0-flash-001';
   const result = await plainChatCompletion(systemPrompt, [
     { role: 'user', content: `CONVERSATION LOG:\n${messagesText}\n\nSUMMARY:` },
-  ]);
+  ], { model: extractionModel });
 
   if (!result || !result.content) return;
 

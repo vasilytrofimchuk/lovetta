@@ -151,7 +151,7 @@
       font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
     }
     .chart-area {
-      position: relative; height: 80px; display: flex; align-items: flex-end; gap: 2px;
+      position: relative; height: 100px; display: flex; align-items: flex-end;
     }
     .chart-area .chart-y {
       position: absolute; top: 0; right: 0; bottom: 0; pointer-events: none;
@@ -163,7 +163,7 @@
       flex: 1; display: flex; align-items: flex-end; justify-content: center; position: relative; height: 100%;
     }
     .chart-bar {
-      width: 4px; border-radius: 2px 2px 0 0; background: var(--accent); transition: height 0.2s;
+      width: 100%; background: var(--accent); transition: height 0.2s;
     }
     .chart-bar-group:hover .chart-bar { background: #e8437a; }
     .chart-bar-group .chart-tip {
@@ -743,7 +743,7 @@
         if (!snaps.length) {
           var _now = Date.now();
           for (var i = 29; i >= 0; i--) {
-            snaps.push({ ts: new Date(_now - i * 5 * 60000).toISOString(),
+            snaps.push({ ts: new Date(_now - i * 60000).toISOString(),
               visitors_online: Math.floor(Math.random() * 6) + 1,
               users_online: Math.floor(Math.random() * 3),
               users_web: Math.floor(Math.random() * 2) + 1,
@@ -771,79 +771,75 @@
     function renderOnlineChart(snapshots) {
       var container = document.getElementById('online-chart-container');
       if (!snapshots.length) {
-        container.innerHTML = '<div class="online-chart"><div class="online-summary"><div class="online-summary-item"><div class="online-label">Online users (30 min)</div><div class="online-value">0</div></div><div class="online-summary-item"><div class="online-label">Online users (5 min)</div><div class="online-value">0</div></div></div><div style="text-align:center;color:var(--muted);padding:20px 0;font-size:0.85rem;">No data yet — snapshots taken every 5 min</div></div>';
+        container.innerHTML = '<div class="online-chart"><div class="online-summary"><div class="online-summary-item"><div class="online-label">Online users (30 min)</div><div class="online-value">0</div></div><div class="online-summary-item"><div class="online-label">Online users (1 min)</div><div class="online-value">0</div></div></div><div style="text-align:center;color:var(--muted);padding:20px 0;font-size:0.85rem;">No data yet — snapshots taken every minute</div></div>';
         return;
       }
 
-      // Filter to last 30 min only (6 bars at 5-min intervals)
+      // Build 30 fixed 1-minute slots, fill from nearest snapshot
       var now = Date.now();
-      var recent = snapshots.filter(function(s) {
-        return now - new Date(s.ts).getTime() <= 31 * 60 * 1000;
-      });
-      if (!recent.length) recent = snapshots.slice(-6);
+      var slots = [];
+      for (var m = 29; m >= 0; m--) {
+        var slotTime = now - m * 60000;
+        // Find closest snapshot within 30s of this slot
+        var best = null, bestDist = Infinity;
+        snapshots.forEach(function(s) {
+          var dist = Math.abs(new Date(s.ts).getTime() - slotTime);
+          if (dist < bestDist && dist < 45000) { best = s; bestDist = dist; }
+        });
+        slots.push({
+          minsAgo: m,
+          users: best ? (parseInt(best.users_online) || 0) : 0,
+          visitors: best ? (parseInt(best.visitors_online) || 0) : 0,
+          web: best ? (parseInt(best.users_web) || 0) : 0,
+          ios: best ? (parseInt(best.users_ios) || 0) : 0
+        });
+      }
 
-      // Summary: peak users in 30min, latest 5min snapshot
+      // Summary
       var peak30 = 0;
-      recent.forEach(function(s) {
-        var u = parseInt(s.users_online) || 0;
-        if (u > peak30) peak30 = u;
-      });
-      var latest = recent[recent.length - 1];
-      var online5 = parseInt(latest.users_online) || 0;
-      var web5 = parseInt(latest.users_web) || 0;
-      var ios5 = parseInt(latest.users_ios) || 0;
-      var vis5 = parseInt(latest.visitors_online) || 0;
+      slots.forEach(function(s) { if (s.users > peak30) peak30 = s.users; });
+      var latest = slots[slots.length - 1];
       var sub5 = [];
-      if (web5) sub5.push(web5 + ' web');
-      if (ios5) sub5.push(ios5 + ' ios');
+      if (latest.web) sub5.push(latest.web + ' web');
+      if (latest.ios) sub5.push(latest.ios + ' ios');
       var sub5Str = sub5.length ? ' (' + sub5.join(' · ') + ')' : '';
 
-      // Chart bars — use only recent snapshots, show users_online as bar height
+      // Max for Y-axis
       var maxVal = 1;
-      recent.forEach(function(s) {
-        var v = (parseInt(s.users_online) || 0) + (parseInt(s.visitors_online) || 0);
+      slots.forEach(function(s) {
+        var v = s.users + s.visitors;
         if (v > maxVal) maxVal = v;
       });
       if (maxVal <= 5) maxVal = 5;
       else if (maxVal <= 10) maxVal = 10;
       else maxVal = Math.ceil(maxVal / 5) * 5;
 
+      // Bars — always 30
       var bars = '';
-      recent.forEach(function(s) {
-        var users = parseInt(s.users_online) || 0;
-        var vis = parseInt(s.visitors_online) || 0;
-        var total = users + vis;
-        var hPx = Math.max(total > 0 ? 2 : 0, Math.round((total / maxVal) * 80));
-        var minsAgo = Math.round((now - new Date(s.ts).getTime()) / 60000);
-        var web = parseInt(s.users_web) || 0;
-        var ios = parseInt(s.users_ios) || 0;
+      slots.forEach(function(s) {
+        var total = s.users + s.visitors;
+        var hPx = Math.max(total > 0 ? 2 : 0, Math.round((total / maxVal) * 100));
         bars += '<div class="chart-bar-group">' +
-          '<div class="chart-tip">-' + minsAgo + ' min — ' + users + ' users (' + web + ' web, ' + ios + ' ios), ' + vis + ' visitors</div>' +
+          '<div class="chart-tip">-' + s.minsAgo + ' min — ' + s.users + ' users (' + s.web + ' web, ' + s.ios + ' ios), ' + s.visitors + ' visitors</div>' +
           '<div class="chart-bar" style="height:' + hPx + 'px"></div>' +
           '</div>';
       });
 
-      // Y-axis labels on right side
       var yLabels = '<div class="chart-y">' +
         '<span style="top:0">' + maxVal + '</span>' +
         '<span style="top:50%">' + Math.round(maxVal / 2) + '</span>' +
         '</div>';
 
-      // Time axis
-      var firstMins = Math.round((now - new Date(recent[0].ts).getTime()) / 60000);
-      var lastMins = Math.round((now - new Date(recent[recent.length - 1].ts).getTime()) / 60000);
-      var midMins = Math.round((firstMins + lastMins) / 2);
-
       container.innerHTML =
         '<div class="online-chart">' +
         '<div class="online-summary">' +
         '<div class="online-summary-item"><div class="online-label">Online users (30 min peak)</div><div class="online-value">' + peak30 + '</div></div>' +
-        '<div class="online-summary-item"><div class="online-label">Online now' + sub5Str + '</div><div class="online-value">' + online5 + '</div></div>' +
-        '<div class="online-summary-item"><div class="online-label">Visitors now</div><div class="online-value">' + vis5 + '</div></div>' +
+        '<div class="online-summary-item"><div class="online-label">Online now' + sub5Str + '</div><div class="online-value">' + latest.users + '</div></div>' +
+        '<div class="online-summary-item"><div class="online-label">Visitors now</div><div class="online-value">' + latest.visitors + '</div></div>' +
         '</div>' +
-        '<div class="online-chart-subtitle">Users + visitors per 5 min</div>' +
+        '<div class="online-chart-subtitle">Users + visitors per minute</div>' +
         '<div class="chart-area" style="padding-right:24px">' + bars + yLabels + '</div>' +
-        '<div class="chart-time-axis" style="padding-right:24px"><span>-' + firstMins + ' min</span><span>-' + midMins + ' min</span><span>-' + lastMins + ' min</span></div>' +
+        '<div class="chart-time-axis" style="padding-right:24px"><span>-30 min</span><span>-15 min</span><span>now</span></div>' +
         '</div>';
     }
 
@@ -947,6 +943,7 @@
         var MODEL_KEYS = [
           { key: 'openrouter_model', label: 'Primary Model' },
           { key: 'openrouter_fallback_model', label: 'Fallback Model' },
+          { key: 'memory_extraction_model', label: 'Memory Model' },
         ];
         var badgesHtml = '';
         MODEL_KEYS.forEach(function(def) {
