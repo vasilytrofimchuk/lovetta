@@ -774,20 +774,100 @@ function renderVideoFrame() {
 async function exportVideoMP4() {
   const girl = v('videoGirl');
   const duration = parseInt(v('videoDuration')) || 6;
-  document.getElementById('videoLabel').textContent = '300x250 — Rendering MP4 on server...';
+  document.getElementById('videoLabel').textContent = '300x250 — Rendering overlay...';
 
+  // Step 1: Render the banner overlay (everything EXCEPT the card image) as PNG
+  const b = BANNERS['300x250'];
+  const W = b.w * S, H = b.h * S;
+  const overlayCanvas = document.createElement('canvas');
+  overlayCanvas.width = W; overlayCanvas.height = H;
+  const ctx = overlayCanvas.getContext('2d');
+
+  // Transparent background — only draw text elements
+  // Background gradient
+  const grad = ctx.createLinearGradient(0, 0, W * 0.3, H);
+  grad.addColorStop(0, v('bg1'));
+  grad.addColorStop(1, v('bg2'));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  const glow = ctx.createRadialGradient(W * 0.3, H * 0.4, 0, W * 0.3, H * 0.4, Math.max(W, H) * 0.5);
+  glow.addColorStop(0, hexRgba(v('ctaBg'), 0.06));
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  // Make the card area fully transparent (clear hole for video)
+  const pos = b.cards1[0];
+  const r = Math.min(pos.w, pos.h) * 0.05;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
+  ctx.clip();
+  ctx.clearRect(pos.x, pos.y, pos.w, pos.h);
+  ctx.restore();
+
+  // Logo
+  if (document.getElementById('showLogo').checked && logoImg) {
+    const L = b.logo;
+    const lw = L.maxW, lh = lw * (logoImg.height / logoImg.width);
+    ctx.save(); ctx.globalAlpha = 0.85;
+    ctx.drawImage(logoImg, L.x, L.y, lw, lh);
+    ctx.restore();
+  }
+
+  // Headline
+  const HL = b.headline;
+  const headText = v('headlineText');
+  if (headText) {
+    const font = v('headlineFont'), weight = v('headlineWeight');
+    const hlScale = n('headlineSizeScale') / 100;
+    const hlSize = Math.round(HL.size * hlScale);
+    ctx.save();
+    ctx.font = `${weight} ${hlSize}px "${font}", sans-serif`;
+    ctx.textAlign = HL.align; ctx.textBaseline = 'top';
+    const words = headText.split(' '); const lines = []; let line = '';
+    words.forEach(w => { const t = line ? line+' '+w : w; if (ctx.measureText(t).width > HL.maxW && line) { lines.push(line); line = w; } else line = t; });
+    if (line) lines.push(line);
+    const effect = v('textEffect'), ctaColor = v('ctaBg');
+    if (effect === 'glow') { ctx.shadowColor = hexRgba(ctaColor, 0.6); ctx.shadowBlur = hlSize * 0.4; }
+    else if (effect === 'shadow') { ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = hlSize * 0.15; ctx.shadowOffsetY = hlSize * 0.06; }
+    ctx.fillStyle = v('headlineColor');
+    lines.forEach((l, i) => ctx.fillText(l, HL.x, HL.y + i * hlSize * 1.15));
+    ctx.restore();
+  }
+
+  // CTA
+  const CT = b.cta;
+  const ctaText = v('ctaText');
+  if (ctaText) {
+    const ctScale = n('ctaSizeScale') / 100;
+    const ctSize = Math.round(CT.size * ctScale);
+    ctx.save();
+    ctx.font = `700 ${ctSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.shadowColor = hexRgba(v('ctaBg'), 0.5); ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+    ctx.beginPath(); ctx.roundRect(CT.x, CT.y, CT.bw, CT.bh, n('ctaRadius') * S);
+    ctx.fillStyle = v('ctaBg'); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(ctaText, CT.x + CT.bw / 2, CT.y + CT.bh / 2);
+    ctx.restore();
+  }
+
+  // Step 2: Send overlay PNG + params to server
+  document.getElementById('videoLabel').textContent = '300x250 — Rendering MP4...';
   try {
-    const resp = await fetch('/render-video', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        girl,
-        headline: v('headlineText'),
-        cta: v('ctaText'),
-        duration,
-        bg1: v('bg1'),
-      }),
-    });
+    const overlayBlob = await new Promise(res => overlayCanvas.toBlob(res, 'image/png'));
+    const formData = new FormData();
+    formData.append('overlay', overlayBlob, 'overlay.png');
+    formData.append('girl', girl);
+    formData.append('duration', duration);
+    formData.append('cardX', pos.x);
+    formData.append('cardY', pos.y);
+    formData.append('cardW', pos.w);
+    formData.append('cardH', pos.h);
+
+    const resp = await fetch('/render-video', { method: 'POST', body: formData });
     if (!resp.ok) throw new Error(await resp.text());
     const mp4Blob = await resp.blob();
     const a = document.createElement('a');

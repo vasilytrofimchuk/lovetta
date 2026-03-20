@@ -43,55 +43,86 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // POST /render-video — render video banner server-side as MP4 directly
+  // POST /render-video — composite overlay PNG + girl video → MP4
   if (req.method === 'POST' && req.url === '/render-video') {
-    let body = '';
-    req.on('data', c => body += c);
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
     req.on('end', () => {
       try {
-        const { girl, headline, cta, duration, bg1, bg2 } = JSON.parse(body);
+        const raw = Buffer.concat(chunks);
+        // Parse multipart form data — handle binary properly
+        const boundaryStr = req.headers['content-type'].split('boundary=')[1];
+        const boundary = Buffer.from('--' + boundaryStr);
+        const parts = {};
+
+        // Find each part by boundary
+        let pos = 0;
+        while (true) {
+          const start = raw.indexOf(boundary, pos);
+          if (start === -1) break;
+          const nextBoundary = raw.indexOf(boundary, start + boundary.length + 2);
+          if (nextBoundary === -1) break;
+
+          const partBuf = raw.slice(start + boundary.length + 2, nextBoundary - 2); // skip \r\n at start, \r\n before next boundary
+          const headerEnd = partBuf.indexOf('\r\n\r\n');
+          if (headerEnd === -1) { pos = nextBoundary; continue; }
+
+          const header = partBuf.slice(0, headerEnd).toString('utf8');
+          const body = partBuf.slice(headerEnd + 4);
+          const nameMatch = header.match(/name="([^"]+)"/);
+          if (!nameMatch) { pos = nextBoundary; continue; }
+
+          if (header.includes('filename=')) {
+            parts[nameMatch[1]] = body;
+          } else {
+            parts[nameMatch[1]] = body.toString('utf8').trim();
+          }
+          pos = nextBoundary;
+        }
+
+        const girl = parts.girl;
+        const dur = Math.min(parseInt(parts.duration) || 6, 15);
+        const cardX = parseInt(parts.cardX) || 260;
+        const cardY = parseInt(parts.cardY) || 16;
+        const cardW = parseInt(parts.cardW) || 320;
+        const cardH = parseInt(parts.cardH) || 427;
+
         const videoPath = path.join(ROOT, 'public', 'assets', 'ads', 'videos', girl + '.mp4');
         if (!fs.existsSync(videoPath)) { res.writeHead(404); res.end('No video for ' + girl); return; }
-        const logoPath = path.join(ROOT, 'public', 'assets', 'brand', 'logo_text.png');
-        const dur = Math.min(duration || 6, 15);
-        const outPath = path.join(ROOT, 'scripts', `_render_${Date.now()}.mp4`);
 
-        // FFmpeg: dark bg + girl video on right + text overlay
-        // Canvas: 600x500 (300x250 at 2x)
-        const W = 600, H = 500;
-        const cardX = 230, cardY = 10, cardW = 360, cardH = 480;
-        const bgColor = bg1 || '#1a0a2e';
+        const ts = Date.now();
+        const overlayPath = path.join(ROOT, 'scripts', `_overlay_${ts}.png`);
+        const outPath = path.join(ROOT, 'scripts', `_render_${ts}.mp4`);
+        fs.writeFileSync(overlayPath, parts.overlay);
+        console.log(`Overlay: ${parts.overlay.length} bytes, girl=${parts.girl}, cardX=${cardX}, cardY=${cardY}, cardW=${cardW}, cardH=${cardH}`);
+        // Debug: keep a copy
 
+        // Get overlay dimensions
+        const W = 600, H = 500; // 300x250 at 2x
+
+        // FFmpeg: dark bg + video at card pos + overlay PNG (with alpha cutout) on top
         const cmd = [
           'ffmpeg', '-y',
-          '-f', 'lavfi', '-i', `color=c=${bgColor.replace('#','0x')}:s=${W}x${H}:d=${dur}:r=30`,
           '-i', `"${videoPath}"`,
-          '-i', `"${logoPath}"`,
-          '-filter_complex', `"` +
-            // Scale video to card size, crop to 3:4
-            `[1:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},setpts=PTS-STARTPTS[vid];` +
-            // Scale logo
-            `[2:v]scale=130:-1[logo];` +
-            // Overlay video on bg
-            `[0:v][vid]overlay=${cardX}:${cardY}:shortest=1[bg1];` +
-            // Overlay logo
-            `[bg1][logo]overlay=12:8[bg2];` +
-            // Draw text
-            `[bg2]drawtext=text='${(headline || 'Your AI Girlfriend').replace(/'/g, "\\'")}':fontsize=24:fontcolor=white:x=12:y=60:fontfile=/System/Library/Fonts/Helvetica.ttc:font='Helvetica Bold',` +
-            `drawtext=text='${(cta || 'Chat Now').replace(/'/g, "\\'")}':fontsize=16:fontcolor=white:x=22:y=180:box=1:boxcolor=0xd6336c:boxborderw=10:fontfile=/System/Library/Fonts/Helvetica.ttc` +
-          `"`,
+          '-i', `"${overlayPath}"`,
+          '-filter_complex',
+          `"[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},setpts=PTS-STARTPTS[vid];` +
+          `color=c=0x0a0618:s=${W}x${H}:d=${dur}:r=30[bg];` +
+          `[bg][vid]overlay=${cardX}:${cardY}:shortest=1[base];` +
+          `[base][1:v]overlay=0:0"`,
           '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
           '-t', String(dur), '-an',
           `"${outPath}"`,
         ].join(' ');
 
-        console.log('Rendering video...');
+        console.log('Rendering video banner...');
         execSync(cmd, { timeout: 60000, stdio: 'pipe' });
         const mp4 = fs.readFileSync(outPath);
-        fs.unlinkSync(outPath);
         console.log(`Video rendered: ${(mp4.length / 1024).toFixed(0)} KB`);
         res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': mp4.length });
         res.end(mp4);
+        try { fs.unlinkSync(overlayPath); } catch {}
+        try { fs.unlinkSync(outPath); } catch {}
       } catch (e) {
         console.error('Render failed:', e.message);
         res.writeHead(500, { 'Content-Type': 'text/plain' });
