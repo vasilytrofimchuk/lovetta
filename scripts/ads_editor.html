@@ -584,7 +584,13 @@ function exportBanner(key) {
   try {
     const c = renderBanner(key, true);
     if (!c) return;
-    c.toBlob(blob => {
+    // Scale down to 1x for ad platform (exact dimensions required)
+    const b = BANNERS[key];
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = b.w;
+    outCanvas.height = b.h;
+    outCanvas.getContext('2d').drawImage(c, 0, 0, b.w, b.h);
+    outCanvas.toBlob(blob => {
       if (!blob) return;
       const a = document.createElement('a');
       const ts = Date.now().toString(36).slice(-4);
