@@ -622,7 +622,8 @@ function exportEachGirl() {
           if (!blob) { i++; next(); return; }
           const a = document.createElement('a');
           const name = card.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          a.download = `lovetta_300x250_${name}.jpg`;
+          const ts = Date.now().toString(36).slice(-4);
+          a.download = `lovetta_300x250_${name}_${ts}.jpg`;
           a.href = URL.createObjectURL(blob);
           document.body.appendChild(a); a.click(); document.body.removeChild(a);
           i++;
