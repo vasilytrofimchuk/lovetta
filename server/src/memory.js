@@ -339,7 +339,7 @@ ${existingText}`;
 
   const { plainChatCompletion, getAISettings } = require('./ai');
   const settings = await getAISettings();
-  const extractionModel = settings.memory_extraction_model || 'google/gemini-2.0-flash-001';
+  const extractionModel = settings.memory_extraction_model || 'qwen/qwen3-235b-a22b-2507';
   const result = await plainChatCompletion(systemPrompt, [
     { role: 'user', content: `Chat messages:\n${messagesText}` },
   ], { model: extractionModel });
@@ -487,7 +487,7 @@ FORMAT: Return ONLY the summary text, nothing else.`;
 
   const { plainChatCompletion, getAISettings } = require('./ai');
   const settings = await getAISettings();
-  const extractionModel = settings.memory_extraction_model || 'google/gemini-2.0-flash-001';
+  const extractionModel = settings.memory_extraction_model || 'qwen/qwen3-235b-a22b-2507';
   const result = await plainChatCompletion(systemPrompt, [
     { role: 'user', content: `CONVERSATION LOG:\n${messagesText}\n\nSUMMARY:` },
   ], { model: extractionModel });

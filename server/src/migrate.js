@@ -71,7 +71,7 @@ const MIGRATIONS = [
         ('openrouter_fallback_model', '"sao10k/l3.1-euryale-70b"'),
         ('fal_image_model', '"fal-ai/flux/dev"'),
         ('fal_video_model', '"wan/v2.6/image-to-video"'),
-        ('memory_extraction_model', '"google/gemini-2.0-flash-001"')
+        ('memory_extraction_model', '"qwen/qwen3-235b-a22b-2507"')
       ON CONFLICT (key) DO NOTHING;
 
       CREATE TABLE IF NOT EXISTS users (
@@ -995,7 +995,7 @@ const MIGRATIONS = [
   },
   {
     name: 'v43_memory_extraction_model',
-    sql: `INSERT INTO app_settings (key, value) VALUES ('memory_extraction_model', '"google/gemini-2.0-flash-001"') ON CONFLICT (key) DO NOTHING`,
+    sql: `INSERT INTO app_settings (key, value) VALUES ('memory_extraction_model', '"qwen/qwen3-235b-a22b-2507"') ON CONFLICT (key) DO NOTHING`,
   },
 ];
 
