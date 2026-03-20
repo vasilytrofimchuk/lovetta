@@ -2,6 +2,12 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## All Payments Table in Economics Tab
+- [x] Add `GET /api/admin/payments` paginated endpoint (tips + subscriptions union, period filter)
+- [x] Add "All Payments" HTML section in Economics tab
+- [x] Add `loadPayments()` JS with table rendering + pagination
+- [x] Wire into `loadEconomics()` — auto-loads when Economics tab opens
+
 ## Image Dedup + Tip Reward Images
 - [x] Fix `findReusableMedia` in media-chat.js — exclude images user already has in chat (per-user dedup)
 - [x] Add reward image constants: 20 scene prompts, 8 flirty captions, image count mapping ($10→1, $20→2, $50→3, $100→4)
@@ -10,6 +16,30 @@
 - [x] Update Stripe + RevenueCat webhook call sites to pass tip amount
 - [x] Run `npm run test:e2e:api` — 28/28 passed
 - [x] Run `npm run test:e2e:ai` — 97/97 passed
+
+## Memory System Improvements
+- [x] Add v42 migration: `last_extracted_message_id` column on conversations
+- [x] Track last extracted message — no user message ever skipped between extractions
+- [x] Filter to `role='user'` only in extraction input — skip assistant fluff
+- [x] Chunk-based extraction: process messages in batches of 10 (3 chunks max)
+- [x] Hybrid extraction: regex patterns (deterministic) + AI chunks (contextual)
+- [x] Regex catches: name, age, birthday, location, job, pets, family, food, music, hobbies, allergies, coffee, learning, friends, night owl, cooking, dog breeds
+- [x] Pass companion name to AI to prevent user/companion confusion
+- [x] Fallback JSON parser for malformed model output
+- [x] Replace per-category cap (5) with global cap (30 total facts)
+- [x] Increase MAX_MEMORY_CHARS from 2000 to 3000 (~750 tokens)
+- [x] Lower extraction threshold: 5 → 3 messages
+- [x] Summary: skip template first message, focus on user details
+- [x] Run tests: 97/97 AI, 28/28 API passed
+- [x] Production test: 30 facts / 94% coverage (was 4 facts / 27%), all recall tests pass
+- [x] Add configurable memory_extraction_model setting (default: gemini-2.0-flash-001)
+- [x] Memory Model badge in admin Settings tab (editable like Primary/Fallback models)
+- [x] Fix fact dedup: use subject+topic key instead of generic "user" key
+- [x] Regex runs AFTER AI so deterministic facts override AI hallucinations
+- [x] Add zodiac, book, coffee regex patterns
+- [x] Benchmark 8 models: all scored 8/8 on 5-message test. Qwen3-235b cheapest at $0.00002/call
+- [x] Switch to qwen/qwen3-235b-a22b-2507 — 3x cheaper than Gemini Flash, same quality
+- [x] Final production test: 30 facts / 88% coverage at lowest cost
 
 ## Admin Chart: 1-Minute Bars (GA Realtime Style)
 - [x] Backend: snapshot interval from 5 min to 1 min (scheduler.js)

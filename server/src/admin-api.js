@@ -295,6 +295,73 @@ router.get('/consumption/summary', async (req, res) => {
   }
 });
 
+// -- GET /api/admin/payments (paginated) -------------------------
+router.get('/payments', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ rows: [], total: 0, page: 1, limit: 50 });
+
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+    const period = ['7d', '30d', '90d', 'all'].includes(req.query.period) ? req.query.period : '30d';
+
+    const interval = period === 'all' ? null
+      : period === '7d' ? '7 days'
+      : period === '90d' ? '90 days'
+      : '30 days';
+    const dateFilter = interval ? `WHERE created_at >= NOW() - INTERVAL '${interval}'` : '';
+
+    const { rows: [{ count }] } = await pool.query(`
+      SELECT COUNT(*) AS count FROM (
+        SELECT id FROM tips ${dateFilter}
+        UNION ALL
+        SELECT id FROM subscriptions ${dateFilter}
+      ) combined
+    `);
+
+    const { rows } = await pool.query(`
+      SELECT * FROM (
+        SELECT
+          'tip' AS type,
+          t.id,
+          u.email AS user_email,
+          t.amount / 100.0 AS amount_usd,
+          CASE WHEN t.stripe_payment_id LIKE 'rc_%' THEN 'revenuecat' ELSE 'stripe' END AS provider,
+          uc.name AS companion_name,
+          t.status,
+          t.created_at
+        FROM tips t
+        LEFT JOIN users u ON u.id = t.user_id
+        LEFT JOIN user_companions uc ON uc.id = t.companion_id
+        ${dateFilter.replace('WHERE created_at', 'WHERE t.created_at')}
+
+        UNION ALL
+
+        SELECT
+          'subscription' AS type,
+          s.id,
+          u.email AS user_email,
+          CASE WHEN s.plan = 'yearly' THEN 99.99 ELSE 19.99 END AS amount_usd,
+          COALESCE(s.payment_provider, 'stripe') AS provider,
+          NULL AS companion_name,
+          s.status,
+          s.created_at
+        FROM subscriptions s
+        LEFT JOIN users u ON u.id = s.user_id
+        ${dateFilter.replace('WHERE created_at', 'WHERE s.created_at')}
+      ) combined
+      ORDER BY created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    res.json({ rows, total: parseInt(count), page, limit });
+  } catch (err) {
+    console.error('[admin] payments error:', err.message);
+    res.status(500).json({ error: 'Failed to load payments' });
+  }
+});
+
 // -- GET /api/admin/reports (paginated) -------------------------
 router.get('/reports', async (req, res) => {
   const pool = getPool();

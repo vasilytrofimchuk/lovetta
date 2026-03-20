@@ -399,6 +399,11 @@
         <h3>Daily Cost vs Tips</h3>
         <div id="econ-daily-table"></div>
       </div>
+      <div class="section" style="margin-top:24px;">
+        <h3>All Payments</h3>
+        <div id="econ-payments-table"></div>
+        <div class="pagination" id="econ-payments-pagination"></div>
+      </div>
     </div>
 
     <!-- Reports Tab -->
@@ -1487,6 +1492,37 @@
           document.getElementById('econ-daily-table').innerHTML = '<p style="color:var(--muted);padding:16px;">No data yet</p>';
         }
 
+        // Load payments table
+        loadPayments(1);
+
+      });
+    }
+
+    function loadPayments(page) {
+      apiFetch('/api/admin/payments?page=' + page + '&limit=50&period=' + (econPeriod || '7d')).then(function(data) {
+        var rows = data.rows || [];
+        if (rows.length) {
+          var html = '<table><tr><th>Type</th><th>User</th><th>Amount</th><th>Provider</th><th>Companion</th><th>Status</th><th>Date</th></tr>';
+          rows.forEach(function(r) {
+            var icon = r.type === 'tip' ? '💰' : '📦';
+            var amt = parseFloat(r.amount_usd) || 0;
+            var statusClass = r.status === 'active' || r.status === 'succeeded' ? 'profit' : '';
+            html += '<tr>' +
+              '<td title="' + esc(r.type) + '">' + icon + ' ' + esc(r.type) + '</td>' +
+              '<td>' + esc(r.user_email || 'N/A') + '</td>' +
+              '<td>$' + amt.toFixed(2) + '</td>' +
+              '<td>' + esc(r.provider || 'stripe') + '</td>' +
+              '<td>' + esc(r.companion_name || '—') + '</td>' +
+              '<td class="' + statusClass + '">' + esc(r.status || 'N/A') + '</td>' +
+              '<td class="mono" style="white-space:nowrap;">' + timeAgo(r.created_at) + '</td>' +
+              '</tr>';
+          });
+          html += '</table>';
+          document.getElementById('econ-payments-table').innerHTML = html;
+        } else {
+          document.getElementById('econ-payments-table').innerHTML = '<p style="color:var(--muted);padding:16px;">No payments yet</p>';
+        }
+        renderPagination('econ-payments-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadPayments');
       });
     }
 
