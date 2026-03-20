@@ -97,19 +97,21 @@ const server = http.createServer((req, res) => {
         console.log(`Overlay: ${parts.overlay.length} bytes, girl=${parts.girl}, cardX=${cardX}, cardY=${cardY}, cardW=${cardW}, cardH=${cardH}`);
         // Debug: keep a copy
 
-        // Get overlay dimensions
-        const W = 600, H = 500; // 300x250 at 2x
+        // Output at 1x (300x250). Overlay is 2x (600x500), scale everything down.
+        const W = 300, H = 250;
+        const cX = Math.round(cardX / 2), cY = Math.round(cardY / 2);
+        const cW = Math.round(cardW / 2), cH = Math.round(cardH / 2);
 
-        // FFmpeg: dark bg + video at card pos + overlay PNG (with alpha cutout) on top
         const cmd = [
           'ffmpeg', '-y',
           '-i', `"${videoPath}"`,
           '-i', `"${overlayPath}"`,
           '-filter_complex',
-          `"[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},setpts=PTS-STARTPTS[vid];` +
+          `"[0:v]scale=${cW}:${cH}:force_original_aspect_ratio=increase,crop=${cW}:${cH},setpts=PTS-STARTPTS[vid];` +
+          `[1:v]scale=${W}:${H}[ovr];` +
           `color=c=0x0a0618:s=${W}x${H}:d=${dur}:r=30[bg];` +
-          `[bg][vid]overlay=${cardX}:${cardY}:shortest=1[base];` +
-          `[base][1:v]overlay=0:0"`,
+          `[bg][vid]overlay=${cX}:${cY}:shortest=1[base];` +
+          `[base][ovr]overlay=0:0"`,
           '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
           '-t', String(dur), '-an',
           `"${outPath}"`,

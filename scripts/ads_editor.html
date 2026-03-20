@@ -129,6 +129,7 @@
   <div class="btn-row">
     <button onclick="loadVideo()">Preview</button>
     <button onclick="exportVideoMP4()">Export MP4</button>
+    <button onclick="exportAllVideoMP4()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);">EACH GIRL</button>
   </div>
   <div style="color:#555;font-size:10px;margin-top:4px;">Start with: <code style="color:#d6336c;">node scripts/ads_server.js</code></div>
 
@@ -937,13 +938,98 @@ async function exportVideoMP4() {
     if (!resp.ok) throw new Error(await resp.text());
     const mp4Blob = await resp.blob();
     const a = document.createElement('a');
-    a.download = `lovetta_ad_300x250_${girl}.mp4`;
+    const ts = Date.now().toString(36).slice(-4);
+    a.download = `lovetta_300x250_${girl}_${ts}.mp4`;
     a.href = URL.createObjectURL(mp4Blob);
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     document.getElementById('videoLabel').textContent = '300x250 — ' + girl + ' MP4 saved!';
   } catch (e) {
     document.getElementById('videoLabel').textContent = 'Failed: ' + e.message + ' (run: node scripts/ads_server.js)';
   }
+}
+
+async function exportAllVideoMP4() {
+  const girls = Object.keys(VIDEO_URLS);
+  const statusEl = document.getElementById('videoLabel') || document.getElementById('snapStatus');
+  function setStatus(t) { if (statusEl) statusEl.textContent = t; }
+  setStatus('Rendering ' + girls.length + ' videos...');
+
+  for (let i = 0; i < girls.length; i++) {
+    const girl = girls[i];
+    document.getElementById('videoGirl').value = girl;
+    setStatus(`Rendering ${girl} (${i+1}/${girls.length})...`);
+
+    try {
+      // Build overlay for this girl
+      const b = BANNERS['300x250'];
+      const W = b.w * S, H = b.h * S;
+      const oc = document.createElement('canvas'); oc.width = W; oc.height = H;
+      const ctx = oc.getContext('2d');
+      const grad = ctx.createLinearGradient(0,0,W*0.3,H);
+      grad.addColorStop(0,v('bg1')); grad.addColorStop(1,v('bg2'));
+      ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+      const glow = ctx.createRadialGradient(W*0.3,H*0.4,0,W*0.3,H*0.4,Math.max(W,H)*0.5);
+      glow.addColorStop(0,hexRgba(v('ctaBg'),0.06)); glow.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle = glow; ctx.fillRect(0,0,W,H);
+      const pos = b.cards1[0], rr = Math.min(pos.w,pos.h)*0.05;
+      ctx.save(); ctx.beginPath(); ctx.roundRect(pos.x,pos.y,pos.w,pos.h,rr);
+      ctx.clip(); ctx.clearRect(pos.x,pos.y,pos.w,pos.h); ctx.restore();
+      if (document.getElementById('showLogo').checked && logoImg) {
+        const L=b.logo,lw=L.maxW,lh=lw*(logoImg.height/logoImg.width);
+        ctx.save();ctx.globalAlpha=0.85;ctx.drawImage(logoImg,L.x,L.y,lw,lh);ctx.restore();
+      }
+      const HL=b.headline, headText=v('headlineText');
+      if (headText) {
+        const font=v('headlineFont'),weight=v('headlineWeight');
+        const hlScale=n('headlineSizeScale')/100, hlSize=Math.round(HL.size*hlScale);
+        ctx.save(); ctx.font=weight+' '+hlSize+'px "'+font+'", sans-serif';
+        ctx.textAlign=HL.align; ctx.textBaseline='top';
+        const words=headText.split(' '); const lines=[]; let line='';
+        words.forEach(w=>{const t=line?line+' '+w:w;if(ctx.measureText(t).width>HL.maxW&&line){lines.push(line);line=w;}else line=t;});
+        if(line) lines.push(line);
+        const effect=v('textEffect'),ctaColor=v('ctaBg');
+        if(effect==='glow'){ctx.shadowColor=hexRgba(ctaColor,0.6);ctx.shadowBlur=hlSize*0.4;}
+        else if(effect==='shadow'){ctx.shadowColor='rgba(0,0,0,0.7)';ctx.shadowBlur=hlSize*0.15;ctx.shadowOffsetY=hlSize*0.06;}
+        ctx.fillStyle=v('headlineColor');
+        lines.forEach((l,j)=>ctx.fillText(l,HL.x,HL.y+j*hlSize*1.15));
+        ctx.restore();
+      }
+      const CT=b.cta, ctaText=v('ctaText');
+      if (ctaText) {
+        const ctScale=n('ctaSizeScale')/100, ctSize=Math.round(CT.size*ctScale);
+        ctx.save(); ctx.font='700 '+ctSize+'px "Plus Jakarta Sans", sans-serif';
+        ctx.shadowColor=hexRgba(v('ctaBg'),0.5);ctx.shadowBlur=10;ctx.shadowOffsetY=3;
+        ctx.beginPath();ctx.roundRect(CT.x,CT.y,CT.bw,CT.bh,n('ctaRadius')*S);
+        ctx.fillStyle=v('ctaBg');ctx.fill();
+        ctx.shadowColor='transparent';ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(ctaText,CT.x+CT.bw/2,CT.y+CT.bh/2);ctx.restore();
+      }
+
+      const overlayBlob = await new Promise(res => oc.toBlob(res, 'image/png'));
+      const formData = new FormData();
+      formData.append('overlay', overlayBlob, 'overlay.png');
+      formData.append('girl', girl);
+      formData.append('duration', '5');
+      formData.append('cardX', pos.x);
+      formData.append('cardY', pos.y);
+      formData.append('cardW', pos.w);
+      formData.append('cardH', pos.h);
+
+      const resp = await fetch('/render-video', { method: 'POST', body: formData });
+      if (!resp.ok) throw new Error(await resp.text());
+      const mp4Blob = await resp.blob();
+      const a = document.createElement('a');
+      const ts = Date.now().toString(36).slice(-4);
+      a.download = `lovetta_300x250_${girl}_${ts}.mp4`;
+      a.href = URL.createObjectURL(mp4Blob);
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+      await new Promise(r => setTimeout(r, 500));
+    } catch(e) {
+      console.log('Failed ' + girl + ':', e.message);
+    }
+  }
+  setStatus(girls.length + ' videos exported!');
 }
 
 // ========== CARD SCREENSHOT TOOL ==========
