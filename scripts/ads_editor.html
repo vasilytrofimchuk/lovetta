@@ -70,6 +70,7 @@
       <option value="Playfair Display">Playfair Display</option>
     </select>
   </label>
+  <label><span>Size scale %</span><input type="number" id="headlineSizeScale" value="100" min="50" max="200"></label>
   <label><span>Weight</span>
     <select id="headlineWeight">
       <option value="700" selected>Bold</option>
@@ -88,6 +89,7 @@
 
   <h3>CTA Button</h3>
   <label><span>Text</span><input type="text" id="ctaText" value="Chat Now"></label>
+  <label><span>Size scale %</span><input type="number" id="ctaSizeScale" value="130" min="50" max="300"></label>
   <label><span>Color</span><div class="color-pair"><input type="color" id="ctaBgPick" value="#d6336c"><input type="text" id="ctaBg" value="#d6336c"></div></label>
   <label><span>Radius</span><input type="number" id="ctaRadius" value="8" min="0" max="30"></label>
 
@@ -115,7 +117,7 @@ const BANNERS = {
     // canvas 600x500. Cards right, text left.
     logo: { x: 24, y: 16, maxW: 130 },
     headline: { x: 24, y: 100, size: 48, maxW: 200, align: 'left' },
-    cta: { x: 24, y: 380, size: 22, padH: 32, padV: 12 },
+    cta: { x: 24, y: 340, size: 28, padH: 40, padV: 16 },
     cards1: [{ x: 260, y: 16, w: 320, h: 427 }],
     cards4: [
       { x: 246, y: 8, w: 168, h: 224 },  { x: 422, y: 8, w: 168, h: 224 },
@@ -127,7 +129,7 @@ const BANNERS = {
     // canvas 672x560. Cards right, text left.
     logo: { x: 28, y: 18, maxW: 150 },
     headline: { x: 28, y: 110, size: 52, maxW: 230, align: 'left' },
-    cta: { x: 28, y: 420, size: 24, padH: 36, padV: 14 },
+    cta: { x: 28, y: 380, size: 30, padH: 42, padV: 16 },
     cards1: [{ x: 290, y: 16, w: 360, h: 480 }],
     cards4: [
       { x: 270, y: 8, w: 192, h: 256 },  { x: 470, y: 8, w: 192, h: 256 },
@@ -137,13 +139,13 @@ const BANNERS = {
   '728x90': {
     w: 728, h: 90, name: 'Leaderboard',
     // canvas 1456x180. Cards left, text right.
-    logo: { x: 560, y: 4, maxW: 100 },
-    headline: { x: 560, y: 44, size: 40, maxW: 550, align: 'left' },
-    cta: { x: 560, y: 114, size: 20, padH: 26, padV: 10 },
+    logo: { x: 700, y: 4, maxW: 100 },
+    headline: { x: 700, y: 48, size: 42, maxW: 700, align: 'left' },
+    cta: { x: 700, y: 118, size: 20, padH: 28, padV: 10 },
     cards1: [{ x: 20, y: 4, w: 129, h: 172 }],
     cards4: [
-      { x: 14, y: 4, w: 126, h: 168 }, { x: 146, y: 4, w: 126, h: 168 },
-      { x: 278, y: 4, w: 126, h: 168 }, { x: 410, y: 4, w: 126, h: 168 },
+      { x: 10, y: 2, w: 160, h: 176 }, { x: 176, y: 2, w: 160, h: 176 },
+      { x: 342, y: 2, w: 160, h: 176 }, { x: 508, y: 2, w: 160, h: 176 },
     ],
   },
   '160x600': {
@@ -161,9 +163,9 @@ const BANNERS = {
   '320x50': {
     w: 320, h: 50, name: 'Mobile Banner',
     // canvas 640x100. Cards left, text right.
-    logo: { x: 310, y: 2, maxW: 70 },
-    headline: { x: 310, y: 28, size: 24, maxW: 200, align: 'left' },
-    cta: { x: 498, y: 22, size: 18, padH: 18, padV: 8 },
+    logo: { x: 318, y: 2, maxW: 70 },
+    headline: { x: 318, y: 28, size: 24, maxW: 180, align: 'left' },
+    cta: { x: 510, y: 20, size: 18, padH: 18, padV: 8 },
     cards1: [{ x: 10, y: 2, w: 72, h: 96 }],
     cards4: [
       { x: 6, y: 2, w: 69, h: 92 },  { x: 79, y: 2, w: 69, h: 92 },
@@ -343,7 +345,6 @@ function renderBanner(key, forExport) {
   const card = getSelectedCard();
   if (card.img) {
     if (card.type === 'grid') {
-      // Draw the 4-plex grid image in the grid area
       const positions = b.cards4;
       const minX = Math.min(...positions.map(p => p.x));
       const minY = Math.min(...positions.map(p => p.y));
@@ -351,17 +352,46 @@ function renderBanner(key, forExport) {
       const maxY = Math.max(...positions.map(p => p.y + p.h));
       const areaW = maxX - minX;
       const areaH = maxY - minY;
+      const areaAR = areaW / areaH;
+      const imgAR = card.img.width / card.img.height;
       const r = Math.min(areaW, areaH) * 0.03;
+
+      // Cover-crop: scale to fill area, crop excess
+      let drawW, drawH, drawX, drawY;
+      if (imgAR > areaAR) {
+        // Image wider — fit height, center horizontally
+        drawH = areaH;
+        drawW = areaH * imgAR;
+        drawX = minX - (drawW - areaW) / 2;
+        drawY = minY;
+      } else {
+        // Image taller — fit width, show middle portion
+        drawW = areaW;
+        drawH = areaW / imgAR;
+        drawX = minX;
+        drawY = minY - (drawH - areaH) * 0.35; // center-ish, slightly above middle
+      }
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(minX, minY, areaW, areaH, r);
       ctx.clip();
-      ctx.drawImage(card.img, minX, minY, areaW, areaH);
+      ctx.drawImage(card.img, drawX, drawY, drawW, drawH);
       ctx.restore();
     } else {
-      // Draw single card in the single-card position
+      // Draw single card, maintaining 3:4 aspect ratio
       const pos = b.cards1[0];
       const r = Math.min(pos.w, pos.h) * 0.05;
+      // Cover-crop for single card too
+      const imgAR = card.img.width / card.img.height;
+      const posAR = pos.w / pos.h;
+      let drawW, drawH, drawX, drawY;
+      if (imgAR > posAR) {
+        drawH = pos.h; drawW = pos.h * imgAR;
+        drawX = pos.x - (drawW - pos.w) / 2; drawY = pos.y;
+      } else {
+        drawW = pos.w; drawH = pos.w / imgAR;
+        drawX = pos.x; drawY = pos.y - (drawH - pos.h) * 0.15;
+      }
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 12;
@@ -375,7 +405,7 @@ function renderBanner(key, forExport) {
       ctx.beginPath();
       ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
       ctx.clip();
-      ctx.drawImage(card.img, pos.x, pos.y, pos.w, pos.h);
+      ctx.drawImage(card.img, drawX, drawY, drawW, drawH);
       ctx.restore();
     }
   }
@@ -402,7 +432,9 @@ function renderBanner(key, forExport) {
     const ctaColor = v('ctaBg');
 
     ctx.save();
-    ctx.font = `${weight} ${HL.size}px "${font}", sans-serif`;
+    const hlScale = n('headlineSizeScale') / 100;
+    const hlSize = Math.round(HL.size * hlScale);
+    ctx.font = `${weight} ${hlSize}px "${font}", sans-serif`;
     ctx.textAlign = HL.align;
     ctx.textBaseline = 'top';
 
@@ -421,15 +453,15 @@ function renderBanner(key, forExport) {
     });
     if (line) lines.push(line);
 
-    const lineH = HL.size * 1.15;
+    const lineH = hlSize * 1.15;
 
     if (effect === 'glow') {
       ctx.shadowColor = hexRgba(ctaColor, 0.6);
-      ctx.shadowBlur = HL.size * 0.4;
+      ctx.shadowBlur = hlSize * 0.4;
     } else if (effect === 'shadow') {
       ctx.shadowColor = 'rgba(0,0,0,0.7)';
-      ctx.shadowBlur = HL.size * 0.15;
-      ctx.shadowOffsetY = HL.size * 0.06;
+      ctx.shadowBlur = hlSize * 0.15;
+      ctx.shadowOffsetY = hlSize * 0.06;
     }
     ctx.fillStyle = color;
     lines.forEach((l, i) => ctx.fillText(l, HL.x, HL.y + i * lineH));
@@ -442,11 +474,15 @@ function renderBanner(key, forExport) {
   if (ctaText) {
     const bgCol = v('ctaBg');
     const radius = n('ctaRadius') * S;
+    const ctScale = n('ctaSizeScale') / 100;
+    const ctSize = Math.round(CT.size * ctScale);
+    const ctPadH = CT.padH;  // padding stays fixed
+    const ctPadV = CT.padV;
     ctx.save();
-    ctx.font = `700 ${CT.size}px "Plus Jakarta Sans", sans-serif`;
+    ctx.font = `700 ${ctSize}px "Plus Jakarta Sans", sans-serif`;
     const tw = ctx.measureText(ctaText).width;
-    const bw = tw + CT.padH * 2;
-    const bh = CT.size + CT.padV * 2;
+    const bw = tw + ctPadH * 2;
+    const bh = ctSize + ctPadV * 2;
     // Shadow
     ctx.shadowColor = hexRgba(bgCol, 0.5);
     ctx.shadowBlur = 10;
