@@ -16,6 +16,7 @@
     "kill:dev": "node scripts/kill-lovetta-runtime.js && node scripts/kill-ports.js 3900 5173",
     "kill:ports": "node scripts/kill-ports.js",
     "kill:runtime": "node scripts/kill-lovetta-runtime.js",
+    "ads": "node scripts/ads_server.js",
     "test:e2e": "npx playwright test --project=default",
     "test:e2e:api": "npx playwright test --project=api",
     "test:e2e:ai": "npx playwright test --project=ai",
