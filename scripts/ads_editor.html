@@ -234,39 +234,25 @@ const BANNERS = {
 };
 
 // ========== GIRLS ==========
-// Image catalog: single cards and 4-card grids
+// Image catalog — built dynamically from server
 const CARD_IMAGES = [
-  // 4-plex grids (type: 'grid')
-  { name: 'Violet + Isabella + Hana + Luna', file: 'grid4_a.png', type: 'grid' },
-  { name: 'Luna + Rei + Chloe + Sakura', file: 'grid4_b.png', type: 'grid' },
-  // Single cards (type: 'single') — realistic
-  { name: 'Lily', file: 'lily.png', type: 'single' },
-  { name: 'Chloe', file: 'chloe.png', type: 'single' },
-  { name: 'Jade', file: 'jade.png', type: 'single' },
-  { name: 'Sophia', file: 'sophia.png', type: 'single' },
-  { name: 'Ruby', file: 'ruby.png', type: 'single' },
-  { name: 'Aria', file: 'aria.png', type: 'single' },
-  { name: 'Zara', file: 'zara.png', type: 'single' },
-  { name: 'Luna', file: 'luna.png', type: 'single' },
-  { name: 'Mia', file: 'mia.png', type: 'single' },
-  { name: 'Emma', file: 'emma.png', type: 'single' },
-  { name: 'Isabella', file: 'isabella.png', type: 'single' },
-  { name: 'Violet', file: 'violet.png', type: 'single' },
-  // Single cards — anime
-  { name: 'Rei (anime)', file: 'rei.png', type: 'single' },
-  { name: 'Hana (anime)', file: 'hana.png', type: 'single' },
-  { name: 'Sakura (anime)', file: 'sakura.png', type: 'single' },
-  { name: 'Yuki (anime)', file: 'yuki.png', type: 'single' },
-  { name: 'Mei (anime)', file: 'mei.png', type: 'single' },
-  { name: 'Aiko (anime)', file: 'aiko.png', type: 'single' },
+  // 4-plex grids (always present)
+  { name: 'Grid: Violet+Isabella+Hana+Luna', file: 'grid4_a.png', type: 'grid' },
+  { name: 'Grid: Luna+Rei+Chloe+Sakura', file: 'grid4_b.png', type: 'grid' },
 ];
+// All possible single card names (will only show if file exists)
+const ALL_GIRLS = ['Lily','Chloe','Jade','Sophia','Ruby','Aria','Zara','Luna','Mia','Emma','Isabella','Violet','Rei','Hana','Sakura','Yuki','Mei','Aiko'];
 
 const cardImages = {};
 let logoImg = null;
 
 function loadImg(url) {
   return new Promise(resolve => {
-    fetch(url).then(r => r.blob()).then(blob => {
+    fetch(url).then(r => {
+      if (!r.ok) return resolve(null);
+      return r.blob();
+    }).then(blob => {
+      if (!blob) return resolve(null);
       const img = new Image();
       img.onload = () => resolve(img);
       img.onerror = () => resolve(null);
@@ -275,17 +261,34 @@ function loadImg(url) {
   });
 }
 
-// Load all card images
-Promise.all([
-  ...CARD_IMAGES.map(c => loadImg('../public/assets/ads/' + c.file).then(img => { cardImages[c.file] = img; })),
-  loadImg('../public/assets/brand/logo_text.png').then(img => { logoImg = img; }),
-]).then(init);
+// Load grids + logo, then check which single cards exist
+async function loadAllImages() {
+  // Load grids
+  await Promise.all(CARD_IMAGES.map(c =>
+    loadImg('../public/assets/ads/' + c.file).then(img => { cardImages[c.file] = img; })
+  ));
+  // Load logo
+  logoImg = await loadImg('../public/assets/brand/logo_text.png');
+  // Try loading each girl — only add to catalog if file exists
+  for (const name of ALL_GIRLS) {
+    const file = name.toLowerCase() + '.png';
+    const img = await loadImg('../public/assets/ads/' + file);
+    if (img) {
+      cardImages[file] = img;
+      CARD_IMAGES.push({ name, file, type: 'single' });
+    }
+  }
+  buildCardDropdown();
+  init();
+}
+loadAllImages();
 
-// Build the dropdown from CARD_IMAGES
-(function buildCardDropdown() {
+function buildCardDropdown() {
   const sel = document.getElementById('cardImage');
   const grids = sel.querySelector('optgroup:first-child');
   const singles = sel.querySelector('optgroup:last-child');
+  grids.innerHTML = '';
+  singles.innerHTML = '';
   CARD_IMAGES.forEach((c, i) => {
     const opt = document.createElement('option');
     opt.value = i;
@@ -293,8 +296,10 @@ Promise.all([
     if (c.type === 'grid') grids.appendChild(opt);
     else singles.appendChild(opt);
   });
-  sel.value = '0'; // default to first grid
-})();
+  // Select first available single card, or first grid
+  const firstSingle = CARD_IMAGES.findIndex(c => c.type === 'single');
+  sel.value = firstSingle >= 0 ? firstSingle : 0;
+}
 
 // ========== UTILS ==========
 function v(id) { return document.getElementById(id).value; }
@@ -1030,12 +1035,25 @@ async function captureSnap() {
     });
     if (!resp.ok) throw new Error(await resp.text());
 
-    // Reload the card image in memory so banners update instantly
+    // Reload the card image and add to dropdown
+    const file = girl + '.png';
     const newImg = new Image();
-    newImg.onload = () => { cardImages[girl + '.png'] = newImg; renderAll(); };
+    newImg.onload = () => {
+      cardImages[file] = newImg;
+      // Add to CARD_IMAGES if not already there
+      if (!CARD_IMAGES.find(c => c.file === file)) {
+        const name = girl.charAt(0).toUpperCase() + girl.slice(1);
+        CARD_IMAGES.push({ name, file, type: 'single' });
+      }
+      buildCardDropdown();
+      // Select this card in dropdown
+      const idx = CARD_IMAGES.findIndex(c => c.file === file);
+      if (idx >= 0) document.getElementById('cardImage').value = idx;
+      renderAll();
+    };
     newImg.src = URL.createObjectURL(blob);
 
-    document.getElementById('snapStatus').textContent = '✓ ' + girl + '.png saved! Banners updated.';
+    document.getElementById('snapStatus').textContent = '✓ ' + girl + '.png saved! Selected in banners.';
     if (capBtn) { capBtn.textContent = '✓ Saved! Capture Again'; capBtn.style.opacity = '1'; capBtn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)'; }
     // Reset button after 2s
     setTimeout(() => { if (capBtn) { capBtn.textContent = '📸 Capture This Frame'; capBtn.style.background = 'linear-gradient(135deg,#d6336c,#f43f5e)'; } }, 2000);
