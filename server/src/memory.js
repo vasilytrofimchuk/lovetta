@@ -373,8 +373,26 @@ ${existingText}`;
 
 // -- Save facts to DB (shared by regex + AI) ----------------------
 
-const DEDUP_VERBS = /\s+(is|are|has|likes|works|prefers|lives|named|plays|loves|drinks|studies|wants|moved|used|born|enjoys|runs|wakes|reads|cooks|watches)\s+/i;
 const VALID_CATEGORIES = new Set(['identity', 'preferences', 'life', 'relationship', 'emotional']);
+
+// Extract a dedup key from a fact: use the subject + topic words (not just "User")
+// "User's name is Vasily" → "user's name"
+// "User is a software engineer" → "user software engineer"
+// "User's favorite movie is Interstellar" → "user's favorite movie"
+function factKey(fact) {
+  const lower = fact.toLowerCase();
+  // Try "User's X is Y" pattern — key = "user's x"
+  const possessiveMatch = lower.match(/^user'?s?\s+(\w+(?:\s+\w+)?)\s+(?:is|are)\b/);
+  if (possessiveMatch) return `user's ${possessiveMatch[1]}`;
+  // Try "User is a/an X" — key = first noun after article
+  const isAMatch = lower.match(/^user\s+(?:is|are)\s+(?:a|an)\s+(.{3,30}?)(?:\s+(?:from|in|at|who|,|$))/);
+  if (isAMatch) return `user is ${isAMatch[1].trim()}`;
+  // Try "User verb X" — key = verb + first word
+  const verbMatch = lower.match(/^user\s+(\w+(?:\s+\w+)?(?:\s+\w+)?)/);
+  if (verbMatch) return verbMatch[1].trim();
+  // Fallback: first 5 words
+  return lower.split(/\s+/).slice(0, 5).join(' ');
+}
 
 async function saveExtractedFacts(pool, conversationId, factsJson, lastMessageId) {
   let saved = 0;
@@ -391,11 +409,8 @@ async function saveExtractedFacts(pool, conversationId, factsJson, lastMessageId
       [conversationId, category]
     );
 
-    const keyPhrase = fact.split(DEDUP_VERBS)[0]?.toLowerCase();
-    const match = existing.find(e => {
-      const eKey = e.fact.split(DEDUP_VERBS)[0]?.toLowerCase();
-      return eKey && keyPhrase && eKey === keyPhrase;
-    });
+    const key = factKey(fact);
+    const match = existing.find(e => factKey(e.fact) === key);
 
     if (match) {
       await pool.query(
