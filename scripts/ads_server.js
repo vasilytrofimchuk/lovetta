@@ -134,6 +134,30 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // POST /render-card-video?girl=sophia&duration=5 — just the girl video, no overlay
+  if (req.method === 'POST' && req.url.startsWith('/render-card-video')) {
+    const params = new URL(req.url, 'http://x').searchParams;
+    const girl = params.get('girl');
+    const dur = Math.min(parseInt(params.get('duration')) || 5, 15);
+    if (!girl) { res.writeHead(400); res.end('Missing girl'); return; }
+    const videoPath = path.join(ROOT, 'public', 'assets', 'ads', 'videos', girl + '.mp4');
+    if (!fs.existsSync(videoPath)) { res.writeHead(404); res.end('No video for ' + girl); return; }
+    const outPath = path.join(ROOT, 'scripts', `_cardvid_${Date.now()}.mp4`);
+    try {
+      const cmd = `ffmpeg -y -i "${videoPath}" -vf "scale=300:250:force_original_aspect_ratio=increase,crop=300:250" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -t ${dur} -an "${outPath}"`;
+      execSync(cmd, { timeout: 30000, stdio: 'pipe' });
+      const mp4 = fs.readFileSync(outPath);
+      console.log(`Card-only video: ${girl} ${(mp4.length / 1024).toFixed(0)} KB`);
+      res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': mp4.length });
+      res.end(mp4);
+    } catch (e) {
+      res.writeHead(500); res.end('ffmpeg failed: ' + e.message);
+    } finally {
+      try { fs.unlinkSync(outPath); } catch {}
+    }
+    return;
+  }
+
   // GET /proxy-video?url=... — proxy R2 video to avoid CORS
   if ((req.method === 'GET' || req.method === 'HEAD') && req.url.startsWith('/proxy-video')) {
     const url = new URL(req.url, 'http://x').searchParams.get('url');

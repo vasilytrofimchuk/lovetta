@@ -144,6 +144,12 @@
   </div>
   <div style="color:#555;font-size:10px;margin-top:4px;">Start with: <code style="color:#d6336c;">node scripts/ads_server.js</code></div>
 
+  <h3>Video — Card Only (no text)</h3>
+  <div class="btn-row">
+    <button onclick="exportAllCardOnlyVideo()" style="background:linear-gradient(135deg,#059669,#10b981);">EACH GIRL (card only)</button>
+  </div>
+  <div id="cardOnlyStatus" style="color:#555;font-size:10px;margin-top:4px;">300x250, just the girl video — no headline/CTA/logo</div>
+
   <h3>Card Screenshot Tool</h3>
   <label><span>Girl</span>
     <select id="snapGirl"></select>
@@ -970,6 +976,31 @@ async function exportVideoMP4() {
   } catch (e) {
     setLabel('FAILED — Run: node scripts/ads_server.js (NOT python)');
   }
+}
+
+async function exportAllCardOnlyVideo() {
+  const girls = Object.keys(VIDEO_URLS);
+  const statusEl = document.getElementById('cardOnlyStatus');
+  const dur = parseInt(v('videoDuration')) || 5;
+
+  for (let i = 0; i < girls.length; i++) {
+    const girl = girls[i];
+    statusEl.textContent = `Rendering ${girl} (${i+1}/${girls.length})...`;
+    try {
+      const resp = await fetch(`/render-card-video?girl=${girl}&duration=${dur}`, { method: 'POST' });
+      if (!resp.ok) throw new Error(await resp.text());
+      const blob = await resp.blob();
+      const a = document.createElement('a');
+      const ts = Date.now().toString(36).slice(-4);
+      a.download = `lovetta_card_${girl}_${ts}.mp4`;
+      a.href = URL.createObjectURL(blob);
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, 500));
+    } catch(e) {
+      console.log('Failed ' + girl + ':', e.message);
+    }
+  }
+  statusEl.textContent = girls.length + ' card-only videos exported!';
 }
 
 async function exportAllVideoMP4() {
