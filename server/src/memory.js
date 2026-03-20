@@ -165,24 +165,24 @@ async function extractFacts(pool, conversationId, companionId, userId) {
 
   const lastMessageId = messages[messages.length - 1]?.id;
 
-  // 1. Rule-based extraction first (deterministic, fast, never misses obvious patterns)
-  const regexFacts = extractFactsWithRegex(messages, companionName);
-  let totalExtracted = 0;
-  if (regexFacts.length > 0) {
-    totalExtracted += await saveExtractedFacts(pool, conversationId, regexFacts, lastMessageId);
-  }
-
-  // 2. AI extraction in chunks (catches nuance, context, implicit facts)
+  // 1. AI extraction first (catches nuance, context, implicit facts)
   const chunks = [];
   for (let i = 0; i < messages.length; i += EXTRACTION_CHUNK_SIZE) {
     chunks.push(messages.slice(i, i + EXTRACTION_CHUNK_SIZE));
   }
+  let totalExtracted = 0;
   for (const chunk of chunks.slice(0, 3)) {
     try {
       totalExtracted += await extractFactsFromChunkAI(pool, conversationId, companionId, userId, chunk, companionName);
     } catch (err) {
       console.warn('[memory] chunk extraction error:', err.message);
     }
+  }
+
+  // 2. Regex extraction LAST (deterministic, overwrites AI garbage with correct facts)
+  const regexFacts = extractFactsWithRegex(messages, companionName);
+  if (regexFacts.length > 0) {
+    totalExtracted += await saveExtractedFacts(pool, conversationId, regexFacts, lastMessageId);
   }
 
   if (totalExtracted > 0) {
