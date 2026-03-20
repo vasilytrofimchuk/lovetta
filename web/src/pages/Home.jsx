@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/Toast'
 import api from '../lib/api'
+import { trackPay } from '../lib/pixels'
 import Pricing from './Pricing'
 
 export default function Home() {
@@ -19,7 +20,7 @@ export default function Home() {
   useEffect(() => {
     const checkout = searchParams.get('checkout')
     const tip = searchParams.get('tip')
-    if (checkout === 'success') toast('Subscription activated!', { type: 'success' })
+    if (checkout === 'success') { trackPay(); toast('Subscription activated!', { type: 'success' }) }
     if (checkout === 'cancel') toast('Checkout canceled', { type: 'info' })
     // Tip success/cancel handled in ChatPage via server-inserted thank-you message
   }, [searchParams])

@@ -9,6 +9,7 @@ import TelegramSignIn from '../components/TelegramSignIn'
 import AppleSignIn from '../components/AppleSignIn'
 import { hasCompleteConsent, readOnboardingData, writeOnboardingData } from '../lib/onboarding'
 import { isCapacitor } from '../lib/platform'
+import { trackSignup } from '../lib/pixels'
 import { getAppPageHeight } from '../lib/layout'
 import logoSrc from '../../../public/assets/brand/logo_text.png'
 
@@ -145,6 +146,7 @@ export default function Signup() {
         aiConsentAccepted: consentData.aiConsentAccepted,
         referralCode,
       })
+      trackSignup()
       if (nativeApp) {
         navigate(postSignupPath)
       } else {
@@ -158,6 +160,7 @@ export default function Signup() {
   }
 
   const handleSocialSuccess = () => {
+    trackSignup()
     navigate(postSignupPath)
   }
 

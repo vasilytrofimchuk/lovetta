@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api from '../lib/api'
 import { clearOnboardingData, getPostAuthPath, readOnboardingData } from '../lib/onboarding'
+import { trackSignup } from '../lib/pixels'
 
 const AuthContext = createContext(null)
 
@@ -56,9 +57,11 @@ export function AuthProvider({ children }) {
       if (onboardingData?.privacyAccepted) payload.privacyAccepted = onboardingData.privacyAccepted
       if (onboardingData?.aiConsentAccepted) payload.aiConsentAccepted = onboardingData.aiConsentAccepted
 
-      // Include referral code if present
+      // Include referral code + click_id if present
       const ref = localStorage.getItem('lovetta-ref')
       if (ref) payload.referralCode = ref
+      const tsClickId = localStorage.getItem('lovetta-ts-click-id')
+      if (tsClickId) payload.tsClickId = tsClickId
 
       api.post('/api/auth/telegram', payload)
         .then(({ data }) => {
@@ -66,6 +69,7 @@ export function AuthProvider({ children }) {
           localStorage.setItem('lovetta-refresh-token', data.refreshToken)
           clearOnboardingData()
           localStorage.removeItem('lovetta-ref')
+          trackSignup()
           setUser(data.user)
           tgWebApp.ready?.()
           tgWebApp.expand?.()
@@ -98,8 +102,9 @@ export function AuthProvider({ children }) {
   }
 
   const signup = async ({ email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode }) => {
+    const tsClickId = localStorage.getItem('lovetta-ts-click-id') || undefined
     const { data } = await api.post('/api/auth/signup', {
-      email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode,
+      email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode, tsClickId,
     })
     localStorage.setItem('lovetta-token', data.accessToken)
     localStorage.setItem('lovetta-refresh-token', data.refreshToken)

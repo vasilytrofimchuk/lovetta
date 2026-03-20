@@ -6,6 +6,7 @@
 
 const { getPool } = require('./db');
 const { resetTipCounter, invalidateThresholdCache } = require('./consumption');
+const { firePayPostback } = require('./trafficstars');
 
 let stripe = null;
 function getStripe() {
@@ -560,6 +561,11 @@ async function handleWebhook(rawBody, signature) {
           [userId, plan, subId, customerId, periodEnd, trialEnd]
         );
         console.log(`[billing] Subscription created: user=${userId} plan=${plan}`);
+        // TrafficStars S2S pay postback (non-blocking)
+        const subPrice = plan === 'yearly' ? '99.990' : '19.990';
+        pool.query('SELECT ts_click_id FROM users WHERE id = $1', [userId])
+          .then(({ rows }) => { if (rows[0]?.ts_click_id) firePayPostback(rows[0].ts_click_id, userId, subPrice); })
+          .catch(() => {});
         // Credit referral commission
         const subAmount = plan === 'yearly' ? 9999 : 1999;
         try { await creditReferralCommission(pool, userId, 'subscription', subId, subAmount); } catch (e) { console.warn('[billing] referral commission error:', e.message); }
@@ -752,6 +758,13 @@ async function handleRevenueCatWebhook(body, authHeader) {
       });
       console.log(`[revenuecat] ${rcType}: user=${userId} plan=${plan}`);
 
+      // TrafficStars S2S pay postback for initial purchase
+      if (rcType === 'INITIAL_PURCHASE') {
+        const rcPrice = plan === 'yearly' ? '99.990' : '19.990';
+        pool.query('SELECT ts_click_id FROM users WHERE id = $1', [userId])
+          .then(({ rows }) => { if (rows[0]?.ts_click_id) firePayPostback(rows[0].ts_click_id, userId, rcPrice); })
+          .catch(() => {});
+      }
       // Credit referral commission
       if (rcType === 'INITIAL_PURCHASE' || rcType === 'RENEWAL') {
         const amount = plan === 'yearly' ? 9999 : 1999;

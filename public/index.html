@@ -50,6 +50,14 @@
     })();
   </script>
   <link rel="stylesheet" href="/style.css">
+  <script src="https://fl-cdn2.contentabc.com/delivery/idsync/idsync.min.js" defer></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      if (window.idsync && typeof window.idsync.config === 'function') {
+        try { window.idsync.config(37322).fp_get().sync(); } catch {}
+      }
+    });
+  </script>
 </head>
 <body>
   <div class="desktop-bg" aria-hidden="true">
@@ -196,6 +204,8 @@
         var params = new URLSearchParams(window.location.search);
         var ref = params.get('ref');
         if (ref) localStorage.setItem('lovetta-ref', ref.trim());
+        var clickId = params.get('click_id');
+        if (clickId) localStorage.setItem('lovetta-ts-click-id', clickId.trim());
       } catch (err) {}
     })();
 

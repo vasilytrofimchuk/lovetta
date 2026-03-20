@@ -7,6 +7,7 @@ import CompanionCard from '../components/CompanionCard';
 import PlanModal from '../components/PlanModal';
 import { isCapacitor } from '../lib/platform';
 import { getAppPageHeight } from '../lib/layout';
+import { trackPay } from '../lib/pixels';
 
 export default function CompanionList() {
   const { user } = useAuth();
@@ -63,6 +64,7 @@ export default function CompanionList() {
     const checkout = searchParams.get('checkout');
     const tip = searchParams.get('tip');
     if (checkout === 'success') {
+      trackPay();
       toast('Subscription activated!', { type: 'success' });
       // Mark as subscribed locally (webhook may not have fired yet on dev)
       setSubscription(prev => prev ? { ...prev, hasSubscription: true, plan: prev.plan || 'monthly' } : { hasSubscription: true, plan: 'monthly' });

@@ -35,6 +35,7 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
       const response = result.response
       const onboardingData = readOnboardingData() || {}
       const referralCode = localStorage.getItem('lovetta-ref') || undefined
+      const tsClickId = localStorage.getItem('lovetta-ts-click-id') || undefined
 
       const { data } = await api.post('/api/auth/apple', {
         identityToken: response.identityToken,
@@ -49,6 +50,7 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
         privacyAccepted: ageData?.privacyAccepted ?? onboardingData.privacyAccepted,
         aiConsentAccepted: ageData?.aiConsentAccepted ?? onboardingData.aiConsentAccepted,
         referralCode,
+        tsClickId,
       })
 
       localStorage.setItem('lovetta-token', data.accessToken)

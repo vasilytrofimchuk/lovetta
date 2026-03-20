@@ -26,6 +26,7 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
       if (!idToken) throw new Error('No ID token from Google')
 
       const referralCode = localStorage.getItem('lovetta-ref') || undefined
+      const tsClickId = localStorage.getItem('lovetta-ts-click-id') || undefined
       const { data } = await api.post('/api/auth/google/token', {
         idToken,
         birthMonth: birthData?.birthMonth,
@@ -34,6 +35,7 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
         privacyAccepted: birthData?.privacyAccepted,
         aiConsentAccepted: birthData?.aiConsentAccepted,
         referralCode,
+        tsClickId,
       })
       localStorage.setItem('lovetta-token', data.accessToken)
       localStorage.setItem('lovetta-refresh-token', data.refreshToken)
@@ -68,6 +70,10 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
     const ref = localStorage.getItem('lovetta-ref')
     if (ref && stateData) stateData.referralCode = ref
     else if (ref) stateData = { referralCode: ref }
+
+    const tsClickId = localStorage.getItem('lovetta-ts-click-id')
+    if (tsClickId && stateData) stateData.tsClickId = tsClickId
+    else if (tsClickId) stateData = { tsClickId }
 
     let url = '/api/auth/google'
     if (stateData) url += '?state=' + encodeURIComponent(btoa(JSON.stringify(stateData)))

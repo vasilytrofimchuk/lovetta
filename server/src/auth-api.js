@@ -15,6 +15,7 @@ const {
 } = require('./jwt');
 const { authenticate } = require('./auth-middleware');
 const { sendVerificationEmail, sendResetEmail, sendNewRegistrationNotification, sendAppleReviewerLoginAlert } = require('./email');
+const { fireSignupPostback } = require('./trafficstars');
 
 const APPLE_REVIEWER_ID = '00000000-0000-0000-0000-000000001234';
 
@@ -95,7 +96,7 @@ router.post('/signup', authLimiter, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'Service unavailable' });
 
   try {
-    const { email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode } = req.body || {};
+    const { email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode, tsClickId } = req.body || {};
 
     // Validate
     if (!email || !EMAIL_RE.test(email)) {
@@ -138,12 +139,12 @@ router.post('/signup', authLimiter, async (req, res) => {
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (email, password_hash, birth_month, birth_year, terms_accepted, privacy_accepted,
                           ai_consent_at, verify_token, ip_address, country, city, timezone, user_agent, auth_provider,
-                          referral_code, referred_by)
-       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, 'email', $13, $14)
+                          referral_code, referred_by, ts_click_id)
+       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, 'email', $13, $14, $15)
        RETURNING *`,
       [email.trim(), passwordHash, month, year, true, true,
        verifyToken, ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
-       refCode, referredBy]
+       refCode, referredBy, tsClickId || null]
     );
 
     // Generate tokens
@@ -154,6 +155,9 @@ router.post('/signup', authLimiter, async (req, res) => {
     // Send verification email (non-blocking)
     sendVerificationEmail(user.email, verifyToken).catch(() => {});
     sendNewRegistrationNotification(user).catch(() => {});
+
+    // TrafficStars S2S signup postback (non-blocking)
+    if (tsClickId) fireSignupPostback(tsClickId, user.id);
 
     res.json({ user: sanitizeUser(user), accessToken, refreshToken });
   } catch (err) {
@@ -508,6 +512,7 @@ router.get('/google/callback', async (req, res) => {
         // New Google user — try to use age/consent data from state param
         let birthMonth = null, birthYear = null, hasConsent = false;
         let stateRefCode = null;
+        let stateTsClickId = null;
 
         if (oauthState) {
           try {
@@ -521,6 +526,7 @@ router.get('/google/callback', async (req, res) => {
               hasConsent = !!(stateData.termsAccepted && stateData.privacyAccepted && stateData.aiConsentAccepted);
             }
             if (stateData.referralCode) stateRefCode = stateData.referralCode;
+            if (stateData.tsClickId) stateTsClickId = stateData.tsClickId;
           } catch {}
         }
 
@@ -537,15 +543,16 @@ router.get('/google/callback', async (req, res) => {
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
-                              referral_code, referred_by)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'google', $12, $13)
+                              referral_code, referred_by, ts_click_id)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'google', $12, $13, $14)
            RETURNING *`,
           [email, googleId, name, picture, birthMonth, birthYear,
            ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
-           refCode, referredBy]
+           refCode, referredBy, stateTsClickId || null]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
+        if (stateTsClickId) fireSignupPostback(stateTsClickId, newUser.id);
       }
     }
 
@@ -580,7 +587,7 @@ router.post('/google/token', async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'Service unavailable' });
 
   try {
-    const { idToken, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode } = req.body;
+    const { idToken, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode, tsClickId } = req.body;
     if (!idToken) return res.status(400).json({ error: 'Missing idToken' });
 
     // Verify token with Google
@@ -637,15 +644,16 @@ router.post('/google/token', async (req, res) => {
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
-                              referral_code, referred_by)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'google', $12, $13)
+                              referral_code, referred_by, ts_click_id)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'google', $12, $13, $14)
            RETURNING *`,
           [email, googleId, name, picture, bMonth, bYear,
            ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
-           refCode, referredBy]
+           refCode, referredBy, tsClickId || null]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
+        if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       }
     }
 
@@ -711,7 +719,7 @@ router.post('/apple', authLimiter, async (req, res) => {
   try {
     const { identityToken, fullName, email: clientEmail,
             birthMonth: bm, birthYear: by,
-            termsAccepted, privacyAccepted, aiConsentAccepted, referralCode } = req.body || {};
+            termsAccepted, privacyAccepted, aiConsentAccepted, referralCode, tsClickId } = req.body || {};
 
     if (!identityToken) {
       return res.status(400).json({ error: 'Identity token is required' });
@@ -779,15 +787,16 @@ router.post('/apple', authLimiter, async (req, res) => {
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
-                              referral_code, referred_by, email_type)
-           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12, $13)
+                              referral_code, referred_by, email_type, ts_click_id)
+           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12, $13, $14)
            RETURNING *`,
           [email, appleId, displayName, month, year,
            ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
-           refCode, referredBy, classifyEmail(email)]
+           refCode, referredBy, classifyEmail(email), tsClickId || null]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
+        if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       }
     } else {
       // No email available (user hid it from Apple) and no existing apple_id — need age/consent
@@ -812,15 +821,16 @@ router.post('/apple', authLimiter, async (req, res) => {
       const { rows: [newUser] } = await pool.query(
         `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
                             terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
-                            referral_code, referred_by, email_type)
-         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12, 'synthetic')
+                            referral_code, referred_by, email_type, ts_click_id)
+         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12, 'synthetic', $13)
          RETURNING *`,
         [syntheticEmail, appleId, displayName, month, year,
          ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
-         refCode, referredBy]
+         refCode, referredBy, tsClickId || null]
       );
       user = newUser;
       sendNewRegistrationNotification(newUser).catch(() => {});
+      if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
     }
 
     const accessToken = generateAccessToken(user.id);
@@ -846,7 +856,7 @@ router.post('/telegram', authLimiter, async (req, res) => {
 
   try {
     const { initData, birthMonth: bm, birthYear: by,
-            termsAccepted, privacyAccepted, aiConsentAccepted, referralCode: tgRefCode } = req.body || {};
+            termsAccepted, privacyAccepted, aiConsentAccepted, referralCode: tgRefCode, tsClickId } = req.body || {};
     if (!initData) {
       return res.status(400).json({ error: 'initData is required' });
     }
@@ -915,15 +925,16 @@ router.post('/telegram', authLimiter, async (req, res) => {
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
-                              referral_code, referred_by)
-           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'telegram', $12, $13)
+                              referral_code, referred_by, ts_click_id)
+           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'telegram', $12, $13, $14)
            RETURNING *`,
           [syntheticEmail, telegramId, displayName, tgUser.photoUrl, month, year,
            ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
-           refCode, referredBy]
+           refCode, referredBy, tsClickId || null]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
+        if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
 
         // Create telegram_users record
         await pool.query(

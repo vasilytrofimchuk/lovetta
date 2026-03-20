@@ -1031,6 +1031,10 @@ const MIGRATIONS = [
       UPDATE companion_templates SET age = 21 WHERE name = 'Mei';
     `,
   },
+  {
+    name: 'v46_ts_click_id',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS ts_click_id TEXT;`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
