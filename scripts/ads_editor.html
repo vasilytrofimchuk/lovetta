@@ -115,6 +115,16 @@
     <button onclick="recordVideo()">Record</button>
   </div>
   <div style="color:#555;font-size:10px;margin-top:4px;">Start with: <code style="color:#d6336c;">node scripts/ads_server.js</code></div>
+
+  <h3>Card Screenshot Tool</h3>
+  <label><span>Girl</span>
+    <select id="snapGirl"></select>
+  </label>
+  <div class="btn-row">
+    <button onclick="loadSnap()">Play Video</button>
+    <button onclick="captureSnap()">📸 Capture Frame</button>
+  </div>
+  <div id="snapStatus" style="color:#555;font-size:10px;margin-top:4px;">Pick a girl and play her video. Pause at the best frame and capture.</div>
 </div>
 
 <div id="main">
@@ -797,6 +807,160 @@ function recordVideo() {
   recorder.start();
   document.getElementById('videoLabel').textContent = '300x250 — Recording ' + (duration/1000) + 's...';
   setTimeout(() => recorder.stop(), duration);
+}
+
+// ========== CARD SCREENSHOT TOOL ==========
+const ALL_VIDEOS = {
+  luna: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/1/a96e011f-a0ca-4567-b8d9-35e84b332d96.mp4',
+  sophia: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/2/a3836f1b-3d60-4ffb-9f1b-29ba9b3799a1.mp4',
+  aria: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/3/38002ba0-7f30-4b11-b89d-83a598c97e0d.mp4',
+  emma: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/4/fc72be74-f82a-47e7-b9dd-82ab347c3a00.mp4',
+  mia: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/5/7c8a4fae-d5a1-4309-ab55-5cc570718078.mp4',
+  isabella: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/6/08a95c0a-eb57-4349-9e34-f2be427232f5.mp4',
+  chloe: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/7/dab0cffa-a969-44ee-8d10-460d7b52868a.mp4',
+  lily: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/8/b7679f09-8b60-4336-a4e5-acd13825a2b8.mp4',
+  zara: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/9/4e693a86-af99-4d8f-b340-aa7e5c204aea.mp4',
+  ruby: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/10/cee890d3-e0e9-4997-88fc-5af9bbd6a31f.mp4',
+  jade: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/11/fadff26a-f026-4e9f-8c8b-fd760a0f8dca.mp4',
+  violet: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/12/b339544a-cf01-4863-b69d-9ab15075bc56.mp4',
+  sakura: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/37/07d46a08-f69b-4c06-b7c6-95861d325197.mp4',
+  yuki: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/38/add15ce1-b9c1-4289-bafc-89afbbff9dbc.mp4',
+  hana: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/39/a70ab942-c287-4cea-a25f-c24992c3e1e1.mp4',
+  rei: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/40/eb2ff94f-865d-4334-8d7b-81b6b41b6fc5.mp4',
+  aiko: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/41/86e556b1-7db7-4608-aebf-2803c5e61bad.mp4',
+  mei: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/42/4488dca4-ddc5-44f1-a07f-f52b544df717.mp4',
+};
+
+// Build snap dropdown
+(function() {
+  const sel = document.getElementById('snapGirl');
+  Object.keys(ALL_VIDEOS).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    sel.appendChild(opt);
+  });
+})();
+
+let snapVideoEl = null;
+let snapContainer = null;
+
+function loadSnap() {
+  const girl = document.getElementById('snapGirl').value;
+  const url = ALL_VIDEOS[girl];
+  if (!url) return;
+
+  // Remove old
+  if (snapContainer) snapContainer.remove();
+
+  // Create container in main area
+  snapContainer = document.createElement('div');
+  snapContainer.style.cssText = 'position:fixed;top:0;left:340px;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+
+  // Video element — visible, playable, with controls
+  snapVideoEl = document.createElement('video');
+  snapVideoEl.src = url;
+  snapVideoEl.controls = true;
+  snapVideoEl.autoplay = true;
+  snapVideoEl.loop = true;
+  snapVideoEl.muted = true;
+  snapVideoEl.playsInline = true;
+  snapVideoEl.style.cssText = 'max-height:70vh;max-width:80%;border-radius:16px;box-shadow:0 8px 40px rgba(214,51,108,0.3);';
+
+  const info = document.createElement('div');
+  info.style.cssText = 'color:#aaa;font-size:14px;text-align:center;';
+  info.innerHTML = `<b style="color:#d6336c;font-size:18px;">${girl.charAt(0).toUpperCase() + girl.slice(1)}</b><br>Pause at the best frame, then click Capture below`;
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:12px;';
+
+  const captureBtn = document.createElement('button');
+  captureBtn.textContent = '📸 Capture This Frame';
+  captureBtn.style.cssText = 'padding:14px 32px;background:linear-gradient(135deg,#d6336c,#f43f5e);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;';
+  captureBtn.onclick = captureSnap;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕ Close';
+  closeBtn.style.cssText = 'padding:14px 24px;background:#2a2a3a;color:#aaa;border:none;border-radius:8px;font-size:14px;cursor:pointer;';
+  closeBtn.onclick = () => { if (snapVideoEl) snapVideoEl.pause(); snapContainer.remove(); snapContainer = null; };
+
+  btnRow.appendChild(captureBtn);
+  btnRow.appendChild(closeBtn);
+  snapContainer.appendChild(info);
+  snapContainer.appendChild(snapVideoEl);
+  snapContainer.appendChild(btnRow);
+  document.body.appendChild(snapContainer);
+
+  document.getElementById('snapStatus').textContent = 'Playing ' + girl + '...';
+}
+
+async function captureSnap() {
+  if (!snapVideoEl || snapVideoEl.readyState < 2) return alert('Video not ready');
+
+  const girl = document.getElementById('snapGirl').value;
+  snapVideoEl.pause();
+
+  // Draw video frame to canvas at card size (386x516 = 3:4 at 2x of ~193x257)
+  const cw = 386, ch = 516;
+  const c = document.createElement('canvas');
+  c.width = cw; c.height = ch;
+  const ctx = c.getContext('2d');
+
+  // Cover-crop video into card aspect ratio
+  const vidAR = snapVideoEl.videoWidth / snapVideoEl.videoHeight;
+  const cardAR = cw / ch;
+  let sx = 0, sy = 0, sw = snapVideoEl.videoWidth, sh = snapVideoEl.videoHeight;
+  if (vidAR > cardAR) {
+    sw = snapVideoEl.videoHeight * cardAR;
+    sx = (snapVideoEl.videoWidth - sw) / 2;
+  } else {
+    sh = snapVideoEl.videoWidth / cardAR;
+    sy = (snapVideoEl.videoHeight - sh) * 0.25;
+  }
+  ctx.drawImage(snapVideoEl, sx, sy, sw, sh, 0, 0, cw, ch);
+
+  // Add card overlay: gradient at bottom, name, age
+  const grad = ctx.createLinearGradient(0, ch * 0.55, 0, ch);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(0.5, 'rgba(0,0,0,0.4)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.75)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Round corners clip (re-draw with clip)
+  const r = 20;
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = cw; tempCanvas.height = ch;
+  const tctx = tempCanvas.getContext('2d');
+  tctx.beginPath();
+  tctx.roundRect(0, 0, cw, ch, r);
+  tctx.clip();
+  tctx.drawImage(c, 0, 0);
+
+  // Save via server
+  document.getElementById('snapStatus').textContent = 'Saving ' + girl + '.png...';
+  tempCanvas.toBlob(async (blob) => {
+    try {
+      const resp = await fetch('/save-card?name=' + encodeURIComponent(girl), {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/png' },
+        body: blob,
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      document.getElementById('snapStatus').textContent = girl + '.png saved! Reload to use in banners.';
+      // Also reload the card image in memory
+      const newImg = new Image();
+      newImg.onload = () => { cardImages[girl + '.png'] = newImg; renderAll(); };
+      newImg.src = URL.createObjectURL(blob);
+    } catch (e) {
+      // Fallback: download
+      const a = document.createElement('a');
+      a.download = girl + '.png';
+      a.href = URL.createObjectURL(blob);
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      document.getElementById('snapStatus').textContent = girl + '.png downloaded (save to public/assets/ads/)';
+    }
+  }, 'image/png');
 }
 
 // Force-load fonts

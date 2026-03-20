@@ -43,6 +43,23 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // POST /save-card?name=sophia — save PNG as card image
+  if (req.method === 'POST' && req.url.startsWith('/save-card')) {
+    const name = new URL(req.url, 'http://x').searchParams.get('name');
+    if (!name || !/^[a-z]+$/.test(name)) { res.writeHead(400); res.end('Bad name'); return; }
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => {
+      const png = Buffer.concat(chunks);
+      const dest = path.join(ROOT, 'public', 'assets', 'ads', name + '.png');
+      fs.writeFileSync(dest, png);
+      console.log(`Saved card: ${dest} (${(png.length / 1024).toFixed(0)} KB)`);
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('OK');
+    });
+    return;
+  }
+
   // Static file server
   let filePath = path.join(ROOT, req.url === '/' ? '/scripts/ads_editor.html' : req.url);
   if (!fs.existsSync(filePath)) { res.writeHead(404); res.end('Not found'); return; }
