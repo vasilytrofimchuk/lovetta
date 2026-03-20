@@ -587,7 +587,8 @@ function exportBanner(key) {
     c.toBlob(blob => {
       if (!blob) return;
       const a = document.createElement('a');
-      a.download = `lovetta_ad_${key}.jpg`;
+      const ts = Date.now().toString(36).slice(-4);
+      a.download = `lovetta_${key}_${ts}.jpg`;
       a.href = URL.createObjectURL(blob);
       document.body.appendChild(a);
       a.click();
