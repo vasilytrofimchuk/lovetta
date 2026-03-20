@@ -41,6 +41,7 @@
 <div id="sidebar">
   <h2>Lovetta</h2>
   <div class="subtitle">AD BANNERS</div>
+  <div id="serverWarning" style="display:none;background:#dc2626;color:#fff;padding:6px 10px;border-radius:6px;font-size:11px;margin-bottom:8px;font-weight:600;">Wrong server! Run: node scripts/ads_server.js</div>
 
   <h3>Presets</h3>
   <div class="presets" id="presetBtns"></div>
@@ -309,6 +310,11 @@ async function loadAllImages() {
   init();
 }
 loadAllImages();
+
+// Check if running on the right server
+fetch('/convert', { method: 'POST', body: '' }).then(r => {
+  if (r.status === 501 || r.status === 405) document.getElementById('serverWarning').style.display = 'block';
+}).catch(() => {});
 
 function buildCardDropdown() {
   const sel = document.getElementById('cardImage');
@@ -962,7 +968,7 @@ async function exportVideoMP4() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setLabel(girl + ' MP4 saved!');
   } catch (e) {
-    setLabel('Failed: ' + e.message);
+    setLabel('FAILED — Run: node scripts/ads_server.js (NOT python)');
   }
 }
 
