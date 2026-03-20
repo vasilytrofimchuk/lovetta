@@ -404,6 +404,13 @@ function init() {
   allBtn.onclick = () => Object.keys(BANNERS).forEach((k, i) => setTimeout(() => exportBanner(k), i * 200));
   expDiv.appendChild(allBtn);
 
+  // "Each Girl 300x250" button
+  const eachBtn = document.createElement('button');
+  eachBtn.textContent = 'EACH GIRL';
+  eachBtn.style.background = 'linear-gradient(135deg, #7c3aed, #a855f7)';
+  eachBtn.onclick = () => exportEachGirl();
+  expDiv.appendChild(eachBtn);
+
   renderAll();
 }
 
@@ -591,6 +598,38 @@ function renderBanner(key, forExport, scaleOverride) {
   }
 
   return canvas;
+}
+
+function exportEachGirl() {
+  // Export 300x250 for every single-card girl
+  const singles = CARD_IMAGES.filter(c => c.type === 'single');
+  if (!singles.length) { document.getElementById('snapStatus').textContent = 'No girl cards captured yet'; return; }
+  const sel = document.getElementById('cardImage');
+  const origVal = sel.value;
+  let i = 0;
+  function next() {
+    if (i >= singles.length) { sel.value = origVal; renderAll(); return; }
+    const card = singles[i];
+    const idx = CARD_IMAGES.indexOf(card);
+    sel.value = idx;
+    renderAll();
+    setTimeout(() => {
+      const c = renderBanner('300x250', true, 1);
+      if (c) {
+        c.toBlob(blob => {
+          if (!blob) { i++; next(); return; }
+          const a = document.createElement('a');
+          const name = card.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          a.download = `lovetta_300x250_${name}.jpg`;
+          a.href = URL.createObjectURL(blob);
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          i++;
+          setTimeout(next, 300);
+        }, 'image/jpeg', 0.99);
+      } else { i++; next(); }
+    }, 100);
+  }
+  next();
 }
 
 function renderAll() {
