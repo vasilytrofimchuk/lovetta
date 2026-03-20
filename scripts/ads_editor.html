@@ -369,7 +369,7 @@ function renderBanner(key, forExport) {
         drawW = areaW;
         drawH = areaW / imgAR;
         drawX = minX;
-        drawY = minY - (drawH - areaH) * 0.5; // true center
+        drawY = minY - (drawH - areaH) * 0.28; // middle of top row cards (faces)
       }
       ctx.save();
       ctx.beginPath();
