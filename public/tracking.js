@@ -66,6 +66,18 @@
     }
   }).catch(function() {});
 
+  // Heartbeat every 60s to keep last_activity fresh
+  setInterval(function() {
+    fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: getSessionId(),
+        page: window.location.pathname
+      })
+    }).catch(function() {});
+  }, 60000);
+
   window.LovettaTracking = {
     getSessionId: getSessionId,
     getDeviceType: getDeviceType

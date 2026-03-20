@@ -93,6 +93,15 @@ export function AuthProvider({ children }) {
     }
   }, [refreshUser])
 
+  // Heartbeat every 60s for logged-in users to keep last_activity fresh
+  useEffect(() => {
+    if (!user) return
+    const hb = setInterval(() => {
+      api.get('/api/auth/me').catch(() => {})
+    }, 60000)
+    return () => clearInterval(hb)
+  }, [user])
+
   const login = async (email, password) => {
     const { data } = await api.post('/api/auth/login', { email, password })
     localStorage.setItem('lovetta-token', data.accessToken)

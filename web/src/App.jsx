@@ -197,23 +197,36 @@ function VisitorTracker() {
     const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return null } })()
     const params = new URLSearchParams(window.location.search)
 
+    const body = {
+      sessionId: getVisitorSessionId(),
+      page: window.location.pathname,
+      deviceType: getDeviceType(),
+      screenResolution: screen.width + 'x' + screen.height,
+      language: navigator.language || null,
+      timezone: tz,
+      referrer: document.referrer || null,
+      utmSource: params.get('utm_source') || null,
+      utmMedium: params.get('utm_medium') || null,
+      utmCampaign: params.get('utm_campaign') || null,
+      gclid: params.get('gclid') || null,
+    }
+
     fetch(apiUrl('/api/track-visitor'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: getVisitorSessionId(),
-        page: window.location.pathname,
-        deviceType: getDeviceType(),
-        screenResolution: screen.width + 'x' + screen.height,
-        language: navigator.language || null,
-        timezone: tz,
-        referrer: document.referrer || null,
-        utmSource: params.get('utm_source') || null,
-        utmMedium: params.get('utm_medium') || null,
-        utmCampaign: params.get('utm_campaign') || null,
-        gclid: params.get('gclid') || null,
-      }),
+      body: JSON.stringify(body),
     }).catch(() => {})
+
+    // Heartbeat every 60s to keep last_activity fresh
+    const hb = setInterval(() => {
+      fetch(apiUrl('/api/track-visitor'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: getVisitorSessionId(), page: window.location.pathname }),
+      }).catch(() => {})
+    }, 60000)
+
+    return () => clearInterval(hb)
   }, [user, loading])
 
   return null
