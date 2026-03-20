@@ -101,6 +101,18 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // GET /proxy-video?url=... — proxy R2 video to avoid CORS
+  if (req.method === 'GET' && req.url.startsWith('/proxy-video')) {
+    const url = new URL(req.url, 'http://x').searchParams.get('url');
+    if (!url || !url.includes('r2.dev')) { res.writeHead(400); res.end('Bad url'); return; }
+    const https = require('https');
+    https.get(url, (proxyRes) => {
+      res.writeHead(200, { 'Content-Type': 'video/mp4', 'Cache-Control': 'public, max-age=86400' });
+      proxyRes.pipe(res);
+    }).on('error', (e) => { res.writeHead(500); res.end(e.message); });
+    return;
+  }
+
   // POST /save-card?name=sophia — save PNG as card image
   if (req.method === 'POST' && req.url.startsWith('/save-card')) {
     const name = new URL(req.url, 'http://x').searchParams.get('name');
