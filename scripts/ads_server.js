@@ -133,7 +133,7 @@ const server = http.createServer((req, res) => {
   }
 
   // GET /proxy-video?url=... — proxy R2 video to avoid CORS
-  if (req.method === 'GET' && req.url.startsWith('/proxy-video')) {
+  if ((req.method === 'GET' || req.method === 'HEAD') && req.url.startsWith('/proxy-video')) {
     const url = new URL(req.url, 'http://x').searchParams.get('url');
     if (!url || !url.includes('r2.dev')) { res.writeHead(400); res.end('Bad url'); return; }
     const https = require('https');
