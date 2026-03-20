@@ -987,8 +987,8 @@ async function captureSnap() {
   if (capBtn) { capBtn.textContent = '⏳ Saving...'; capBtn.style.opacity = '0.6'; }
   document.getElementById('snapStatus').textContent = 'Capturing ' + girl + '...';
 
-  // Draw video frame to canvas at card size (386x516 = 3:4)
-  const cw = 386, ch = 516;
+  // Draw video frame to canvas at card size (300x400 = 3:4, optimized file size)
+  const cw = 300, ch = 400;
   const c = document.createElement('canvas');
   c.width = cw; c.height = ch;
   const ctx = c.getContext('2d');
@@ -1025,7 +1025,7 @@ async function captureSnap() {
   tctx.drawImage(c, 0, 0);
 
   try {
-    const blob = await new Promise((res, rej) => tempCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
+    const blob = await new Promise((res, rej) => tempCanvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png', 0.92));
 
     // Save via server
     const resp = await fetch('/save-card?name=' + encodeURIComponent(girl), {
