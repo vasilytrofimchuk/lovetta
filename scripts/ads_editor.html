@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lovetta Ad Banner Editor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #0a0a0f; color: #aaa; display: flex; height: 100vh; overflow: hidden; }
+  #sidebar { width: 340px; background: #101018; padding: 20px; overflow-y: auto; border-right: 1px solid #1a1a2e; flex-shrink: 0; }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  #main { flex: 1; overflow: auto; padding: 24px; }
+  .banner-grid { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  h2 { color: #d6336c; margin-bottom: 4px; font-size: 16px; letter-spacing: 2px; }
+  .subtitle { color: #444; font-size: 11px; margin-bottom: 16px; }
+  h3 { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; margin: 14px 0 6px; padding-top: 10px; border-top: 1px solid #1a1a2e; }
+  label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 12px; }
+  label span { min-width: 90px; color: #777; }
+  input[type="text"], input[type="number"], select, textarea {
+    background: #16161e; border: 1px solid #2a2a3a; color: #ddd; padding: 4px 7px;
+    border-radius: 4px; width: 150px; font-size: 12px; outline: none; font-family: inherit;
+  }
+  textarea { width: 100%; height: 26px; resize: vertical; margin-bottom: 3px; }
+  input[type="color"] { width: 28px; height: 24px; border: 1px solid #2a2a3a; background: #16161e; cursor: pointer; border-radius: 3px; padding: 1px; }
+  .color-pair { display: flex; align-items: center; gap: 4px; width: 150px; }
+  .color-pair input[type="text"] { width: 95px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+  .presets button { padding: 4px 8px; font-size: 11px; border: 1px solid #2a2a3a; background: #16161e; color: #888; border-radius: 4px; cursor: pointer; }
+  .presets button:hover { color: #d6336c; border-color: #d6336c; }
+  .btn-row { display: flex; gap: 5px; margin-top: 14px; flex-wrap: wrap; }
+  .btn-row button { flex: 1; min-width: 55px; padding: 9px 6px; background: linear-gradient(135deg, #d6336c, #f43f5e); color: #fff; border: none; border-radius: 6px; font-size: 10px; font-weight: 600; cursor: pointer; }
+  .card { flex-shrink: 0; }
+  .card canvas { border-radius: 6px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: block; }
+  .card-label { text-align: center; font-size: 10px; color: #444; margin-top: 4px; }
+  input[type="checkbox"] { accent-color: #d6336c; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Sora:wght@400;600;700;800&family=Montserrat:wght@400;600;700;800;900&family=Playfair+Display:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Lovetta</h2>
+  <div class="subtitle">AD BANNERS</div>
+
+  <h3>Presets</h3>
+  <div class="presets" id="presetBtns"></div>
+
+  <h3>Card Image</h3>
+  <label><span>Image</span>
+    <select id="cardImage" onchange="renderAll();">
+      <optgroup label="4-Card Grids">
+      </optgroup>
+      <optgroup label="Single Cards">
+      </optgroup>
+    </select>
+  </label>
+
+  <h3>Background</h3>
+  <label><span>Color 1</span><div class="color-pair"><input type="color" id="bg1Pick" value="#1a0a2e"><input type="text" id="bg1" value="#1a0a2e"></div></label>
+  <label><span>Color 2</span><div class="color-pair"><input type="color" id="bg2Pick" value="#0a0618"><input type="text" id="bg2" value="#0a0618"></div></label>
+
+  <h3>Text</h3>
+  <label><span>Headline</span><input type="text" id="headlineText" value="Your AI Girlfriend"></label>
+  <label><span>Font</span>
+    <select id="headlineFont">
+      <option value="Outfit" selected>Outfit</option>
+      <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+      <option value="Sora">Sora</option>
+      <option value="Montserrat">Montserrat</option>
+      <option value="Playfair Display">Playfair Display</option>
+    </select>
+  </label>
+  <label><span>Weight</span>
+    <select id="headlineWeight">
+      <option value="700" selected>Bold</option>
+      <option value="800">Extra Bold</option>
+      <option value="900">Black</option>
+    </select>
+  </label>
+  <label><span>Color</span><div class="color-pair"><input type="color" id="headlineColorPick" value="#ffffff"><input type="text" id="headlineColor" value="#ffffff"></div></label>
+  <label><span>Glow</span>
+    <select id="textEffect">
+      <option value="glow" selected>Glow</option>
+      <option value="shadow">Shadow</option>
+      <option value="none">None</option>
+    </select>
+  </label>
+
+  <h3>CTA Button</h3>
+  <label><span>Text</span><input type="text" id="ctaText" value="Chat Now"></label>
+  <label><span>Color</span><div class="color-pair"><input type="color" id="ctaBgPick" value="#d6336c"><input type="text" id="ctaBg" value="#d6336c"></div></label>
+  <label><span>Radius</span><input type="number" id="ctaRadius" value="8" min="0" max="30"></label>
+
+  <h3>Logo</h3>
+  <label><span>Show</span><input type="checkbox" id="showLogo" checked></label>
+
+  <div class="btn-row" id="exportBtns"></div>
+</div>
+
+<div id="main">
+  <div class="banner-grid" id="grid"></div>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const S = 2; // retina scale
+
+// All sizes with HARDCODED layouts (pixel positions at 2x)
+// Each layout: { headline: {x,y,size,maxW,align}, cta: {x,y,size,padH,padV}, logo: {x,y,maxW}, cards: [{x,y,w,h},...] }
+const BANNERS = {
+  // Cards are 3:4 aspect ratio. All positions in canvas coords (2x).
+  // Card sizes MUST keep 3:4 ratio: if w=X then h=X*4/3
+  '300x250': {
+    w: 300, h: 250, name: 'Medium Rectangle',
+    // canvas 600x500. Cards right, text left.
+    logo: { x: 24, y: 16, maxW: 130 },
+    headline: { x: 24, y: 100, size: 48, maxW: 200, align: 'left' },
+    cta: { x: 24, y: 380, size: 22, padH: 32, padV: 12 },
+    cards1: [{ x: 260, y: 16, w: 320, h: 427 }],
+    cards4: [
+      { x: 246, y: 8, w: 168, h: 224 },  { x: 422, y: 8, w: 168, h: 224 },
+      { x: 246, y: 240, w: 168, h: 224 }, { x: 422, y: 240, w: 168, h: 224 },
+    ],
+  },
+  '336x280': {
+    w: 336, h: 280, name: 'Large Rectangle',
+    // canvas 672x560. Cards right, text left.
+    logo: { x: 28, y: 18, maxW: 150 },
+    headline: { x: 28, y: 110, size: 52, maxW: 230, align: 'left' },
+    cta: { x: 28, y: 420, size: 24, padH: 36, padV: 14 },
+    cards1: [{ x: 290, y: 16, w: 360, h: 480 }],
+    cards4: [
+      { x: 270, y: 8, w: 192, h: 256 },  { x: 470, y: 8, w: 192, h: 256 },
+      { x: 270, y: 272, w: 192, h: 256 }, { x: 470, y: 272, w: 192, h: 256 },
+    ],
+  },
+  '728x90': {
+    w: 728, h: 90, name: 'Leaderboard',
+    // canvas 1456x180. Cards left, text right.
+    logo: { x: 560, y: 4, maxW: 100 },
+    headline: { x: 560, y: 44, size: 40, maxW: 550, align: 'left' },
+    cta: { x: 560, y: 114, size: 20, padH: 26, padV: 10 },
+    cards1: [{ x: 20, y: 4, w: 129, h: 172 }],
+    cards4: [
+      { x: 14, y: 4, w: 126, h: 168 }, { x: 146, y: 4, w: 126, h: 168 },
+      { x: 278, y: 4, w: 126, h: 168 }, { x: 410, y: 4, w: 126, h: 168 },
+    ],
+  },
+  '160x600': {
+    w: 160, h: 600, name: 'Wide Skyscraper',
+    // canvas 320x1200. Cards top, text bottom.
+    logo: { x: 16, y: 556, maxW: 110 },
+    headline: { x: 16, y: 620, size: 38, maxW: 288, align: 'left' },
+    cta: { x: 16, y: 790, size: 20, padH: 30, padV: 12 },
+    cards1: [{ x: 20, y: 16, w: 280, h: 373 }],
+    cards4: [
+      { x: 8, y: 10, w: 148, h: 197 },  { x: 164, y: 10, w: 148, h: 197 },
+      { x: 8, y: 215, w: 148, h: 197 }, { x: 164, y: 215, w: 148, h: 197 },
+    ],
+  },
+  '320x50': {
+    w: 320, h: 50, name: 'Mobile Banner',
+    // canvas 640x100. Cards left, text right.
+    logo: { x: 310, y: 2, maxW: 70 },
+    headline: { x: 310, y: 28, size: 24, maxW: 200, align: 'left' },
+    cta: { x: 498, y: 22, size: 18, padH: 18, padV: 8 },
+    cards1: [{ x: 10, y: 2, w: 72, h: 96 }],
+    cards4: [
+      { x: 6, y: 2, w: 69, h: 92 },  { x: 79, y: 2, w: 69, h: 92 },
+      { x: 152, y: 2, w: 69, h: 92 }, { x: 225, y: 2, w: 69, h: 92 },
+    ],
+  },
+};
+
+// ========== GIRLS ==========
+// Image catalog: single cards and 4-card grids
+const CARD_IMAGES = [
+  // 4-plex grids (type: 'grid')
+  { name: 'Violet + Isabella + Hana + Luna', file: 'grid4_a.png', type: 'grid' },
+  { name: 'Luna + Rei + Chloe + Sakura', file: 'grid4_b.png', type: 'grid' },
+  // Single cards (type: 'single')
+  { name: 'Jade', file: 'card_0.png', type: 'single' },
+  { name: 'Chloe', file: 'card_1.png', type: 'single' },
+  { name: 'Rei', file: 'card_2.png', type: 'single' },
+  { name: 'Ruby', file: 'card_3.png', type: 'single' },
+  { name: 'Violet', file: 'card_4.png', type: 'single' },
+  { name: 'Isabella', file: 'card_5.png', type: 'single' },
+  { name: 'Hana', file: 'card_6.png', type: 'single' },
+  { name: 'Luna', file: 'card_7.png', type: 'single' },
+];
+
+const cardImages = {};
+let logoImg = null;
+
+function loadImg(url) {
+  return new Promise(resolve => {
+    fetch(url).then(r => r.blob()).then(blob => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = URL.createObjectURL(blob);
+    }).catch(() => resolve(null));
+  });
+}
+
+// Load all card images
+Promise.all([
+  ...CARD_IMAGES.map(c => loadImg('../public/assets/ads/' + c.file).then(img => { cardImages[c.file] = img; })),
+  loadImg('../public/assets/brand/logo_text.png').then(img => { logoImg = img; }),
+]).then(init);
+
+// Build the dropdown from CARD_IMAGES
+(function buildCardDropdown() {
+  const sel = document.getElementById('cardImage');
+  const grids = sel.querySelector('optgroup:first-child');
+  const singles = sel.querySelector('optgroup:last-child');
+  CARD_IMAGES.forEach((c, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = c.name;
+    if (c.type === 'grid') grids.appendChild(opt);
+    else singles.appendChild(opt);
+  });
+  sel.value = '0'; // default to first grid
+})();
+
+// ========== UTILS ==========
+function v(id) { return document.getElementById(id).value; }
+function n(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function hexRgba(hex, a) {
+  const h = hex.replace('#', '');
+  return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;
+}
+
+// Color picker sync
+['bg1', 'bg2', 'headlineColor', 'ctaBg'].forEach(id => {
+  const p = document.getElementById(id + 'Pick'), t = document.getElementById(id);
+  if (!p || !t) return;
+  p.oninput = () => { t.value = p.value; renderAll(); };
+  t.oninput = () => { if (/^#[0-9a-f]{6}$/i.test(t.value)) p.value = t.value; renderAll(); };
+});
+
+// Bind all inputs
+document.querySelectorAll('#sidebar input, #sidebar select, #sidebar textarea').forEach(el => {
+  el.addEventListener('input', renderAll);
+  el.addEventListener('change', renderAll);
+});
+
+// Get the currently selected card image and its type
+function getSelectedCard() {
+  const idx = parseInt(v('cardImage'));
+  const entry = CARD_IMAGES[idx];
+  return { img: cardImages[entry.file], type: entry.type };
+}
+
+// ========== PRESETS ==========
+const PRESETS = {
+  dark_brand: { bg1: '#1a0a2e', bg2: '#0a0618', headlineFont: 'Outfit', headlineWeight: '700', headlineColor: '#ffffff', textEffect: 'glow', ctaText: 'Chat Now', ctaBg: '#d6336c', ctaRadius: 8 },
+  hot_pink: { bg1: '#200818', bg2: '#0a0208', headlineFont: 'Plus Jakarta Sans', headlineWeight: '800', headlineColor: '#ffd6e8', textEffect: 'glow', ctaText: 'Try Free', ctaBg: '#ff2d7b', ctaRadius: 20 },
+  minimal: { bg1: '#0f0a1a', bg2: '#050308', headlineFont: 'Sora', headlineWeight: '700', headlineColor: '#e0d0f0', textEffect: 'none', ctaText: 'Meet Her', ctaBg: '#d6336c', ctaRadius: 6 },
+  elegant: { bg1: '#140e28', bg2: '#080414', headlineFont: 'Playfair Display', headlineWeight: '700', headlineColor: '#f5e6ff', textEffect: 'shadow', ctaText: 'Start Free', ctaBg: '#d6336c', ctaRadius: 6 },
+};
+
+const presetDiv = document.getElementById('presetBtns');
+Object.keys(PRESETS).forEach(name => {
+  const btn = document.createElement('button');
+  btn.textContent = name.replace(/_/g, ' ');
+  btn.onclick = () => {
+    const p = PRESETS[name];
+    Object.keys(p).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.value = p[id]; const pk = document.getElementById(id+'Pick'); if (pk && /^#/.test(p[id])) pk.value = p[id]; }
+    });
+    renderAll();
+  };
+  presetDiv.appendChild(btn);
+});
+
+// ========== CANVAS SETUP ==========
+const canvasMap = {};
+const grid = document.getElementById('grid');
+
+function init() {
+  Object.entries(BANNERS).forEach(([key, b]) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const canvas = document.createElement('canvas');
+    canvas.width = b.w * S;
+    canvas.height = b.h * S;
+    // CSS display size: show at 1x for 300+ wide, 1.5x for small
+    const cssW = b.w <= 200 ? b.w * 1.8 : b.w;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = Math.round(cssW * b.h / b.w) + 'px';
+    card.appendChild(canvas);
+    const lbl = document.createElement('div');
+    lbl.className = 'card-label';
+    lbl.textContent = `${key} — ${b.name}`;
+    card.appendChild(lbl);
+    grid.appendChild(card);
+    canvasMap[key] = canvas;
+  });
+
+  // Export buttons
+  const expDiv = document.getElementById('exportBtns');
+  Object.keys(BANNERS).forEach(key => {
+    const btn = document.createElement('button');
+    btn.textContent = key;
+    btn.onclick = () => exportBanner(key);
+    expDiv.appendChild(btn);
+  });
+  const allBtn = document.createElement('button');
+  allBtn.textContent = 'ALL';
+  allBtn.onclick = () => Object.keys(BANNERS).forEach((k, i) => setTimeout(() => exportBanner(k), i * 200));
+  expDiv.appendChild(allBtn);
+
+  renderAll();
+}
+
+// ========== RENDER ==========
+function renderBanner(key, forExport) {
+  const b = BANNERS[key];
+  const W = b.w * S, H = b.h * S;
+  const canvas = forExport ? document.createElement('canvas') : canvasMap[key];
+  if (!canvas) return null;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // 1. Background gradient
+  const grad = ctx.createLinearGradient(0, 0, W * 0.3, H);
+  grad.addColorStop(0, v('bg1'));
+  grad.addColorStop(1, v('bg2'));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle glow
+  const glow = ctx.createRadialGradient(W * 0.3, H * 0.4, 0, W * 0.3, H * 0.4, Math.max(W, H) * 0.5);
+  glow.addColorStop(0, hexRgba(v('ctaBg'), 0.06));
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  // 2. Card image — single card or 4-plex grid
+  const card = getSelectedCard();
+  if (card.img) {
+    if (card.type === 'grid') {
+      // Draw the 4-plex grid image in the grid area
+      const positions = b.cards4;
+      const minX = Math.min(...positions.map(p => p.x));
+      const minY = Math.min(...positions.map(p => p.y));
+      const maxX = Math.max(...positions.map(p => p.x + p.w));
+      const maxY = Math.max(...positions.map(p => p.y + p.h));
+      const areaW = maxX - minX;
+      const areaH = maxY - minY;
+      const r = Math.min(areaW, areaH) * 0.03;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(minX, minY, areaW, areaH, r);
+      ctx.clip();
+      ctx.drawImage(card.img, minX, minY, areaW, areaH);
+      ctx.restore();
+    } else {
+      // Draw single card in the single-card position
+      const pos = b.cards1[0];
+      const r = Math.min(pos.w, pos.h) * 0.05;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 4;
+      ctx.beginPath();
+      ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
+      ctx.fillStyle = 'rgba(0,0,0,0.01)';
+      ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
+      ctx.clip();
+      ctx.drawImage(card.img, pos.x, pos.y, pos.w, pos.h);
+      ctx.restore();
+    }
+  }
+
+  // 3. Logo
+  if (document.getElementById('showLogo').checked && logoImg) {
+    const L = b.logo;
+    const lw = L.maxW;
+    const lh = lw * (logoImg.height / logoImg.width);
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.drawImage(logoImg, L.x, L.y, lw, lh);
+    ctx.restore();
+  }
+
+  // 4. Headline — hardcoded position
+  const HL = b.headline;
+  const headText = v('headlineText');
+  if (headText) {
+    const font = v('headlineFont');
+    const weight = v('headlineWeight');
+    const color = v('headlineColor');
+    const effect = v('textEffect');
+    const ctaColor = v('ctaBg');
+
+    ctx.save();
+    ctx.font = `${weight} ${HL.size}px "${font}", sans-serif`;
+    ctx.textAlign = HL.align;
+    ctx.textBaseline = 'top';
+
+    // Word wrap
+    const words = headText.split(' ');
+    const lines = [];
+    let line = '';
+    words.forEach(w => {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > HL.maxW && line) {
+        lines.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+    });
+    if (line) lines.push(line);
+
+    const lineH = HL.size * 1.15;
+
+    if (effect === 'glow') {
+      ctx.shadowColor = hexRgba(ctaColor, 0.6);
+      ctx.shadowBlur = HL.size * 0.4;
+    } else if (effect === 'shadow') {
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = HL.size * 0.15;
+      ctx.shadowOffsetY = HL.size * 0.06;
+    }
+    ctx.fillStyle = color;
+    lines.forEach((l, i) => ctx.fillText(l, HL.x, HL.y + i * lineH));
+    ctx.restore();
+  }
+
+  // 5. CTA button — hardcoded position
+  const CT = b.cta;
+  const ctaText = v('ctaText');
+  if (ctaText) {
+    const bgCol = v('ctaBg');
+    const radius = n('ctaRadius') * S;
+    ctx.save();
+    ctx.font = `700 ${CT.size}px "Plus Jakarta Sans", sans-serif`;
+    const tw = ctx.measureText(ctaText).width;
+    const bw = tw + CT.padH * 2;
+    const bh = CT.size + CT.padV * 2;
+    // Shadow
+    ctx.shadowColor = hexRgba(bgCol, 0.5);
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    ctx.beginPath();
+    ctx.roundRect(CT.x, CT.y, bw, bh, radius);
+    ctx.fillStyle = bgCol;
+    ctx.fill();
+    // Text
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ctaText, CT.x + bw / 2, CT.y + bh / 2);
+    ctx.restore();
+  }
+
+  return canvas;
+}
+
+function renderAll() {
+  Object.keys(BANNERS).forEach(k => renderBanner(k));
+}
+
+function exportBanner(key) {
+  try {
+    const c = renderBanner(key, true);
+    if (!c) return;
+    c.toBlob(blob => {
+      if (!blob) return;
+      const a = document.createElement('a');
+      a.download = `lovetta_ad_${key}.png`;
+      a.href = URL.createObjectURL(blob);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, 'image/png');
+  } catch (e) {
+    if (e.message.includes('ainted'))
+      alert('Export needs HTTP server.\n\npython3 -m http.server 8111\n\nThen open:\nhttp://localhost:8111/scripts/ads_editor.html');
+  }
+}
+
+// Force-load fonts
+const fl = document.createElement('div');
+fl.style.cssText = 'position:absolute;top:-9999px;visibility:hidden;';
+['Outfit','Plus Jakarta Sans','Sora','Montserrat','Playfair Display'].forEach(f => {
+  ['700','800','900'].forEach(w => {
+    const s = document.createElement('span');
+    s.style.cssText = `font-family:"${f}";font-weight:${w};font-size:48px;`;
+    s.textContent = 'Test';
+    fl.appendChild(s);
+  });
+});
+document.body.appendChild(fl);
+</script>
+</body>
+</html>
