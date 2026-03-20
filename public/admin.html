@@ -91,8 +91,8 @@
     /* Tables */
     .section { margin-bottom: 32px; }
     .section h3 { font-size: 1rem; color: var(--text2); margin-bottom: 12px; }
-    table { width: 100%; border-collapse: collapse; background: var(--bg3); border-radius: var(--radius); overflow: hidden; }
-    th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    table { width: 100%; border-collapse: collapse; background: var(--bg3); border-radius: var(--radius); overflow: hidden; table-layout: auto; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.85rem; white-space: nowrap; }
     th { color: var(--muted); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
     td { color: var(--text2); }
 
@@ -160,10 +160,10 @@
       position: absolute; right: 0; font-size: 0.6rem; color: var(--muted); transform: translateY(-50%);
     }
     .chart-bar-group {
-      flex: 1; display: flex; align-items: flex-end; justify-content: center; position: relative; height: 100%;
+      flex: 1; display: flex; align-items: flex-end; justify-content: center; position: relative; height: 100%; padding: 0 1px;
     }
     .chart-bar {
-      width: 100%; background: var(--accent); transition: height 0.2s;
+      width: 100%; background: var(--accent); transition: height 0.2s; border-radius: 1px 1px 0 0;
     }
     .chart-bar-group:hover .chart-bar { background: #e8437a; }
     .chart-bar-group .chart-tip {
@@ -344,8 +344,8 @@
       </div>
       <table>
         <thead><tr>
-          <th>ID</th><th>Email</th><th>Name</th><th>Auth</th><th>Country</th><th>City</th>
-          <th>Device</th><th>Girls</th><th>Msgs</th><th>Subscription</th><th>Refs</th><th>Ref $</th><th>Created</th><th>Last Active</th><th></th>
+          <th>Email</th><th>Name</th><th>Auth</th><th>Country</th><th>City</th>
+          <th>Device</th><th>Girls</th><th>Msgs</th><th>Sub</th><th>Created</th><th>Last Active</th><th></th>
         </tr></thead>
         <tbody id="user-rows"></tbody>
       </table>
@@ -889,12 +889,10 @@
           var os = parseOS(r.user_agent);
           var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '');
           var sub = r.sub_status ? esc(r.sub_plan) + ' (' + esc(r.sub_status) + ')' : 'Free';
-          var refCount = r.referral_count || 0;
-          var refEarn = r.referral_earnings ? '$' + (r.referral_earnings / 100).toFixed(2) : '-';
+          var sub = r.sub_status ? esc(r.sub_plan) + ' (' + esc(r.sub_status) + ')' : 'Free';
           return '<tr>' +
-            '<td class="mono" title="' + esc(r.id || '') + '">' + esc((r.id || '').slice(0, 8)) + '</td>' +
-            '<td class="mono">' + esc(r.email || '-') + '</td>' +
-            '<td>' + esc(r.display_name || '-') + '</td>' +
+            '<td class="mono" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.email || '') + '">' + esc(r.email || '-') + '</td>' +
+            '<td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.display_name || '') + '">' + esc(r.display_name || '-') + '</td>' +
             '<td>' + esc(r.auth_provider || '-') + '</td>' +
             '<td>' + esc(shortCountry(r.country) || '-') + '</td>' +
             '<td>' + esc(r.city || '-') + '</td>' +
@@ -902,15 +900,13 @@
             '<td>' + (r.companion_count || 0) + '</td>' +
             '<td>' + (r.message_count || 0) + '</td>' +
             '<td>' + sub + '</td>' +
-            '<td>' + refCount + '</td>' +
-            '<td>' + refEarn + '</td>' +
             '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
             '<td class="mono">' + timeAgo(r.last_activity) + '</td>' +
-            '<td><button onclick="deleteUser(\'' + esc(r.id) + '\', \'' + esc(r.email || '') + '\')" style="padding:3px 8px;background:var(--bg3);color:var(--error);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:12px;">Delete</button></td>' +
+            '<td><button onclick="deleteUser(\'' + esc(r.id) + '\', \'' + esc(r.email || '') + '\')" title="Delete" style="padding:2px 6px;background:var(--bg3);color:var(--error);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:12px;line-height:1;">✕</button></td>' +
           '</tr>';
         }).join('');
         document.getElementById('user-rows').innerHTML = rows ||
-          '<tr><td colspan="15" class="empty-row">No users yet</td></tr>';
+          '<tr><td colspan="12" class="empty-row">No users yet</td></tr>';
         renderPagination('user-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadUsers');
       });
     }

@@ -187,18 +187,11 @@ router.get('/users', async (req, res) => {
       SELECT u.id, u.email, u.display_name, u.auth_provider, u.country, u.city,
              u.device_type, u.user_agent, u.created_at, u.last_activity,
              s.plan AS sub_plan, s.status AS sub_status,
-             rc.referral_count, re.referral_earnings,
              cc.companion_count, mc.message_count
       FROM users u
       LEFT JOIN LATERAL (
         SELECT plan, status FROM subscriptions WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
       ) s ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS referral_count FROM users ref WHERE ref.referred_by = u.id
-      ) rc ON true
-      LEFT JOIN LATERAL (
-        SELECT COALESCE(SUM(commission_amount), 0)::int AS referral_earnings FROM referral_commissions WHERE referrer_id = u.id
-      ) re ON true
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::int AS companion_count FROM user_companions WHERE user_id = u.id
       ) cc ON true
