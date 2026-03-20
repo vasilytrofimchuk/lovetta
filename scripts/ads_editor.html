@@ -840,8 +840,10 @@ function renderVideoFrame() {
 
 async function exportVideoMP4() {
   const girl = v('videoGirl');
-  const duration = parseInt(v('videoDuration')) || 6;
-  document.getElementById('videoLabel').textContent = '300x250 — Rendering overlay...';
+  const duration = parseInt(v('videoDuration')) || 5;
+  const labelEl = document.getElementById('videoLabel') || document.getElementById('snapStatus');
+  function setLabel(t) { if (labelEl) labelEl.textContent = t; }
+  setLabel('Rendering ' + girl + '...');
 
   // Step 1: Render the banner overlay (everything EXCEPT the card image) as PNG
   const b = BANNERS['300x250'];
@@ -922,7 +924,7 @@ async function exportVideoMP4() {
   }
 
   // Step 2: Send overlay PNG + params to server
-  document.getElementById('videoLabel').textContent = '300x250 — Rendering MP4...';
+  setLabel('Rendering MP4...');
   try {
     const overlayBlob = await new Promise(res => overlayCanvas.toBlob(res, 'image/png'));
     const formData = new FormData();
@@ -942,9 +944,9 @@ async function exportVideoMP4() {
     a.download = `lovetta_300x250_${girl}_${ts}.mp4`;
     a.href = URL.createObjectURL(mp4Blob);
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    document.getElementById('videoLabel').textContent = '300x250 — ' + girl + ' MP4 saved!';
+    setLabel(girl + ' MP4 saved!');
   } catch (e) {
-    document.getElementById('videoLabel').textContent = 'Failed: ' + e.message + ' (run: node scripts/ads_server.js)';
+    setLabel('Failed: ' + e.message);
   }
 }
 
