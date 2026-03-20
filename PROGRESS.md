@@ -2,6 +2,29 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Update Template Ages to 18-25
+- [x] Update all 12 realistic template ages (18-25, skewing toward 18)
+- [x] Update all 6 anime template ages (18-22, skewing toward 18)
+- [x] Add v45 migration to update ages in prod DB
+- [x] Update AI prompt age references from "20+" to "18+"
+- [x] Update age-guard regeneration prompt from "22" to "18"
+- [x] Update default age from 22 to 18 (schema, companion-api, frontend)
+- [x] Fix test assertion for new age rule text
+- [x] All 97 AI tests pass
+
+## Ad Banner Editor
+- [x] Create `scripts/ads_editor.html` — canvas-based ad banner editor
+- [x] 5 standard IAB sizes: 300×250, 336×280, 728×90, 160×600, 320×50
+- [x] Girl card images cropped from App Store gallery screenshot
+- [x] Image modes: single / 2 girls / 3 girls (fan) / 4 girls (grid)
+- [x] Girl selection dropdowns (Lily, Zara, Emma, Rei)
+- [x] Adaptive layout per aspect ratio (square, wide, tall, ultrawide)
+- [x] Headline text with glow/shadow effects
+- [x] CTA button with customizable text/color/radius
+- [x] Logo overlay with position control
+- [x] 5 presets (dark_brand, gradient_pink, minimal, neon, elegant)
+- [x] PNG export per size or all at once (2x retina)
+
 ## All Payments Table in Economics Tab
 - [x] Add `GET /api/admin/payments` paginated endpoint (tips + subscriptions union, period filter)
 - [x] Add "All Payments" HTML section in Economics tab

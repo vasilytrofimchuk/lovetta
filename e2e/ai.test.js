@@ -282,7 +282,7 @@ test.describe('Content Levels — buildContentPrompt', () => {
     const prompt = await buildContentPrompt('web');
     expect(prompt).toContain('MANDATORY AGE RULE');
     expect(prompt).toContain('NEVER reference, imply, or roleplay being underage');
-    expect(prompt).toContain('20 years old or older');
+    expect(prompt).toContain('18 years old or older');
   });
 
   test('includes age rule for appstore platform', async () => {

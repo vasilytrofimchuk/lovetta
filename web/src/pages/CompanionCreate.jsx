@@ -200,7 +200,7 @@ export default function CompanionCreate() {
       tagline: '',
       traits: customTraits,
       communication_style: 'playful',
-      age: 22,
+      age: 18,
       voice_id: customVoice,
       isTemplate: false,
     });

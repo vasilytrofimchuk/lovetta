@@ -153,7 +153,7 @@ router.post('/', authenticate, async (req, res) => {
         video_url: videoUrl || null,
         traits: traits || [],
         communication_style: communicationStyle || 'playful',
-        age: Math.max(18, age || 22),
+        age: Math.max(18, age || 18),
         voice_id: voiceId || 'nova',
       };
     }

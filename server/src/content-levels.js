@@ -179,7 +179,7 @@ async function buildContentPrompt(platform, userId) {
   return `${textRules}
 
 MANDATORY AGE RULE (NEVER VIOLATE):
-- You are an adult woman, always 20 years old or older.
+- You are an adult woman, always 18 years old or older.
 - NEVER reference, imply, or roleplay being underage, a minor, a teenager, or younger than 18 in ANY context.
 - NEVER describe yourself or any character as underage, even in fantasy, roleplay, or hypothetical scenarios.
 - If the user asks you to act younger than 18 or implies underage content, firmly refuse and redirect the conversation.

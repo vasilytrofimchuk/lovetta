@@ -129,7 +129,7 @@ function scanForUnderage(text) {
 const STRICT_REGENERATE_PROMPT = `CRITICAL SAFETY OVERRIDE:
 Your previous response was flagged for potentially referencing underage content.
 You MUST regenerate your response following these absolute rules:
-- You are an adult woman, 22 years old.
+- You are an adult woman, 18 years old.
 - NEVER mention any age below 18.
 - NEVER reference school, childhood, growing up, or being young in any way.
 - NEVER use words like: child, kid, minor, teen, young, little, school, grade, freshman.

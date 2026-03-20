@@ -159,7 +159,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
 
   const settings = await getAISettings();
-  const primaryModel = opts.model || settings.openrouter_model || 'sao10k/l3.3-euryale-70b';
+  const primaryModel = opts.model || settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
   const fallbackModel = settings.openrouter_fallback_model || 'thedrummer/rocinante-12b';
   let model = primaryModel;
   const platform = opts.platform || 'web';
@@ -275,7 +275,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
 
   const settings = await getAISettings();
-  const model = opts.model || settings.openrouter_model || 'sao10k/l3.3-euryale-70b';
+  const model = opts.model || settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
   const platform = opts.platform || 'web';
 
   const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform, opts.userId);
@@ -387,7 +387,7 @@ async function generateImage(prompt, opts = {}) {
 
   // Append image level rules to the prompt
   const imageRules = await buildImagePrompt(platform, opts.userId);
-  const constrainedPrompt = `${prompt}\n\n${imageRules}\n\nMANDATORY: The subject must be a clearly adult woman, 20+ years old. Never generate images of minors or anyone appearing underage.`;
+  const constrainedPrompt = `${prompt}\n\n${imageRules}\n\nMANDATORY: The subject must be a clearly adult woman, 18+ years old. Never generate images of minors or anyone appearing underage.`;
 
   const response = await fetch(`${FAL_BASE}/${model}`, {
     method: 'POST',
@@ -454,7 +454,7 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   if (!FAL_KEY) throw new Error('FAL_KEY not configured');
 
   const model = 'fal-ai/flux-pulid';
-  const fullPrompt = `${prompt}, photorealistic, beautiful adult woman, 20+ years old`;
+  const fullPrompt = `${prompt}, photorealistic, beautiful adult woman, 18+ years old`;
 
   let response;
   let usedModel = model;
@@ -499,7 +499,7 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
       },
       body: JSON.stringify({
         image_url: referenceImageUrl,
-        prompt: `Change the scene: ${prompt}. The subject is a clearly adult woman, 20+ years old.`,
+        prompt: `Change the scene: ${prompt}. The subject is a clearly adult woman, 18+ years old.`,
       }),
     });
   }
