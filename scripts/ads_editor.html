@@ -394,13 +394,16 @@ function init() {
 }
 
 // ========== RENDER ==========
-function renderBanner(key, forExport) {
+function renderBanner(key, forExport, scaleOverride) {
   const b = BANNERS[key];
-  const W = b.w * S, H = b.h * S;
+  const sc = scaleOverride || S;
+  const r = sc / S; // ratio to scale hardcoded 2x positions
+  const W = b.w * sc, H = b.h * sc;
   const canvas = forExport ? document.createElement('canvas') : canvasMap[key];
   if (!canvas) return null;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
+  if (r !== 1) ctx.scale(r, r); // scale all drawing to target size
 
   // 1. Background gradient
   const grad = ctx.createLinearGradient(0, 0, W * 0.3, H);
@@ -582,15 +585,10 @@ function renderAll() {
 
 function exportBanner(key) {
   try {
-    const c = renderBanner(key, true);
+    // Render at 1x — exact ad dimensions, no scaling, no quality loss
+    const c = renderBanner(key, true, 1);
     if (!c) return;
-    // Scale down to 1x for ad platform (exact dimensions required)
-    const b = BANNERS[key];
-    const outCanvas = document.createElement('canvas');
-    outCanvas.width = b.w;
-    outCanvas.height = b.h;
-    outCanvas.getContext('2d').drawImage(c, 0, 0, b.w, b.h);
-    outCanvas.toBlob(blob => {
+    c.toBlob(blob => {
       if (!blob) return;
       const a = document.createElement('a');
       const ts = Date.now().toString(36).slice(-4);
