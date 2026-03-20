@@ -204,7 +204,9 @@ function parseContextText(text) {
 
 async function generateScene(companion, messageContent) {
   try {
-    const { plainChatCompletion } = require('./ai');
+    const { plainChatCompletion, getAISettings } = require('./ai');
+    const settings = await getAISettings();
+    const sceneModel = settings.scene_model || 'qwen/qwen3-235b-a22b-2507';
     const result = await plainChatCompletion(
       `Reply with ONLY a scene description in 5-8 words. Setting and mood only. No names, no dialogue, no actions, no labels, no continuation.
 
@@ -214,7 +216,7 @@ Examples:
 - Kitchen counter, barefoot on cool tiles
 - Dim bedroom, phone glow on her face`,
       [{ role: 'user', content: `Her message: ${messageContent}` }],
-      { model: 'thedrummer/rocinante-12b', max_tokens: 25 }
+      { model: sceneModel, max_tokens: 25 }
     );
     let scene = result.content
       .split('\n')[0]

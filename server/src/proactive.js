@@ -4,7 +4,7 @@
  */
 
 const { getPool } = require('./db');
-const { plainChatCompletion } = require('./ai');
+const { plainChatCompletion, getAISettings } = require('./ai');
 const { buildMemoryContext } = require('./memory');
 const { sendCompanionEmail } = require('./email');
 const { sendPushNotification } = require('./push');
@@ -185,7 +185,9 @@ async function runProactiveMessages() {
         const actionsEnabled = row.show_actions ?? true;
         const memoryContext = await buildMemoryContext(row.conversation_id);
         const prompt = buildProactivePrompt(row, memoryContext, slot, { actionsEnabled });
-        const result = await plainChatCompletion(prompt, []);
+        const proSettings = await getAISettings();
+        const proModel = proSettings.proactive_model || 'qwen/qwen3-235b-a22b-2507';
+        const result = await plainChatCompletion(prompt, [], { model: proModel });
 
         if (!result.content || result.content.length < 5) continue;
 

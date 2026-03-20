@@ -946,9 +946,12 @@
 
         // Render model badges
         var MODEL_KEYS = [
-          { key: 'openrouter_model', label: 'Primary Model' },
-          { key: 'openrouter_fallback_model', label: 'Fallback Model' },
-          { key: 'memory_extraction_model', label: 'Memory Model' },
+          { key: 'openrouter_model', label: 'Chat Model' },
+          { key: 'openrouter_fallback_model', label: 'Chat Fallback' },
+          { key: 'memory_extraction_model', label: 'Memory' },
+          { key: 'scene_model', label: 'Scene' },
+          { key: 'proactive_model', label: 'Proactive' },
+          { key: 'tip_thankyou_model', label: 'Tip Thank-You' },
         ];
         var badgesHtml = '';
         MODEL_KEYS.forEach(function(def) {

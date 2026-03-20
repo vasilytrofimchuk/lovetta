@@ -316,7 +316,9 @@ async function insertTipThankYou(pool, userId, companionId, amountCents = 0) {
   const conversationId = convRows[0].id;
 
   // Generate thank-you in companion's voice via AI
-  const { chatCompletion } = require('./ai');
+  const { chatCompletion, getAISettings } = require('./ai');
+  const aiSettings = await getAISettings();
+  const tipModel = aiSettings.tip_thankyou_model || 'qwen/qwen3-235b-a22b-2507';
   const traits = Array.isArray(companion.traits) ? companion.traits.join(', ') : '';
   const systemPrompt = `You are ${companion.name}, a ${companion.age}-year-old woman.
 
@@ -338,7 +340,7 @@ Response format: Always start with a brief action or emotional context in *aster
     try {
       const result = await chatCompletion(systemPrompt, [
         { role: 'user', content: `[The user just sent you a generous gift to support you. React in your own unique way. Be ${mood}. You MUST start with a brief action in *asterisks* like *throws arms around you* then your message. Write 2-3 sentences max. Thank him warmly in YOUR voice and style. Do NOT mention specific money amounts. Stay fully in character.]` },
-      ], { model: 'thedrummer/rocinante-12b' });
+      ], { model: tipModel });
       msg = result.content;
     } catch (err) {
       console.warn('[billing] AI thank-you generation failed, using fallback:', err.message);

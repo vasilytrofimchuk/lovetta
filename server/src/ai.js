@@ -49,7 +49,7 @@ async function getAISettings() {
   if (!pool) return {};
 
   const { rows } = await pool.query(
-    `SELECT key, value FROM app_settings WHERE key IN ('openrouter_model', 'openrouter_fallback_model', 'fal_image_model', 'fal_video_model', 'memory_extraction_model')`
+    `SELECT key, value FROM app_settings WHERE key IN ('openrouter_model', 'openrouter_fallback_model', 'fal_image_model', 'fal_video_model', 'memory_extraction_model', 'scene_model', 'proactive_model', 'tip_thankyou_model')`
   );
   const settings = {};
   for (const row of rows) {
