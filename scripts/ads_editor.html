@@ -207,7 +207,7 @@ const BANNERS = {
     logo: { x: 40, y: 20, maxW: 234 },
     headline: { x: 40, y: 120, size: 72, maxW: 500, align: 'left' },
     cta: { x: 40, y: 340, size: 40, bw: 260, bh: 64 },
-    cards1: [{ x: 620, y: 16, w: 350, h: 467 }],
+    cards1: [{ x: 600, y: 16, w: 300, h: 467 }, { x: 920, y: 30, w: 280, h: 440 }, { x: 1220, y: 16, w: 300, h: 467 }, { x: 1540, y: 30, w: 280, h: 440 }],
     cards4: [
       { x: 600, y: 10, w: 300, h: 480 }, { x: 910, y: 10, w: 300, h: 480 },
       { x: 1220, y: 10, w: 300, h: 480 }, { x: 1530, y: 10, w: 300, h: 480 },
@@ -220,7 +220,7 @@ const BANNERS = {
     logo: { x: 920, y: 4, maxW: 156 },
     headline: { x: 920, y: 50, size: 44, maxW: 900, align: 'left' },
     cta: { x: 920, y: 116, size: 30, bw: 200, bh: 48 },
-    cards1: [{ x: 20, y: 4, w: 129, h: 172 }],
+    cards1: [{ x: 14, y: 4, w: 126, h: 172 }, { x: 148, y: 4, w: 126, h: 172 }, { x: 282, y: 4, w: 126, h: 172 }, { x: 416, y: 4, w: 126, h: 172 }, { x: 550, y: 4, w: 126, h: 172 }, { x: 684, y: 4, w: 126, h: 172 }],
     cards4: [
       { x: 14, y: 2, w: 210, h: 176 }, { x: 230, y: 2, w: 210, h: 176 },
       { x: 446, y: 2, w: 210, h: 176 }, { x: 662, y: 2, w: 210, h: 176 },
@@ -233,7 +233,7 @@ const BANNERS = {
     logo: { x: 440, y: 2, maxW: 104 },
     headline: { x: 440, y: 34, size: 30, maxW: 450, align: 'left' },
     cta: { x: 440, y: 78, size: 22, bw: 140, bh: 34 },
-    cards1: [{ x: 14, y: 4, w: 84, h: 112 }],
+    cards1: [{ x: 10, y: 4, w: 84, h: 112 }, { x: 100, y: 4, w: 84, h: 112 }, { x: 190, y: 4, w: 84, h: 112 }, { x: 280, y: 4, w: 84, h: 112 }],
     cards4: [
       { x: 10, y: 2, w: 96, h: 116 }, { x: 110, y: 2, w: 96, h: 116 },
       { x: 210, y: 2, w: 96, h: 116 }, { x: 310, y: 2, w: 96, h: 116 },
@@ -502,35 +502,51 @@ function renderBanner(key, forExport, scaleOverride) {
       ctx.drawImage(card.img, drawX, drawY, drawW, drawH);
       ctx.restore();
     } else {
-      // Draw single card, maintaining 3:4 aspect ratio
-      const pos = b.cards1[0];
-      const r = Math.min(pos.w, pos.h) * 0.05;
-      // Cover-crop for single card too
-      const imgAR = card.img.width / card.img.height;
-      const posAR = pos.w / pos.h;
-      let drawW, drawH, drawX, drawY;
-      if (imgAR > posAR) {
-        drawH = pos.h; drawW = pos.h * imgAR;
-        drawX = pos.x - (drawW - pos.w) / 2; drawY = pos.y;
-      } else {
-        drawW = pos.w; drawH = pos.w / imgAR;
-        drawX = pos.x; drawY = pos.y - (drawH - pos.h) * 0.15;
+      // Draw cards — selected card first, then random others to fill remaining positions
+      const allSingles = CARD_IMAGES.filter(c => c.type === 'single' && cardImages[c.file]);
+      const positions = b.cards1;
+      for (let ci = 0; ci < positions.length; ci++) {
+        let img;
+        if (ci === 0) {
+          img = card.img; // selected card
+        } else {
+          // pick a random other card
+          const others = allSingles.filter(c => cardImages[c.file] !== card.img);
+          if (others.length > 0) {
+            img = cardImages[others[(ci * 7 + positions.length) % others.length].file]; // deterministic "random"
+          } else {
+            img = card.img;
+          }
+        }
+        if (!img) continue;
+        const pos = positions[ci];
+        const r = Math.min(pos.w, pos.h) * 0.05;
+        const imgAR = img.width / img.height;
+        const posAR = pos.w / pos.h;
+        let drawW, drawH, drawX, drawY;
+        if (imgAR > posAR) {
+          drawH = pos.h; drawW = pos.h * imgAR;
+          drawX = pos.x - (drawW - pos.w) / 2; drawY = pos.y;
+        } else {
+          drawW = pos.w; drawH = pos.w / imgAR;
+          drawX = pos.x; drawY = pos.y - (drawH - pos.h) * 0.15;
+        }
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 4;
+        ctx.beginPath();
+        ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
+        ctx.fillStyle = 'rgba(0,0,0,0.01)';
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
+        ctx.clip();
+        ctx.drawImage(img, drawX, drawY, drawW, drawH);
+        ctx.restore();
       }
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.5)';
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetY = 4;
-      ctx.beginPath();
-      ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
-      ctx.fillStyle = 'rgba(0,0,0,0.01)';
-      ctx.fill();
-      ctx.restore();
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
-      ctx.clip();
-      ctx.drawImage(card.img, drawX, drawY, drawW, drawH);
-      ctx.restore();
     }
   }
 
