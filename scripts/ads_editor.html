@@ -97,6 +97,35 @@
   <label><span>Show</span><input type="checkbox" id="showLogo" checked></label>
 
   <div class="btn-row" id="exportBtns"></div>
+
+  <h3>Video Banner (300x250)</h3>
+  <label><span>Girl</span>
+    <select id="videoGirl">
+      <option value="lily">Lily</option>
+      <option value="chloe">Chloe</option>
+      <option value="jade">Jade</option>
+      <option value="sophia" selected>Sophia</option>
+      <option value="ruby">Ruby</option>
+      <option value="aria">Aria</option>
+      <option value="zara">Zara</option>
+      <option value="luna">Luna</option>
+      <option value="mia">Mia</option>
+      <option value="emma">Emma</option>
+      <option value="isabella">Isabella</option>
+      <option value="violet">Violet</option>
+      <option value="rei">Rei</option>
+      <option value="hana">Hana</option>
+      <option value="sakura">Sakura</option>
+      <option value="yuki">Yuki</option>
+      <option value="mei">Mei</option>
+      <option value="aiko">Aiko</option>
+    </select>
+  </label>
+  <label><span>Duration (s)</span><input type="number" id="videoDuration" value="6" min="2" max="15"></label>
+  <div class="btn-row">
+    <button onclick="loadVideo()">Load</button>
+    <button onclick="recordVideo()">Record WebM</button>
+  </div>
 </div>
 
 <div id="main">
@@ -533,6 +562,219 @@ function exportBanner(key) {
     if (e.message.includes('ainted'))
       alert('Export needs HTTP server.\n\npython3 -m http.server 8111\n\nThen open:\nhttp://localhost:8111/scripts/ads_editor.html');
   }
+}
+
+// ========== VIDEO BANNER ==========
+const VIDEO_URLS = {
+  lily: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/8/b7679f09-8b60-4336-a4e5-acd13825a2b8.mp4',
+  chloe: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/7/dab0cffa-a969-44ee-8d10-460d7b52868a.mp4',
+  jade: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/11/fadff26a-f026-4e9f-8c8b-fd760a0f8dca.mp4',
+  sophia: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/2/a3836f1b-3d60-4ffb-9f1b-29ba9b3799a1.mp4',
+  ruby: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/10/cee890d3-e0e9-4997-88fc-5af9bbd6a31f.mp4',
+  aria: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/3/38002ba0-7f30-4b11-b89d-83a598c97e0d.mp4',
+  zara: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/9/4e693a86-af99-4d8f-b340-aa7e5c204aea.mp4',
+  luna: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/1/a96e011f-a0ca-4567-b8d9-35e84b332d96.mp4',
+  mia: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/5/7c8a4fae-d5a1-4309-ab55-5cc570718078.mp4',
+  emma: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/4/fc72be74-f82a-47e7-b9dd-82ab347c3a00.mp4',
+  isabella: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/6/08a95c0a-eb57-4349-9e34-f2be427232f5.mp4',
+  violet: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/12/b339544a-cf01-4863-b69d-9ab15075bc56.mp4',
+  rei: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/40/eb2ff94f-865d-4334-8d7b-81b6b41b6fc5.mp4',
+  hana: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/39/a70ab942-c287-4cea-a25f-c24992c3e1e1.mp4',
+  sakura: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/37/07d46a08-f69b-4c06-b7c6-95861d325197.mp4',
+  yuki: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/38/add15ce1-b9c1-4289-bafc-89afbbff9dbc.mp4',
+  mei: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/42/4488dca4-ddc5-44f1-a07f-f52b544df717.mp4',
+  aiko: 'https://pub-62acb9c79ba940b1a2edf123ed6dfda6.r2.dev/videos/templates/41/86e556b1-7db7-4608-aebf-2803c5e61bad.mp4',
+};
+
+let videoEl = null;
+let videoCanvas = null;
+let videoCtx = null;
+let videoAnimId = null;
+
+function loadVideo() {
+  const girl = v('videoGirl');
+  const url = VIDEO_URLS[girl];
+  if (!url) return alert('No video for ' + girl);
+
+  // Create video canvas if not exists
+  if (!videoCanvas) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'videoCard';
+    videoCanvas = document.createElement('canvas');
+    videoCanvas.width = 300 * S;
+    videoCanvas.height = 250 * S;
+    videoCanvas.style.width = '300px';
+    videoCanvas.style.height = '250px';
+    card.appendChild(videoCanvas);
+    const lbl = document.createElement('div');
+    lbl.className = 'card-label';
+    lbl.id = 'videoLabel';
+    lbl.textContent = '300x250 — Video Banner';
+    card.appendChild(lbl);
+    grid.appendChild(card);
+    videoCtx = videoCanvas.getContext('2d');
+  }
+
+  // Stop previous
+  if (videoAnimId) cancelAnimationFrame(videoAnimId);
+  if (videoEl) { videoEl.pause(); videoEl.remove(); }
+
+  // Create video element
+  videoEl = document.createElement('video');
+  videoEl.crossOrigin = 'anonymous';
+  videoEl.muted = true;
+  videoEl.loop = true;
+  videoEl.playsInline = true;
+  videoEl.src = url;
+  videoEl.style.display = 'none';
+  document.body.appendChild(videoEl);
+
+  document.getElementById('videoLabel').textContent = '300x250 — Video: ' + girl + ' (loading...)';
+
+  videoEl.addEventListener('canplay', () => {
+    videoEl.play();
+    document.getElementById('videoLabel').textContent = '300x250 — Video: ' + girl;
+    renderVideoFrame();
+  }, { once: true });
+}
+
+function renderVideoFrame() {
+  if (!videoEl || videoEl.paused) return;
+  const b = BANNERS['300x250'];
+  const W = b.w * S, H = b.h * S;
+  const ctx = videoCtx;
+
+  // Background
+  const grad = ctx.createLinearGradient(0, 0, W * 0.3, H);
+  grad.addColorStop(0, v('bg1'));
+  grad.addColorStop(1, v('bg2'));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Glow
+  const glow = ctx.createRadialGradient(W * 0.3, H * 0.4, 0, W * 0.3, H * 0.4, Math.max(W, H) * 0.5);
+  glow.addColorStop(0, hexRgba(v('ctaBg'), 0.06));
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw video in the single-card position
+  const pos = b.cards1[0];
+  const r = Math.min(pos.w, pos.h) * 0.05;
+  if (videoEl.readyState >= 2) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    ctx.beginPath();
+    ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
+    ctx.fillStyle = 'rgba(0,0,0,0.01)';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(pos.x, pos.y, pos.w, pos.h, r);
+    ctx.clip();
+    // Cover-crop video to fill card area
+    const vidAR = videoEl.videoWidth / videoEl.videoHeight;
+    const posAR = pos.w / pos.h;
+    let sx = 0, sy = 0, sw = videoEl.videoWidth, sh = videoEl.videoHeight;
+    if (vidAR > posAR) {
+      sw = videoEl.videoHeight * posAR;
+      sx = (videoEl.videoWidth - sw) / 2;
+    } else {
+      sh = videoEl.videoWidth / posAR;
+      sy = (videoEl.videoHeight - sh) * 0.2;
+    }
+    ctx.drawImage(videoEl, sx, sy, sw, sh, pos.x, pos.y, pos.w, pos.h);
+    ctx.restore();
+  }
+
+  // Logo
+  if (document.getElementById('showLogo').checked && logoImg) {
+    const L = b.logo;
+    const lw = L.maxW;
+    const lh = lw * (logoImg.height / logoImg.width);
+    ctx.save(); ctx.globalAlpha = 0.85;
+    ctx.drawImage(logoImg, L.x, L.y, lw, lh);
+    ctx.restore();
+  }
+
+  // Headline
+  const HL = b.headline;
+  const headText = v('headlineText');
+  if (headText) {
+    const font = v('headlineFont');
+    const weight = v('headlineWeight');
+    const hlScale = n('headlineSizeScale') / 100;
+    const hlSize = Math.round(HL.size * hlScale);
+    ctx.save();
+    ctx.font = `${weight} ${hlSize}px "${font}", sans-serif`;
+    ctx.textAlign = HL.align;
+    ctx.textBaseline = 'top';
+    const words = headText.split(' ');
+    const lines = [];
+    let line = '';
+    words.forEach(w => {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > HL.maxW && line) { lines.push(line); line = w; }
+      else line = test;
+    });
+    if (line) lines.push(line);
+    const effect = v('textEffect');
+    const ctaColor = v('ctaBg');
+    if (effect === 'glow') { ctx.shadowColor = hexRgba(ctaColor, 0.6); ctx.shadowBlur = hlSize * 0.4; }
+    else if (effect === 'shadow') { ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = hlSize * 0.15; ctx.shadowOffsetY = hlSize * 0.06; }
+    ctx.fillStyle = v('headlineColor');
+    lines.forEach((l, i) => ctx.fillText(l, HL.x, HL.y + i * hlSize * 1.15));
+    ctx.restore();
+  }
+
+  // CTA
+  const CT = b.cta;
+  const ctaText = v('ctaText');
+  if (ctaText) {
+    const ctScale = n('ctaSizeScale') / 100;
+    const ctSize = Math.round(CT.size * ctScale);
+    ctx.save();
+    ctx.font = `700 ${ctSize}px "Plus Jakarta Sans", sans-serif`;
+    const bw = CT.bw, bh = CT.bh;
+    const radius = n('ctaRadius') * S;
+    ctx.shadowColor = hexRgba(v('ctaBg'), 0.5);
+    ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+    ctx.beginPath(); ctx.roundRect(CT.x, CT.y, bw, bh, radius);
+    ctx.fillStyle = v('ctaBg'); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(ctaText, CT.x + bw / 2, CT.y + bh / 2);
+    ctx.restore();
+  }
+
+  videoAnimId = requestAnimationFrame(renderVideoFrame);
+}
+
+function recordVideo() {
+  if (!videoEl || !videoCanvas) return alert('Load a video first');
+  const duration = (parseInt(v('videoDuration')) || 6) * 1000;
+  const stream = videoCanvas.captureStream(30);
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+  const chunks = [];
+  recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.download = `lovetta_ad_300x250_${v('videoGirl')}.webm`;
+    a.href = URL.createObjectURL(blob);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    document.getElementById('videoLabel').textContent = '300x250 — Video: ' + v('videoGirl') + ' (saved!)';
+  };
+  // Restart video from beginning
+  videoEl.currentTime = 0;
+  recorder.start();
+  document.getElementById('videoLabel').textContent = '300x250 — Recording ' + (duration/1000) + 's...';
+  setTimeout(() => recorder.stop(), duration);
 }
 
 // Force-load fonts
