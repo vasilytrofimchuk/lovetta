@@ -60,7 +60,21 @@
   <label><span>Color 2</span><div class="color-pair"><input type="color" id="bg2Pick" value="#0a0618"><input type="text" id="bg2" value="#0a0618"></div></label>
 
   <h3>Text</h3>
-  <label><span>Headline</span><input type="text" id="headlineText" value="Your AI Girlfriend"></label>
+  <label><span>Headline</span>
+    <select id="headlinePreset" onchange="document.getElementById('headlineText').value=this.value;renderAll();" style="width:150px;">
+      <option value="Your AI Girlfriend">Your AI Girlfriend</option>
+      <option value="Chat With Her Now">Chat With Her Now</option>
+      <option value="She's Waiting For You">She's Waiting For You</option>
+      <option value="Meet Your Dream Girl">Meet Your Dream Girl</option>
+      <option value="Talk To Beautiful Girls">Talk To Beautiful Girls</option>
+      <option value="Your Perfect Match">Your Perfect Match</option>
+      <option value="Never Feel Lonely Again">Never Feel Lonely Again</option>
+      <option value="She Wants To Talk">She Wants To Talk</option>
+      <option value="Find Your Soulmate">Find Your Soulmate</option>
+      <option value="Real Conversations, Real Feelings">Real Conversations, Real Feelings</option>
+    </select>
+  </label>
+  <label><span>Custom</span><input type="text" id="headlineText" value="Your AI Girlfriend" oninput="renderAll();"></label>
   <label><span>Font</span>
     <select id="headlineFont">
       <option value="Outfit" selected>Outfit</option>
