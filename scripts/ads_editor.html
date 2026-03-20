@@ -111,8 +111,8 @@
   </label>
   <label><span>Duration (s)</span><input type="number" id="videoDuration" value="6" min="2" max="15"></label>
   <div class="btn-row">
-    <button onclick="loadVideo()">Load</button>
-    <button onclick="recordVideo()">Record</button>
+    <button onclick="loadVideo()">Preview</button>
+    <button onclick="exportVideoMP4()">Export MP4</button>
   </div>
   <div style="color:#555;font-size:10px;margin-top:4px;">Start with: <code style="color:#d6336c;">node scripts/ads_server.js</code></div>
 
@@ -771,42 +771,33 @@ function renderVideoFrame() {
   videoAnimId = requestAnimationFrame(renderVideoFrame);
 }
 
-function recordVideo() {
-  if (!videoEl || !videoCanvas) return alert('Load a video first');
-  const duration = (parseInt(v('videoDuration')) || 6) * 1000;
-  const stream = videoCanvas.captureStream(30);
-  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
-  const chunks = [];
-  recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  recorder.onstop = async () => {
-    const webmBlob = new Blob(chunks, { type: 'video/webm' });
-    const girl = v('videoGirl');
-    document.getElementById('videoLabel').textContent = '300x250 — Converting to MP4...';
+async function exportVideoMP4() {
+  const girl = v('videoGirl');
+  const duration = parseInt(v('videoDuration')) || 6;
+  document.getElementById('videoLabel').textContent = '300x250 — Rendering MP4 on server...';
 
-    try {
-      // Send to local server for ffmpeg conversion
-      const resp = await fetch('/convert', { method: 'POST', body: webmBlob });
-      if (!resp.ok) throw new Error(await resp.text());
-      const mp4Blob = await resp.blob();
-      const a = document.createElement('a');
-      a.download = `lovetta_ad_300x250_${girl}.mp4`;
-      a.href = URL.createObjectURL(mp4Blob);
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      document.getElementById('videoLabel').textContent = '300x250 — ' + girl + ' (MP4 saved!)';
-    } catch (e) {
-      console.log('MP4 conversion failed, saving WebM:', e);
-      const a = document.createElement('a');
-      a.download = `lovetta_ad_300x250_${girl}.webm`;
-      a.href = URL.createObjectURL(webmBlob);
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      document.getElementById('videoLabel').textContent = '300x250 — ' + girl + ' (WebM saved — start with: node scripts/ads_server.js)';
-    }
-  };
-  // Restart video from beginning
-  videoEl.currentTime = 0;
-  recorder.start();
-  document.getElementById('videoLabel').textContent = '300x250 — Recording ' + (duration/1000) + 's...';
-  setTimeout(() => recorder.stop(), duration);
+  try {
+    const resp = await fetch('/render-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        girl,
+        headline: v('headlineText'),
+        cta: v('ctaText'),
+        duration,
+        bg1: v('bg1'),
+      }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const mp4Blob = await resp.blob();
+    const a = document.createElement('a');
+    a.download = `lovetta_ad_300x250_${girl}.mp4`;
+    a.href = URL.createObjectURL(mp4Blob);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    document.getElementById('videoLabel').textContent = '300x250 — ' + girl + ' MP4 saved!';
+  } catch (e) {
+    document.getElementById('videoLabel').textContent = 'Failed: ' + e.message + ' (run: node scripts/ads_server.js)';
+  }
 }
 
 // ========== CARD SCREENSHOT TOOL ==========

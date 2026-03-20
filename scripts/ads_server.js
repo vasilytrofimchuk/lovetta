@@ -43,6 +43,64 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // POST /render-video — render video banner server-side as MP4 directly
+  if (req.method === 'POST' && req.url === '/render-video') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { girl, headline, cta, duration, bg1, bg2 } = JSON.parse(body);
+        const videoPath = path.join(ROOT, 'public', 'assets', 'ads', 'videos', girl + '.mp4');
+        if (!fs.existsSync(videoPath)) { res.writeHead(404); res.end('No video for ' + girl); return; }
+        const logoPath = path.join(ROOT, 'public', 'assets', 'brand', 'logo_text.png');
+        const dur = Math.min(duration || 6, 15);
+        const outPath = path.join(ROOT, 'scripts', `_render_${Date.now()}.mp4`);
+
+        // FFmpeg: dark bg + girl video on right + text overlay
+        // Canvas: 600x500 (300x250 at 2x)
+        const W = 600, H = 500;
+        const cardX = 230, cardY = 10, cardW = 360, cardH = 480;
+        const bgColor = bg1 || '#1a0a2e';
+
+        const cmd = [
+          'ffmpeg', '-y',
+          '-f', 'lavfi', '-i', `color=c=${bgColor.replace('#','0x')}:s=${W}x${H}:d=${dur}:r=30`,
+          '-i', `"${videoPath}"`,
+          '-i', `"${logoPath}"`,
+          '-filter_complex', `"` +
+            // Scale video to card size, crop to 3:4
+            `[1:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},setpts=PTS-STARTPTS[vid];` +
+            // Scale logo
+            `[2:v]scale=130:-1[logo];` +
+            // Overlay video on bg
+            `[0:v][vid]overlay=${cardX}:${cardY}:shortest=1[bg1];` +
+            // Overlay logo
+            `[bg1][logo]overlay=12:8[bg2];` +
+            // Draw text
+            `[bg2]drawtext=text='${(headline || 'Your AI Girlfriend').replace(/'/g, "\\'")}':fontsize=24:fontcolor=white:x=12:y=60:fontfile=/System/Library/Fonts/Helvetica.ttc:font='Helvetica Bold',` +
+            `drawtext=text='${(cta || 'Chat Now').replace(/'/g, "\\'")}':fontsize=16:fontcolor=white:x=22:y=180:box=1:boxcolor=0xd6336c:boxborderw=10:fontfile=/System/Library/Fonts/Helvetica.ttc` +
+          `"`,
+          '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
+          '-t', String(dur), '-an',
+          `"${outPath}"`,
+        ].join(' ');
+
+        console.log('Rendering video...');
+        execSync(cmd, { timeout: 60000, stdio: 'pipe' });
+        const mp4 = fs.readFileSync(outPath);
+        fs.unlinkSync(outPath);
+        console.log(`Video rendered: ${(mp4.length / 1024).toFixed(0)} KB`);
+        res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': mp4.length });
+        res.end(mp4);
+      } catch (e) {
+        console.error('Render failed:', e.message);
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Render failed: ' + e.message);
+      }
+    });
+    return;
+  }
+
   // POST /save-card?name=sophia — save PNG as card image
   if (req.method === 'POST' && req.url.startsWith('/save-card')) {
     const name = new URL(req.url, 'http://x').searchParams.get('name');
