@@ -303,7 +303,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
       <button class="tab" data-tab="visitors" onclick="switchTab('visitors')">Visitors</button>
-      <button class="tab" data-tab="users" onclick="switchTab('users')">Users</button>
+      <button class="tab" data-tab="users" onclick="switchTab('users')">Users <span class="badge" id="users-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="economics" onclick="switchTab('economics')">Economics</button>
       <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
       <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
@@ -345,7 +345,7 @@
       <table>
         <thead><tr>
           <th>ID</th><th>Email</th><th>Name</th><th>Auth</th><th>Country</th><th>City</th>
-          <th>Device</th><th>Subscription</th><th>Refs</th><th>Ref $</th><th>Created</th><th>Last Active</th><th></th>
+          <th>Device</th><th>Girls</th><th>Msgs</th><th>Subscription</th><th>Refs</th><th>Ref $</th><th>Created</th><th>Last Active</th><th></th>
         </tr></thead>
         <tbody id="user-rows"></tbody>
       </table>
@@ -599,6 +599,7 @@
       loadSentryBadge();
       loadReportsBadge();
       loadSupportBadge();
+      loadUsersBadge();
     }
 
     // Tabs
@@ -898,6 +899,8 @@
             '<td>' + esc(shortCountry(r.country) || '-') + '</td>' +
             '<td>' + esc(r.city || '-') + '</td>' +
             '<td title="' + esc((r.device_type || '') + (os ? ' ' + os : '')) + '">' + dev + '</td>' +
+            '<td>' + (r.companion_count || 0) + '</td>' +
+            '<td>' + (r.message_count || 0) + '</td>' +
             '<td>' + sub + '</td>' +
             '<td>' + refCount + '</td>' +
             '<td>' + refEarn + '</td>' +
@@ -907,7 +910,7 @@
           '</tr>';
         }).join('');
         document.getElementById('user-rows').innerHTML = rows ||
-          '<tr><td colspan="13" class="empty-row">No users yet</td></tr>';
+          '<tr><td colspan="15" class="empty-row">No users yet</td></tr>';
         renderPagination('user-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadUsers');
       });
     }
@@ -919,6 +922,16 @@
           .then(function(r) { return r.json(); })
           .then(function() { loadUsers(); });
       });
+    }
+
+    function loadUsersBadge() {
+      apiFetch('/api/admin/stats').then(function(data) {
+        var badge = document.getElementById('users-badge');
+        if (!badge) return;
+        var count = (data.users && data.users.today) || 0;
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? 'inline' : 'none';
+      }).catch(function() {});
     }
 
     // Settings
