@@ -587,12 +587,12 @@ function exportBanner(key) {
     c.toBlob(blob => {
       if (!blob) return;
       const a = document.createElement('a');
-      a.download = `lovetta_ad_${key}.png`;
+      a.download = `lovetta_ad_${key}.jpg`;
       a.href = URL.createObjectURL(blob);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    }, 'image/png');
+    }, 'image/jpeg', 0.88);
   } catch (e) {
     if (e.message.includes('ainted'))
       alert('Export needs HTTP server.\n\npython3 -m http.server 8111\n\nThen open:\nhttp://localhost:8111/scripts/ads_editor.html');
