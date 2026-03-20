@@ -130,6 +130,7 @@ const S = 2; // retina scale
 const BANNERS = {
   // Cards are 3:4 aspect ratio. All positions in canvas coords (2x).
   // Card sizes MUST keep 3:4 ratio: if w=X then h=X*4/3
+
   '300x250': {
     w: 300, h: 250, name: 'Medium Rectangle',
     // canvas 600x500. Cards right, text left.
@@ -142,52 +143,82 @@ const BANNERS = {
       { x: 246, y: 240, w: 168, h: 224 }, { x: 422, y: 240, w: 168, h: 224 },
     ],
   },
-  '336x280': {
-    w: 336, h: 280, name: 'Large Rectangle',
-    // canvas 672x560. Cards right, text left.
-    logo: { x: 28, y: 18, maxW: 150 },
-    headline: { x: 28, y: 110, size: 52, maxW: 230, align: 'left' },
-    cta: { x: 28, y: 380, size: 40, bw: 220, bh: 62 },
-    cards1: [{ x: 290, y: 16, w: 360, h: 480 }],
+
+  '315x300': {
+    w: 315, h: 300, name: 'Large Rectangle',
+    // canvas 630x600. Cards right, text left.
+    logo: { x: 24, y: 16, maxW: 140 },
+    headline: { x: 24, y: 100, size: 50, maxW: 210, align: 'left' },
+    cta: { x: 24, y: 410, size: 38, bw: 210, bh: 58 },
+    cards1: [{ x: 260, y: 16, w: 350, h: 567 }],
     cards4: [
-      { x: 270, y: 8, w: 192, h: 256 },  { x: 470, y: 8, w: 192, h: 256 },
-      { x: 270, y: 272, w: 192, h: 256 }, { x: 470, y: 272, w: 192, h: 256 },
+      { x: 246, y: 8, w: 183, h: 280 },  { x: 437, y: 8, w: 183, h: 280 },
+      { x: 246, y: 296, w: 183, h: 280 }, { x: 437, y: 296, w: 183, h: 280 },
     ],
   },
-  '728x90': {
-    w: 728, h: 90, name: 'Leaderboard',
-    // canvas 1456x180. Cards left, text right.
-    logo: { x: 700, y: 4, maxW: 100 },
-    headline: { x: 700, y: 48, size: 42, maxW: 700, align: 'left' },
-    cta: { x: 700, y: 112, size: 30, bw: 180, bh: 48 },
+
+  '950x250': {
+    w: 950, h: 250, name: 'Billboard',
+    // canvas 1900x500. Cards right, text left.
+    logo: { x: 40, y: 20, maxW: 180 },
+    headline: { x: 40, y: 120, size: 72, maxW: 500, align: 'left' },
+    cta: { x: 40, y: 340, size: 40, bw: 260, bh: 64 },
+    cards1: [{ x: 620, y: 16, w: 350, h: 467 }],
+    cards4: [
+      { x: 600, y: 10, w: 300, h: 480 }, { x: 910, y: 10, w: 300, h: 480 },
+      { x: 1220, y: 10, w: 300, h: 480 }, { x: 1530, y: 10, w: 300, h: 480 },
+    ],
+  },
+
+  '970x90': {
+    w: 970, h: 90, name: 'Super Leaderboard',
+    // canvas 1940x180. Cards left, text right.
+    logo: { x: 920, y: 4, maxW: 120 },
+    headline: { x: 920, y: 50, size: 44, maxW: 900, align: 'left' },
+    cta: { x: 920, y: 116, size: 30, bw: 200, bh: 48 },
     cards1: [{ x: 20, y: 4, w: 129, h: 172 }],
     cards4: [
-      { x: 10, y: 2, w: 160, h: 176 }, { x: 176, y: 2, w: 160, h: 176 },
-      { x: 342, y: 2, w: 160, h: 176 }, { x: 508, y: 2, w: 160, h: 176 },
+      { x: 14, y: 2, w: 210, h: 176 }, { x: 230, y: 2, w: 210, h: 176 },
+      { x: 446, y: 2, w: 210, h: 176 }, { x: 662, y: 2, w: 210, h: 176 },
     ],
   },
-  '160x600': {
-    w: 160, h: 600, name: 'Wide Skyscraper',
-    // canvas 320x1200. Cards top, text bottom.
-    logo: { x: 16, y: 556, maxW: 110 },
-    headline: { x: 16, y: 620, size: 38, maxW: 288, align: 'left' },
-    cta: { x: 16, y: 790, size: 30, bw: 180, bh: 50 },
-    cards1: [{ x: 20, y: 16, w: 280, h: 373 }],
+
+  '468x60': {
+    w: 468, h: 60, name: 'Banner',
+    // canvas 936x120. Cards left, text right.
+    logo: { x: 440, y: 2, maxW: 80 },
+    headline: { x: 440, y: 34, size: 30, maxW: 450, align: 'left' },
+    cta: { x: 440, y: 78, size: 22, bw: 140, bh: 34 },
+    cards1: [{ x: 14, y: 4, w: 84, h: 112 }],
     cards4: [
-      { x: 8, y: 10, w: 148, h: 197 },  { x: 164, y: 10, w: 148, h: 197 },
-      { x: 8, y: 215, w: 148, h: 197 }, { x: 164, y: 215, w: 148, h: 197 },
+      { x: 10, y: 2, w: 96, h: 116 }, { x: 110, y: 2, w: 96, h: 116 },
+      { x: 210, y: 2, w: 96, h: 116 }, { x: 310, y: 2, w: 96, h: 116 },
     ],
   },
-  '320x50': {
-    w: 320, h: 50, name: 'Mobile Banner',
-    // canvas 640x100. Cards left, text right.
-    logo: { x: 318, y: 2, maxW: 70 },
-    headline: { x: 318, y: 28, size: 24, maxW: 180, align: 'left' },
-    cta: { x: 510, y: 18, size: 24, bw: 120, bh: 40 },
-    cards1: [{ x: 10, y: 2, w: 72, h: 96 }],
+
+  '300x100': {
+    w: 300, h: 100, name: 'Small Banner',
+    // canvas 600x200. Cards left, text right.
+    logo: { x: 290, y: 4, maxW: 90 },
+    headline: { x: 290, y: 48, size: 32, maxW: 280, align: 'left' },
+    cta: { x: 290, y: 130, size: 24, bw: 150, bh: 42 },
+    cards1: [{ x: 14, y: 8, w: 138, h: 184 }],
     cards4: [
-      { x: 6, y: 2, w: 69, h: 92 },  { x: 79, y: 2, w: 69, h: 92 },
-      { x: 152, y: 2, w: 69, h: 92 }, { x: 225, y: 2, w: 69, h: 92 },
+      { x: 8, y: 4, w: 64, h: 192 }, { x: 76, y: 4, w: 64, h: 192 },
+      { x: 144, y: 4, w: 64, h: 192 }, { x: 212, y: 4, w: 64, h: 192 },
+    ],
+  },
+
+  '320x480': {
+    w: 320, h: 480, name: 'Mobile Interstitial',
+    // canvas 640x960. Cards top, text bottom.
+    logo: { x: 24, y: 560, maxW: 140 },
+    headline: { x: 24, y: 640, size: 56, maxW: 590, align: 'left' },
+    cta: { x: 24, y: 820, size: 40, bw: 260, bh: 64 },
+    cards1: [{ x: 60, y: 16, w: 520, h: 520 }],
+    cards4: [
+      { x: 16, y: 10, w: 300, h: 260 },  { x: 324, y: 10, w: 300, h: 260 },
+      { x: 16, y: 278, w: 300, h: 260 }, { x: 324, y: 278, w: 300, h: 260 },
     ],
   },
 };
