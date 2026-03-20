@@ -241,7 +241,8 @@ async function runProactiveMessages() {
           [row.user_id]
         );
         const pref = prefRows[0];
-        if (pref?.notify_new_messages && row.email && !row.email_disabled && row.email_type !== 'synthetic') {
+        if (pref?.notify_new_messages && row.email && !row.email_disabled && row.email_type !== 'synthetic'
+            && !row.email.endsWith('@telegram.lovetta.ai') && !row.email.endsWith('@apple.lovetta.ai')) {
           // Rate limit: at most once per 30 min
           const canEmail = !pref.last_notification_at ||
             (Date.now() - new Date(pref.last_notification_at).getTime() > 30 * 60 * 1000);
@@ -260,10 +261,19 @@ async function runProactiveMessages() {
           }
         }
 
-        // Telegram
+        // Telegram — rich message with button to open chat
         if (row.telegram_id) {
-          sendTelegramMessage(row.telegram_id, `${row.companion_name}: ${messagePreview}`)
-            .catch(() => {});
+          const SITE_URL = process.env.SITE_URL || 'http://localhost:3900';
+          sendTelegramMessage(row.telegram_id,
+            `💕 <b>${row.companion_name}</b>\n\n${messagePreview}`,
+            {
+              reply_markup: {
+                inline_keyboard: [[
+                  { text: '💬 Reply', web_app: { url: `${SITE_URL}/my/chat/${row.companion_id}` } }
+                ]],
+              },
+            }
+          ).catch(() => {});
         }
 
         console.log(`[proactive] Sent ${slot} message from ${row.companion_name} to user ${row.user_id}`);

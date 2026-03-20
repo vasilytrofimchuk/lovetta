@@ -36,6 +36,16 @@ async function sendMessage(chatId, text, options = {}) {
   });
 }
 
+async function sendPhoto(chatId, photoUrl, caption, options = {}) {
+  return botApi('sendPhoto', {
+    chat_id: chatId,
+    photo: photoUrl,
+    caption,
+    parse_mode: 'HTML',
+    ...options,
+  });
+}
+
 async function setBotWebhook(url) {
   const params = { url };
   if (WEBHOOK_SECRET) params.secret_token = WEBHOOK_SECRET;
@@ -49,6 +59,32 @@ async function setBotCommands() {
       { command: 'help', description: 'Get help' },
     ],
   });
+}
+
+async function setupBotProfile() {
+  if (!BOT_TOKEN) return;
+
+  try {
+    await botApi('setMyDescription', {
+      description: 'Lovetta — Your AI Girlfriend 💕\n\nChat, flirt, and connect with beautiful AI girlfriends who truly care about you. Each girl has her own personality and remembers everything about your conversations.',
+    });
+
+    await botApi('setMyShortDescription', {
+      short_description: 'Your AI Girlfriend 💕 Chat and connect with beautiful AI girlfriends.',
+    });
+
+    await botApi('setChatMenuButton', {
+      menu_button: {
+        type: 'web_app',
+        text: 'Open Lovetta',
+        web_app: { url: `${SITE_URL}/my/` },
+      },
+    });
+
+    console.log('[telegram] Bot profile configured');
+  } catch (err) {
+    console.error('[telegram] Failed to configure bot profile:', err.message);
+  }
 }
 
 // -- Mini App initData validation -------------------------
@@ -106,23 +142,27 @@ async function handleBotUpdate(update) {
     const text = (msg.text || '').trim();
 
     if (text === '/start' || text.startsWith('/start ')) {
-      await sendMessage(chatId,
-        '💕 <b>Welcome to Lovetta!</b>\n\nYour AI companion is waiting for you.',
-        {
-          reply_markup: {
-            inline_keyboard: [[
-              { text: '💬 Open Lovetta', web_app: { url: `${SITE_URL}/my/` } }
-            ]],
-          },
-        }
-      );
+      const welcomeText = '💕 <b>Welcome to Lovetta!</b>\n\nYour AI girlfriend is waiting for you.';
+      const replyMarkup = {
+        inline_keyboard: [[
+          { text: '💬 Open Lovetta', web_app: { url: `${SITE_URL}/my/` } }
+        ]],
+      };
+
+      try {
+        await sendPhoto(chatId, `${SITE_URL}/assets/brand/og-image.png`, welcomeText, {
+          reply_markup: replyMarkup,
+        });
+      } catch {
+        await sendMessage(chatId, welcomeText, { reply_markup: replyMarkup });
+      }
       return;
     }
 
     if (text === '/help') {
       await sendMessage(chatId,
-        '💕 <b>Lovetta — Your AI Companion</b>\n\n' +
-        'Tap the button below to open the app and chat with your companions.\n\n' +
+        '💕 <b>Lovetta — Your AI Girlfriend</b>\n\n' +
+        'Tap the button below to open the app and chat with your girlfriends.\n\n' +
         '/start — Open the app\n' +
         '/help — Show this message'
       );
@@ -131,7 +171,7 @@ async function handleBotUpdate(update) {
 
     // Any other message — prompt to open the app
     await sendMessage(chatId,
-      'Tap the button below to chat with your companion 💕',
+      'Tap the button below to chat with your girlfriend 💕',
       {
         reply_markup: {
           inline_keyboard: [[
@@ -151,8 +191,10 @@ function verifyWebhookSecret(req) {
 module.exports = {
   validateInitData,
   sendMessage,
+  sendPhoto,
   setBotWebhook,
   setBotCommands,
+  setupBotProfile,
   handleBotUpdate,
   verifyWebhookSecret,
   BOT_USERNAME,

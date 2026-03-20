@@ -1035,6 +1035,10 @@ const MIGRATIONS = [
     name: 'v46_ts_click_id',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS ts_click_id TEXT;`,
   },
+  {
+    name: 'v47_fix_telegram_email_type',
+    sql: `UPDATE users SET email_type = 'synthetic' WHERE email LIKE '%@telegram.lovetta.ai' AND (email_type IS NULL OR email_type != 'synthetic');`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

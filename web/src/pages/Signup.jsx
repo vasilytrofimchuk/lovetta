@@ -64,6 +64,11 @@ export default function Signup() {
     if (onboardingData?.privacyAccepted) setPrivacyChecked(true)
     if (onboardingData?.aiConsentAccepted) setAiConsentChecked(true)
 
+    // Telegram Mini App with complete consent: skip to auto-auth
+    if (from === 'telegram' && hasCompleteConsent(onboardingData) && window.Telegram?.WebApp?.initData) {
+      window.location.replace('/my/')
+      return
+    }
     if ((from === 'telegram' || provider === 'google') && hasCompleteConsent(onboardingData)) {
       setStep(2)
     }
@@ -103,6 +108,13 @@ export default function Signup() {
     }
 
     persistOnboarding()
+
+    // Telegram Mini App: redirect to trigger auto-auth with consent data now saved
+    if (window.Telegram?.WebApp?.initData) {
+      window.location.replace('/my/')
+      return
+    }
+
     setStep(2)
   }
 

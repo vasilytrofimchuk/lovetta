@@ -925,8 +925,8 @@ router.post('/telegram', authLimiter, async (req, res) => {
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
                               terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
-                              referral_code, referred_by, ts_click_id)
-           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'telegram', $12, $13, $14)
+                              referral_code, referred_by, email_type, ts_click_id)
+           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'telegram', $12, $13, 'synthetic', $14)
            RETURNING *`,
           [syntheticEmail, telegramId, displayName, tgUser.photoUrl, month, year,
            ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,

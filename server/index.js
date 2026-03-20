@@ -363,6 +363,13 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`[lovetta] Server running on port ${PORT}`);
     require('./src/scheduler').startScheduler();
+
+    // Configure Telegram bot profile (non-blocking, non-fatal)
+    const { setupBotProfile, setBotCommands, BOT_TOKEN } = require('./src/telegram');
+    if (BOT_TOKEN) {
+      setupBotProfile().catch(err => console.error('[telegram] setup error:', err.message));
+      setBotCommands().catch(err => console.error('[telegram] commands error:', err.message));
+    }
   });
 }
 

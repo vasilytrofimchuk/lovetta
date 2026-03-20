@@ -21,6 +21,13 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Telegram Mini App: redirect to home for auto-auth
+  useEffect(() => {
+    if (window.Telegram?.WebApp?.initData) {
+      window.location.replace('/my/')
+    }
+  }, [])
+
   // Handle Google OAuth callback
   useEffect(() => {
     const oauth = searchParams.get('oauth')
