@@ -267,9 +267,15 @@ function extractFactsWithRegex(messages, companionName) {
     const allergyMatch = text.match(/allergic to (\w+)/i);
     if (allergyMatch) facts.push({ category: 'life', fact: `User is allergic to ${allergyMatch[1]}` });
 
-    // Coffee/drinks: "X cups of coffee"
-    const drinkMatch = text.match(/(\d+) cups? (?:of )?(\w+)/i);
-    if (drinkMatch) facts.push({ category: 'preferences', fact: `User drinks ${drinkMatch[1]} cups of ${drinkMatch[2]} daily` });
+    // Coffee/drinks: "X cups of coffee", "X cups a day"
+    const drinkMatch = text.match(/(\d+) cups? (?:of )?(coffee|tea|cocoa)/i);
+    if (drinkMatch) {
+      facts.push({ category: 'preferences', fact: `User drinks ${drinkMatch[1]} cups of ${drinkMatch[2]} daily` });
+    } else if (/cups?.*(?:coffee|tea)/i.test(text) || /(?:coffee|tea).*cups?/i.test(text)) {
+      const numMatch = text.match(/(\d+)\s*cups?/i);
+      const bevMatch = text.match(/(coffee|tea)/i);
+      if (numMatch && bevMatch) facts.push({ category: 'preferences', fact: `User drinks ${numMatch[1]} cups of ${bevMatch[1]} daily` });
+    }
 
     // Learning
     const learnMatch = text.match(/(?:started |been )?learning (\w+(?:\s\w+)?)/i);
@@ -281,6 +287,14 @@ function extractFactsWithRegex(messages, companionName) {
 
     // Night owl
     if (/night owl/i.test(text)) facts.push({ category: 'identity', fact: 'User is a night owl' });
+
+    // Zodiac: "I'm a Capricorn", "I'm a Leo"
+    const zodiacMatch = text.match(/i'?m (?:a |an )?(capricorn|aquarius|pisces|aries|taurus|gemini|cancer|leo|virgo|libra|scorpio|sagittarius)\b/i);
+    if (zodiacMatch) facts.push({ category: 'identity', fact: `User is a ${zodiacMatch[1]}` });
+
+    // Books: "finished reading X", "reading X"
+    const bookMatch = text.match(/(?:reading|finished reading|just read) ([A-Z][\w\s]{1,30}?)(?:[.,!]|$)/);
+    if (bookMatch) facts.push({ category: 'preferences', fact: `User read ${bookMatch[1].trim()}` });
 
     // Cooking: "my specialty is X", "I cook"
     const cookMatch = text.match(/(?:specialty|speciality) is (?:homemade )?(\w+(?:\s\w+)?)/i);
