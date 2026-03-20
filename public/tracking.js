@@ -31,6 +31,7 @@
         utmSource: p.get('utm_source') || null,
         utmMedium: p.get('utm_medium') || null,
         utmCampaign: p.get('utm_campaign') || null,
+        utmContent: p.get('utm_content') || null,
         gclid: p.get('gclid') || null
       };
     } catch (e) {
@@ -54,6 +55,7 @@
       utmSource: utm.utmSource,
       utmMedium: utm.utmMedium,
       utmCampaign: utm.utmCampaign,
+      utmContent: utm.utmContent,
       gclid: utm.gclid
     })
   }).then(function(r) {

@@ -317,9 +317,9 @@
     <!-- Overview Tab -->
     <div id="tab-overview" class="tab-content active">
       <div class="tab-header"><h2>Overview</h2><button class="refresh-btn" onclick="loadOverview()">↻ Refresh</button></div>
+      <div id="online-chart-container"></div>
       <div class="stat-cards" id="overview-all-cards"></div>
       <div class="breakdown-grid" id="overview-visitor-breakdowns"></div>
-      <div id="online-chart-container"></div>
     </div>
 
     <!-- Visitors Tab -->
@@ -328,7 +328,7 @@
       <table>
         <thead><tr>
           <th>Session</th><th>Page</th><th>Device</th><th>Country</th><th>City</th>
-          <th>Source</th><th>Medium</th><th>Campaign</th><th>Referrer</th>
+          <th>Source</th><th>Medium</th><th>Campaign</th><th>Content</th><th>Referrer</th>
           <th>First Visit</th><th>Last Active</th>
         </tr></thead>
         <tbody id="visitor-rows"></tbody>
@@ -864,13 +864,14 @@
             '<td>' + esc(r.utm_source || '-') + '</td>' +
             '<td>' + esc(r.utm_medium || '-') + '</td>' +
             '<td>' + esc(r.utm_campaign || '-') + '</td>' +
+            '<td>' + esc(r.utm_content || '-') + '</td>' +
             '<td class="truncate" title="' + esc(r.referrer || '') + '">' + esc(r.referrer || '-') + '</td>' +
             '<td class="mono">' + timeAgo(r.created_at) + '</td>' +
             '<td class="mono">' + timeAgo(r.last_activity) + '</td>' +
           '</tr>';
         }).join('');
         document.getElementById('visitor-rows').innerHTML = rows ||
-          '<tr><td colspan="11" class="empty-row">No visitors yet</td></tr>';
+          '<tr><td colspan="12" class="empty-row">No visitors yet</td></tr>';
         renderPagination('visitor-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadVisitors');
       });
     }

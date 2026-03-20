@@ -14,6 +14,7 @@ const { runProactiveMessages } = require('./proactive');
 const ONE_HOUR = 60 * 60 * 1000;
 const THIRTY_MINUTES = 30 * 60 * 1000;
 const FIVE_MINUTES = 5 * 60 * 1000;
+const ONE_MINUTE = 60 * 1000;
 
 // -- Email frequency cap (max 2 notification emails per user per day) --
 
@@ -224,7 +225,7 @@ async function runRenewalReminders() {
   }
 }
 
-// -- Online snapshots (every 5 min) ---------------------------------
+// -- Online snapshots (every 1 min) ---------------------------------
 
 async function runOnlineSnapshot() {
   const pool = getPool();
@@ -272,8 +273,8 @@ function startScheduler() {
   setInterval(runProactiveMessages, THIRTY_MINUTES);
   setTimeout(runProactiveMessages, 2 * 60 * 1000);
 
-  // Online user snapshots — every 5 min
-  setInterval(runOnlineSnapshot, FIVE_MINUTES);
+  // Online user snapshots — every 1 min
+  setInterval(runOnlineSnapshot, ONE_MINUTE);
   setTimeout(runOnlineSnapshot, 15 * 1000);
 }
 

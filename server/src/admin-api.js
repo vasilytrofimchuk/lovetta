@@ -147,7 +147,7 @@ router.get('/visitors', async (req, res) => {
     const [countResult, dataResult] = await Promise.all([
       pool.query('SELECT COUNT(*) AS total FROM visitors'),
       pool.query(`SELECT session_id, current_page, device_type, user_agent, country, city,
-                         utm_source, utm_medium, utm_campaign, referrer, created_at, last_activity
+                         utm_source, utm_medium, utm_campaign, utm_content, referrer, created_at, last_activity
                   FROM visitors ORDER BY last_activity DESC LIMIT $1 OFFSET $2`, [limit, offset]),
     ]);
 

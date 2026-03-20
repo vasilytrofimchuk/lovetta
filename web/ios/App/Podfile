@@ -16,6 +16,7 @@ def capacitor_pods
   pod 'CapacitorBrowser', :path => '../../../node_modules/@capacitor/browser'
   pod 'CapacitorKeyboard', :path => '../../../node_modules/@capacitor/keyboard'
   pod 'CapacitorPushNotifications', :path => '../../../node_modules/@capacitor/push-notifications'
+  pod 'CapacitorSplashScreen', :path => '../../../node_modules/@capacitor/splash-screen'
   pod 'CodetrixStudioCapacitorGoogleAuth', :path => '../../../node_modules/@codetrix-studio/capacitor-google-auth'
   pod 'RevenuecatPurchasesCapacitor', :path => '../../../node_modules/@revenuecat/purchases-capacitor'
   pod 'CapacitorVoiceRecorder', :path => '../../../node_modules/capacitor-voice-recorder'

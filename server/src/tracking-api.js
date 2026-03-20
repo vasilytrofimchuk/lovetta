@@ -56,7 +56,7 @@ router.post('/track-visitor', rateLimit, async (req, res) => {
 
   try {
     const { sessionId, page, deviceType, screenResolution, language, timezone, referrer,
-            utmSource, utmMedium, utmCampaign, gclid } = req.body || {};
+            utmSource, utmMedium, utmCampaign, utmContent, gclid } = req.body || {};
 
     const sid = san(sessionId, 100);
     if (!sid || sid.length < 10) return res.json({ ok: true });
@@ -82,14 +82,14 @@ router.post('/track-visitor', rateLimit, async (req, res) => {
     await pool.query(
       `INSERT INTO visitors (session_id, current_page, language, timezone, device_type, screen_resolution,
                              user_agent, ip_address, country, state, city, utm_source, utm_medium,
-                             utm_campaign, gclid, referrer)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+                             utm_campaign, utm_content, gclid, referrer)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (session_id) DO NOTHING`,
       [sid, san(page), san(language, 50), san(timezone, 100), san(deviceType, 50),
        san(screenResolution, 30), san(ua, 500), san(ip, 100),
        geo.country || null, geo.state || null, geo.city || null,
        san(utmSource, 100), san(utmMedium, 100), san(utmCampaign, 200),
-       san(gclid, 200), san(referrer, 500)]
+       san(utmContent, 200), san(gclid, 200), san(referrer, 500)]
     );
 
     res.json({ ok: true, country: geo.country || null, city: geo.city || null, state: geo.state || null });
