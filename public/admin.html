@@ -803,11 +803,12 @@
 
       // Summary
       var peak30 = 0;
-      slots.forEach(function(s) { if (s.users > peak30) peak30 = s.users; });
+      slots.forEach(function(s) { var t = s.users + s.visitors; if (t > peak30) peak30 = t; });
       var latest = slots[slots.length - 1];
+      var latestTotal = latest.users + latest.visitors;
       var sub5 = [];
-      if (latest.web) sub5.push(latest.web + ' web');
-      if (latest.ios) sub5.push(latest.ios + ' ios');
+      if (latest.users) sub5.push(latest.users + ' users');
+      if (latest.visitors) sub5.push(latest.visitors + ' visitors');
       var sub5Str = sub5.length ? ' (' + sub5.join(' · ') + ')' : '';
 
       // Max for Y-axis
@@ -839,9 +840,8 @@
       container.innerHTML =
         '<div class="online-chart">' +
         '<div class="online-summary">' +
-        '<div class="online-summary-item"><div class="online-label">Online users (30 min peak)</div><div class="online-value">' + peak30 + '</div></div>' +
-        '<div class="online-summary-item"><div class="online-label">Online now' + sub5Str + '</div><div class="online-value">' + latest.users + '</div></div>' +
-        '<div class="online-summary-item"><div class="online-label">Visitors now</div><div class="online-value">' + latest.visitors + '</div></div>' +
+        '<div class="online-summary-item"><div class="online-label">30 min peak</div><div class="online-value">' + peak30 + '</div></div>' +
+        '<div class="online-summary-item"><div class="online-label">Online now' + sub5Str + '</div><div class="online-value">' + latestTotal + '</div></div>' +
         '</div>' +
         '<div class="online-chart-subtitle">Users + visitors per minute</div>' +
         '<div class="chart-area" style="padding-right:24px">' + bars + yLabels + '</div>' +
