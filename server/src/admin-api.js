@@ -186,9 +186,12 @@ router.get('/users', async (req, res) => {
     const dataQuery = `
       SELECT u.id, u.email, u.display_name, u.auth_provider, u.country, u.city,
              u.device_type, u.user_agent, u.created_at, u.last_activity,
+             u.referred_by, u.ts_click_id, u.utm_source,
+             ref.email AS referrer_email,
              s.plan AS sub_plan, s.status AS sub_status,
              cc.companion_count, mc.message_count
       FROM users u
+      LEFT JOIN users ref ON ref.id = u.referred_by
       LEFT JOIN LATERAL (
         SELECT plan, status FROM subscriptions WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
       ) s ON true

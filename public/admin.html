@@ -345,7 +345,7 @@
       <table>
         <thead><tr>
           <th>Email</th><th>Name</th><th>Auth</th><th>Country</th><th>City</th>
-          <th>Device</th><th>Girls</th><th>Msgs</th><th>Sub</th><th>Created</th><th>Last Active</th><th></th>
+          <th>Device</th><th>Girls</th><th>Msgs</th><th>Sub</th><th>Source</th><th>Created</th><th>Last Active</th><th></th>
         </tr></thead>
         <tbody id="user-rows"></tbody>
       </table>
@@ -889,7 +889,11 @@
           var os = parseOS(r.user_agent);
           var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '');
           var sub = r.sub_status ? esc(r.sub_plan) + ' (' + esc(r.sub_status) + ')' : 'Free';
-          var sub = r.sub_status ? esc(r.sub_plan) + ' (' + esc(r.sub_status) + ')' : 'Free';
+          var srcParts = [];
+          if (r.utm_source) srcParts.push(esc(r.utm_source));
+          if (r.referred_by) srcParts.push('ref:' + esc((r.referrer_email || '').split('@')[0] || '?'));
+          if (r.ts_click_id) srcParts.push('ts');
+          var src = srcParts.length ? srcParts.join(' ') : '-';
           return '<tr>' +
             '<td class="mono" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.email || '') + '">' + esc(r.email || '-') + '</td>' +
             '<td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.display_name || '') + '">' + esc(r.display_name || '-') + '</td>' +
@@ -900,13 +904,14 @@
             '<td>' + (r.companion_count || 0) + '</td>' +
             '<td>' + (r.message_count || 0) + '</td>' +
             '<td>' + sub + '</td>' +
+            '<td>' + src + '</td>' +
             '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
             '<td class="mono">' + timeAgo(r.last_activity) + '</td>' +
             '<td><button onclick="deleteUser(\'' + esc(r.id) + '\', \'' + esc(r.email || '') + '\')" title="Delete" style="padding:2px 6px;background:var(--bg3);color:var(--error);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:12px;line-height:1;">✕</button></td>' +
           '</tr>';
         }).join('');
         document.getElementById('user-rows').innerHTML = rows ||
-          '<tr><td colspan="12" class="empty-row">No users yet</td></tr>';
+          '<tr><td colspan="13" class="empty-row">No users yet</td></tr>';
         renderPagination('user-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadUsers');
       });
     }
