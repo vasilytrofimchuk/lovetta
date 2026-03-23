@@ -1043,6 +1043,13 @@ const MIGRATIONS = [
     name: 'v48_utm_content',
     sql: `ALTER TABLE visitors ADD COLUMN IF NOT EXISTS utm_content TEXT;`,
   },
+  {
+    name: 'v49_user_utm_columns',
+    sql: `
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

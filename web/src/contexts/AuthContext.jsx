@@ -57,11 +57,17 @@ export function AuthProvider({ children }) {
       if (onboardingData?.privacyAccepted) payload.privacyAccepted = onboardingData.privacyAccepted
       if (onboardingData?.aiConsentAccepted) payload.aiConsentAccepted = onboardingData.aiConsentAccepted
 
-      // Include referral code + click_id if present
+      // Include referral code + click_id + UTM if present
       const ref = localStorage.getItem('lovetta-ref')
       if (ref) payload.referralCode = ref
       const tsClickId = localStorage.getItem('lovetta-ts-click-id')
       if (tsClickId) payload.tsClickId = tsClickId
+      const utmSource = localStorage.getItem('lovetta-utm-source')
+      if (utmSource) payload.utmSource = utmSource
+      const utmMedium = localStorage.getItem('lovetta-utm-medium')
+      if (utmMedium) payload.utmMedium = utmMedium
+      const utmCampaign = localStorage.getItem('lovetta-utm-campaign')
+      if (utmCampaign) payload.utmCampaign = utmCampaign
 
       api.post('/api/auth/telegram', payload)
         .then(({ data }) => {
@@ -69,6 +75,9 @@ export function AuthProvider({ children }) {
           localStorage.setItem('lovetta-refresh-token', data.refreshToken)
           clearOnboardingData()
           localStorage.removeItem('lovetta-ref')
+          localStorage.removeItem('lovetta-utm-source')
+          localStorage.removeItem('lovetta-utm-medium')
+          localStorage.removeItem('lovetta-utm-campaign')
           trackSignup()
           setUser(data.user)
           tgWebApp.ready?.()
@@ -112,13 +121,20 @@ export function AuthProvider({ children }) {
 
   const signup = async ({ email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode }) => {
     const tsClickId = localStorage.getItem('lovetta-ts-click-id') || undefined
+    const utmSource = localStorage.getItem('lovetta-utm-source') || undefined
+    const utmMedium = localStorage.getItem('lovetta-utm-medium') || undefined
+    const utmCampaign = localStorage.getItem('lovetta-utm-campaign') || undefined
     const { data } = await api.post('/api/auth/signup', {
       email, password, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode, tsClickId,
+      utmSource, utmMedium, utmCampaign,
     })
     localStorage.setItem('lovetta-token', data.accessToken)
     localStorage.setItem('lovetta-refresh-token', data.refreshToken)
     clearOnboardingData()
     localStorage.removeItem('lovetta-ref')
+    localStorage.removeItem('lovetta-utm-source')
+    localStorage.removeItem('lovetta-utm-medium')
+    localStorage.removeItem('lovetta-utm-campaign')
     setUser(data.user)
     return data
   }

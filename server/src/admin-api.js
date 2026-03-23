@@ -186,12 +186,19 @@ router.get('/users', async (req, res) => {
     const dataQuery = `
       SELECT u.id, u.email, u.display_name, u.auth_provider, u.country, u.city,
              u.device_type, u.user_agent, u.created_at, u.last_activity,
-             u.referred_by, u.ts_click_id, u.utm_source,
+             u.referred_by, u.ts_click_id,
+             COALESCE(u.utm_source, fv.utm_source) AS utm_source,
+             COALESCE(u.utm_medium, fv.utm_medium) AS utm_medium,
+             COALESCE(u.utm_campaign, fv.utm_campaign) AS utm_campaign,
              ref.email AS referrer_email,
              s.plan AS sub_plan, s.status AS sub_status,
              cc.companion_count, mc.message_count
       FROM users u
       LEFT JOIN users ref ON ref.id = u.referred_by
+      LEFT JOIN LATERAL (
+        SELECT utm_source, utm_medium, utm_campaign FROM visitors
+        WHERE ip_address = u.ip_address ORDER BY created_at ASC LIMIT 1
+      ) fv ON true
       LEFT JOIN LATERAL (
         SELECT plan, status FROM subscriptions WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
       ) s ON true

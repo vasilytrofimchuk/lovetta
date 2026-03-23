@@ -206,6 +206,12 @@
         if (ref) localStorage.setItem('lovetta-ref', ref.trim());
         var clickId = params.get('click_id');
         if (clickId) localStorage.setItem('lovetta-ts-click-id', clickId.trim());
+        var utmSource = params.get('utm_source');
+        if (utmSource) localStorage.setItem('lovetta-utm-source', utmSource.trim());
+        var utmMedium = params.get('utm_medium');
+        if (utmMedium) localStorage.setItem('lovetta-utm-medium', utmMedium.trim());
+        var utmCampaign = params.get('utm_campaign');
+        if (utmCampaign) localStorage.setItem('lovetta-utm-campaign', utmCampaign.trim());
       } catch (err) {}
     })();
 

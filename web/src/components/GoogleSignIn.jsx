@@ -27,6 +27,9 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
 
       const referralCode = localStorage.getItem('lovetta-ref') || undefined
       const tsClickId = localStorage.getItem('lovetta-ts-click-id') || undefined
+      const utmSource = localStorage.getItem('lovetta-utm-source') || undefined
+      const utmMedium = localStorage.getItem('lovetta-utm-medium') || undefined
+      const utmCampaign = localStorage.getItem('lovetta-utm-campaign') || undefined
       const { data } = await api.post('/api/auth/google/token', {
         idToken,
         birthMonth: birthData?.birthMonth,
@@ -36,11 +39,15 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
         aiConsentAccepted: birthData?.aiConsentAccepted,
         referralCode,
         tsClickId,
+        utmSource, utmMedium, utmCampaign,
       })
       localStorage.setItem('lovetta-token', data.accessToken)
       localStorage.setItem('lovetta-refresh-token', data.refreshToken)
       clearOnboardingData()
       localStorage.removeItem('lovetta-ref')
+      localStorage.removeItem('lovetta-utm-source')
+      localStorage.removeItem('lovetta-utm-medium')
+      localStorage.removeItem('lovetta-utm-campaign')
       await refreshUser()
       onSuccess?.()
     } catch (err) {
@@ -74,6 +81,11 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
     const tsClickId = localStorage.getItem('lovetta-ts-click-id')
     if (tsClickId && stateData) stateData.tsClickId = tsClickId
     else if (tsClickId) stateData = { tsClickId }
+
+    const utmSource = localStorage.getItem('lovetta-utm-source')
+    const utmMedium = localStorage.getItem('lovetta-utm-medium')
+    const utmCampaign = localStorage.getItem('lovetta-utm-campaign')
+    if (utmSource) stateData = { ...(stateData || {}), utmSource, utmMedium, utmCampaign }
 
     let url = '/api/auth/google'
     if (stateData) url += '?state=' + encodeURIComponent(btoa(JSON.stringify(stateData)))

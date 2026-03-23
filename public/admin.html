@@ -894,6 +894,7 @@
           if (r.referred_by) srcParts.push('ref:' + esc((r.referrer_email || '').split('@')[0] || '?'));
           if (r.ts_click_id) srcParts.push('ts');
           var src = srcParts.length ? srcParts.join(' ') : '-';
+          var srcTitle = [r.utm_source, r.utm_medium, r.utm_campaign].filter(Boolean).join(' / ');
           return '<tr>' +
             '<td class="mono" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.email || '') + '">' + esc(r.email || '-') + '</td>' +
             '<td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.display_name || '') + '">' + esc(r.display_name || '-') + '</td>' +
@@ -904,7 +905,7 @@
             '<td>' + (r.companion_count || 0) + '</td>' +
             '<td>' + (r.message_count || 0) + '</td>' +
             '<td>' + sub + '</td>' +
-            '<td>' + src + '</td>' +
+            '<td title="' + esc(srcTitle) + '">' + src + '</td>' +
             '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
             '<td class="mono">' + timeAgo(r.last_activity) + '</td>' +
             '<td><button onclick="deleteUser(\'' + esc(r.id) + '\', \'' + esc(r.email || '') + '\')" title="Delete" style="padding:2px 6px;background:var(--bg3);color:var(--error);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:12px;line-height:1;">✕</button></td>' +

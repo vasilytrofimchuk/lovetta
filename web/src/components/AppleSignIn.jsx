@@ -36,6 +36,9 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
       const onboardingData = readOnboardingData() || {}
       const referralCode = localStorage.getItem('lovetta-ref') || undefined
       const tsClickId = localStorage.getItem('lovetta-ts-click-id') || undefined
+      const utmSource = localStorage.getItem('lovetta-utm-source') || undefined
+      const utmMedium = localStorage.getItem('lovetta-utm-medium') || undefined
+      const utmCampaign = localStorage.getItem('lovetta-utm-campaign') || undefined
 
       const { data } = await api.post('/api/auth/apple', {
         identityToken: response.identityToken,
@@ -51,12 +54,16 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
         aiConsentAccepted: ageData?.aiConsentAccepted ?? onboardingData.aiConsentAccepted,
         referralCode,
         tsClickId,
+        utmSource, utmMedium, utmCampaign,
       })
 
       localStorage.setItem('lovetta-token', data.accessToken)
       localStorage.setItem('lovetta-refresh-token', data.refreshToken)
       clearOnboardingData()
       localStorage.removeItem('lovetta-ref')
+      localStorage.removeItem('lovetta-utm-source')
+      localStorage.removeItem('lovetta-utm-medium')
+      localStorage.removeItem('lovetta-utm-campaign')
       await refreshUser()
       onSuccess?.()
     } catch (err) {
