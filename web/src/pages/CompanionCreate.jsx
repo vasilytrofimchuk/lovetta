@@ -232,7 +232,10 @@ export default function CompanionCreate() {
       style={{ height: pageHeight }}
     >
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
+      <div
+        className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter pb-3"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
+      >
         <div className="w-full flex items-center gap-3">
           <button onClick={() => {
             if (step === 'choose') navigate('/');
