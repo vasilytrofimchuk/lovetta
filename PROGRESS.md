@@ -2,6 +2,20 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Apple App Review Fixes — v1.0 Resubmission
+- [x] Update StoreKit tip descriptions (remove "AI girlfriend" → "support your chat")
+- [x] Update Info.plist microphone usage (remove "girlfriend")
+- [x] Add `DELETE /api/auth/account` endpoint (user-facing soft delete)
+- [x] Add delete account UI to Profile page with confirmation modal
+- [x] Add `deleteAccount()` to AuthContext
+- [x] Run `npm run build:ios` for native changes
+- [x] All 28 API tests pass
+- [x] All 48 UI tests pass
+- [ ] Manual: Update ASC description ("no limits" → "when it's personal")
+- [ ] Manual: Add IAP review notes to App Store Connect
+- [ ] Manual: Record account deletion screen recording for Apple
+- [ ] Manual: Resubmit to App Review
+
 ## Update Template Ages to 18-25
 - [x] Update all 12 realistic template ages (18-25, skewing toward 18)
 - [x] Update all 6 anime template ages (18-22, skewing toward 18)

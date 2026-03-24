@@ -9,7 +9,7 @@ import { getAppPageHeight } from '../lib/layout';
 import RealEmailPrompt from '../components/RealEmailPrompt';
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState(null);
@@ -43,6 +43,20 @@ export default function Profile() {
   const [cashoutLoading, setCashoutLoading] = useState(false);
   const [refMsg, setRefMsg] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      navigate('/');
+    } catch (err) {
+      toast('Failed to delete account. Please try again.');
+      setDeleting(false);
+    }
+  };
 
   const PAYOUT_OPTIONS = [
     { value: 'paypal', label: 'PayPal' },
@@ -851,15 +865,56 @@ export default function Profile() {
           </button>
         </div>
 
+        {/* Delete Account */}
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="w-full py-3 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors text-sm mt-4"
+        >
+          Delete Account
+        </button>
+
         {/* Sign out */}
         <button
           onClick={logout}
-          className="w-full py-3 rounded-xl border border-brand-border text-brand-text-secondary hover:bg-brand-surface transition-colors text-sm mt-4"
+          className="w-full py-3 rounded-xl border border-brand-border text-brand-text-secondary hover:bg-brand-surface transition-colors text-sm mt-2"
         >
           Sign out
         </button>
       </div>
       </div>
+
+      {/* Delete account confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setConfirmDelete(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="relative w-[300px] bg-brand-card border border-brand-border rounded-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 pt-5 pb-4 text-center">
+              <p className="text-base font-semibold text-brand-text mb-1">Delete your account?</p>
+              <p className="text-sm text-brand-muted leading-snug">
+                This will permanently delete your account, all conversations, and data. This cannot be undone.
+              </p>
+            </div>
+            <div className="border-t border-brand-border flex">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-3 text-sm font-medium text-brand-text-secondary border-r border-brand-border active:bg-brand-surface transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="flex-1 py-3 text-sm font-semibold text-red-400 active:bg-brand-surface transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -10,7 +10,7 @@
       "internalID" : "21449921",
       "localizations" : [
         {
-          "description" : "Send a $9.99 tip to your AI girlfriend.",
+          "description" : "Send a $9.99 tip to support your chat.",
           "displayName" : "Tip $9.99",
           "locale" : "en_US"
         }
@@ -25,7 +25,7 @@
       "internalID" : "21449922",
       "localizations" : [
         {
-          "description" : "Send a $19.99 tip to your AI girlfriend.",
+          "description" : "Send a $19.99 tip to support your chat.",
           "displayName" : "Tip $19.99",
           "locale" : "en_US"
         }
@@ -40,7 +40,7 @@
       "internalID" : "21449923",
       "localizations" : [
         {
-          "description" : "Send a $49.99 tip to your AI girlfriend.",
+          "description" : "Send a $49.99 tip to support your chat.",
           "displayName" : "Tip $49.99",
           "locale" : "en_US"
         }
@@ -55,7 +55,7 @@
       "internalID" : "21449924",
       "localizations" : [
         {
-          "description" : "Send a $99.99 tip to your AI girlfriend.",
+          "description" : "Send a $99.99 tip to support your chat.",
           "displayName" : "Tip $99.99",
           "locale" : "en_US"
         }

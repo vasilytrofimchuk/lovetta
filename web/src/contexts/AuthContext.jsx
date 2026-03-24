@@ -152,8 +152,15 @@ export function AuthProvider({ children }) {
     if (tg) tg.close?.()
   }
 
+  const deleteAccount = async () => {
+    await api.delete('/api/auth/account')
+    localStorage.removeItem('lovetta-token')
+    localStorage.removeItem('lovetta-refresh-token')
+    setUser(null)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, deleteAccount, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

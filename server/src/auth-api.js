@@ -273,6 +273,26 @@ router.post('/logout', authenticate, async (req, res) => {
   res.json({ ok: true });
 });
 
+// -- DELETE /api/auth/account --------------------------------
+router.delete('/account', authenticate, async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Service unavailable' });
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET email = NULL, google_id = NULL, apple_id = NULL, telegram_id = NULL,
+       deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+      [req.userId]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    // Delete all refresh tokens
+    await pool.query('DELETE FROM refresh_tokens WHERE user_id = $1', [req.userId]).catch(() => {});
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[auth] delete account error:', err.message);
+    res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
 // -- GET /api/auth/me -------------------------------------
 router.get('/me', authenticate, async (req, res) => {
   const pool = getPool();
