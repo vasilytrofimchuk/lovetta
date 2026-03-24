@@ -83,10 +83,7 @@ export default function SupportPage() {
       style={{ height: pageHeight }}
     >
       {/* Header */}
-      <div
-        className="flex items-center gap-3 app-page-gutter pb-3 border-b border-brand-border flex-shrink-0 bg-brand-bg"
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
-      >
+      <div className="flex items-center gap-3 app-page-gutter py-3 border-b border-brand-border flex-shrink-0 bg-brand-bg">
         <button
           onClick={() => navigate('/profile')}
           aria-label="Back to profile"

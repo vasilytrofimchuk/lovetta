@@ -81,10 +81,7 @@ export default function CompanionList() {
       style={{ height: pageHeight, overscrollBehaviorY: 'none' }}
     >
       {/* Header */}
-      <div
-        className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter pb-3 flex-shrink-0"
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
-      >
+      <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3 flex-shrink-0">
         <div className="w-full flex items-center justify-between">
           <div className="flex items-center gap-1">
             <img src="/assets/brand/logo_l.png" alt="Lovetta" className="h-8 w-8 rounded-lg" />

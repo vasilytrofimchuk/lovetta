@@ -23,7 +23,7 @@ import WelcomeScreen from './pages/WelcomeScreen'
 import DesktopShell from './components/DesktopShell'
 
 function Loading() {
-  const pageHeight = getAppPageHeight()
+  const pageHeight = getAppPageHeight(isCapacitor())
 
   return (
     <div className="bg-brand-bg flex items-center justify-center" style={{ height: pageHeight }}>
@@ -309,7 +309,8 @@ export default function App() {
           <RevenueCatInitializer />
           <PushInitializer />
           <DesktopShell>
-            <div>
+            {/* Push all content below the camera notch / Dynamic Island */}
+            <div style={{ paddingTop: isCapacitor() ? 'max(0px, env(safe-area-inset-top))' : undefined }}>
               <AppRoutes />
               <PwaInstallBanner />
             </div>

@@ -16,10 +16,7 @@ export default function ChatHeader({ companion, onCompanionTap }) {
   const [from, to] = getGradient(companion?.name || '');
 
   return (
-    <div
-      className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter pb-3"
-      style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
-    >
+    <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
       <div className="w-full flex items-center gap-3">
         <button onClick={() => navigate('/')}
           aria-label="Back to companions"
