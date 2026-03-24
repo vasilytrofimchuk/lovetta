@@ -114,6 +114,13 @@ export default function SupportPage() {
         {!loading && !error && messages.length === 0 && (
           <div className="text-center text-brand-muted text-sm mt-12 leading-relaxed">
             How can we help?<br />Send us a message and we'll get back to you.
+            <div className="mt-6 pt-4 border-t border-brand-border/50">
+              <p className="text-xs text-brand-muted">
+                To delete your account, go to{' '}
+                <button onClick={() => navigate('/profile')} className="text-brand-accent underline">Profile</button>
+                {' '}→ Delete Account
+              </p>
+            </div>
           </div>
         )}
         {messages.map(msg => (
