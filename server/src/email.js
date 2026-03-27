@@ -563,6 +563,23 @@ async function sendAppleReviewerTranscriptAlert(messages) {
   });
 }
 
+async function sendLowBalanceAlert(provider, statusCode, errorText) {
+  await sendEmail({
+    to: ADMIN_FORWARD_EMAIL,
+    subject: `⚠️ Low balance: ${provider} (${statusCode})`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+        <h3 style="color: #c00;">AI Provider Balance Alert</h3>
+        <p><strong>Provider:</strong> ${provider}</p>
+        <p><strong>Status:</strong> ${statusCode}</p>
+        <p><strong>Error:</strong> ${(errorText || '').slice(0, 500)}</p>
+        <p><strong>Time:</strong> ${new Date().toISOString()}</p>
+        <p style="color: #999; font-size: 13px; margin-top: 16px;">Top up the account to restore service.</p>
+      </div>
+    `,
+  });
+}
+
 module.exports = {
   sendEmail, sendVerificationEmail, sendResetEmail,
   sendCompanionEmail, companionEmailAddress, parseCompanionEmailId,
@@ -571,5 +588,6 @@ module.exports = {
   sendWelcomeDay0, sendWelcomeDay1, sendWelcomeDay3, sendRenewalReminder,
   generateUnsubscribeToken, unsubscribeLink,
   sendAppleReviewerLoginAlert, sendAppleReviewerTranscriptAlert,
+  sendLowBalanceAlert,
   ADMIN_EMAIL, ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN,
 };

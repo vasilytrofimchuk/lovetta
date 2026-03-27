@@ -8,6 +8,7 @@ const { buildContentPrompt, buildImagePrompt } = require('./content-levels');
 const { processResponse, scanUserMessage, STRICT_REGENERATE_PROMPT } = require('./age-guard');
 const { getPool } = require('./db');
 const { uploadFromUrl } = require('./r2');
+const { sendLowBalanceAlert } = require('./email');
 
 const https = require('https');
 const OPENROUTER_API_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
@@ -19,6 +20,27 @@ const FAL_BASE = 'https://fal.run';
 
 // Max regeneration attempts when age guard flags a response
 const MAX_REGENERATE_ATTEMPTS = 2;
+
+// -- Balance error detection & admin alerting ------------------
+
+const BALANCE_KEYWORDS = /balance|credit|insufficient|quota|billing|funds|payment.required/i;
+const _balanceAlertCooldown = new Map(); // provider → timestamp
+const ALERT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+
+function checkAndAlertBalance(provider, statusCode, errorText) {
+  const isBalance = statusCode === 402 ||
+    ((statusCode === 403 || statusCode === 429) && BALANCE_KEYWORDS.test(errorText));
+  if (!isBalance) return;
+
+  const lastAlert = _balanceAlertCooldown.get(provider) || 0;
+  if (Date.now() - lastAlert < ALERT_COOLDOWN_MS) return;
+
+  _balanceAlertCooldown.set(provider, Date.now());
+  console.error(`[ai] Balance error from ${provider} (${statusCode}), sending admin alert`);
+  sendLowBalanceAlert(provider, statusCode, errorText).catch(e =>
+    console.error('[ai] Failed to send balance alert email:', e.message)
+  );
+}
 
 // -- Pricing maps (fallback when header not available) --------
 
@@ -122,6 +144,7 @@ async function _chatRequest(systemPrompt, messages, model, extraParams = {}) {
   });
   if (statusCode !== 200) {
     const errText = Buffer.concat(responseChunks).toString();
+    checkAndAlertBalance('OpenRouter', statusCode, errText);
     const err = new Error(`OpenRouter ${statusCode}: ${errText}`);
     err.status = statusCode;
     throw err;
@@ -404,6 +427,7 @@ async function generateImage(prompt, opts = {}) {
 
   if (!response.ok) {
     const err = await response.text();
+    checkAndAlertBalance('fal.ai', response.status, err);
     throw new Error(`fal.ai ${response.status}: ${err}`);
   }
 
@@ -488,6 +512,7 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   if (!falData) {
     if (response && !response.ok) {
       const errText = await response.text();
+      checkAndAlertBalance('fal.ai', response.status, errText);
       console.warn(`[ai] PuLID ${response.status}, falling back to Kontext:`, errText.slice(0, 100));
     }
     usedModel = 'fal-ai/flux-pro/kontext';
@@ -507,6 +532,7 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   if (!falData) {
     if (!response.ok) {
       const err = await response.text();
+      checkAndAlertBalance('fal.ai', response.status, err);
       throw new Error(`fal.ai ${usedModel} ${response.status}: ${err}`);
     }
     falData = await response.json();
@@ -574,6 +600,7 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
 
   if (!submitRes.ok) {
     const err = await submitRes.text();
+    checkAndAlertBalance('fal.ai', submitRes.status, err);
     throw new Error(`fal.ai queue submit ${submitRes.status}: ${err}`);
   }
 
@@ -686,6 +713,7 @@ async function generateSpeech(text, voiceId = 'hA4zGnmTwX2NQiTRMt7o') {
 
   if (statusCode !== 200) {
     const errText = Buffer.concat(responseChunks).toString();
+    checkAndAlertBalance('ElevenLabs', statusCode, errText);
     throw new Error(`ElevenLabs TTS ${statusCode}: ${errText}`);
   }
 
@@ -742,6 +770,7 @@ async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
 
   const respText = Buffer.concat(responseChunks).toString();
   if (statusCode !== 200) {
+    checkAndAlertBalance('ElevenLabs', statusCode, respText);
     console.error('[stt] ElevenLabs error:', statusCode, respText);
     throw new Error(`ElevenLabs STT ${statusCode}: ${respText}`);
   }
