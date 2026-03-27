@@ -1058,6 +1058,10 @@ const MIGRATIONS = [
       UPDATE app_settings SET value = 'true' WHERE key = 'enable_video_generation';
     `,
   },
+  {
+    name: 'v51_appstore_text_level_1',
+    sql: `UPDATE app_settings SET value = '1' WHERE key = 'text_level_appstore';`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
