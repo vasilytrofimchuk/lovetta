@@ -391,6 +391,7 @@
         <button class="econ-period" onclick="loadEconomics('all', this)">All</button>
       </div>
       <div class="stat-cards" id="econ-cards"></div>
+      <div class="section" id="econ-elevenlabs" style="margin-bottom:24px;"></div>
       <div class="breakdown-grid">
         <div class="section">
           <h3>By Companion</h3>
@@ -1487,6 +1488,36 @@
         });
       }
 
+      // ElevenLabs credits
+      apiFetch('/api/admin/elevenlabs/credits?period=' + econPeriod).then(function(data) {
+        var el = document.getElementById('econ-elevenlabs');
+        var sub = data.subscription;
+        var usage = data.usage;
+        if (!sub && !usage) { el.innerHTML = ''; return; }
+
+        var html = '<h3>ElevenLabs Credits</h3>';
+        if (sub) {
+          var used = sub.character_count || 0;
+          var limit = sub.character_limit || 0;
+          var pct = limit ? Math.round(used / limit * 100) : 0;
+          var resetDate = sub.next_reset ? new Date(sub.next_reset * 1000).toLocaleDateString() : '?';
+          html += '<div class="stat-cards">' +
+            card('Used / Limit', formatNumber(used) + ' / ' + formatNumber(limit) + ' (' + pct + '%)') +
+            card('Remaining', formatNumber(limit - used)) +
+            card('Tier', sub.tier || '?') +
+            card('Resets', resetDate) +
+            '</div>';
+        }
+        if (usage && usage.breakdown) {
+          var bk = usage.breakdown;
+          var parts = [];
+          if (bk.tts) parts.push('TTS: ' + formatNumber(bk.tts.credits) + ' credits (' + bk.tts.calls + ' calls)');
+          if (bk.stt) parts.push('STT: ' + formatNumber(bk.stt.credits) + ' credits (' + bk.stt.calls + ' calls)');
+          if (parts.length) html += '<p style="color:var(--muted);margin-top:8px;">Local tracking (' + econPeriod + '): ' + parts.join(' &middot; ') + ' &middot; Total: ' + formatNumber(usage.total) + '</p>';
+        }
+        el.innerHTML = html;
+      }).catch(function() {});
+
       apiFetch('/api/admin/consumption/summary?period=' + econPeriod).then(function(data) {
         var cost = parseFloat(data.totalCostUsd) || 0;
         var tips = parseFloat(data.totalTips) || 0;
@@ -1500,7 +1531,7 @@
         // Companion table
         var companions = data.byCompanion || [];
         if (companions.length) {
-          var html = '<table><tr><th>Girl</th><th>User</th><th>Chat</th><th>Image</th><th>Video</th><th>TTS</th><th>Total</th></tr>';
+          var html = '<table><tr><th>Girl</th><th>User</th><th>Chat</th><th>Image</th><th>Video</th><th>TTS</th><th>STT</th><th>Total</th></tr>';
           companions.forEach(function(c) {
             var total = parseFloat(c.cost) || 0;
             html += '<tr><td>' + esc(c.companion_name || 'N/A') + '</td>' +
@@ -1509,6 +1540,7 @@
               '<td>$' + (parseFloat(c.image_cost) || 0).toFixed(3) + '</td>' +
               '<td>$' + (parseFloat(c.video_cost) || 0).toFixed(3) + '</td>' +
               '<td>$' + (parseFloat(c.tts_cost) || 0).toFixed(3) + '</td>' +
+              '<td>$' + (parseFloat(c.stt_cost) || 0).toFixed(3) + '</td>' +
               '<td>$' + total.toFixed(3) + '</td></tr>';
           });
           html += '</table>';

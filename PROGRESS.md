@@ -2,6 +2,18 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## ElevenLabs Credit Tracking for STT + Real-Time Subscription Balance (2026-03-27)
+
+- [x] Switch TTS/STT from fake USD pricing to credit-based (Creator plan: 100K credits/mo)
+- [x] `transcribeSpeech()` now returns `{ text, durationSec, credits, costUsd }`
+- [x] `generateSpeech()` now returns `credits` alongside `costUsd`
+- [x] STT consumption tracking in `tts-api.js` (was completely untracked)
+- [x] `getElevenLabsSubscription()` — real-time balance via `/v1/user/subscription` API
+- [x] `getElevenLabsCreditsUsed(period)` — local per-call credit breakdown by TTS/STT
+- [x] `GET /api/admin/elevenlabs/credits` endpoint for admin dashboard
+- [x] Admin Economics: ElevenLabs credits section (used/limit, remaining, tier, reset date)
+- [x] Admin Economics: STT column in companion breakdown table
+
 ## iOS App Rate Banner + Admin iOS User Identification (2026-03-27)
 
 - [x] v52 migration: `app_feedback` table (rating, feedback, user_id)

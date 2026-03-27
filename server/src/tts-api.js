@@ -9,7 +9,7 @@ const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
 const { generateSpeech, transcribeSpeech } = require('./ai');
 const { uploadBuffer } = require('./r2');
-const { trackConsumption } = require('./consumption');
+const consumption = require('./consumption');
 
 const router = Router();
 
@@ -116,7 +116,7 @@ router.post('/tts', authenticate, async (req, res) => {
       const ttsText = actionsToAudioTags(msg.content);
       if (!ttsText) throw new Error('No speakable text');
 
-      const { buffer, costUsd } = await generateSpeech(ttsText, voiceId);
+      const { buffer, costUsd, credits } = await generateSpeech(ttsText, voiceId);
 
       const { url: audioUrl } = await uploadBuffer(buffer, 'audio', {
         filename: messageId,
@@ -124,14 +124,14 @@ router.post('/tts', authenticate, async (req, res) => {
         contentType: 'audio/mpeg',
       });
 
-      await trackConsumption({
+      await consumption.trackConsumption({
         userId: req.userId,
         companionId: msg.companion_id,
         provider: 'elevenlabs',
         model: 'eleven_v3',
         callType: 'tts',
         costUsd,
-        metadata: { messageId, chars: ttsText.length, voice: voiceId },
+        metadata: { messageId, chars: ttsText.length, credits, voice: voiceId },
       });
 
       return audioUrl || cachedUrl;
@@ -163,8 +163,18 @@ router.post('/stt', authenticate, async (req, res) => {
     const contentType = req.headers['content-type'] || 'audio/webm';
     const ext = getAudioExtension(contentType);
 
-    const { text } = await transcribeSpeech(audioBuffer, `voice.${ext}`);
+    const { text, durationSec, credits, costUsd } = await transcribeSpeech(audioBuffer, `voice.${ext}`);
     res.json({ text });
+
+    // Track STT credits (fire-and-forget)
+    consumption.trackConsumption({
+      userId: req.userId,
+      provider: 'elevenlabs',
+      model: 'scribe_v2',
+      callType: 'stt',
+      costUsd,
+      metadata: { chars: text.length, credits, audioBytes: audioBuffer.length, durationSec },
+    }).catch(err => console.warn('[stt] consumption tracking failed:', err.message));
   } catch (err) {
     console.error('[stt] error:', err.message);
     res.status(500).json({ error: 'Failed to transcribe audio' });

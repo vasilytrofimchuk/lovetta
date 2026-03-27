@@ -210,7 +210,8 @@ async function getConsumptionSummary(period = '30d') {
         SUM(CASE WHEN call_type = 'chat' THEN cost ELSE 0 END) AS chat_cost,
         SUM(CASE WHEN call_type = 'image' THEN cost ELSE 0 END) AS image_cost,
         SUM(CASE WHEN call_type = 'video' THEN cost ELSE 0 END) AS video_cost,
-        SUM(CASE WHEN call_type = 'tts' THEN cost ELSE 0 END) AS tts_cost
+        SUM(CASE WHEN call_type = 'tts' THEN cost ELSE 0 END) AS tts_cost,
+        SUM(CASE WHEN call_type = 'stt' THEN cost ELSE 0 END) AS stt_cost
       FROM consumption
       WHERE companion_id IS NOT NULL
       GROUP BY companion_id
@@ -229,7 +230,7 @@ async function getConsumptionSummary(period = '30d') {
       (SELECT total_tips FROM tip_totals) AS total_tips,
       (SELECT COALESCE(json_agg(json_build_object('provider', provider, 'cost', cost, 'calls', calls)), '[]') FROM by_provider) AS by_provider,
       (SELECT COALESCE(json_agg(json_build_object('model', model, 'provider', provider, 'cost', cost, 'calls', calls, 'tokens', tokens)), '[]') FROM by_model) AS by_model,
-      (SELECT COALESCE(json_agg(json_build_object('companion_name', companion_name, 'user_email', user_email, 'cost', cost, 'calls', calls, 'chat_cost', chat_cost, 'image_cost', image_cost, 'video_cost', video_cost, 'tts_cost', tts_cost) ORDER BY cost DESC), '[]') FROM by_companion_named) AS by_companion
+      (SELECT COALESCE(json_agg(json_build_object('companion_name', companion_name, 'user_email', user_email, 'cost', cost, 'calls', calls, 'chat_cost', chat_cost, 'image_cost', image_cost, 'video_cost', video_cost, 'tts_cost', tts_cost, 'stt_cost', stt_cost) ORDER BY cost DESC), '[]') FROM by_companion_named) AS by_companion
   `);
 
   // Daily breakdown
@@ -273,6 +274,44 @@ async function getConsumptionSummary(period = '30d') {
   };
 }
 
+/**
+ * Get ElevenLabs credit usage from local consumption records.
+ * Sums credits stored in metadata for provider='elevenlabs'.
+ * @param {string} period - '7d', '30d', '90d', or 'all'
+ */
+async function getElevenLabsCreditsUsed(period = '30d') {
+  const pool = getPool();
+  if (!pool) return null;
+
+  const interval = period === 'all' ? null
+    : period === '7d' ? '7 days'
+    : period === '90d' ? '90 days'
+    : '30 days';
+
+  const dateFilter = interval
+    ? `AND created_at >= NOW() - INTERVAL '${interval}'`
+    : '';
+
+  const { rows } = await pool.query(`
+    SELECT
+      call_type,
+      COUNT(*) AS calls,
+      SUM(COALESCE((metadata->>'credits')::numeric, 0)) AS credits
+    FROM api_consumption
+    WHERE provider = 'elevenlabs' ${dateFilter}
+    GROUP BY call_type
+  `);
+
+  let total = 0;
+  const breakdown = {};
+  for (const r of rows) {
+    const credits = parseFloat(r.credits) || 0;
+    total += credits;
+    breakdown[r.call_type] = { calls: parseInt(r.calls), credits };
+  }
+  return { total, breakdown };
+}
+
 module.exports = {
   trackConsumption,
   resetTipCounter,
@@ -280,4 +319,5 @@ module.exports = {
   checkFreeLimit,
   invalidateThresholdCache,
   getConsumptionSummary,
+  getElevenLabsCreditsUsed,
 };

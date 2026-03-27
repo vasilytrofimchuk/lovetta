@@ -670,7 +670,9 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
 
 // -- ElevenLabs TTS -------------------------------------------
 
-const TTS_COST_PER_CHAR = 0.00024; // ~$0.24 per 1K chars (Creator tier)
+// ElevenLabs Creator plan: 100K credits/month ($22/mo → ~$0.00022/credit)
+const ELEVENLABS_CREDITS_COST_USD = 0.00022; // USD per credit, for threshold math
+const STT_CREDITS_PER_MINUTE = 1000; // Scribe v2 credit consumption rate
 
 /**
  * Generate speech audio from text via ElevenLabs TTS API.
@@ -718,9 +720,10 @@ async function generateSpeech(text, voiceId = 'hA4zGnmTwX2NQiTRMt7o') {
   }
 
   const buffer = Buffer.concat(responseChunks);
-  const costUsd = text.length * TTS_COST_PER_CHAR;
+  const credits = text.length; // 1 credit = 1 character on Creator plan
+  const costUsd = credits * ELEVENLABS_CREDITS_COST_USD;
 
-  return { buffer, costUsd };
+  return { buffer, costUsd, credits };
 }
 
 /**
@@ -776,7 +779,45 @@ async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
   }
 
   const result = JSON.parse(respText);
-  return { text: result.text || '' };
+  // Estimate duration from buffer size (~16 KB/s for webm/opus)
+  const durationSec = audioBuffer.length / 16000;
+  const credits = Math.ceil((durationSec / 60) * STT_CREDITS_PER_MINUTE);
+  const costUsd = credits * ELEVENLABS_CREDITS_COST_USD;
+  return { text: result.text || '', durationSec, credits, costUsd };
+}
+
+/**
+ * Query ElevenLabs subscription for real-time credit balance.
+ * @returns {{ character_count, character_limit, tier, next_reset }} or null on error
+ */
+async function getElevenLabsSubscription() {
+  if (!ELEVENLABS_API_KEY) return null;
+  try {
+    const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'api.elevenlabs.io',
+        path: '/v1/user/subscription',
+        method: 'GET',
+        headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+      }, (res) => {
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => resolve({ responseChunks: chunks, statusCode: res.statusCode }));
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+      req.setTimeout(10000, () => { req.destroy(new Error('timeout')); });
+      req.end();
+    });
+    if (statusCode !== 200) return null;
+    const data = JSON.parse(Buffer.concat(responseChunks).toString());
+    return {
+      character_count: data.character_count,       // used this period
+      character_limit: data.character_limit,       // total credits
+      tier: data.tier,
+      next_reset: data.next_character_count_reset_unix,
+    };
+  } catch { return null; }
 }
 
 module.exports = {
@@ -788,6 +829,7 @@ module.exports = {
   generateVideo,
   generateSpeech,
   transcribeSpeech,
+  getElevenLabsSubscription,
   getAISettings,
   buildSystemPrompt,
 };

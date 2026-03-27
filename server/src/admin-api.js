@@ -5,7 +5,8 @@
 
 const { Router } = require('express');
 const { getPool } = require('./db');
-const { getConsumptionSummary } = require('./consumption');
+const { getConsumptionSummary, getElevenLabsCreditsUsed } = require('./consumption');
+const { getElevenLabsSubscription } = require('./ai');
 const { invalidateSettingsCache } = require('./content-levels');
 
 const router = Router();
@@ -310,6 +311,24 @@ router.get('/consumption/summary', async (req, res) => {
   } catch (err) {
     console.error('[admin] consumption summary error:', err.message);
     res.status(500).json({ error: 'Failed to load consumption summary' });
+  }
+});
+
+// -- GET /api/admin/elevenlabs/credits ----------------------------
+router.get('/elevenlabs/credits', async (req, res) => {
+  try {
+    const period = ['7d', '30d', '90d', 'all'].includes(req.query.period) ? req.query.period : '30d';
+    const [subscription, usage] = await Promise.all([
+      getElevenLabsSubscription(),
+      getElevenLabsCreditsUsed(period),
+    ]);
+    res.json({
+      subscription,  // real-time from ElevenLabs API (character_count, character_limit, tier, next_reset)
+      usage,         // local breakdown (total, breakdown by call_type)
+    });
+  } catch (err) {
+    console.error('[admin] elevenlabs credits error:', err.message);
+    res.status(500).json({ error: 'Failed to load ElevenLabs credits' });
   }
 });
 
