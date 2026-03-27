@@ -109,20 +109,20 @@ async function _checkThreshold(pool, userId, subscription) {
 }
 
 /**
- * Check if a free (unsubscribed) user has exceeded the free cost threshold.
- * Returns true if they should be blocked (show plan modal).
+ * Check if a free (unsubscribed) user has exceeded the free weekly cost threshold.
+ * Returns true if they should be blocked (show limit popup).
  */
 async function checkFreeLimit(userId) {
   const pool = getPool();
   if (!pool) return false;
 
   const { rows: costRows } = await pool.query(
-    `SELECT COALESCE(SUM(cost_usd), 0) AS monthly_cost
+    `SELECT COALESCE(SUM(cost_usd), 0) AS weekly_cost
      FROM api_consumption
-     WHERE user_id = $1 AND created_at >= date_trunc('month', NOW())`,
+     WHERE user_id = $1 AND created_at >= date_trunc('week', NOW())`,
     [userId]
   );
-  const monthlyCost = parseFloat(costRows[0].monthly_cost);
+  const weeklyCost = parseFloat(costRows[0].weekly_cost);
 
   const { rows: settings } = await pool.query(
     `SELECT value FROM app_settings WHERE key = 'tip_request_threshold_free_usd'`
@@ -130,7 +130,7 @@ async function checkFreeLimit(userId) {
   const threshold = parseFloat(settings[0]?.value || '0.10');
 
   if (threshold === 0) return false; // 0 = no free tier, subscription required immediately
-  return monthlyCost >= threshold;
+  return weeklyCost >= threshold;
 }
 
 /**

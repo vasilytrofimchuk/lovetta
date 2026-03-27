@@ -7,6 +7,7 @@ import ChatInput from '../components/chat/ChatInput';
 import CompanionSheet from '../components/chat/CompanionSheet';
 import ReportModal from '../components/chat/ReportModal';
 import PlanModal from '../components/PlanModal';
+import FreeLimitPopup from '../components/FreeLimitPopup';
 import { isCapacitor } from '../lib/platform';
 import { getAppPageHeight } from '../lib/layout';
 
@@ -24,6 +25,7 @@ export default function ChatPage() {
   } = useChat(companionId);
   const [showSheet, setShowSheet] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showPlanFromLimit, setShowPlanFromLimit] = useState(false);
   const [scrollTrigger, setScrollTrigger] = useState(0);
   const [tipSent, setTipSent] = useState(null); // { amount }
 
@@ -145,10 +147,16 @@ export default function ChatPage() {
         />
       )}
 
+      <FreeLimitPopup
+        isOpen={error === 'free_limit_reached' && !showPlanFromLimit}
+        onUpgrade={() => setShowPlanFromLimit(true)}
+        onClose={() => { setShowPlanFromLimit(false); clearError(); }}
+      />
+
       <PlanModal
-        isOpen={error === 'subscription_required' || error === 'free_limit_reached'}
-        onClose={clearError}
-        onSuccess={clearError}
+        isOpen={error === 'subscription_required' || showPlanFromLimit}
+        onClose={() => { setShowPlanFromLimit(false); clearError(); }}
+        onSuccess={() => { setShowPlanFromLimit(false); clearError(); }}
       />
     </div>
   );
