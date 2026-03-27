@@ -2,6 +2,15 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Personalize Lifecycle Emails from Companion (2026-03-27)
+
+- [x] Add LATERAL join to scheduler queries (abandoned payment, day 1, day 3) to find user's most active companion
+- [x] Rewrite `sendAbandonedPaymentReminder` — sends FROM companion, first-person copy, fallback to generic
+- [x] Freshen `sendWelcomeDay0` — warmer copy, no bullet list, "Meet Your Girlfriend" CTA
+- [x] Rewrite `sendWelcomeDay1` — sends FROM companion, personal subject/body, "Let's Chat" CTA
+- [x] Rewrite `sendWelcomeDay3` — sends FROM companion, emotional trial-ending appeal, "Stay With Me" CTA
+- [x] All 28 API tests + 97 AI tests pass
+
 ## Prod User Analysis + Critical Fixes (2026-03-27)
 
 Based on analysis of 35 real prod users (891 messages):

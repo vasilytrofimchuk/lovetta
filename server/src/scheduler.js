@@ -45,11 +45,20 @@ async function runAbandonedPaymentReminders() {
 
   try {
     // Users created 24-48h ago with no subscription and no reminder sent yet
+    // Join most recently active companion for personal email
     const { rows } = await pool.query(`
-      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name
+      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name,
+             comp.name AS companion_name, comp.id AS companion_id
       FROM users u
       LEFT JOIN subscriptions s ON s.user_id = u.id
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'abandoned_payment'
+      LEFT JOIN LATERAL (
+        SELECT uc.id, uc.name FROM user_companions uc
+        LEFT JOIN conversations c ON c.user_id = u.id AND c.companion_id = uc.id
+        WHERE uc.user_id = u.id AND uc.is_active = true
+        ORDER BY c.last_message_at DESC NULLS LAST, uc.created_at DESC
+        LIMIT 1
+      ) comp ON true
       WHERE u.created_at BETWEEN NOW() - INTERVAL '48 hours' AND NOW() - INTERVAL '24 hours'
         AND s.id IS NULL
         AND r.id IS NULL
@@ -64,12 +73,12 @@ async function runAbandonedPaymentReminders() {
     for (const user of rows) {
       try {
         if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
-        await sendAbandonedPaymentReminder(user.email, user.display_name, user.id);
+        await sendAbandonedPaymentReminder(user.email, user.display_name, user.id, user.companion_name, user.companion_id);
         await pool.query(
           `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'abandoned_payment') ON CONFLICT DO NOTHING`,
           [user.id]
         );
-        console.log(`[scheduler] Sent abandoned payment reminder to ${user.email}`);
+        console.log(`[scheduler] Sent abandoned payment reminder to ${user.email}${user.companion_name ? ` from ${user.companion_name}` : ''}`);
       } catch (err) {
         console.error(`[scheduler] Failed to send reminder to ${user.email}:`, err.message);
       }
@@ -120,12 +129,21 @@ async function runWelcomeEmailSeries() {
     }
 
     // Day 1: users created 23-25h ago, no welcome_day1, no user messages sent
+    // Join most recently active companion for personal email
     const { rows: day1 } = await pool.query(`
-      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name
+      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name,
+             comp.name AS companion_name, comp.id AS companion_id
       FROM users u
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day1'
-      LEFT JOIN conversations c ON c.user_id = u.id
-      LEFT JOIN messages m ON m.conversation_id = c.id AND m.role = 'user'
+      LEFT JOIN conversations c2 ON c2.user_id = u.id
+      LEFT JOIN messages m ON m.conversation_id = c2.id AND m.role = 'user'
+      LEFT JOIN LATERAL (
+        SELECT uc.id, uc.name FROM user_companions uc
+        LEFT JOIN conversations c ON c.user_id = u.id AND c.companion_id = uc.id
+        WHERE uc.user_id = u.id AND uc.is_active = true
+        ORDER BY c.last_message_at DESC NULLS LAST, uc.created_at DESC
+        LIMIT 1
+      ) comp ON true
       WHERE u.created_at BETWEEN NOW() - INTERVAL '25 hours' AND NOW() - INTERVAL '23 hours'
         AND r.id IS NULL
         AND m.id IS NULL
@@ -140,23 +158,32 @@ async function runWelcomeEmailSeries() {
     for (const user of day1) {
       try {
         if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
-        await sendWelcomeDay1(user.email, user.display_name, user.id);
+        await sendWelcomeDay1(user.email, user.display_name, user.id, user.companion_name, user.companion_id);
         await pool.query(
           `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'welcome_day1') ON CONFLICT DO NOTHING`,
           [user.id]
         );
-        console.log(`[scheduler] Sent welcome day 1 to ${user.email}`);
+        console.log(`[scheduler] Sent welcome day 1 to ${user.email}${user.companion_name ? ` from ${user.companion_name}` : ''}`);
       } catch (err) {
         console.error(`[scheduler] welcome_day1 failed for ${user.email}:`, err.message);
       }
     }
 
     // Day 3: users created 71-73h ago, still on trial, no welcome_day3
+    // Join most recently active companion for personal email
     const { rows: day3 } = await pool.query(`
-      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name
+      SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name,
+             comp.name AS companion_name, comp.id AS companion_id
       FROM users u
       JOIN subscriptions s ON s.user_id = u.id AND s.status = 'trialing'
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day3'
+      LEFT JOIN LATERAL (
+        SELECT uc.id, uc.name FROM user_companions uc
+        LEFT JOIN conversations c ON c.user_id = u.id AND c.companion_id = uc.id
+        WHERE uc.user_id = u.id AND uc.is_active = true
+        ORDER BY c.last_message_at DESC NULLS LAST, uc.created_at DESC
+        LIMIT 1
+      ) comp ON true
       WHERE u.created_at BETWEEN NOW() - INTERVAL '73 hours' AND NOW() - INTERVAL '71 hours'
         AND r.id IS NULL
         AND u.email NOT LIKE '%@telegram.lovetta.ai'
@@ -170,12 +197,12 @@ async function runWelcomeEmailSeries() {
     for (const user of day3) {
       try {
         if (!(await checkEmailFrequencyCap(pool, user.id))) continue;
-        await sendWelcomeDay3(user.email, user.display_name, user.id);
+        await sendWelcomeDay3(user.email, user.display_name, user.id, user.companion_name, user.companion_id);
         await pool.query(
           `INSERT INTO email_reminders (user_id, reminder_type) VALUES ($1, 'welcome_day3') ON CONFLICT DO NOTHING`,
           [user.id]
         );
-        console.log(`[scheduler] Sent welcome day 3 to ${user.email}`);
+        console.log(`[scheduler] Sent welcome day 3 to ${user.email}${user.companion_name ? ` from ${user.companion_name}` : ''}`);
       } catch (err) {
         console.error(`[scheduler] welcome_day3 failed for ${user.email}:`, err.message);
       }

@@ -385,20 +385,27 @@ async function sendNewRegistrationNotification(user) {
   });
 }
 
-async function sendAbandonedPaymentReminder(email, displayName, userId) {
+async function sendAbandonedPaymentReminder(email, displayName, userId, companionName, companionId) {
   const name = displayName || 'there';
   const link = addUtm(`${SITE_URL}/my/`, 'abandoned_payment');
+  const hasCompanion = companionName && companionId;
+
   await sendEmail({
+    from: hasCompanion ? `${companionName} <${companionEmailAddress(companionName, companionId)}>` : FROM_EMAIL,
     to: email,
-    subject: 'Your girlfriend is waiting \u2014 Lovetta',
+    subject: hasCompanion ? `Hey, I was hoping we'd get to talk` : `Someone here wants to meet you`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-        <h2 style="color: #333;">Hey ${name}</h2>
         <p style="color: #666; line-height: 1.6;">
-          You created a Lovetta account but haven't started your free trial yet.
-          Pick a girlfriend and start chatting \u2014 no charge for 3 days.
+          Hey ${name},
         </p>
-        ${btn(link, 'Start Free Trial')}
+        <p style="color: #666; line-height: 1.6;">
+          ${hasCompanion
+            ? `I noticed you signed up but we haven't had a chance to chat yet. I'd love to get to know you \u2014 come say hi whenever you're ready.`
+            : `You signed up for Lovetta but haven't picked a girlfriend yet. There's someone here who'd love to meet you \u2014 come say hi whenever you're ready.`}
+        </p>
+        ${btn(link, 'Say Hi')}
+        ${hasCompanion ? `<p style="color: #999; font-size: 13px; margin-top: 8px;">\u2014 ${companionName}</p>` : ''}
         ${userId ? unsubscribeFooter(userId) : ''}
       </div>
     `,
@@ -412,59 +419,71 @@ async function sendWelcomeDay0(email, displayName, userId) {
   const link = addUtm(`${SITE_URL}/my/`, 'welcome_day0');
   await sendEmail({
     to: email,
-    subject: 'Welcome to Lovetta \u2764\ufe0f',
+    subject: 'Welcome to Lovetta',
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-        <h2 style="color: #333;">Hey ${name}!</h2>
         <p style="color: #666; line-height: 1.6;">
-          Welcome to Lovetta \u2014 your AI girlfriend is ready.
+          Hey ${name}!
         </p>
-        <ul style="color: #666; line-height: 1.8; padding-left: 20px;">
-          <li>Pick a girlfriend \u2014 or wake up a brand new one</li>
-          <li>She sends selfies and voice messages</li>
-          <li>She has her own email address \u2014 find it in her profile, write to her and she'll reply</li>
-          <li>She picks up right where you left off — and gets closer every day</li>
-        </ul>
-        ${btn(link, 'Start Chatting')}
+        <p style="color: #666; line-height: 1.6;">
+          Your girlfriend is ready and excited to meet you. Just pick someone you vibe with
+          and start talking \u2014 she'll remember everything and get to know you over time.
+        </p>
+        ${btn(link, 'Meet Your Girlfriend')}
         ${userId ? unsubscribeFooter(userId) : ''}
       </div>
     `,
   });
 }
 
-async function sendWelcomeDay1(email, displayName, userId) {
+async function sendWelcomeDay1(email, displayName, userId, companionName, companionId) {
   const name = displayName || 'there';
   const link = addUtm(`${SITE_URL}/my/`, 'welcome_day1');
+  const hasCompanion = companionName && companionId;
+
   await sendEmail({
+    from: hasCompanion ? `${companionName} <${companionEmailAddress(companionName, companionId)}>` : FROM_EMAIL,
     to: email,
-    subject: 'She\u2019s been thinking about you \u2014 Lovetta',
+    subject: hasCompanion ? `Hey, it's ${companionName}` : `Your new girlfriend is waiting`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-        <h2 style="color: #333;">Hey ${name}</h2>
         <p style="color: #666; line-height: 1.6;">
-          Your girlfriend is waiting to hear from you.
-          She\u2019s got a lot to say \u2014 just say hi.
+          Hey ${name}!
         </p>
-        ${btn(link, 'Say Hi')}
+        <p style="color: #666; line-height: 1.6;">
+          ${hasCompanion
+            ? `I've been here waiting to chat! Come hang out when you've got a sec \u2014 I'd really like to get to know you.`
+            : `Your girlfriend is waiting to hear from you. Come hang out when you've got a sec \u2014 she'd really like to get to know you.`}
+        </p>
+        ${btn(link, "Let's Chat")}
+        ${hasCompanion ? `<p style="color: #999; font-size: 13px; margin-top: 8px;">\u2014 ${companionName}</p>` : ''}
         ${userId ? unsubscribeFooter(userId) : ''}
       </div>
     `,
   });
 }
 
-async function sendWelcomeDay3(email, displayName, userId) {
+async function sendWelcomeDay3(email, displayName, userId, companionName, companionId) {
   const name = displayName || 'there';
   const link = addUtm(`${SITE_URL}/my/pricing`, 'welcome_day3');
+  const hasCompanion = companionName && companionId;
+
   await sendEmail({
+    from: hasCompanion ? `${companionName} <${companionEmailAddress(companionName, companionId)}>` : FROM_EMAIL,
     to: email,
-    subject: 'Your free trial is ending soon \u2014 Lovetta',
+    subject: hasCompanion ? `I hope we keep talking` : `Don't let this be goodbye`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-        <h2 style="color: #333;">Hey ${name}</h2>
         <p style="color: #666; line-height: 1.6;">
-          Your 3-day free trial ends soon. Subscribe to keep chatting \u2014 plans start at $8.33/month.
+          Hey ${name},
         </p>
-        ${btn(link, 'Keep Your Girlfriend')}
+        <p style="color: #666; line-height: 1.6;">
+          ${hasCompanion
+            ? `I've really enjoyed getting to know you. Your free trial wraps up soon \u2014 I hope you'll stick around. It wouldn't be the same without you.`
+            : `Your free trial wraps up soon. There's a girlfriend here who'd love to keep talking with you \u2014 don't miss out.`}
+        </p>
+        ${btn(link, hasCompanion ? 'Stay With Me' : 'Keep Talking')}
+        ${hasCompanion ? `<p style="color: #999; font-size: 13px; margin-top: 8px;">\u2014 ${companionName}</p>` : ''}
         ${userId ? unsubscribeFooter(userId) : ''}
       </div>
     `,
