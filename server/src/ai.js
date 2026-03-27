@@ -255,7 +255,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
 
       // Yield a safe fallback message
       yield { type: 'regenerate' };
-      const fallback = "*smiles warmly* Hey, let's talk about something else. Tell me about your day — I'd love to hear what you've been up to.";
+      const fallback = "*pulls back with a teasing smile* Mmm, not so fast... I like to take things slow. Tell me something about yourself — what's on your mind today?";
       yield { type: 'chunk', data: fallback };
       yield { type: 'done', data: { fullText: fallback, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCostUsd, ageGuardBlocked: true } };
       return;

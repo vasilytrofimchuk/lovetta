@@ -1050,6 +1050,14 @@ const MIGRATIONS = [
       ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
     `,
   },
+  {
+    name: 'v50_web_content_level_2_enable_video',
+    sql: `
+      UPDATE app_settings SET value = '2' WHERE key = 'text_level_web';
+      UPDATE app_settings SET value = '2' WHERE key = 'image_level_web';
+      UPDATE app_settings SET value = 'true' WHERE key = 'enable_video_generation';
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

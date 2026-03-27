@@ -2,6 +2,20 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Prod User Analysis + Critical Fixes (2026-03-27)
+
+Based on analysis of 35 real prod users (891 messages):
+
+- [x] Raise web content levels to 2 (intimate) — migration v50
+- [x] Enable video generation — migration v50
+- [x] Fix media delivery bug: add `media_pending` to chat history SELECT query
+- [x] Fix media delivery: auto-resume polling for pending media on page refresh
+- [x] Improve memory extraction: restrict to identity/preferences/life categories, better prompt
+- [x] Add junk fact filter (blocks ephemeral events, relationship dynamics, sexual acts)
+- [x] Add graceful content redirect for levels 0-1 (stay in character, never break immersion)
+- [x] Fix age guard fallback message (was robotic "let's talk about something else")
+- [ ] Run E2E tests to verify all changes
+
 ## Apple App Review Fixes — v1.0 Resubmission
 - [x] Update StoreKit tip descriptions (remove "AI girlfriend" → "support your chat")
 - [x] Update Info.plist microphone usage (remove "girlfriend")

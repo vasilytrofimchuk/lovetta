@@ -330,11 +330,27 @@ async function extractFactsFromChunkAI(pool, conversationId, companionId, userId
   const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
   const messagesText = messages.map(m => `- ${cleanMsg(m.content)}`).join('\n');
 
-  const systemPrompt = `Extract ALL personal facts about the USER (human) from messages below. "${companionName}" is the AI, NOT the user.
+  const systemPrompt = `Extract ONLY persistent personal facts about the USER (human) from messages below. "${companionName}" is the AI companion, NOT the user.
 Return JSON array with "category" and "fact" keys.
-Categories: identity, preferences, life, relationship, emotional
-Example: [{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User has a cat named Whiskers"}]
-Extract EVERY detail explicitly mentioned. Do NOT infer or guess.
+Categories: identity, preferences, life
+
+EXTRACT these types of facts:
+- Name, age, birthday, location, nationality, zodiac sign
+- Job, profession, education, skills, languages
+- Pets (name + type), family members (name + relation + location)
+- Hobbies, interests, favorite things (movies, music, food, sports, books, etc.)
+- Allergies, dietary preferences, daily habits
+- Dreams, goals, aspirations
+
+DO NOT EXTRACT:
+- What the user said, asked, agreed to, or requested in conversation
+- Temporary emotions or moods ("user feels happy", "user is waiting")
+- Anything about the relationship with ${companionName} ("user calls her love", "user wants intimacy")
+- Sexual acts, preferences, or desires
+- Conversation flow events ("user responded", "user expressed interest")
+
+Example: [{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User has a cat named Whiskers"},{"category":"preferences","fact":"User's favorite movie is Inception"}]
+Only extract facts explicitly stated. Do NOT infer or guess.
 ${existingText}`;
 
   const { plainChatCompletion, getAISettings } = require('./ai');
@@ -387,7 +403,27 @@ ${existingText}`;
 
 // -- Save facts to DB (shared by regex + AI) ----------------------
 
-const VALID_CATEGORIES = new Set(['identity', 'preferences', 'life', 'relationship', 'emotional']);
+const VALID_CATEGORIES = new Set(['identity', 'preferences', 'life']);
+
+// Reject junk facts that are conversation events, not persistent user attributes
+function isJunkFact(fact) {
+  if (fact.length < 10) return true;
+  const lower = fact.toLowerCase();
+  const junkPrefixes = [
+    'user agrees', 'user expresses', 'user is waiting', 'user says',
+    'user asked', 'user responded', 'user wants to', 'user is patient',
+    'user refers to', 'user calls', 'user addresses', 'user expects',
+    'user is engaged in', 'user is trying', 'user states that',
+    'user is comfortable', 'user is defensive', 'user feels conflicted',
+    'user believes', 'user questions', 'user no longer',
+  ];
+  if (junkPrefixes.some(p => lower.startsWith(p))) return true;
+  // Reject facts about relationship dynamics with the AI
+  if (/\b(intimate|intimacy|sexual|orgasm|arousal|lust|submission|worship|dominant)\b/i.test(fact)) return true;
+  // Reject facts that are just "User's name is not mentioned"
+  if (/not mentioned|not specified|not provided|not stated/i.test(fact)) return true;
+  return false;
+}
 
 // Extract a dedup key from a fact: use the subject + topic words (not just "User")
 // "User's name is Vasily" → "user's name"
@@ -417,6 +453,7 @@ async function saveExtractedFacts(pool, conversationId, factsJson, lastMessageId
     const fact = String(item.fact).trim();
     if (!VALID_CATEGORIES.has(category)) continue;
     if (!fact || fact.length > 500) continue;
+    if (isJunkFact(fact)) continue;
 
     const { rows: existing } = await pool.query(
       `SELECT id, fact FROM companion_memories WHERE conversation_id = $1 AND category = $2`,

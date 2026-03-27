@@ -58,6 +58,12 @@ export default function useChat(companionId) {
         count++;
       }
       setMessagesSinceLastMedia(count);
+      // Resume polling for any messages still pending media generation
+      for (const msg of msgs) {
+        if (msg.media_pending && !msg.media_url && msg.id) {
+          startMediaPoll(msg.id, msg.media_type);
+        }
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load chat');
     } finally {

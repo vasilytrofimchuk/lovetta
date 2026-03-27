@@ -815,12 +815,12 @@ router.get('/:companionId/history', authenticate, async (req, res) => {
 
     let query, params;
     if (before) {
-      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, created_at
+      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, media_pending, created_at
                FROM messages WHERE conversation_id = $1 AND created_at < (SELECT created_at FROM messages WHERE id = $2)
                ORDER BY created_at DESC LIMIT 50`;
       params = [conversation.id, before];
     } else {
-      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, created_at
+      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, media_pending, created_at
                FROM messages WHERE conversation_id = $1
                ORDER BY created_at DESC LIMIT 50`;
       params = [conversation.id];

@@ -540,7 +540,7 @@ test.describe('Admin Settings — AI economics', () => {
     // Reset
     await request.put(`${BASE}/api/admin/settings`, {
       headers: adminHeaders(),
-      data: { key: 'openrouter_model', value: 'venice/uncensored' },
+      data: { key: 'openrouter_model', value: 'qwen/qwen3-235b-a22b-2507' },
     });
   });
 
