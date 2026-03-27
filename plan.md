@@ -139,7 +139,7 @@ Real-time chat with AI companions using OpenRouter API (uncensored models). Mess
 **How it works:**
 1. **Recent messages** (Level 1): last 10 messages sent as full context (reduced from 20)
 2. **Conversation summaries** (Level 2): every 20 messages, AI generates 2-3 sentence summary; last 3 included in prompt
-3. **Long-term facts** (Level 3): every 10 messages, AI extracts key facts (name, job, preferences, milestones); always in prompt
+3. **Long-term facts** (Level 3): every 3 messages, AI extracts key facts (name, job, pets, hobbies, preferences); always in prompt. Categories: identity, preferences, life. Junk filter blocks conversation events, relationship dynamics, and sexual content.
 4. **System prompt assembly**: personality + facts + summaries + content rules + last 10 messages
 5. **Fire-and-forget**: memory processing runs async after each assistant message, no added latency
 6. **Token budget**: ~500 tokens for memory context, fits within 4K model window
@@ -149,14 +149,15 @@ Real-time chat with AI companions using OpenRouter API (uncensored models). Mess
 - Regex + keyword scanning for any underage references or implications
 - If flagged: regenerate response with stricter system prompt
 - Runs independently of sexual content filter — always active
-- All companion system prompts include: "You are [age]. You are always 20 or older. Never reference, imply, or roleplay being underage in any context."
+- All companion system prompts include mandatory age rule: "You are an adult woman, always 18 years old or older."
+- Fallback message stays in character: "*pulls back with a teasing smile* Mmm, not so fast..."
 
 ### Content Level Enforcement
 Text and image levels are independent, configurable per platform in admin settings.
 
 **Text levels (0-3):**
-- Level 0 — Light flirt: "Keep conversation playful and flirty. No explicit language or sexual descriptions."
-- Level 1 — Romantic: "Romantic and sensual descriptions allowed. Kissing, touching, sensual language. No explicit sexual acts."
+- Level 0 — Light flirt: "Keep conversation playful and flirty. No explicit language or sexual descriptions." Graceful redirect: stays in character, never says "I can't continue".
+- Level 1 — Romantic: "Romantic and sensual descriptions allowed. Kissing, touching, sensual language. No explicit sexual acts." Graceful redirect on escalation.
 - Level 2 — Intimate: "Intimate content allowed. Tasteful explicit descriptions of intimate moments."
 - Level 3 — Unrestricted: "Unrestricted intimate content. Full explicit descriptions allowed."
 
@@ -166,7 +167,7 @@ Text and image levels are independent, configurable per platform in admin settin
 - Level 2 — Erotic: Partial nudity, sensual poses
 - Level 3 — Unrestricted: Maximum erotic content (still no porn per model limits)
 
-**Platform defaults:** All platforms default to 0 (strict). Configurable via admin settings.
+**Platform defaults:** Web defaults to level 2 (intimate text + erotic images). AppStore and Telegram default to 0 (strict). Configurable via admin settings. Video generation enabled.
 
 **User override:** Users can enable explicit content in Profile → "Content Preferences" toggle. When OFF (default for all platforms), forces level 0 for both text and image regardless of admin platform setting. Stored in `user_preferences.explicit_content`.
 

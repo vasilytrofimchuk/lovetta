@@ -14,7 +14,8 @@ Based on analysis of 35 real prod users (891 messages):
 - [x] Add junk fact filter (blocks ephemeral events, relationship dynamics, sexual acts)
 - [x] Add graceful content redirect for levels 0-1 (stay in character, never break immersion)
 - [x] Fix age guard fallback message (was robotic "let's talk about something else")
-- [ ] Run E2E tests to verify all changes
+- [x] Run E2E tests — 191 passed, 0 failed
+- [x] Fix E2E test poisoning: ai.test.js was resetting model to dead `venice/uncensored`
 
 ## Apple App Review Fixes — v1.0 Resubmission
 - [x] Update StoreKit tip descriptions (remove "AI girlfriend" → "support your chat")
