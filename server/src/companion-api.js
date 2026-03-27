@@ -250,25 +250,33 @@ router.get('/', authenticate, async (req, res) => {
   if (!pool) return res.json({ companions: [] });
 
   try {
-    const { rows } = await pool.query(`
-      SELECT uc.*,
-             m.content AS last_message,
-             m.context_text AS last_context,
-             m.created_at AS last_message_at
-      FROM user_companions uc
-      LEFT JOIN LATERAL (
-        SELECT msg.content, msg.context_text, msg.created_at
-        FROM messages msg
-        JOIN conversations c ON c.id = msg.conversation_id
-        WHERE c.companion_id = uc.id
-        ORDER BY msg.created_at DESC
-        LIMIT 1
-      ) m ON TRUE
-      WHERE uc.user_id = $1 AND uc.is_active = TRUE
-      ORDER BY COALESCE(m.created_at, uc.created_at) DESC
-    `, [req.userId]);
+    const [{ rows }, msgCount] = await Promise.all([
+      pool.query(`
+        SELECT uc.*,
+               m.content AS last_message,
+               m.context_text AS last_context,
+               m.created_at AS last_message_at
+        FROM user_companions uc
+        LEFT JOIN LATERAL (
+          SELECT msg.content, msg.context_text, msg.created_at
+          FROM messages msg
+          JOIN conversations c ON c.id = msg.conversation_id
+          WHERE c.companion_id = uc.id
+          ORDER BY msg.created_at DESC
+          LIMIT 1
+        ) m ON TRUE
+        WHERE uc.user_id = $1 AND uc.is_active = TRUE
+        ORDER BY COALESCE(m.created_at, uc.created_at) DESC
+      `, [req.userId]),
+      pool.query(
+        `SELECT COUNT(*)::int AS total FROM messages m
+         JOIN conversations c ON c.id = m.conversation_id
+         WHERE c.user_id = $1 AND m.role = 'user'`,
+        [req.userId]
+      ),
+    ]);
 
-    res.json({ companions: rows });
+    res.json({ companions: rows, totalUserMessages: msgCount.rows[0]?.total || 0 });
   } catch (err) {
     console.error('[companions] list error:', err.message);
     res.status(500).json({ error: 'Failed to load companions' });

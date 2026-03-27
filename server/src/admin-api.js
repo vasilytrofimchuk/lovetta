@@ -173,13 +173,20 @@ router.get('/users', async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const offset = (page - 1) * limit;
     const search = (req.query.search || '').trim().toLowerCase();
+    const platform = (req.query.platform || '').trim().toLowerCase();
 
     let where = 'WHERE u.deleted_at IS NULL';
     const params = [];
 
     if (search) {
       params.push(`%${search}%`);
-      where += ` AND (LOWER(u.email) LIKE $1 OR LOWER(u.display_name) LIKE $1)`;
+      where += ` AND (LOWER(u.email) LIKE $${params.length} OR LOWER(u.display_name) LIKE $${params.length})`;
+    }
+
+    if (platform === 'ios') {
+      where += ` AND (LOWER(u.user_agent) LIKE '%capacitor%' OR LOWER(u.user_agent) LIKE '%lovetta-ios%')`;
+    } else if (platform === 'web') {
+      where += ` AND (u.user_agent IS NULL OR (LOWER(u.user_agent) NOT LIKE '%capacitor%' AND LOWER(u.user_agent) NOT LIKE '%lovetta-ios%'))`;
     }
 
     const countQuery = `SELECT COUNT(*) AS total FROM users u ${where}`;
@@ -941,6 +948,52 @@ router.post('/push/test', async (req, res) => {
     });
   } catch (err) {
     console.error('[admin] push test error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- GET /api/admin/feedback --------------------------------
+router.get('/feedback', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ rows: [], total: 0 });
+
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, parseInt(req.query.limit) || 50);
+  const offset = (page - 1) * limit;
+  const ratingFilter = req.query.rating ? parseInt(req.query.rating) : null;
+
+  try {
+    const where = ratingFilter ? 'WHERE f.rating = $3' : '';
+    const params = ratingFilter ? [limit, offset, ratingFilter] : [limit, offset];
+
+    const [countRes, dataRes] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::int AS total FROM app_feedback f ${where}`,
+        ratingFilter ? [ratingFilter] : []
+      ),
+      pool.query(
+        `SELECT f.id, f.rating, f.feedback, f.created_at,
+                u.email AS user_email, u.display_name
+         FROM app_feedback f
+         LEFT JOIN users u ON u.id = f.user_id
+         ${where}
+         ORDER BY f.created_at DESC
+         LIMIT $1 OFFSET $2`,
+        params
+      ),
+    ]);
+
+    const avgRes = await pool.query('SELECT ROUND(AVG(rating), 1) AS avg FROM app_feedback');
+
+    res.json({
+      rows: dataRes.rows,
+      total: countRes.rows[0].total,
+      page,
+      limit,
+      avgRating: parseFloat(avgRes.rows[0].avg) || 0,
+    });
+  } catch (err) {
+    console.error('[admin] feedback error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

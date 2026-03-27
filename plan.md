@@ -405,6 +405,9 @@ Users earn configurable commission (default 30%) from payments made by people th
 - Native APNs push notifications (server + client)
 - UI adjustments: referral hidden, explicit content hidden, Telegram login hidden, PWA banner hidden
 - Content filtering already wired server-side (appstore = level 0)
+- App rate banner (stars UI → App Store review or feedback form)
+- Admin: iOS user identification (📲 badge) + platform filter on Users tab
+- Admin: Feedback tab for app ratings
 
 **Manual TODOs:**
 - Create RevenueCat project + App Store Connect products (lovetta_monthly, lovetta_yearly, tip consumables)

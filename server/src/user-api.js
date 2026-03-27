@@ -7,6 +7,7 @@ const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
 // content-levels import removed — explicit default is now false for all platforms
 const { getVapidPublicKey } = require('./push');
+const { sendEmail, ADMIN_EMAIL } = require('./email');
 
 const router = Router();
 
@@ -194,6 +195,43 @@ router.put('/real-email', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[user] real-email error:', err.message);
     res.status(500).json({ error: 'Failed to save email' });
+  }
+});
+
+// -- POST /api/user/app-feedback (in-app rating + optional comment) --
+router.post('/app-feedback', authenticate, async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) return res.status(503).json({ error: 'Database not configured' });
+
+    const { rating, feedback } = req.body || {};
+    const numRating = parseInt(rating, 10);
+    if (!numRating || numRating < 1 || numRating > 5) {
+      return res.status(400).json({ error: 'Rating must be 1-5' });
+    }
+
+    const trimmed = (feedback || '').trim().slice(0, 2000) || null;
+
+    await pool.query(
+      'INSERT INTO app_feedback (user_id, rating, feedback) VALUES ($1, $2, $3)',
+      [req.userId, numRating, trimmed]
+    );
+
+    if (numRating <= 3 && trimmed) {
+      sendEmail({
+        to: ADMIN_EMAIL,
+        subject: `[Lovetta] App feedback: ${numRating}/5 stars`,
+        html: `<p><strong>Rating:</strong> ${numRating}/5</p>
+               <p><strong>User:</strong> ${req.userId}</p>
+               <p><strong>Feedback:</strong></p>
+               <pre>${trimmed}</pre>`,
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[user] app-feedback error:', err.message);
+    res.status(500).json({ error: 'Failed to save feedback' });
   }
 });
 

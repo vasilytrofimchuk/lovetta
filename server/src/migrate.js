@@ -1062,6 +1062,19 @@ const MIGRATIONS = [
     name: 'v51_appstore_text_level_1',
     sql: `UPDATE app_settings SET value = '1' WHERE key = 'text_level_appstore';`,
   },
+  {
+    name: 'v52_app_feedback',
+    sql: `
+      CREATE TABLE IF NOT EXISTS app_feedback (
+        id          SERIAL PRIMARY KEY,
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        rating      INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        feedback    TEXT,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_app_feedback_user ON app_feedback(user_id);
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

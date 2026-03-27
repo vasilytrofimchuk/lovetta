@@ -312,6 +312,7 @@
       <button class="tab" data-tab="companion-emails" onclick="switchTab('companion-emails')">Girl Emails</button>
       <button class="tab" data-tab="cashouts" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="support" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
+      <button class="tab" data-tab="feedback" onclick="switchTab('feedback')">Feedback <span class="badge" id="feedback-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
     </div>
 
     <!-- Overview Tab -->
@@ -339,8 +340,13 @@
     <!-- Users Tab -->
     <div id="tab-users" class="tab-content">
       <div class="tab-header"><h2>Users</h2><button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button></div>
-      <div class="search-bar">
+      <div class="search-bar" style="display:flex;gap:8px;align-items:center;">
         <input type="text" id="user-search" placeholder="Search by email or name..." onkeydown="if(event.key==='Enter'){userPage=1;loadUsers();}">
+        <select id="user-platform-filter" onchange="userPage=1;loadUsers();" style="padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem;cursor:pointer;">
+          <option value="">All platforms</option>
+          <option value="ios">📲 iOS App</option>
+          <option value="web">🌐 Web only</option>
+        </select>
       </div>
       <table>
         <thead><tr>
@@ -509,6 +515,32 @@
     </div>
 
     <div id="tab-support" class="tab-content"></div>
+
+    <!-- Feedback Tab -->
+    <div id="tab-feedback" class="tab-content">
+      <div class="tab-header">
+        <h2>App Feedback</h2>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="feedback-avg" style="font-size:14px;color:var(--text2);"></span>
+          <select id="feedback-rating-filter" onchange="loadFeedback(1)" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;">
+            <option value="">All ratings</option>
+            <option value="5">5 stars</option>
+            <option value="4">4 stars</option>
+            <option value="3">3 stars</option>
+            <option value="2">2 stars</option>
+            <option value="1">1 star</option>
+          </select>
+          <button class="refresh-btn" onclick="loadFeedback()">&#8635; Refresh</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Rating</th><th>Feedback</th><th>User</th><th>Date</th>
+        </tr></thead>
+        <tbody id="feedback-rows"></tbody>
+      </table>
+      <div class="pagination" id="feedback-pagination"></div>
+    </div>
   </div>
 
   <script>
@@ -623,6 +655,7 @@
       else if (name === 'companion-emails') loadCompanionEmails();
       else if (name === 'cashouts') loadCashouts();
       else if (name === 'support') { loadSupport(); supportPollInterval = setInterval(loadSupport, 30000); }
+      else if (name === 'feedback') loadFeedback();
     }
 
     // --- Helper functions (ported from KeyID) ---
@@ -650,6 +683,13 @@
       if (os === 'Android') return '🟢';
       if (os === 'Linux') return '🐧';
       if (os === 'ChromeOS') return '🌐';
+      return '';
+    }
+
+    function platformBadge(ua) {
+      if (!ua) return '';
+      var lower = ua.toLowerCase();
+      if (lower.indexOf('capacitor') !== -1 || lower.indexOf('lovetta-ios') !== -1) return ' 📲';
       return '';
     }
 
@@ -855,7 +895,7 @@
       apiFetch('/api/admin/visitors?page=' + visitorPage + '&limit=50').then(function(data) {
         var rows = (data.rows || []).map(function(r) {
           var os = parseOS(r.user_agent);
-          var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '');
+          var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '') + platformBadge(r.user_agent);
           return '<tr>' +
             '<td class="mono truncate" title="' + esc(r.session_id || '') + '">' + esc((r.session_id || '').slice(0, 8)) + '</td>' +
             '<td>' + esc(r.current_page || '-') + '</td>' +
@@ -881,13 +921,15 @@
     function loadUsers(page) {
       userPage = page || userPage;
       var search = (document.getElementById('user-search') || {}).value || '';
+      var platform = (document.getElementById('user-platform-filter') || {}).value || '';
       var url = '/api/admin/users?page=' + userPage + '&limit=50';
       if (search) url += '&search=' + encodeURIComponent(search);
+      if (platform) url += '&platform=' + encodeURIComponent(platform);
 
       apiFetch(url).then(function(data) {
         var rows = (data.rows || []).map(function(r) {
           var os = parseOS(r.user_agent);
-          var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '');
+          var dev = deviceEmoji(r.device_type) + (os ? ' ' + osIcon(os) : '') + platformBadge(r.user_agent);
           var sub = r.sub_status ? esc(r.sub_plan) + ' (' + esc(r.sub_status) + ')' : 'Free';
           var srcParts = [];
           if (r.utm_source) srcParts.push(esc(r.utm_source));
@@ -1794,6 +1836,60 @@
         if (r.ok) loadCashouts();
       });
     }
+
+    // -- Feedback tab --
+    var feedbackPage = 1;
+    function loadFeedback(page) {
+      feedbackPage = page || feedbackPage;
+      var rating = (document.getElementById('feedback-rating-filter') || {}).value || '';
+      var url = '/api/admin/feedback?page=' + feedbackPage + '&limit=50';
+      if (rating) url += '&rating=' + rating;
+
+      apiFetch(url).then(function(data) {
+        // Average rating display
+        var avgEl = document.getElementById('feedback-avg');
+        if (data.avgRating) avgEl.textContent = 'Avg: ' + data.avgRating + '/5 (' + data.total + ' total)';
+        else avgEl.textContent = '';
+
+        // Badge
+        var badge = document.getElementById('feedback-badge');
+        if (data.total > 0) {
+          badge.textContent = data.total;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+
+        var starStr = function(n) {
+          var s = '';
+          for (var i = 0; i < 5; i++) s += i < n ? '★' : '☆';
+          return s;
+        };
+
+        var rows = (data.rows || []).map(function(r) {
+          var color = r.rating >= 4 ? 'var(--success)' : r.rating >= 3 ? '#f59e0b' : 'var(--error)';
+          return '<tr>' +
+            '<td style="color:' + color + ';font-weight:600;white-space:nowrap;">' + starStr(r.rating) + ' ' + r.rating + '/5</td>' +
+            '<td style="max-width:400px;white-space:pre-wrap;word-break:break-word;">' + esc(r.feedback || '—') + '</td>' +
+            '<td class="mono">' + esc(r.user_email || r.display_name || '—') + '</td>' +
+            '<td class="mono">' + fmtDate(r.created_at) + '</td>' +
+          '</tr>';
+        }).join('');
+
+        document.getElementById('feedback-rows').innerHTML = rows ||
+          '<tr><td colspan="4" class="empty-row">No feedback yet</td></tr>';
+        renderPagination('feedback-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadFeedback');
+      });
+    }
+
+    // Load feedback badge on dashboard init
+    apiFetch('/api/admin/feedback?limit=1').then(function(data) {
+      var badge = document.getElementById('feedback-badge');
+      if (data && data.total > 0) {
+        badge.textContent = data.total;
+        badge.style.display = 'inline-block';
+      }
+    }).catch(function() {});
 
     // Load cashout badge on dashboard init
     apiFetch('/api/admin/cashouts?limit=1&status=pending').then(function(data) {

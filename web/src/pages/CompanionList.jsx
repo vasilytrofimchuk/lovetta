@@ -7,6 +7,7 @@ import CompanionCard from '../components/CompanionCard';
 import PlanModal from '../components/PlanModal';
 import { isCapacitor } from '../lib/platform';
 import { getAppPageHeight } from '../lib/layout';
+import RateAppBanner from '../components/RateAppBanner';
 import { trackPay } from '../lib/pixels';
 
 export default function CompanionList() {
@@ -21,13 +22,17 @@ export default function CompanionList() {
   const [loading, setLoading] = useState(true);
   const [supportUnread, setSupportUnread] = useState(0);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [totalUserMessages, setTotalUserMessages] = useState(0);
   const [pushBannerVisible, setPushBannerVisible] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const unreadPollRef = useRef(null);
 
   useEffect(() => {
     Promise.all([
-      api.get('/api/companions').then(({ data }) => setCompanions(data.companions || [])),
+      api.get('/api/companions').then(({ data }) => {
+        setCompanions(data.companions || []);
+        setTotalUserMessages(data.totalUserMessages || 0);
+      }),
       api.get('/api/billing/status').then(({ data }) => {
         setSubscription(data);
         const isNewUser = new URLSearchParams(window.location.search).get('newUser') === 'true';
@@ -169,6 +174,11 @@ export default function CompanionList() {
               {pushLoading ? 'Enabling...' : 'Allow Notifications'}
             </button>
           </div>
+        )}
+
+        {/* Rate app banner */}
+        {!loading && (
+          <RateAppBanner companions={companions} totalUserMessages={totalUserMessages} />
         )}
 
         {/* Loading */}

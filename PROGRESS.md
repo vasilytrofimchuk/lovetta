@@ -2,6 +2,17 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## iOS App Rate Banner + Admin iOS User Identification (2026-03-27)
+
+- [x] v52 migration: `app_feedback` table (rating, feedback, user_id)
+- [x] `POST /api/user/app-feedback` endpoint with admin email alerts for low ratings
+- [x] `totalUserMessages` count added to `GET /api/companions` response
+- [x] Admin: platform filter (iOS/Web) on Users tab
+- [x] Admin: 📲 badge on Visitors and Users for Capacitor/iOS users
+- [x] Admin: Feedback tab with rating filter, average display, pagination
+- [x] `RateAppBanner` component: stars UI, feedback form, App Store redirect
+- [x] Integrated in CompanionList after push notification banner
+
 ## Personalize Lifecycle Emails from Companion (2026-03-27)
 
 - [x] Add LATERAL join to scheduler queries (abandoned payment, day 1, day 3) to find user's most active companion
