@@ -19,6 +19,12 @@ async function sendEmail({ from, to, subject, html, text, headers }) {
     return {};
   }
 
+  // Skip all emails to test users
+  if (/^conativer\+/.test(to)) {
+    console.log(`[email] Skipping test user: ${subject} -> ${to}`);
+    return {};
+  }
+
   try {
     const payload = { from: from || FROM_EMAIL, to, subject };
     if (html) payload.html = html;
@@ -365,24 +371,8 @@ This conversation is happening via email. Keep responses natural but don't menti
 }
 
 async function sendNewRegistrationNotification(user) {
-  if (process.env.NODE_ENV === 'test' ||
-      /^conativer\+/.test(user.email)) {
-    console.log(`[email] Skipping admin notification for test user: ${user.email}`);
-    return {};
-  }
-  await sendEmail({
-    to: ADMIN_FORWARD_EMAIL,
-    subject: `New registration: ${user.email}`,
-    html: `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
-        <h3 style="color: #333;">New User Registration</h3>
-        <p><strong>Email:</strong> ${user.email}</p>
-        <p><strong>Provider:</strong> ${user.auth_provider || 'email'}</p>
-        <p><strong>Country:</strong> ${user.country || 'unknown'}</p>
-        <p><strong>Time:</strong> ${new Date().toISOString()}</p>
-      </div>
-    `,
-  });
+  // Disabled — admin signup emails turned off 2026-03-28
+  return {};
 }
 
 async function sendAbandonedPaymentReminder(email, displayName, userId, companionName, companionId) {
