@@ -10,6 +10,7 @@ const {
   sendRenewalReminder,
 } = require('./email');
 const { runProactiveMessages } = require('./proactive');
+const { startDigestWorker } = require('./daily-digest');
 
 const ONE_HOUR = 60 * 60 * 1000;
 const THIRTY_MINUTES = 30 * 60 * 1000;
@@ -303,6 +304,9 @@ function startScheduler() {
   // Online user snapshots — every 1 min
   setInterval(runOnlineSnapshot, ONE_MINUTE);
   setTimeout(runOnlineSnapshot, 15 * 1000);
+
+  // Daily admin digest — checks hourly, sends at 9:00 UTC
+  startDigestWorker();
 }
 
 module.exports = { startScheduler };

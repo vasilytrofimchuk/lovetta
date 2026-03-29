@@ -1017,4 +1017,16 @@ router.get('/feedback', async (req, res) => {
   }
 });
 
+// -- POST /api/admin/digest/send (manual trigger) -----------
+router.post('/digest/send', async (req, res) => {
+  try {
+    const { sendDailyDigest } = require('./daily-digest');
+    await sendDailyDigest();
+    res.json({ ok: true, message: 'Digest sent' });
+  } catch (err) {
+    console.error('[admin] digest send error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

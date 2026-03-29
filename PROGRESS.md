@@ -2,6 +2,14 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Daily Admin Digest Email (2026-03-28)
+
+- [x] Create `server/src/daily-digest.js` with all Lovetta metrics
+- [x] Hook digest worker into `server/src/scheduler.js`
+- [x] Add `POST /api/admin/digest/send` manual trigger endpoint
+- [x] Test digest email delivery
+- [x] Run API e2e tests
+
 ## ElevenLabs Credit Tracking for STT + Real-Time Subscription Balance (2026-03-27)
 
 - [x] Switch TTS/STT from fake USD pricing to credit-based (Creator plan: 100K credits/mo)
