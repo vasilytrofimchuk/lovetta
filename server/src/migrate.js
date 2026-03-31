@@ -1075,6 +1075,36 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_app_feedback_user ON app_feedback(user_id);
     `,
   },
+  {
+    name: 'v53_demo_audio_and_auto_audio',
+    sql: `
+      ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS demo_audio_url TEXT;
+      ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS auto_audio BOOLEAN DEFAULT false;
+    `,
+  },
+  {
+    name: 'v54_seed_demo_audio_urls',
+    sql: `
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-luna.mp3' WHERE name = 'Luna';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-sophia.mp3' WHERE name = 'Sophia';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-aria.mp3' WHERE name = 'Aria';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-emma.mp3' WHERE name = 'Emma';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-mia.mp3' WHERE name = 'Mia';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-isabella.mp3' WHERE name = 'Isabella';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-chloe.mp3' WHERE name = 'Chloe';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-lily.mp3' WHERE name = 'Lily';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-zara.mp3' WHERE name = 'Zara';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-ruby.mp3' WHERE name = 'Ruby';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-jade.mp3' WHERE name = 'Jade';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-violet.mp3' WHERE name = 'Violet';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-sakura.mp3' WHERE name = 'Sakura';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-yuki.mp3' WHERE name = 'Yuki';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-hana.mp3' WHERE name = 'Hana';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-rei.mp3' WHERE name = 'Rei';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-aiko.mp3' WHERE name = 'Aiko';
+      UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-mei.mp3' WHERE name = 'Mei';
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

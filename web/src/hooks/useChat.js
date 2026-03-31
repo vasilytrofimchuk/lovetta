@@ -20,6 +20,7 @@ export default function useChat(companionId) {
   const [error, setError] = useState(null);
   const [shouldRequestTip, setShouldRequestTip] = useState(false);
   const [tipPromoMessage, setTipPromoMessage] = useState(null);
+  const [lastAssistantMessageId, setLastAssistantMessageId] = useState(null);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaLoadingType, setMediaLoadingType] = useState(null);
   const [messagesSinceLastMedia, setMessagesSinceLastMedia] = useState(0);
@@ -309,6 +310,7 @@ export default function useChat(companionId) {
         created_at: new Date().toISOString(),
       };
       setMessages(prev => [...prev, newMsg]);
+      setLastAssistantMessageId(event.messageId);
 
       // Track messages since last media for button visibility
       if (event.mediaUrl) {
@@ -382,6 +384,7 @@ export default function useChat(companionId) {
     messages, companion, setCompanion, conversation, loading, streaming, streamingText,
     hasMore, error, shouldRequestTip, tipPromoMessage,
     mediaLoading, mediaLoadingType, showMediaButton,
+    lastAssistantMessageId, setLastAssistantMessageId,
     loadChat, loadMore, sendMessage, triggerNext, requestMedia, dismissTip, clearError,
   };
 }

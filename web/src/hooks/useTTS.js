@@ -1,21 +1,26 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import api from '../lib/api';
+import { playAudio, stopAudio } from '../lib/audioManager';
+import { waitForMessageAudio } from '../lib/tts';
 
 /**
  * Hook for TTS playback on a message.
  * Returns { state, toggle } where state is 'idle' | 'loading' | 'playing' | 'paused'.
  */
-export default function useTTS(messageId) {
+export default function useTTS(messageId, initialAudioUrl = null) {
   const [state, setState] = useState('idle');
-  const audioRef = useRef(null);
-  const urlRef = useRef(null);
+  const urlRef = useRef(initialAudioUrl);
+  const activeRef = useRef(null); // tracks if THIS hook's audio is the current one
+
+  useEffect(() => {
+    if (initialAudioUrl) urlRef.current = initialAudioUrl;
+  }, [initialAudioUrl]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+      if (activeRef.current) {
+        stopAudio();
+        activeRef.current = null;
       }
     };
   }, []);
@@ -23,17 +28,11 @@ export default function useTTS(messageId) {
   const toggle = useCallback(async () => {
     if (!messageId) return;
 
-    // Playing → pause
-    if (state === 'playing' && audioRef.current) {
-      audioRef.current.pause();
-      setState('paused');
-      return;
-    }
-
-    // Paused → resume
-    if (state === 'paused' && audioRef.current) {
-      audioRef.current.play();
-      setState('playing');
+    // Playing → stop
+    if (state === 'playing') {
+      stopAudio();
+      activeRef.current = null;
+      setState('idle');
       return;
     }
 
@@ -41,24 +40,18 @@ export default function useTTS(messageId) {
     setState('loading');
 
     try {
-      // Reuse cached URL if available
       let url = urlRef.current;
       if (!url) {
-        const { data } = await api.post('/api/chat/tts', { messageId });
+        const data = await waitForMessageAudio(messageId, { timeoutMs: 20000 });
         url = data.audioUrl;
+        if (!url) throw new Error(data.error || 'Audio not ready');
         urlRef.current = url;
       }
 
-      // Create or reuse Audio
-      if (!audioRef.current || audioRef.current.src !== url) {
-        if (audioRef.current) audioRef.current.pause();
-        audioRef.current = new Audio(url);
-        audioRef.current.addEventListener('ended', () => setState('idle'));
-        audioRef.current.addEventListener('error', () => setState('idle'));
-      }
-
-      audioRef.current.currentTime = 0;
-      await audioRef.current.play();
+      activeRef.current = playAudio(url, {
+        onEnded: () => { activeRef.current = null; setState('idle'); },
+        onError: () => { activeRef.current = null; setState('idle'); },
+      });
       setState('playing');
     } catch (err) {
       console.error('[tts]', err);

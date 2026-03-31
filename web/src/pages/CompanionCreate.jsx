@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { VOICES } from '../lib/voices';
 import useVoicePreview from '../hooks/useVoicePreview';
+import { playAudio, stopAudio } from '../lib/audioManager';
 import { getAppPageHeight } from '../lib/layout';
 
 const GRADIENT_COLORS = [
@@ -163,16 +164,21 @@ export default function CompanionCreate() {
     }).catch(() => {});
   }, [styleFilter, hairFilter, skinFilter, ageFilter]);
 
+  // Stop audio on unmount
+  useEffect(() => () => stopAudio(), []);
+
   function selectSurprise() {
     if (!templates.length) return;
     const random = templates[Math.floor(Math.random() * templates.length)];
     setSelected({ ...random, isTemplate: true });
     setStep('confirm');
+    if (random.demo_audio_url) playAudio(random.demo_audio_url);
   }
 
   function selectTemplate(t) {
     setSelected({ ...t, isTemplate: true });
     setStep('confirm');
+    if (t.demo_audio_url) playAudio(t.demo_audio_url);
   }
 
   async function imaginePersonality() {
@@ -235,6 +241,7 @@ export default function CompanionCreate() {
       <div className="sticky top-0 z-10 bg-brand-bg/95 backdrop-blur-sm border-b border-brand-border app-page-gutter py-3">
         <div className="w-full flex items-center gap-3">
           <button onClick={() => {
+            if (step === 'confirm') stopAudio();
             if (step === 'choose') navigate('/');
             else if (step === 'confirm' && selected?.isTemplate) setStep('templates');
             else if (step === 'confirm') setStep('custom');
@@ -449,7 +456,7 @@ export default function CompanionCreate() {
               <label className="block text-sm text-brand-text-secondary mb-1">Voice</label>
               <div className="grid grid-cols-3 gap-2">
                 {VOICES.map(v => (
-                  <button key={v.id} type="button" onClick={() => { setCustomVoice(v.id); playVoice(v.id); }}
+                  <button key={v.id} type="button" onClick={() => { stopAudio(); setCustomVoice(v.id); playVoice(v.id); }}
                     className={`p-2 rounded-lg border text-left transition-colors relative ${customVoice === v.id ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border bg-brand-surface hover:border-brand-accent/40'}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className={`absolute top-1.5 right-1.5 ${playingId === v.id ? 'text-brand-accent animate-pulse' : 'text-brand-muted'}`}>
                       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>
@@ -581,7 +588,7 @@ export default function CompanionCreate() {
               <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
                 {VOICES.map(v => (
                   <button key={v.id} type="button"
-                    onClick={() => { setSelected({ ...selected, voice_id: v.id }); playVoice(v.id); }}
+                    onClick={() => { stopAudio(); setSelected({ ...selected, voice_id: v.id }); playVoice(v.id); }}
                     className={`px-2 py-1.5 rounded-lg border text-left transition-colors relative ${(selected.voice_id || '') === v.id ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border bg-brand-surface hover:border-brand-accent/40'}`}>
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className={`absolute top-1 right-1 ${playingId === v.id ? 'text-brand-accent animate-pulse' : 'text-brand-muted'}`}>
                       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/>

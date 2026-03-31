@@ -45,6 +45,26 @@ AI companion app for entertaining and intimate chats with AI-generated women com
 
 ---
 
+## Audio Features: Demo Voice on Templates + Auto-Play in Chat — IN PROGRESS
+
+### What
+1. Pre-generated demo audio per girl template — plays when user taps template on confirm page
+2. Auto-play toggle in chat header — persists preference, auto-plays assistant message TTS
+
+### Implementation
+- Ported audioManager.js + tts.js from Mystery repo
+- Migration v53: `demo_audio_url` on companion_templates, `auto_audio` on user_preferences
+- Script `scripts/generate-demo-audio.js` to pre-generate demo clips per template
+- ChatHeader: speaker icon toggle (volume-on / volume-x)
+- ChatPage: full auto-audio effect with playedAutoIds tracking, visibility change, companion switch cleanup
+- CompanionCreate: play demo_audio_url on confirm step entry
+
+### Remaining
+- [ ] Run generate-demo-audio.js to populate demo_audio_url for all templates
+- [ ] Run e2e tests
+
+---
+
 ## Phase 2b: Companion System — NEXT
 
 ### What

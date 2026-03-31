@@ -2,6 +2,22 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Audio Features: Demo Voice + Auto-Play in Chat (2026-03-31)
+
+- [x] Create `web/src/lib/audioManager.js` — global singleton (playAudio, stopAudio, setOnStopCallback)
+- [x] Create `web/src/lib/tts.js` — waitForMessageAudio polling helper
+- [x] Update `web/src/hooks/useTTS.js` — use audioManager instead of raw Audio
+- [x] Migration v53: `demo_audio_url` on companion_templates, `auto_audio` on user_preferences
+- [x] Update `server/src/user-api.js` — auto_audio in GET/PUT preferences
+- [x] Create `scripts/generate-demo-audio.js` — pre-generate demo TTS per template
+- [x] Update `web/src/pages/CompanionCreate.jsx` — play demo audio on confirm step, stop on back/voice preview
+- [x] Update `web/src/components/chat/ChatHeader.jsx` — speaker icon toggle button
+- [x] Update `web/src/hooks/useChat.js` — add lastAssistantMessageId tracking
+- [x] Update `web/src/pages/ChatPage.jsx` — full auto-audio logic (preference load, toggle, auto-play, visibility, cleanup)
+- [x] Run `node scripts/generate-demo-audio.js` — 18/18 templates generated and uploaded to R2
+- [x] Migration v54: seed demo_audio_url for all 18 templates (for prod deploy)
+- [x] Run e2e tests — 47 passed, 1 pre-existing failure (iOS welcome heading)
+
 ## QA fixes — images for all users + paywall popup + mobile overflow (2026-03-31)
 
 - [x] Remove subscription gate from request-media — images now work for all users, only weekly limit blocks
