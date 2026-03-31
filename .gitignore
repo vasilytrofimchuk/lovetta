@@ -33,3 +33,4 @@ web/ios-dist/
 web/ios/App/App.xcworkspace/
 web/ios/App/App/Base.lproj/
 .gstack/
+.mystack/

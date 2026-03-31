@@ -280,34 +280,36 @@ app.post('/api/inbound', async (req, res) => {
 const RESEND_EVENTS_SECRET = (process.env.RESEND_EVENTS_SECRET || '').trim();
 
 app.post('/api/email-events', async (req, res) => {
-  if (RESEND_EVENTS_SECRET) {
-    const signature = req.get('svix-signature') || '';
-    const timestamp = req.get('svix-timestamp') || '';
-    const msgId = req.get('svix-id') || '';
+  if (!RESEND_EVENTS_SECRET) {
+    return res.status(503).json({ error: 'Webhook not configured' });
+  }
 
-    if (!signature || !timestamp) {
-      return res.status(401).json({ error: 'Missing webhook signature' });
-    }
+  const signature = req.get('svix-signature') || '';
+  const timestamp = req.get('svix-timestamp') || '';
+  const msgId = req.get('svix-id') || '';
 
-    const timestampSec = parseInt(timestamp, 10);
-    const nowSec = Math.floor(Date.now() / 1000);
-    if (isNaN(timestampSec) || Math.abs(nowSec - timestampSec) > 300) {
-      return res.status(401).json({ error: 'Webhook timestamp too old or invalid' });
-    }
+  if (!signature || !timestamp) {
+    return res.status(401).json({ error: 'Missing webhook signature' });
+  }
 
-    const payload = JSON.stringify(req.body);
-    const toSign = `${msgId}.${timestamp}.${payload}`;
-    const expected = crypto
-      .createHmac('sha256', Buffer.from(RESEND_EVENTS_SECRET.replace('whsec_', ''), 'base64'))
-      .update(toSign)
-      .digest('base64');
+  const timestampSec = parseInt(timestamp, 10);
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (isNaN(timestampSec) || Math.abs(nowSec - timestampSec) > 300) {
+    return res.status(401).json({ error: 'Webhook timestamp too old or invalid' });
+  }
 
-    const sigParts = signature.split(' ');
-    const valid = sigParts.some(s => s.replace(/^v1,/, '') === expected);
+  const payload = JSON.stringify(req.body);
+  const toSign = `${msgId}.${timestamp}.${payload}`;
+  const expected = crypto
+    .createHmac('sha256', Buffer.from(RESEND_EVENTS_SECRET.replace('whsec_', ''), 'base64'))
+    .update(toSign)
+    .digest('base64');
 
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid webhook signature' });
-    }
+  const sigParts = signature.split(' ');
+  const valid = sigParts.some(s => s.replace(/^v1,/, '') === expected);
+
+  if (!valid) {
+    return res.status(401).json({ error: 'Invalid webhook signature' });
   }
 
   try {
