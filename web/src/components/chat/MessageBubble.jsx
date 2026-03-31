@@ -101,7 +101,7 @@ export default function MessageBubble({ message }) {
           <div className="mb-2 app-chat-media aspect-[16/9] rounded-xl bg-brand-surface border border-brand-border overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-brand-border/30 to-transparent animate-shimmer" />
             <div className="absolute inset-0 flex items-center justify-center text-brand-muted text-sm">
-              {message.media_type === 'video' ? 'Generating video...' : 'Generating photo...'}
+              {message.media_type === 'video' ? 'Sending video...' : 'Sending photo...'}
             </div>
           </div>
         )}
