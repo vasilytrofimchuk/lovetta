@@ -2,6 +2,11 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Auto-send photo after intro message (2026-03-31)
+
+- [x] Auto-trigger `request-media` 1.5s after loading a brand-new conversation (1 intro message, no media)
+- [x] Run UI e2e tests — 48 passed
+
 ## Daily Admin Digest Email (2026-03-28)
 
 - [x] Create `server/src/daily-digest.js` with all Lovetta metrics

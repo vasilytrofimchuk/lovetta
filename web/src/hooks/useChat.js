@@ -58,6 +58,12 @@ export default function useChat(companionId) {
         count++;
       }
       setMessagesSinceLastMedia(count);
+      // Auto-send a photo right after the intro message
+      if (msgs.length === 1 && !msgs[0].media_url && !msgs[0].media_pending) {
+        setTimeout(() => {
+          processSSE(`/api/chat/${companionId}/request-media`, {});
+        }, 1500);
+      }
       // Resume polling for any messages still pending media generation
       for (const msg of msgs) {
         if (msg.media_pending && !msg.media_url && msg.id) {
