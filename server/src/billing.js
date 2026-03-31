@@ -561,6 +561,10 @@ async function handleWebhook(rawBody, signature) {
           [userId, plan, subId, customerId, periodEnd, trialEnd]
         );
         console.log(`[billing] Subscription created: user=${userId} plan=${plan}`);
+        // Tracker event (non-blocking)
+        pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
+          if (rows[0]) fetch('https://tracker-vt-94773e1894c9.herokuapp.com/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'purchase', userEmail: rows[0].email, meta: { plan } }) }).catch(() => {});
+        }).catch(() => {});
         // TrafficStars S2S pay postback (non-blocking)
         const subPrice = plan === 'yearly' ? '99.990' : '19.990';
         pool.query('SELECT ts_click_id FROM users WHERE id = $1', [userId])

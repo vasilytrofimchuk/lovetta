@@ -160,6 +160,9 @@ router.post('/signup', authLimiter, async (req, res) => {
     // TrafficStars S2S signup postback (non-blocking)
     if (tsClickId) fireSignupPostback(tsClickId, user.id);
 
+    // Tracker event (non-blocking)
+    fetch('https://tracker-vt-94773e1894c9.herokuapp.com/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: user.email }) }).catch(() => {});
+
     res.json({ user: sanitizeUser(user), accessToken, refreshToken });
   } catch (err) {
     console.error('[auth] signup error:', err.message);
