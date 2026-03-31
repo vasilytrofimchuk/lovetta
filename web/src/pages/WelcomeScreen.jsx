@@ -25,7 +25,7 @@ export default function WelcomeScreen() {
 
           {/* Tagline */}
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-brand-text">Your AI Girlfriend</h1>
+            <h1 className="text-2xl font-bold text-brand-text">Your Girlfriend</h1>
             <p className="text-brand-text-secondary text-sm mt-1">She picks up right where you left off</p>
           </div>
 

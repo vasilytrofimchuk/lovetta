@@ -70,7 +70,7 @@ export default function StreamingMessage({ text, mediaLoading, mediaLoadingType,
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
               <div className="w-10 h-10 border-3 border-white/30 border-t-white/90 rounded-full animate-spin" />
               <span className="text-white text-sm font-medium drop-shadow-lg">
-                {mediaLoadingType === 'video' ? 'Sending video...' : 'Sending photo...'}
+                {mediaLoadingType === 'video' ? 'Recording a video for you...' : 'Taking a photo for you...'}
               </span>
             </div>
           </div>

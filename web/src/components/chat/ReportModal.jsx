@@ -57,7 +57,7 @@ export default function ReportModal({ companionId, onClose }) {
           <>
             <h3 className="text-lg font-semibold text-brand-text mb-1">Report Content</h3>
             <p className="text-sm text-brand-text-secondary mb-5">
-              Help us improve by reporting inappropriate AI responses.
+              Help us improve by reporting inappropriate content.
             </p>
 
             <div className="space-y-2 mb-4">

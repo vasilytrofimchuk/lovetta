@@ -74,7 +74,7 @@ export default function ChatInput({ onSend, disabled }) {
       });
 
       if (!resp.ok) {
-        const message = await getResponseErrorMessage(resp, 'Could not transcribe audio');
+        const message = await getResponseErrorMessage(resp, 'Couldn\'t understand that');
         console.error('[stt]', message);
         setMicError(message);
         return;
@@ -86,11 +86,11 @@ export default function ChatInput({ onSend, disabled }) {
         setMicError('');
         onSend(transcript);
       } else {
-        setMicError('No speech detected. Try speaking a bit longer.');
+        setMicError('Didn\'t catch that — try again?');
       }
     } catch (err) {
       console.error('[stt]', err);
-      setMicError('Voice transcription failed. Please try again.');
+      setMicError('Couldn\'t hear you. Try again?');
     }
   }, [onSend]);
 
