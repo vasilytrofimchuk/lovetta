@@ -127,7 +127,7 @@ export default function CompanionList() {
           <div className="mb-4 bg-brand-card border border-brand-border rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-brand-text">Meet her for free</p>
+                <p className="text-sm font-semibold text-brand-text">Full experience</p>
                 <p className="text-xs text-brand-text-secondary mt-0.5">3 days free · Monthly or Yearly</p>
               </div>
               <button
