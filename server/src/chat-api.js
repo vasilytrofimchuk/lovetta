@@ -674,10 +674,6 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     }
 
     const sub = await getUserSubscription(req.userId);
-    if (!isSubscriptionActive(sub)) {
-      res.write(`data: ${JSON.stringify({ type: 'error', code: 'subscription_required' })}\n\n`);
-      return res.end();
-    }
 
     const companion = await verifyCompanionOwnership(pool, req.params.companionId, req.userId);
     if (!companion) {
@@ -685,14 +681,14 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       return res.end();
     }
 
+    const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
+
     // Check media block BEFORE calling LLM — no point generating text if media will be blocked
     const blocked = await checkMediaBlocked(req.userId, sub);
     if (blocked) {
       res.write(`data: ${JSON.stringify({ type: 'media_blocked', shouldRequestTip: true })}\n\n`);
       return res.end();
     }
-
-    const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
 
     const { rows: recentMessages } = await pool.query(
       `SELECT role, content FROM messages WHERE conversation_id = $1

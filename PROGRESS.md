@@ -2,6 +2,14 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## QA fixes — images for all users + paywall popup + mobile overflow (2026-03-31)
+
+- [x] Remove subscription gate from request-media — images now work for all users, only weekly limit blocks
+- [x] Paywall shows friendly popup before plan modal (subscription_required uses FreeLimitPopup first)
+- [x] Fix mobile landing page horizontal overflow — added `overflow-x: hidden` to body
+- [x] Build React app — success
+- [x] Run AI + API + UI e2e tests — all passed (97 + 28 + 48)
+
 ## Auto-send photo after intro message (2026-03-31)
 
 - [x] Auto-trigger `request-media` 1.5s after loading a brand-new conversation (1 intro message, no media)

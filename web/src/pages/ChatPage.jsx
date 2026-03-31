@@ -148,13 +148,13 @@ export default function ChatPage() {
       )}
 
       <FreeLimitPopup
-        isOpen={error === 'free_limit_reached' && !showPlanFromLimit}
+        isOpen={(error === 'free_limit_reached' || error === 'subscription_required') && !showPlanFromLimit}
         onUpgrade={() => setShowPlanFromLimit(true)}
         onClose={() => { setShowPlanFromLimit(false); clearError(); }}
       />
 
       <PlanModal
-        isOpen={error === 'subscription_required' || showPlanFromLimit}
+        isOpen={showPlanFromLimit}
         onClose={() => { setShowPlanFromLimit(false); clearError(); }}
         onSuccess={() => { setShowPlanFromLimit(false); clearError(); }}
       />
