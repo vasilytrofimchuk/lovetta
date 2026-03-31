@@ -79,6 +79,14 @@ router.get('/stats', async (req, res) => {
           WHERE referrer IS NOT NULL AND referrer != ''
           GROUP BY referrer_domain ORDER BY count DESC LIMIT 10
         ),
+        platforms AS (
+          SELECT
+            CASE WHEN LOWER(user_agent) LIKE '%capacitor%' OR LOWER(user_agent) LIKE '%lovetta-ios%'
+                 THEN 'iOS' ELSE 'Web' END AS platform,
+            COUNT(*) AS count
+          FROM users
+          GROUP BY platform ORDER BY count DESC
+        ),
         user_stats AS (
           SELECT
             COUNT(*) AS total,
@@ -104,6 +112,7 @@ router.get('/stats', async (req, res) => {
         (SELECT COALESCE(json_agg(mediums), '[]') FROM mediums) AS mediums,
         (SELECT COALESCE(json_agg(campaigns), '[]') FROM campaigns) AS campaigns,
         (SELECT COALESCE(json_agg(referrers), '[]') FROM referrers) AS referrers,
+        (SELECT COALESCE(json_agg(platforms), '[]') FROM platforms) AS platforms,
         (SELECT row_to_json(online_stats) FROM online_stats) AS online
     `);
 

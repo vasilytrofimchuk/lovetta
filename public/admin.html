@@ -781,6 +781,7 @@
         breakdowns += breakdownTable('UTM Mediums', 'utm_medium', data.mediums || []);
         breakdowns += breakdownTable('Campaigns', 'utm_campaign', data.campaigns || []);
         breakdowns += breakdownTable('Referrers', 'referrer_domain', data.referrers || []);
+        breakdowns += breakdownTable('Platforms', 'platform', data.platforms || []);
         document.getElementById('overview-visitor-breakdowns').innerHTML = breakdowns;
       });
 
