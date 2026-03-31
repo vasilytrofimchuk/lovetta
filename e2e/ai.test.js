@@ -216,13 +216,13 @@ test.describe('Content Levels — platform detection', () => {
     expect(detectPlatform(req)).toBe('telegram');
   });
 
-  test('detects iOS app from Capacitor user-agent', () => {
-    const req = { get: () => 'Mozilla/5.0 Capacitor/3.0', body: {} };
+  test('detects iOS app from WKWebView user-agent (iPhone, no Safari)', () => {
+    const req = { get: () => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148', body: {} };
     expect(detectPlatform(req)).toBe('appstore');
   });
 
-  test('detects iOS app from lovetta-ios user-agent', () => {
-    const req = { get: () => 'Mozilla/5.0 lovetta-ios/1.0', body: {} };
+  test('detects iOS app from WKWebView user-agent (iPad, no Safari)', () => {
+    const req = { get: () => 'Mozilla/5.0 (iPad; CPU OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148', body: {} };
     expect(detectPlatform(req)).toBe('appstore');
   });
 

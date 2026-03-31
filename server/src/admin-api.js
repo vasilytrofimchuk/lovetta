@@ -81,10 +81,13 @@ router.get('/stats', async (req, res) => {
         ),
         platforms AS (
           SELECT
-            CASE WHEN LOWER(user_agent) LIKE '%capacitor%' OR LOWER(user_agent) LIKE '%lovetta-ios%'
-                 THEN 'iOS' ELSE 'Web' END AS platform,
+            CASE WHEN (user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%')
+                      AND user_agent NOT LIKE '%Safari/%'
+                 THEN 'iOS App'
+                 ELSE 'Web' END AS platform,
             COUNT(*) AS count
           FROM users
+          WHERE user_agent IS NOT NULL
           GROUP BY platform ORDER BY count DESC
         ),
         user_stats AS (
@@ -97,8 +100,8 @@ router.get('/stats', async (req, res) => {
           SELECT
             (SELECT COUNT(*) FROM visitors WHERE last_activity >= NOW() - INTERVAL '5 minutes') AS visitors_online,
             COUNT(*) AS users_online,
-            COUNT(*) FILTER (WHERE LOWER(user_agent) LIKE '%capacitor%' OR LOWER(user_agent) LIKE '%lovetta-ios%') AS users_ios,
-            COUNT(*) FILTER (WHERE LOWER(user_agent) NOT LIKE '%capacitor%' AND LOWER(user_agent) NOT LIKE '%lovetta-ios%') AS users_web
+            COUNT(*) FILTER (WHERE (user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%') AND user_agent NOT LIKE '%Safari/%') AS users_ios,
+            COUNT(*) FILTER (WHERE NOT ((user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%') AND user_agent NOT LIKE '%Safari/%')) AS users_web
           FROM users
           WHERE last_activity >= NOW() - INTERVAL '5 minutes'
         )
@@ -194,9 +197,9 @@ router.get('/users', async (req, res) => {
     }
 
     if (platform === 'ios') {
-      where += ` AND (LOWER(u.user_agent) LIKE '%capacitor%' OR LOWER(u.user_agent) LIKE '%lovetta-ios%')`;
+      where += ` AND (u.user_agent LIKE '%iPhone%' OR u.user_agent LIKE '%iPad%') AND u.user_agent NOT LIKE '%Safari/%'`;
     } else if (platform === 'web') {
-      where += ` AND (u.user_agent IS NULL OR (LOWER(u.user_agent) NOT LIKE '%capacitor%' AND LOWER(u.user_agent) NOT LIKE '%lovetta-ios%'))`;
+      where += ` AND (u.user_agent IS NULL OR NOT ((u.user_agent LIKE '%iPhone%' OR u.user_agent LIKE '%iPad%') AND u.user_agent NOT LIKE '%Safari/%'))`;
     }
 
     const countQuery = `SELECT COUNT(*) AS total FROM users u ${where}`;

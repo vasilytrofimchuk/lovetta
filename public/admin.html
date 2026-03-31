@@ -690,7 +690,7 @@
     function platformBadge(ua) {
       if (!ua) return '';
       var lower = ua.toLowerCase();
-      if (lower.indexOf('capacitor') !== -1 || lower.indexOf('lovetta-ios') !== -1) return ' 📲';
+      if ((lower.indexOf('iphone') !== -1 || lower.indexOf('ipad') !== -1) && lower.indexOf('safari/') === -1) return ' 📲';
       return '';
     }
 

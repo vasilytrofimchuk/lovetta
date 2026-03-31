@@ -265,8 +265,8 @@ async function runOnlineSnapshot() {
       SELECT
         (SELECT COUNT(*) FROM visitors WHERE last_activity >= NOW() - INTERVAL '5 minutes'),
         COUNT(*),
-        COUNT(*) FILTER (WHERE LOWER(user_agent) NOT LIKE '%capacitor%' AND LOWER(user_agent) NOT LIKE '%lovetta-ios%'),
-        COUNT(*) FILTER (WHERE LOWER(user_agent) LIKE '%capacitor%' OR LOWER(user_agent) LIKE '%lovetta-ios%')
+        COUNT(*) FILTER (WHERE NOT ((user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%') AND user_agent NOT LIKE '%Safari/%')),
+        COUNT(*) FILTER (WHERE (user_agent LIKE '%iPhone%' OR user_agent LIKE '%iPad%') AND user_agent NOT LIKE '%Safari/%')
       FROM users
       WHERE last_activity >= NOW() - INTERVAL '5 minutes'
     `);

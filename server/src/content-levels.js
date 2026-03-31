@@ -20,8 +20,8 @@ function detectPlatform(req) {
     return 'telegram';
   }
 
-  // iOS native app via Capacitor
-  if (ua.includes('capacitor') || ua.includes('lovetta-ios')) {
+  // iOS native app (WKWebView: has iPhone/iPad but no Safari/ in UA)
+  if ((ua.includes('iphone') || ua.includes('ipad')) && !ua.includes('safari/')) {
     return 'appstore';
   }
 
