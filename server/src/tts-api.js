@@ -119,7 +119,7 @@ router.post('/tts', authenticate, async (req, res) => {
         userId: req.userId,
         companionId: msg.companion_id,
         provider: 'fish_audio',
-        model: 'fish_s1',
+        model: 'fish_s2_pro',
         callType: 'tts',
         costUsd,
         metadata: { messageId, bytes: Buffer.byteLength(ttsText, 'utf8'), credits, voice: voiceId },

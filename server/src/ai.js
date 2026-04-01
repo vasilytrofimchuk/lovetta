@@ -692,6 +692,7 @@ async function generateSpeech(text, voiceId = FISH_AUDIO_DEFAULT_VOICE) {
   const body = JSON.stringify({
     text,
     reference_id: voiceId,
+    model: 's2-pro',
     format: 'mp3',
     latency: 'normal',
   });
