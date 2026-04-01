@@ -392,6 +392,10 @@
       </div>
       <div class="stat-cards" id="econ-cards"></div>
       <div class="section" id="econ-voice-credits" style="margin-bottom:24px;"></div>
+      <div class="section" style="margin-bottom:24px;">
+        <h3>By Provider</h3>
+        <div id="econ-provider-table"></div>
+      </div>
       <div class="breakdown-grid">
         <div class="section">
           <h3>By Companion</h3>
@@ -1510,7 +1514,9 @@
         if (balCards) html += '<div class="stat-cards">' + balCards + '</div>';
 
         el.innerHTML = html;
-      }).catch(function() {});
+      }).catch(function() {
+        document.getElementById('econ-voice-credits').innerHTML = '<p style="color:var(--muted);padding:16px;">Failed to load voice credits</p>';
+      });
 
       apiFetch('/api/admin/consumption/summary?period=' + econPeriod).then(function(data) {
         var cost = parseFloat(data.totalCostUsd) || 0;
@@ -1521,6 +1527,21 @@
           card('API Cost', '$' + cost.toFixed(2)) +
           card('Tips Revenue', '$' + tips.toFixed(2)) +
           card('Net Margin', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>');
+
+        // Provider table
+        var providers = data.byProvider || [];
+        if (providers.length) {
+          var html = '<table><tr><th>Provider</th><th>Calls</th><th>Cost</th></tr>';
+          providers.forEach(function(p) {
+            html += '<tr><td>' + esc(p.provider) + '</td>' +
+              '<td>' + formatNumber(parseInt(p.calls) || 0) + '</td>' +
+              '<td>$' + (parseFloat(p.cost) || 0).toFixed(3) + '</td></tr>';
+          });
+          html += '</table>';
+          document.getElementById('econ-provider-table').innerHTML = html;
+        } else {
+          document.getElementById('econ-provider-table').innerHTML = '<p style="color:var(--muted);padding:16px;">No data yet</p>';
+        }
 
         // Companion table
         var companions = data.byCompanion || [];
