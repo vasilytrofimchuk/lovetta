@@ -2,6 +2,18 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Migrate STT: ElevenLabs → OpenAI gpt-4o-mini-transcribe (2026-04-01)
+
+- [x] Rewrite `transcribeSpeech()` in `server/src/ai.js` — OpenAI API instead of ElevenLabs Scribe v2
+- [x] Remove `getElevenLabsSubscription()` from `server/src/ai.js`
+- [x] Update `server/src/tts-api.js` — provider/model tracking to openai/gpt-4o-mini-transcribe
+- [x] Remove `getElevenLabsCreditsUsed()` from `server/src/consumption.js`
+- [x] Simplify `server/src/admin-api.js` — remove ElevenLabs imports and voice/credits data
+- [x] Update `public/admin.html` — remove ElevenLabs STT section from Economics tab
+- [x] Update `.env` — add OPENAI_API_KEY, comment out ELEVENLABS_API_KEY
+- [x] Add OPENAI_API_KEY to Heroku config (v310)
+- [x] Run E2E tests — 28 API + 97 AI passed
+
 ## Migrate TTS: ElevenLabs → Fish.audio (2026-03-31)
 
 - [x] Add FISH_AUDIO_API_KEY to .env and Heroku

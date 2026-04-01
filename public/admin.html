@@ -1489,11 +1489,10 @@
         });
       }
 
-      // Voice provider credits (Fish.audio TTS + ElevenLabs STT)
+      // Voice provider credits (Fish.audio TTS)
       apiFetch('/api/admin/voice/credits?period=' + econPeriod).then(function(data) {
         var el = document.getElementById('econ-voice-credits');
         var fish = data.fishAudio || {};
-        var eleven = data.elevenlabs || {};
         var html = '';
 
         // Fish.audio TTS balance & usage
@@ -1509,28 +1508,6 @@
           balCards += card('Bytes Used', formatNumber(fish.usage.totalBytes || 0));
         }
         if (balCards) html += '<div class="stat-cards">' + balCards + '</div>';
-
-        // ElevenLabs STT (still active)
-        var elSub = eleven.subscription;
-        var elUsage = eleven.usage;
-        if (elSub || elUsage) {
-          html += '<h3 style="margin-top:16px;">ElevenLabs STT</h3>';
-          if (elSub) {
-            var used = elSub.character_count || 0;
-            var limit = elSub.character_limit || 0;
-            var pct = limit ? Math.round(used / limit * 100) : 0;
-            var resetDate = elSub.next_reset ? new Date(elSub.next_reset * 1000).toLocaleDateString() : '?';
-            html += '<div class="stat-cards">' +
-              card('Credits Used', formatNumber(used) + ' / ' + formatNumber(limit) + ' (' + pct + '%)') +
-              card('Tier', elSub.tier || '?') +
-              card('Resets', resetDate) +
-              '</div>';
-          }
-          if (elUsage && elUsage.breakdown && elUsage.breakdown.stt) {
-            var stt = elUsage.breakdown.stt;
-            html += '<p style="color:var(--muted);margin-top:8px;">STT: ' + formatNumber(stt.credits) + ' credits (' + stt.calls + ' calls)</p>';
-          }
-        }
 
         el.innerHTML = html;
       }).catch(function() {});

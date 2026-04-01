@@ -5,8 +5,8 @@
 
 const { Router } = require('express');
 const { getPool } = require('./db');
-const { getConsumptionSummary, getElevenLabsCreditsUsed, getFishAudioUsage } = require('./consumption');
-const { getElevenLabsSubscription, getFishAudioBalance } = require('./ai');
+const { getConsumptionSummary, getFishAudioUsage } = require('./consumption');
+const { getFishAudioBalance } = require('./ai');
 const { invalidateSettingsCache } = require('./content-levels');
 
 const router = Router();
@@ -330,15 +330,12 @@ router.get('/consumption/summary', async (req, res) => {
 router.get('/voice/credits', async (req, res) => {
   try {
     const period = ['7d', '30d', '90d', 'all'].includes(req.query.period) ? req.query.period : '30d';
-    const [fishBalance, fishUsage, elSubscription, elUsage] = await Promise.all([
+    const [fishBalance, fishUsage] = await Promise.all([
       getFishAudioBalance(),
       getFishAudioUsage(period),
-      getElevenLabsSubscription(),
-      getElevenLabsCreditsUsed(period),
     ]);
     res.json({
       fishAudio: { balance: fishBalance, usage: fishUsage },
-      elevenlabs: { subscription: elSubscription, usage: elUsage },
     });
   } catch (err) {
     console.error('[admin] voice credits error:', err.message);

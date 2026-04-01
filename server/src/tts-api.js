@@ -1,7 +1,7 @@
 /**
- * TTS + STT API — Fish.audio text-to-speech + ElevenLabs speech-to-text.
+ * TTS + STT API — Fish.audio text-to-speech + OpenAI speech-to-text.
  * TTS: on-demand generation with R2 caching, emotion tags for Fish.audio S2.
- * STT: voice input transcription via ElevenLabs Scribe v2.
+ * STT: voice input transcription via OpenAI gpt-4o-mini-transcribe.
  */
 
 const { Router } = require('express');
@@ -154,17 +154,17 @@ router.post('/stt', authenticate, async (req, res) => {
     const contentType = req.headers['content-type'] || 'audio/webm';
     const ext = getAudioExtension(contentType);
 
-    const { text, durationSec, credits, costUsd } = await transcribeSpeech(audioBuffer, `voice.${ext}`);
+    const { text, durationSec, costUsd } = await transcribeSpeech(audioBuffer, `voice.${ext}`);
     res.json({ text });
 
     // Track STT credits (fire-and-forget)
     consumption.trackConsumption({
       userId: req.userId,
-      provider: 'elevenlabs',
-      model: 'scribe_v2',
+      provider: 'openai',
+      model: 'gpt-4o-mini-transcribe',
       callType: 'stt',
       costUsd,
-      metadata: { chars: text.length, credits, audioBytes: audioBuffer.length, durationSec },
+      metadata: { chars: text.length, audioBytes: audioBuffer.length, durationSec },
     }).catch(err => console.warn('[stt] consumption tracking failed:', err.message));
   } catch (err) {
     console.error('[stt] error:', err.message);

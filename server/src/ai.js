@@ -12,7 +12,7 @@ const { sendLowBalanceAlert } = require('./email');
 
 const https = require('https');
 const OPENROUTER_API_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
-const ELEVENLABS_API_KEY = (process.env.ELEVENLABS_API_KEY || '').trim();
+const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const FISH_AUDIO_API_KEY = (process.env.FISH_AUDIO_API_KEY || '').trim();
 const FAL_KEY = (process.env.FAL_KEY || '').trim();
 
@@ -675,9 +675,8 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
 const FISH_AUDIO_COST_PER_BYTE = 0.000015;
 const FISH_AUDIO_DEFAULT_VOICE = 'b089032e45db460fb1934ece75a8c51d';
 
-// ElevenLabs STT pricing (still used for speech-to-text)
-const ELEVENLABS_CREDITS_COST_USD = 0.00022; // USD per credit
-const STT_CREDITS_PER_MINUTE = 1000; // Scribe v2 credit consumption rate
+// OpenAI STT pricing (gpt-4o-mini-transcribe)
+const STT_COST_PER_MINUTE = 0.003;
 
 /**
  * Generate speech audio from text via Fish.audio TTS API.
@@ -761,21 +760,21 @@ async function getFishAudioBalance() {
 }
 
 /**
- * Transcribe audio via ElevenLabs Speech-to-Text (Scribe v2).
+ * Transcribe audio via OpenAI Speech-to-Text (gpt-4o-mini-transcribe).
  * @param {Buffer} audioBuffer - Audio file buffer
  * @param {string} fileName - Original filename
- * @returns {{ text: string }}
+ * @returns {{ text: string, durationSec: number, costUsd: number }}
  */
 async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
-  if (!ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not configured');
+  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
 
-  const boundary = '----ELBoundary' + Date.now();
+  const boundary = '----OAIBoundary' + Date.now();
 
   // Build multipart/form-data body
   const head = Buffer.from(
     `--${boundary}\r\n` +
-    `Content-Disposition: form-data; name="model_id"\r\n\r\n` +
-    `scribe_v2\r\n` +
+    `Content-Disposition: form-data; name="model"\r\n\r\n` +
+    `gpt-4o-mini-transcribe\r\n` +
     `--${boundary}\r\n` +
     `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
     `Content-Type: application/octet-stream\r\n\r\n`
@@ -785,11 +784,11 @@ async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
 
   const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
     const req = https.request({
-      hostname: 'api.elevenlabs.io',
-      path: '/v1/speech-to-text',
+      hostname: 'api.openai.com',
+      path: '/v1/audio/transcriptions',
       method: 'POST',
       headers: {
-        'xi-api-key': ELEVENLABS_API_KEY,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
         'Content-Length': body.length,
       },
@@ -807,51 +806,16 @@ async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
 
   const respText = Buffer.concat(responseChunks).toString();
   if (statusCode !== 200) {
-    checkAndAlertBalance('ElevenLabs', statusCode, respText);
-    console.error('[stt] ElevenLabs error:', statusCode, respText);
-    throw new Error(`ElevenLabs STT ${statusCode}: ${respText}`);
+    checkAndAlertBalance('OpenAI', statusCode, respText);
+    console.error('[stt] OpenAI error:', statusCode, respText);
+    throw new Error(`OpenAI STT ${statusCode}: ${respText}`);
   }
 
   const result = JSON.parse(respText);
   // Estimate duration from buffer size (~16 KB/s for webm/opus)
   const durationSec = audioBuffer.length / 16000;
-  const credits = Math.ceil((durationSec / 60) * STT_CREDITS_PER_MINUTE);
-  const costUsd = credits * ELEVENLABS_CREDITS_COST_USD;
-  return { text: result.text || '', durationSec, credits, costUsd };
-}
-
-/**
- * Query ElevenLabs subscription for real-time credit balance.
- * @returns {{ character_count, character_limit, tier, next_reset }} or null on error
- */
-async function getElevenLabsSubscription() {
-  if (!ELEVENLABS_API_KEY) return null;
-  try {
-    const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
-      const req = https.request({
-        hostname: 'api.elevenlabs.io',
-        path: '/v1/user/subscription',
-        method: 'GET',
-        headers: { 'xi-api-key': ELEVENLABS_API_KEY },
-      }, (res) => {
-        const chunks = [];
-        res.on('data', chunk => chunks.push(chunk));
-        res.on('end', () => resolve({ responseChunks: chunks, statusCode: res.statusCode }));
-        res.on('error', reject);
-      });
-      req.on('error', reject);
-      req.setTimeout(10000, () => { req.destroy(new Error('timeout')); });
-      req.end();
-    });
-    if (statusCode !== 200) return null;
-    const data = JSON.parse(Buffer.concat(responseChunks).toString());
-    return {
-      character_count: data.character_count,       // used this period
-      character_limit: data.character_limit,       // total credits
-      tier: data.tier,
-      next_reset: data.next_character_count_reset_unix,
-    };
-  } catch { return null; }
+  const costUsd = (durationSec / 60) * STT_COST_PER_MINUTE;
+  return { text: result.text || '', durationSec, costUsd };
 }
 
 module.exports = {
@@ -864,7 +828,6 @@ module.exports = {
   generateSpeech,
   transcribeSpeech,
   getFishAudioBalance,
-  getElevenLabsSubscription,
   getAISettings,
   buildSystemPrompt,
 };
