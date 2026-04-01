@@ -13,6 +13,7 @@ const { sendLowBalanceAlert } = require('./email');
 const https = require('https');
 const OPENROUTER_API_KEY = (process.env.OPENROUTER_API_KEY || '').trim();
 const ELEVENLABS_API_KEY = (process.env.ELEVENLABS_API_KEY || '').trim();
+const FISH_AUDIO_API_KEY = (process.env.FISH_AUDIO_API_KEY || '').trim();
 const FAL_KEY = (process.env.FAL_KEY || '').trim();
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
@@ -668,36 +669,40 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
   return { url: videoUrl, cost: costUsd, ...consumptionResult };
 }
 
-// -- ElevenLabs TTS -------------------------------------------
+// -- Fish.audio TTS -------------------------------------------
 
-// ElevenLabs Creator plan: 100K credits/month ($22/mo → ~$0.00022/credit)
-const ELEVENLABS_CREDITS_COST_USD = 0.00022; // USD per credit, for threshold math
+// Fish.audio: $15 per 1M UTF-8 bytes
+const FISH_AUDIO_COST_PER_BYTE = 0.000015;
+const FISH_AUDIO_DEFAULT_VOICE = 'b089032e45db460fb1934ece75a8c51d';
+
+// ElevenLabs STT pricing (still used for speech-to-text)
+const ELEVENLABS_CREDITS_COST_USD = 0.00022; // USD per credit
 const STT_CREDITS_PER_MINUTE = 1000; // Scribe v2 credit consumption rate
 
 /**
- * Generate speech audio from text via ElevenLabs TTS API.
- * Uses eleven_v3 model for audio tag support ([laughs], [giggles], etc.)
+ * Generate speech audio from text via Fish.audio TTS API.
  * @param {string} text - Text to convert to speech
- * @param {string} voiceId - ElevenLabs voice ID
- * @returns {{ buffer: Buffer, costUsd: number }}
+ * @param {string} voiceId - Fish.audio voice model ID
+ * @returns {{ buffer: Buffer, costUsd: number, credits: number }}
  */
-async function generateSpeech(text, voiceId = 'hA4zGnmTwX2NQiTRMt7o') {
-  if (!ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not configured');
+async function generateSpeech(text, voiceId = FISH_AUDIO_DEFAULT_VOICE) {
+  if (!FISH_AUDIO_API_KEY) throw new Error('FISH_AUDIO_API_KEY not configured');
   if (!text || !text.trim()) throw new Error('Empty text for TTS');
 
   const body = JSON.stringify({
     text,
-    model_id: 'eleven_v3',
-    voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.4 },
+    reference_id: voiceId,
+    format: 'mp3',
+    latency: 'normal',
   });
 
   const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
     const req = https.request({
-      hostname: 'api.elevenlabs.io',
-      path: `/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+      hostname: 'api.fish.audio',
+      path: '/v1/tts',
       method: 'POST',
       headers: {
-        'xi-api-key': ELEVENLABS_API_KEY,
+        'Authorization': `Bearer ${FISH_AUDIO_API_KEY}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
       },
@@ -715,15 +720,43 @@ async function generateSpeech(text, voiceId = 'hA4zGnmTwX2NQiTRMt7o') {
 
   if (statusCode !== 200) {
     const errText = Buffer.concat(responseChunks).toString();
-    checkAndAlertBalance('ElevenLabs', statusCode, errText);
-    throw new Error(`ElevenLabs TTS ${statusCode}: ${errText}`);
+    checkAndAlertBalance('fish.audio', statusCode, errText);
+    throw new Error(`fish.audio TTS ${statusCode}: ${errText}`);
   }
 
   const buffer = Buffer.concat(responseChunks);
-  const credits = text.length; // 1 credit = 1 character on Creator plan
-  const costUsd = credits * ELEVENLABS_CREDITS_COST_USD;
+  const bytes = Buffer.byteLength(text, 'utf8');
+  const costUsd = bytes * FISH_AUDIO_COST_PER_BYTE;
 
-  return { buffer, costUsd, credits };
+  return { buffer, costUsd, credits: bytes };
+}
+
+/**
+ * Query Fish.audio wallet balance (prepaid API credits).
+ * @returns {{ credit: number }} or null on error
+ */
+async function getFishAudioBalance() {
+  if (!FISH_AUDIO_API_KEY) return null;
+  try {
+    const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'api.fish.audio',
+        path: '/wallet/self/api-credit',
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${FISH_AUDIO_API_KEY}` },
+      }, (res) => {
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => resolve({ responseChunks: chunks, statusCode: res.statusCode }));
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+      req.setTimeout(10000, () => { req.destroy(new Error('timeout')); });
+      req.end();
+    });
+    if (statusCode !== 200) return null;
+    return JSON.parse(Buffer.concat(responseChunks).toString());
+  } catch { return null; }
 }
 
 /**
@@ -829,6 +862,7 @@ module.exports = {
   generateVideo,
   generateSpeech,
   transcribeSpeech,
+  getFishAudioBalance,
   getElevenLabsSubscription,
   getAISettings,
   buildSystemPrompt,

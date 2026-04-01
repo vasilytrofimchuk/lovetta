@@ -45,7 +45,7 @@ async function main() {
   console.log(`Found ${templates.length} active templates\n`);
 
   for (const template of templates) {
-    const voiceId = template.voice_id || 'hA4zGnmTwX2NQiTRMt7o';
+    const voiceId = template.voice_id || 'b089032e45db460fb1934ece75a8c51d';
     const slug = template.name.toLowerCase().replace(/\s+/g, '-');
 
     // Short flirty demo message — unique per girl using her tagline

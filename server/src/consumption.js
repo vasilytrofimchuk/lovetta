@@ -312,6 +312,47 @@ async function getElevenLabsCreditsUsed(period = '30d') {
   return { total, breakdown };
 }
 
+/**
+ * Get Fish.audio TTS usage from local consumption records.
+ * @param {string} period - '7d', '30d', '90d', or 'all'
+ */
+async function getFishAudioUsage(period = '30d') {
+  const pool = getPool();
+  if (!pool) return null;
+
+  const interval = period === 'all' ? null
+    : period === '7d' ? '7 days'
+    : period === '90d' ? '90 days'
+    : '30 days';
+
+  const dateFilter = interval
+    ? `AND created_at >= NOW() - INTERVAL '${interval}'`
+    : '';
+
+  const { rows } = await pool.query(`
+    SELECT
+      call_type,
+      COUNT(*) AS calls,
+      SUM(COALESCE((metadata->>'bytes')::numeric, COALESCE((metadata->>'credits')::numeric, 0))) AS bytes,
+      SUM(cost_usd) AS cost
+    FROM api_consumption
+    WHERE provider = 'fish_audio' ${dateFilter}
+    GROUP BY call_type
+  `);
+
+  let totalBytes = 0;
+  let totalCost = 0;
+  const breakdown = {};
+  for (const r of rows) {
+    const bytes = parseFloat(r.bytes) || 0;
+    const cost = parseFloat(r.cost) || 0;
+    totalBytes += bytes;
+    totalCost += cost;
+    breakdown[r.call_type] = { calls: parseInt(r.calls), bytes, cost };
+  }
+  return { totalBytes, totalCost, breakdown };
+}
+
 module.exports = {
   trackConsumption,
   resetTipCounter,
@@ -320,4 +361,5 @@ module.exports = {
   invalidateThresholdCache,
   getConsumptionSummary,
   getElevenLabsCreditsUsed,
+  getFishAudioUsage,
 };

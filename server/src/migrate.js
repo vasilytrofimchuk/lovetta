@@ -1105,6 +1105,68 @@ const MIGRATIONS = [
       UPDATE companion_templates SET demo_audio_url = '${R2}/audio/demo/demo-mei.mp3' WHERE name = 'Mei';
     `,
   },
+  {
+    name: 'v55_fish_audio_voices',
+    sql: `
+      -- Migrate from ElevenLabs to Fish.audio voice IDs
+      -- Realistic templates
+      UPDATE companion_templates SET voice_id = '83c19893c4974594839bd2d101b1fd66' WHERE name = 'Luna';
+      UPDATE companion_templates SET voice_id = '7e9a17104fd644bb86b91a240b4f2055' WHERE name = 'Sophia';
+      UPDATE companion_templates SET voice_id = 'b089032e45db460fb1934ece75a8c51d' WHERE name = 'Aria';
+      UPDATE companion_templates SET voice_id = '8126dcf7ccd949a2b4d83c328efb91a5' WHERE name = 'Emma';
+      UPDATE companion_templates SET voice_id = '13ea42e651954876a59109ba40c8cdb2' WHERE name = 'Mia';
+      UPDATE companion_templates SET voice_id = '22550e2d849b44e18c7df57f61e666f9' WHERE name = 'Isabella';
+      UPDATE companion_templates SET voice_id = '3c274731ecfb45e99f2dd5f65b32b518' WHERE name = 'Chloe';
+      UPDATE companion_templates SET voice_id = 'db841cac47164082b26fcfe54c27748d' WHERE name = 'Lily';
+      UPDATE companion_templates SET voice_id = '42e70f5bc7b34a9e84abbbd6ec5572d0' WHERE name = 'Zara';
+      UPDATE companion_templates SET voice_id = '8ef4a238714b45718ce04243307c57a7' WHERE name = 'Ruby';
+      UPDATE companion_templates SET voice_id = '37ab9e84be5b42a18681adb35ab988d1' WHERE name = 'Jade';
+      UPDATE companion_templates SET voice_id = '58c1e4127a924d678a1a9d49e3751669' WHERE name = 'Violet';
+
+      -- Anime templates
+      UPDATE companion_templates SET voice_id = 'df5c6c19dca944918dcbd6f1368fd02f' WHERE name = 'Sakura';
+      UPDATE companion_templates SET voice_id = 'd60c136243984ec78a3be125b2f38faf' WHERE name = 'Yuki';
+      UPDATE companion_templates SET voice_id = '08b50a4cac844cea91a4b396bd1d10c3' WHERE name = 'Hana';
+      UPDATE companion_templates SET voice_id = '584afa907518428fac9b04c92ec8a563' WHERE name = 'Rei';
+      UPDATE companion_templates SET voice_id = '42f70c38fa054b65a6baecd4f817d696' WHERE name = 'Aiko';
+      UPDATE companion_templates SET voice_id = 'b1e436a2375f4cdfbefc432381e385f4' WHERE name = 'Mei';
+
+      -- Migrate existing user companions (ElevenLabs → fish.audio)
+      UPDATE user_companions SET voice_id = '83c19893c4974594839bd2d101b1fd66' WHERE voice_id = 'hA4zGnmTwX2NQiTRMt7o';
+      UPDATE user_companions SET voice_id = '7e9a17104fd644bb86b91a240b4f2055' WHERE voice_id = 'rBUHN6YO9PJUwGXk13Jt';
+      UPDATE user_companions SET voice_id = 'b089032e45db460fb1934ece75a8c51d' WHERE voice_id = 'KF337ZXYjoHdNuYUrufC';
+      UPDATE user_companions SET voice_id = '8126dcf7ccd949a2b4d83c328efb91a5' WHERE voice_id = 'iCrDUkL56s3C8sCRl7wb';
+      UPDATE user_companions SET voice_id = '3c274731ecfb45e99f2dd5f65b32b518' WHERE voice_id = 'FGY2WhTYpPnrIDTdsKH5';
+      UPDATE user_companions SET voice_id = '83c19893c4974594839bd2d101b1fd66' WHERE voice_id = 'Xb7hH8MSUJpSbSDYk0k2';
+      UPDATE user_companions SET voice_id = 'db841cac47164082b26fcfe54c27748d' WHERE voice_id = 'pFZP5JQG7iQjIQuC4Bku';
+      UPDATE user_companions SET voice_id = 'b1e436a2375f4cdfbefc432381e385f4' WHERE voice_id = 'hpp4J3VqNfWAUOO0d1Us';
+      UPDATE user_companions SET voice_id = '42f70c38fa054b65a6baecd4f817d696' WHERE voice_id = 'xctasy8XvGp2cVO9HL9k';
+      UPDATE user_companions SET voice_id = '13ea42e651954876a59109ba40c8cdb2' WHERE voice_id = 'AyCt0WmAXUcPJR11zeeP';
+      UPDATE user_companions SET voice_id = '42e70f5bc7b34a9e84abbbd6ec5572d0' WHERE voice_id = 'i4CzbCVWoqvD0P1QJCUL';
+      UPDATE user_companions SET voice_id = '8ef4a238714b45718ce04243307c57a7' WHERE voice_id = 'jpICOesdLlRSc39O1UB5';
+      UPDATE user_companions SET voice_id = '37ab9e84be5b42a18681adb35ab988d1' WHERE voice_id = '6tHWtWy43FFxMeA73K4c';
+      UPDATE user_companions SET voice_id = 'd60c136243984ec78a3be125b2f38faf' WHERE voice_id = 'wNvqdMNs9MLd1PG6uWuY';
+      UPDATE user_companions SET voice_id = 'df5c6c19dca944918dcbd6f1368fd02f' WHERE voice_id = 'z12gfZvqqjJ9oHFbB5i6';
+      UPDATE user_companions SET voice_id = '584afa907518428fac9b04c92ec8a563' WHERE voice_id = 'ytfkKJNB1AXxIr8dKm5H';
+      UPDATE user_companions SET voice_id = '08b50a4cac844cea91a4b396bd1d10c3' WHERE voice_id = 'OHY6EjdeHKeQymoihwfz';
+      UPDATE user_companions SET voice_id = '22550e2d849b44e18c7df57f61e666f9' WHERE voice_id = 'nPpkc230TdYdntJKFNby';
+
+      -- Catch-all: any remaining old voice IDs → default
+      UPDATE user_companions SET voice_id = 'b089032e45db460fb1934ece75a8c51d'
+        WHERE voice_id NOT IN (
+          '83c19893c4974594839bd2d101b1fd66','7e9a17104fd644bb86b91a240b4f2055','b089032e45db460fb1934ece75a8c51d',
+          '8126dcf7ccd949a2b4d83c328efb91a5','3c274731ecfb45e99f2dd5f65b32b518','db841cac47164082b26fcfe54c27748d',
+          '42e70f5bc7b34a9e84abbbd6ec5572d0','8ef4a238714b45718ce04243307c57a7','37ab9e84be5b42a18681adb35ab988d1',
+          '58c1e4127a924d678a1a9d49e3751669','13ea42e651954876a59109ba40c8cdb2','b1e436a2375f4cdfbefc432381e385f4',
+          'df5c6c19dca944918dcbd6f1368fd02f','d60c136243984ec78a3be125b2f38faf','08b50a4cac844cea91a4b396bd1d10c3',
+          '584afa907518428fac9b04c92ec8a563','42f70c38fa054b65a6baecd4f817d696','22550e2d849b44e18c7df57f61e666f9'
+        );
+
+      -- Update defaults
+      ALTER TABLE companion_templates ALTER COLUMN voice_id SET DEFAULT 'b089032e45db460fb1934ece75a8c51d';
+      ALTER TABLE user_companions ALTER COLUMN voice_id SET DEFAULT 'b089032e45db460fb1934ece75a8c51d';
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

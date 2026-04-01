@@ -2,6 +2,23 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Migrate TTS: ElevenLabs → Fish.audio (2026-03-31)
+
+- [x] Add FISH_AUDIO_API_KEY to .env and Heroku
+- [x] Rewrite `generateSpeech()` in `server/src/ai.js` for fish.audio API
+- [x] Add `getFishAudioBalance()` to `server/src/ai.js`
+- [x] Update `server/src/tts-api.js` — action tags for fish.audio S2, consumption tracking, fallback IDs
+- [x] Replace 18 voice IDs in `web/src/lib/voices.js` with fish.audio UUIDs
+- [x] Update `server/src/companion-api.js` default voice ID
+- [x] Add migration v55_fish_audio_voices to `server/src/migrate.js`
+- [x] Update `server/src/admin-api.js` — `/voice/credits` endpoint with fish.audio balance + ElevenLabs STT
+- [x] Add `getFishAudioUsage()` to `server/src/consumption.js`
+- [x] Update `public/admin.html` Economics tab — fish.audio TTS + ElevenLabs STT display
+- [x] Update `scripts/generate-voice-previews.js` with 18 new fish.audio voice IDs
+- [x] Update `scripts/generate-demo-audio.js` fallback voice ID
+- [x] Run voice previews script — 18/18 generated ($0.01 total)
+- [x] Run demo audio script — 18/18 templates regenerated
+
 ## Audio Features: Demo Voice + Auto-Play in Chat (2026-03-31)
 
 - [x] Create `web/src/lib/audioManager.js` — global singleton (playAudio, stopAudio, setOnStopCallback)

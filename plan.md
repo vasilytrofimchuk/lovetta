@@ -60,8 +60,8 @@ AI companion app for entertaining and intimate chats with AI-generated women com
 - CompanionCreate: play demo_audio_url on confirm step entry
 
 ### Remaining
-- [ ] Run generate-demo-audio.js to populate demo_audio_url for all templates
-- [ ] Run e2e tests
+- [x] Run generate-demo-audio.js to populate demo_audio_url for all templates
+- [x] Run e2e tests
 
 ---
 
@@ -1041,3 +1041,12 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Client-side only — no server changes needed (webhook handler already generic).
 - Files: `revenuecat.js`, `PlanModal.jsx`, `tipCheckout.js`, `TipPromoMessage.jsx`, `CompanionSheet.jsx`.
 - Fallback: if offerings API fails, falls back to existing `getProducts` flow with hardcoded prices.
+
+## Migrate TTS from ElevenLabs to Fish.audio — DONE
+- Switched TTS from ElevenLabs ($0.00022/char) to Fish.audio ($0.000015/byte) — ~15x cheaper.
+- STT stays on ElevenLabs (Scribe v2).
+- 18 fish.audio voices curated by personality: sultry, playful, warm, mysterious, confident, cute.
+- DB migration v55 maps all ElevenLabs voice IDs → fish.audio UUIDs in templates + user companions.
+- Admin dashboard updated: fish.audio wallet balance + TTS usage, ElevenLabs STT section.
+- Voice previews and template demos regenerated via fish.audio.
+- Files: ai.js, tts-api.js, companion-api.js, migrate.js, voices.js, admin-api.js, consumption.js, admin.html, generate-voice-previews.js, generate-demo-audio.js.

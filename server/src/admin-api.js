@@ -5,8 +5,8 @@
 
 const { Router } = require('express');
 const { getPool } = require('./db');
-const { getConsumptionSummary, getElevenLabsCreditsUsed } = require('./consumption');
-const { getElevenLabsSubscription } = require('./ai');
+const { getConsumptionSummary, getElevenLabsCreditsUsed, getFishAudioUsage } = require('./consumption');
+const { getElevenLabsSubscription, getFishAudioBalance } = require('./ai');
 const { invalidateSettingsCache } = require('./content-levels');
 
 const router = Router();
@@ -326,21 +326,23 @@ router.get('/consumption/summary', async (req, res) => {
   }
 });
 
-// -- GET /api/admin/elevenlabs/credits ----------------------------
-router.get('/elevenlabs/credits', async (req, res) => {
+// -- GET /api/admin/voice/credits ----------------------------
+router.get('/voice/credits', async (req, res) => {
   try {
     const period = ['7d', '30d', '90d', 'all'].includes(req.query.period) ? req.query.period : '30d';
-    const [subscription, usage] = await Promise.all([
+    const [fishBalance, fishUsage, elSubscription, elUsage] = await Promise.all([
+      getFishAudioBalance(),
+      getFishAudioUsage(period),
       getElevenLabsSubscription(),
       getElevenLabsCreditsUsed(period),
     ]);
     res.json({
-      subscription,  // real-time from ElevenLabs API (character_count, character_limit, tier, next_reset)
-      usage,         // local breakdown (total, breakdown by call_type)
+      fishAudio: { balance: fishBalance, usage: fishUsage },
+      elevenlabs: { subscription: elSubscription, usage: elUsage },
     });
   } catch (err) {
-    console.error('[admin] elevenlabs credits error:', err.message);
-    res.status(500).json({ error: 'Failed to load ElevenLabs credits' });
+    console.error('[admin] voice credits error:', err.message);
+    res.status(500).json({ error: 'Failed to load voice credits' });
   }
 });
 

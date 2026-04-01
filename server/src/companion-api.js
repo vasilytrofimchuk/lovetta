@@ -137,7 +137,7 @@ router.post('/', authenticate, async (req, res) => {
         communication_style: communicationStyle || t.communication_style,
         age: Math.max(18, age || t.age),
         style: t.style || 'realistic',
-        voice_id: voiceId || t.voice_id || 'nova',
+        voice_id: voiceId || t.voice_id || 'b089032e45db460fb1934ece75a8c51d',
       };
     } else {
       // Custom companion
@@ -154,7 +154,7 @@ router.post('/', authenticate, async (req, res) => {
         traits: traits || [],
         communication_style: communicationStyle || 'playful',
         age: Math.max(18, age || 18),
-        voice_id: voiceId || 'nova',
+        voice_id: voiceId || 'b089032e45db460fb1934ece75a8c51d',
       };
     }
 
@@ -166,7 +166,7 @@ router.post('/', authenticate, async (req, res) => {
       [req.userId, companionData.template_id, companionData.name, companionData.personality,
        companionData.backstory, companionData.avatar_url, companionData.video_url,
        JSON.stringify(companionData.traits), companionData.communication_style, companionData.age,
-       companionData.style || 'realistic', companionData.voice_id || 'nova']
+       companionData.style || 'realistic', companionData.voice_id || 'b089032e45db460fb1934ece75a8c51d']
     );
 
     // Create conversation
@@ -215,9 +215,10 @@ Examples:
       }
 
       const { rows: [msg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text)
-         VALUES ($1, 'assistant', $2, $3, $4) RETURNING *`,
-        [conversation.id, content, contextText, sceneText]
+        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type)
+         VALUES ($1, 'assistant', $2, $3, $4, $5, $6) RETURNING *`,
+        [conversation.id, content, contextText, sceneText,
+         companionData.video_url || null, companionData.video_url ? 'video' : null]
       );
       firstMessage = msg;
 
@@ -230,9 +231,10 @@ Examples:
       // Create a fallback first message
       const fallbackContent = `Thank you for bringing me to life... I'm ${companion.name}, and I can already feel this is the beginning of something beautiful. Tell me about the person who gave me life?`;
       const { rows: [msg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text)
-         VALUES ($1, 'assistant', $2, $3) RETURNING *`,
-        [conversation.id, fallbackContent, 'opens her eyes for the first time, a gentle smile forming']
+        `INSERT INTO messages (conversation_id, role, content, context_text, media_url, media_type)
+         VALUES ($1, 'assistant', $2, $3, $4, $5) RETURNING *`,
+        [conversation.id, fallbackContent, 'opens her eyes for the first time, a gentle smile forming',
+         companionData.video_url || null, companionData.video_url ? 'video' : null]
       );
       firstMessage = msg;
     }

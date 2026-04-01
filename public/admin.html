@@ -391,7 +391,7 @@
         <button class="econ-period" onclick="loadEconomics('all', this)">All</button>
       </div>
       <div class="stat-cards" id="econ-cards"></div>
-      <div class="section" id="econ-elevenlabs" style="margin-bottom:24px;"></div>
+      <div class="section" id="econ-voice-credits" style="margin-bottom:24px;"></div>
       <div class="breakdown-grid">
         <div class="section">
           <h3>By Companion</h3>
@@ -1489,33 +1489,49 @@
         });
       }
 
-      // ElevenLabs credits
-      apiFetch('/api/admin/elevenlabs/credits?period=' + econPeriod).then(function(data) {
-        var el = document.getElementById('econ-elevenlabs');
-        var sub = data.subscription;
-        var usage = data.usage;
-        if (!sub && !usage) { el.innerHTML = ''; return; }
+      // Voice provider credits (Fish.audio TTS + ElevenLabs STT)
+      apiFetch('/api/admin/voice/credits?period=' + econPeriod).then(function(data) {
+        var el = document.getElementById('econ-voice-credits');
+        var fish = data.fishAudio || {};
+        var eleven = data.elevenlabs || {};
+        var html = '';
 
-        var html = '<h3>ElevenLabs Credits</h3>';
-        if (sub) {
-          var used = sub.character_count || 0;
-          var limit = sub.character_limit || 0;
-          var pct = limit ? Math.round(used / limit * 100) : 0;
-          var resetDate = sub.next_reset ? new Date(sub.next_reset * 1000).toLocaleDateString() : '?';
-          html += '<div class="stat-cards">' +
-            card('Used / Limit', formatNumber(used) + ' / ' + formatNumber(limit) + ' (' + pct + '%)') +
-            card('Remaining', formatNumber(limit - used)) +
-            card('Tier', sub.tier || '?') +
-            card('Resets', resetDate) +
-            '</div>';
+        // Fish.audio TTS balance & usage
+        html += '<h3>Fish.audio TTS</h3>';
+        var balCards = '';
+        if (fish.balance && fish.balance.credit != null) {
+          balCards += card('Wallet Balance', '$' + parseFloat(fish.balance.credit).toFixed(2));
         }
-        if (usage && usage.breakdown) {
-          var bk = usage.breakdown;
-          var parts = [];
-          if (bk.tts) parts.push('TTS: ' + formatNumber(bk.tts.credits) + ' credits (' + bk.tts.calls + ' calls)');
-          if (bk.stt) parts.push('STT: ' + formatNumber(bk.stt.credits) + ' credits (' + bk.stt.calls + ' calls)');
-          if (parts.length) html += '<p style="color:var(--muted);margin-top:8px;">Local tracking (' + econPeriod + '): ' + parts.join(' &middot; ') + ' &middot; Total: ' + formatNumber(usage.total) + '</p>';
+        if (fish.usage) {
+          balCards += card('TTS Cost (' + econPeriod + ')', '$' + (fish.usage.totalCost || 0).toFixed(4));
+          var ttsCalls = fish.usage.breakdown && fish.usage.breakdown.tts ? fish.usage.breakdown.tts.calls : 0;
+          balCards += card('TTS Calls', formatNumber(ttsCalls));
+          balCards += card('Bytes Used', formatNumber(fish.usage.totalBytes || 0));
         }
+        if (balCards) html += '<div class="stat-cards">' + balCards + '</div>';
+
+        // ElevenLabs STT (still active)
+        var elSub = eleven.subscription;
+        var elUsage = eleven.usage;
+        if (elSub || elUsage) {
+          html += '<h3 style="margin-top:16px;">ElevenLabs STT</h3>';
+          if (elSub) {
+            var used = elSub.character_count || 0;
+            var limit = elSub.character_limit || 0;
+            var pct = limit ? Math.round(used / limit * 100) : 0;
+            var resetDate = elSub.next_reset ? new Date(elSub.next_reset * 1000).toLocaleDateString() : '?';
+            html += '<div class="stat-cards">' +
+              card('Credits Used', formatNumber(used) + ' / ' + formatNumber(limit) + ' (' + pct + '%)') +
+              card('Tier', elSub.tier || '?') +
+              card('Resets', resetDate) +
+              '</div>';
+          }
+          if (elUsage && elUsage.breakdown && elUsage.breakdown.stt) {
+            var stt = elUsage.breakdown.stt;
+            html += '<p style="color:var(--muted);margin-top:8px;">STT: ' + formatNumber(stt.credits) + ' credits (' + stt.calls + ' calls)</p>';
+          }
+        }
+
         el.innerHTML = html;
       }).catch(function() {});
 
