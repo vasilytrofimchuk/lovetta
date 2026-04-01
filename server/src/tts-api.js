@@ -61,7 +61,7 @@ router.post('/tts', authenticate, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'No database' });
 
   try {
-    const { messageId } = req.body || {};
+    const { messageId, source } = req.body || {};
     if (!messageId) return res.status(400).json({ error: 'messageId required' });
 
     // Verify message ownership via conversation → user
@@ -76,6 +76,17 @@ router.post('/tts', authenticate, async (req, res) => {
     if (!msg) return res.status(404).json({ error: 'Message not found' });
     if (msg.user_id !== req.userId) return res.status(403).json({ error: 'Forbidden' });
     if (msg.role !== 'assistant') return res.status(400).json({ error: 'Only assistant messages can be played' });
+
+    // Block auto-generated TTS when user has auto_audio disabled
+    if (source === 'auto') {
+      const { rows: [pref] } = await pool.query(
+        'SELECT auto_audio FROM user_preferences WHERE user_id = $1',
+        [req.userId]
+      );
+      if (!pref?.auto_audio) {
+        return res.status(403).json({ error: 'Auto audio is disabled' });
+      }
+    }
 
     // Check R2 cache
     const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').replace(/\/$/, '');

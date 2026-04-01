@@ -42,7 +42,7 @@ export default function useTTS(messageId, initialAudioUrl = null) {
     try {
       let url = urlRef.current;
       if (!url) {
-        const data = await waitForMessageAudio(messageId, { timeoutMs: 20000 });
+        const data = await waitForMessageAudio(messageId, { timeoutMs: 20000, source: 'manual' });
         url = data.audioUrl;
         if (!url) throw new Error(data.error || 'Audio not ready');
         urlRef.current = url;

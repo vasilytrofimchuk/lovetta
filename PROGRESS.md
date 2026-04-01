@@ -2,6 +2,13 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Server-side enforcement for auto-audio toggle (2026-04-01)
+
+- [x] Add `source` param to `waitForMessageAudio` in `web/src/lib/tts.js`, don't retry 403s
+- [x] Pass `source: 'auto'` from ChatPage auto-play effect
+- [x] Pass `source: 'manual'` from useTTS manual play button
+- [x] Server-side check in `POST /api/chat/tts` — reject `source: 'auto'` when `auto_audio` is OFF
+
 ## Migrate STT: ElevenLabs → OpenAI gpt-4o-mini-transcribe (2026-04-01)
 
 - [x] Rewrite `transcribeSpeech()` in `server/src/ai.js` — OpenAI API instead of ElevenLabs Scribe v2

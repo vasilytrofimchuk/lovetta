@@ -97,6 +97,7 @@ export default function ChatPage() {
       try {
         const data = await waitForMessageAudio(lastAssistantMessageId, {
           timeoutMs: 20000,
+          source: 'auto',
         });
         const audioUrl = data?.audioUrl;
 
