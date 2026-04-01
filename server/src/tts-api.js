@@ -48,8 +48,10 @@ function actionsToAudioTags(content) {
     if (/\bsad\b|sorrowful/.test(lower)) return '[sad] ';
     if (/\bangr/.test(lower)) return '[angry] ';
 
-    // Unsupported actions — strip
-    return '';
+    // Multi-word = stage direction → strip
+    if (action.trim().includes(' ')) return '';
+    // Single word, not a known action = emphasis (e.g. *felt*) → keep as plain text
+    return action;
   }).replace(/\s+/g, ' ').trim();
 }
 

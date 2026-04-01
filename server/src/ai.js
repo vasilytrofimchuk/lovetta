@@ -760,6 +760,31 @@ async function getFishAudioBalance() {
 }
 
 /**
+ * Convert AAC (ADTS) audio to WAV via ffmpeg.
+ * iOS native recordings use AAC which OpenAI doesn't support.
+ */
+function convertAacToWav(audioBuffer) {
+  const { execFile } = require('child_process');
+  const { writeFileSync, readFileSync, unlinkSync } = require('fs');
+  const { join } = require('path');
+  const { tmpdir } = require('os');
+
+  const tmpIn = join(tmpdir(), `stt-in-${Date.now()}.aac`);
+  const tmpOut = join(tmpdir(), `stt-out-${Date.now()}.wav`);
+  writeFileSync(tmpIn, audioBuffer);
+
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', ['-y', '-i', tmpIn, '-ar', '16000', '-ac', '1', '-f', 'wav', tmpOut], (err) => {
+      try { unlinkSync(tmpIn); } catch {}
+      if (err) { try { unlinkSync(tmpOut); } catch {}; return reject(err); }
+      const wav = readFileSync(tmpOut);
+      try { unlinkSync(tmpOut); } catch {}
+      resolve(wav);
+    });
+  });
+}
+
+/**
  * Transcribe audio via OpenAI Speech-to-Text (gpt-4o-mini-transcribe).
  * @param {Buffer} audioBuffer - Audio file buffer
  * @param {string} fileName - Original filename
@@ -767,6 +792,14 @@ async function getFishAudioBalance() {
  */
 async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
   if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+
+  // iOS native recordings are ADTS AAC — OpenAI doesn't support raw AAC
+  let finalBuffer = audioBuffer;
+  let finalName = fileName;
+  if (fileName.endsWith('.aac')) {
+    finalBuffer = await convertAacToWav(audioBuffer);
+    finalName = fileName.replace(/\.aac$/i, '.wav');
+  }
 
   const boundary = '----OAIBoundary' + Date.now();
 
@@ -776,11 +809,11 @@ async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
     `Content-Disposition: form-data; name="model"\r\n\r\n` +
     `gpt-4o-mini-transcribe\r\n` +
     `--${boundary}\r\n` +
-    `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
+    `Content-Disposition: form-data; name="file"; filename="${finalName}"\r\n` +
     `Content-Type: application/octet-stream\r\n\r\n`
   );
   const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
-  const body = Buffer.concat([head, audioBuffer, tail]);
+  const body = Buffer.concat([head, finalBuffer, tail]);
 
   const { responseChunks, statusCode } = await new Promise((resolve, reject) => {
     const req = https.request({

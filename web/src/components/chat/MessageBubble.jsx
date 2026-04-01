@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import useTTS from '../../hooks/useTTS';
 
 function truncateNatural(text, maxWords) {
@@ -17,10 +18,48 @@ export function formatActions(text) {
   return parts.map((part, i) => {
     const actionMatch = part.match(/^\*([^*]+)\*$/);
     if (actionMatch) {
-      return <em key={i} className="text-brand-accent/70 not-italic text-[13px]">{actionMatch[1]}</em>;
+      const inner = actionMatch[1];
+      // Multi-word = stage direction/action → green text
+      // Single word = emphasis (e.g. *felt*, *own*) → italic
+      if (inner.trim().includes(' ')) {
+        return <em key={i} className="text-brand-accent/70 not-italic text-[13px]">{inner}</em>;
+      }
+      return <em key={i} className="italic">{inner}</em>;
     }
     return part;
   });
+}
+
+function ChatVideo({ src }) {
+  const ref = useRef(null);
+  const [ended, setEnded] = useState(false);
+
+  const replay = () => {
+    ref.current.currentTime = 0;
+    ref.current.play();
+    setEnded(false);
+  };
+
+  return (
+    <div className="mb-2 rounded-xl overflow-hidden relative" onClick={ended ? replay : undefined}>
+      <video
+        ref={ref}
+        src={src}
+        autoPlay
+        muted
+        playsInline
+        onEnded={() => setEnded(true)}
+        className="app-chat-media rounded-xl"
+      />
+      {ended && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 cursor-pointer">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="white" opacity="0.9">
+            <polygon points="5 3 19 12 5 21 5 3" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PlayButton({ messageId }) {
@@ -111,9 +150,7 @@ export default function MessageBubble({ message }) {
           </div>
         )}
         {!isUser && message.media_url && message.media_type === 'video' && (
-          <div className="mb-2 rounded-xl overflow-hidden">
-            <video src={message.media_url} autoPlay loop muted playsInline className="app-chat-media rounded-xl" />
-          </div>
+          <ChatVideo src={message.media_url} />
         )}
 
         {/* Message bubble */}
