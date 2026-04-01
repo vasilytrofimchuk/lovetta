@@ -2,6 +2,14 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Expand companion chat memory: 10→30 messages + image/tip awareness (2026-04-01)
+
+- [x] Add `RECENT_MESSAGE_LIMIT = 30` constant and `formatMessagesForAI()` helper in chat-api.js
+- [x] Update all 3 message history queries (message, next, request-media) to LIMIT 30 + include media_url/media_type
+- [x] Replace `.map()` calls with `formatMessagesForAI()` so AI sees image annotations
+- [x] Add tip query to `buildMemoryContext()` in memory.js — shows last 5 tips in system prompt
+- [x] Run tests (28 API + 97 AI passed)
+
 ## Server-side enforcement for auto-audio toggle (2026-04-01)
 
 - [x] Add `source` param to `waitForMessageAudio` in `web/src/lib/tts.js`, don't retry 403s

@@ -1,7 +1,7 @@
 /**
  * Multi-level companion memory system.
  *
- * Level 1: Recent messages (last 10) — handled in chat-api.js
+ * Level 1: Recent messages (last 30) — handled in chat-api.js
  * Level 2: Conversation summaries — generated every ~20 messages
  * Level 3: Long-term facts — extracted every ~3 messages (AI + regex)
  *
@@ -23,7 +23,7 @@ async function buildMemoryContext(conversationId) {
   const pool = getPool();
   if (!pool) return '';
 
-  const [factsResult, summariesResult] = await Promise.all([
+  const [factsResult, summariesResult, tipsResult] = await Promise.all([
     pool.query(
       `SELECT category, fact FROM companion_memories
        WHERE conversation_id = $1 ORDER BY category, updated_at DESC`,
@@ -34,12 +34,20 @@ async function buildMemoryContext(conversationId) {
        WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 3`,
       [conversationId]
     ),
+    pool.query(
+      `SELECT t.amount, t.created_at FROM tips t
+       JOIN conversations c ON c.id = $1
+       WHERE t.user_id = c.user_id AND t.companion_id = c.companion_id
+       ORDER BY t.created_at DESC LIMIT 5`,
+      [conversationId]
+    ),
   ]);
 
   const facts = factsResult.rows;
   const summaries = summariesResult.rows.reverse();
+  const tips = tipsResult.rows;
 
-  if (facts.length === 0 && summaries.length === 0) return '';
+  if (facts.length === 0 && summaries.length === 0 && tips.length === 0) return '';
 
   let memoryPrompt = '';
 
@@ -54,6 +62,15 @@ async function buildMemoryContext(conversationId) {
     for (const s of summaries) {
       memoryPrompt += `[${timeAgo(s.created_at)}] ${s.summary}\n`;
     }
+  }
+
+  if (tips.length > 0) {
+    memoryPrompt += '\nTIPS FROM THIS USER:\n';
+    for (const t of tips) {
+      const amount = (t.amount / 100).toFixed(2);
+      memoryPrompt += `- $${amount} on ${t.created_at.toLocaleDateString()}\n`;
+    }
+    memoryPrompt += 'You feel genuinely grateful. Reference tips warmly when natural, but do not constantly bring them up.\n';
   }
 
   if (memoryPrompt.length > MAX_MEMORY_CHARS) {

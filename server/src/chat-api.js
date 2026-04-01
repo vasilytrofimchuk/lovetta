@@ -22,8 +22,21 @@ const { sendPushNotification } = require('./push');
 const router = Router();
 
 // -- Per-user rate limiting via Redis --------------------------
+const RECENT_MESSAGE_LIMIT = 30; // messages in AI context window
 const RATE_LIMIT_MAX = 20;       // max requests
 const RATE_LIMIT_WINDOW = 60;    // seconds
+
+/** Enrich raw message rows with image annotations for AI context */
+function formatMessagesForAI(rows) {
+  return rows.map(m => {
+    let content = m.content || '';
+    if (m.media_url && m.role === 'assistant') {
+      const label = m.media_type === 'video' ? 'video' : 'photo';
+      content += `\n[I sent a ${label}: ${m.media_url}]`;
+    }
+    return { role: m.role, content };
+  });
+}
 
 async function checkRateLimit(userId) {
   const redis = getRedis();
@@ -340,14 +353,14 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       }, 5 * 60 * 1000);
     }
 
-    // Load recent messages for context (last 10 — room for memory context)
+    // Load recent messages for context (last 30 — room for memory context)
     const { rows: recentMessages } = await pool.query(
-      `SELECT role, content FROM messages WHERE conversation_id = $1
-       ORDER BY created_at DESC LIMIT 10`,
+      `SELECT role, content, media_url, media_type FROM messages WHERE conversation_id = $1
+       ORDER BY created_at DESC LIMIT ${RECENT_MESSAGE_LIMIT}`,
       [conversation.id]
     );
     recentMessages.reverse();
-    const aiMessages = recentMessages.map(m => ({ role: m.role, content: m.content }));
+    const aiMessages = formatMessagesForAI(recentMessages);
 
     // Build system prompt with memory context
     const [mediaEnabled, videoEnabled, actionsPref] = await Promise.all([
@@ -522,8 +535,8 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
     const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
 
     const { rows: recentMessages } = await pool.query(
-      `SELECT role, content FROM messages WHERE conversation_id = $1
-       ORDER BY created_at DESC LIMIT 10`,
+      `SELECT role, content, media_url, media_type FROM messages WHERE conversation_id = $1
+       ORDER BY created_at DESC LIMIT ${RECENT_MESSAGE_LIMIT}`,
       [conversation.id]
     );
     recentMessages.reverse();
@@ -544,7 +557,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
     }
 
     const aiMessages = [
-      ...recentMessages.map(m => ({ role: m.role, content: m.content })),
+      ...formatMessagesForAI(recentMessages),
       { role: 'user', content: syntheticContent },
     ];
     const platform = detectPlatform(req);
@@ -691,13 +704,13 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     }
 
     const { rows: recentMessages } = await pool.query(
-      `SELECT role, content FROM messages WHERE conversation_id = $1
-       ORDER BY created_at DESC LIMIT 10`,
+      `SELECT role, content, media_url, media_type FROM messages WHERE conversation_id = $1
+       ORDER BY created_at DESC LIMIT ${RECENT_MESSAGE_LIMIT}`,
       [conversation.id]
     );
     recentMessages.reverse();
     const aiMessages = [
-      ...recentMessages.map(m => ({ role: m.role, content: m.content })),
+      ...formatMessagesForAI(recentMessages),
       { role: 'user', content: 'send me a photo of you right now' },
     ];
 
