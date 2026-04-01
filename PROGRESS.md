@@ -2,6 +2,16 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Admin Chat Viewer + Breaking-Character Analysis (2026-04-01)
+
+- [x] Add `GET /api/admin/chats` endpoint — list all conversations with search, pagination
+- [x] Add `GET /api/admin/chats/:id` endpoint — full conversation detail with messages
+- [x] Add `GET /api/admin/chats/flagged` endpoint — regex search for breaking-character patterns
+- [x] Add "Chats" tab to admin dashboard with "All Chats" and "Flagged" sub-views
+- [x] All Chats: searchable conversation list → click to view full chat bubble view
+- [x] Flagged: filter by category (wellness/breaking/bland) and time range, with context
+- [x] Tests pass (28 API)
+
 ## Expand companion chat memory: 10→30 messages + image/tip awareness (2026-04-01)
 
 - [x] Add `RECENT_MESSAGE_LIMIT = 30` constant and `formatMessagesForAI()` helper in chat-api.js

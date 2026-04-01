@@ -1040,4 +1040,199 @@ router.post('/digest/send', async (req, res) => {
   }
 });
 
+// -- GET /api/admin/chats (list conversations) ---------------
+router.get('/chats', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ rows: [], total: 0, page: 1, limit: 50 });
+
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+    const search = (req.query.search || '').trim();
+
+    let where = '';
+    const params = [];
+    if (search) {
+      params.push(`%${search}%`);
+      where = `WHERE (u.email ILIKE $1 OR u.display_name ILIKE $1 OR uc.name ILIKE $1)`;
+    }
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*)::int AS total
+       FROM conversations c
+       JOIN users u ON u.id = c.user_id
+       JOIN user_companions uc ON uc.id = c.companion_id
+       ${where}`,
+      params
+    );
+
+    const dataParams = [...params, limit, offset];
+    const { rows } = await pool.query(
+      `SELECT
+         c.id,
+         c.user_id,
+         u.email AS user_email,
+         u.display_name AS user_name,
+         uc.name AS companion_name,
+         c.last_message_at,
+         c.created_at,
+         (SELECT COUNT(*)::int FROM messages m WHERE m.conversation_id = c.id) AS message_count,
+         (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message
+       FROM conversations c
+       JOIN users u ON u.id = c.user_id
+       JOIN user_companions uc ON uc.id = c.companion_id
+       ${where}
+       ORDER BY c.last_message_at DESC NULLS LAST
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      dataParams
+    );
+
+    res.json({ rows, total: countRes.rows[0].total, page, limit });
+  } catch (err) {
+    console.error('[admin] chats list error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- GET /api/admin/chats/flagged (breaking-character search) --
+router.get('/chats/flagged', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({ rows: [], total: 0, page: 1, limit: 50 });
+
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+    const category = (req.query.category || '').trim();
+    const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 30));
+
+    const patterns = {
+      wellness: [
+        'go outside', 'take a break', 'fresh air', 'screen time',
+        'self.care', 'step away', 'disconnect from', 'real.world',
+        'well.being', 'touch some grass',
+      ],
+      breaking: [
+        "I'm (just )?an AI", 'as an AI', "I can't actually", "I'm not (a )?real",
+        'language model', 'artificial intelligence', "I don't have (real )?feelings",
+        "I'm (a )?program", "I was (designed|programmed|created) to",
+      ],
+      bland: [
+        'mindful(ness)?', 'breath(e|ing) (deeply|slowly)', 'being present',
+        'just be still', 'inner peace', 'centering (yourself|ourselves)',
+        'grounding exercise', 'body scan',
+      ],
+    };
+
+    // Build regex from selected or all categories
+    let selectedPatterns;
+    if (category && patterns[category]) {
+      selectedPatterns = patterns[category];
+    } else {
+      selectedPatterns = [].concat(patterns.wellness, patterns.breaking, patterns.bland);
+    }
+    const regex = selectedPatterns.join('|');
+
+    const params = [regex, days, limit, offset];
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*)::int AS total
+       FROM messages m
+       JOIN conversations c ON c.id = m.conversation_id
+       WHERE m.role = 'assistant'
+         AND m.content ~* $1
+         AND m.created_at >= NOW() - ($2 || ' days')::INTERVAL`,
+      [regex, days]
+    );
+
+    const { rows } = await pool.query(
+      `SELECT
+         m.id AS message_id,
+         m.content,
+         m.created_at,
+         c.id AS conversation_id,
+         c.user_id,
+         u.email AS user_email,
+         u.display_name AS user_name,
+         uc.name AS companion_name,
+         (
+           SELECT json_agg(sub ORDER BY sub.created_at)
+           FROM (
+             SELECT role, content, created_at
+             FROM messages m2
+             WHERE m2.conversation_id = c.id AND m2.created_at < m.created_at
+             ORDER BY m2.created_at DESC LIMIT 2
+           ) sub
+         ) AS context_before
+       FROM messages m
+       JOIN conversations c ON c.id = m.conversation_id
+       JOIN users u ON u.id = c.user_id
+       JOIN user_companions uc ON uc.id = c.companion_id
+       WHERE m.role = 'assistant'
+         AND m.content ~* $1
+         AND m.created_at >= NOW() - ($2 || ' days')::INTERVAL
+       ORDER BY m.created_at DESC
+       LIMIT $3 OFFSET $4`,
+      params
+    );
+
+    res.json({ rows, total: countRes.rows[0].total, page, limit });
+  } catch (err) {
+    console.error('[admin] chats flagged error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- GET /api/admin/chats/:id (conversation detail) -----------
+router.get('/chats/:id', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'DB not available' });
+
+  try {
+    const conversationId = req.params.id;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 100));
+    const offset = (page - 1) * limit;
+
+    // Conversation metadata
+    const { rows: convRows } = await pool.query(
+      `SELECT c.id, c.user_id, c.created_at, c.last_message_at,
+              u.email AS user_email, u.display_name AS user_name,
+              uc.name AS companion_name, uc.personality AS companion_personality
+       FROM conversations c
+       JOIN users u ON u.id = c.user_id
+       JOIN user_companions uc ON uc.id = c.companion_id
+       WHERE c.id = $1`,
+      [conversationId]
+    );
+    if (!convRows.length) return res.status(404).json({ error: 'Conversation not found' });
+
+    const countRes = await pool.query(
+      'SELECT COUNT(*)::int AS total FROM messages WHERE conversation_id = $1',
+      [conversationId]
+    );
+
+    const { rows: messages } = await pool.query(
+      `SELECT id, role, content, context_text, scene_text, media_url, media_type, is_proactive, created_at
+       FROM messages
+       WHERE conversation_id = $1
+       ORDER BY created_at ASC
+       LIMIT $2 OFFSET $3`,
+      [conversationId, limit, offset]
+    );
+
+    res.json({
+      conversation: convRows[0],
+      messages,
+      total: countRes.rows[0].total,
+      page,
+      limit,
+    });
+  } catch (err) {
+    console.error('[admin] chat detail error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

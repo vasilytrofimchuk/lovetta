@@ -1964,6 +1964,198 @@
       }
     }).catch(function() {});
 
+    // -- Chats tab -----------------------------------------------
+    function loadChats() {
+      if (chatsView === 'flagged') return loadChatsFlagged();
+      if (chatsActiveCId) return loadChatDetail(chatsActiveCId);
+      loadChatsList();
+    }
+
+    function chatViewBtn(label, val) {
+      var active = chatsView === val;
+      return '<button onclick="switchChatsView(\'' + val + '\')" style="padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:500;' +
+        (active ? 'background:var(--accent);color:#fff;border:1px solid var(--accent)' : 'background:var(--bg2);color:var(--text2);border:1px solid var(--border)') +
+        '">' + label + '</button>';
+    }
+
+    function switchChatsView(view) {
+      chatsView = view;
+      chatsActiveCId = null;
+      chatsChatData = null;
+      chatsPage = 1;
+      chatsFlaggedPage = 1;
+      loadChats();
+    }
+
+    function loadChatsList(page) {
+      chatsPage = page || chatsPage;
+      var search = (document.getElementById('chats-search') || {}).value || '';
+      var url = '/api/admin/chats?page=' + chatsPage + '&limit=50';
+      if (search) url += '&search=' + encodeURIComponent(search);
+
+      apiFetch(url).then(function(data) {
+        var html =
+          '<div class="tab-header"><h2>Chats</h2><button class="refresh-btn" onclick="loadChats()">↻ Refresh</button></div>' +
+          '<div style="display:flex;gap:0.5rem;margin-bottom:1rem">' +
+            chatViewBtn('All Chats', 'all') + chatViewBtn('Flagged', 'flagged') +
+          '</div>' +
+          '<div class="search-bar" style="margin-bottom:1rem">' +
+            '<input type="text" id="chats-search" placeholder="Search by user or companion name..." value="' + esc(search) + '" onkeyup="if(event.key===\'Enter\'){chatsPage=1;loadChatsList();}">' +
+          '</div>';
+
+        if (!(data.rows || []).length) {
+          html += '<div style="color:var(--muted);padding:1rem">No conversations found</div>';
+        } else {
+          html += '<table><thead><tr>' +
+            '<th>User</th><th>Companion</th><th>Messages</th><th>Last Message</th><th>Last Active</th>' +
+          '</tr></thead><tbody>';
+          data.rows.forEach(function(r) {
+            var preview = (r.last_message || '').substring(0, 100);
+            html += '<tr style="cursor:pointer" onclick="openChatDetail(\'' + r.id + '\')">' +
+              '<td>' + esc(r.user_name || r.user_email || '—') + '</td>' +
+              '<td>' + esc(r.companion_name) + '</td>' +
+              '<td>' + (r.message_count || 0) + '</td>' +
+              '<td style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text2)">' + esc(preview) + '</td>' +
+              '<td class="mono">' + timeAgo(r.last_message_at) + '</td>' +
+            '</tr>';
+          });
+          html += '</tbody></table>';
+        }
+        html += '<div class="pagination" id="chats-pagination"></div>';
+
+        document.getElementById('tab-chats').innerHTML = html;
+        renderPagination('chats-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadChatsList');
+      });
+    }
+
+    function openChatDetail(conversationId) {
+      chatsActiveCId = conversationId;
+      loadChatDetail(conversationId);
+    }
+
+    function loadChatDetail(conversationId, page) {
+      var pg = page || 1;
+      apiFetch('/api/admin/chats/' + conversationId + '?page=' + pg + '&limit=200').then(function(data) {
+        chatsChatData = data;
+        var conv = data.conversation;
+        var msgs = data.messages || [];
+
+        var html =
+          '<div class="tab-header"><h2>Chats</h2><button class="refresh-btn" onclick="loadChats()">↻ Refresh</button></div>' +
+          '<div style="display:flex;gap:0.5rem;margin-bottom:1rem">' +
+            chatViewBtn('All Chats', 'all') + chatViewBtn('Flagged', 'flagged') +
+          '</div>' +
+          '<button onclick="chatsActiveCId=null;chatsChatData=null;loadChatsList();" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;font-size:0.85rem;margin-bottom:1rem">← Back to list</button>' +
+          '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem">' +
+            '<div style="display:flex;justify-content:space-between">' +
+              '<div><strong>' + esc(conv.user_name || conv.user_email || '—') + '</strong>' +
+                (conv.user_email ? ' <span style="color:var(--muted);font-size:0.85rem">' + esc(conv.user_email) + '</span>' : '') +
+              '</div>' +
+              '<div style="color:var(--muted);font-size:0.85rem">with <strong>' + esc(conv.companion_name) + '</strong> · ' + data.total + ' messages</div>' +
+            '</div>' +
+          '</div>';
+
+        // Messages
+        html += '<div style="display:flex;flex-direction:column;gap:0.5rem;max-height:600px;overflow-y:auto;padding:0.5rem">';
+        if (!msgs.length) {
+          html += '<div style="color:var(--muted);text-align:center;padding:1rem">No messages</div>';
+        } else {
+          msgs.forEach(function(m) {
+            var isUser = m.role === 'user';
+            html +=
+              '<div style="display:flex;justify-content:' + (isUser ? 'flex-end' : 'flex-start') + '">' +
+                '<div style="max-width:75%;padding:0.6rem 0.8rem;border-radius:0.75rem;' +
+                  (isUser ? 'background:var(--accent);color:#fff' : 'background:var(--bg2);border:1px solid var(--border);color:var(--text)') + '">' +
+                  (m.context_text ? '<div style="font-style:italic;font-size:0.8rem;color:' + (isUser ? 'rgba(255,255,255,0.7)' : 'var(--muted)') + ';margin-bottom:4px">*' + esc(m.context_text) + '*</div>' : '') +
+                  '<div style="white-space:pre-wrap;font-size:0.9rem">' + esc(m.content) + '</div>' +
+                  (m.media_url ? '<div style="margin-top:6px"><img src="' + esc(m.media_url) + '" style="max-width:200px;border-radius:8px" onerror="this.style.display=\'none\'"></div>' : '') +
+                  '<div style="font-size:0.7rem;color:' + (isUser ? 'rgba(255,255,255,0.6)' : 'var(--muted)') + ';margin-top:3px">' +
+                    timeAgo(m.created_at) +
+                    (m.is_proactive ? ' · proactive' : '') +
+                  '</div>' +
+                '</div>' +
+              '</div>';
+          });
+        }
+        html += '</div>';
+
+        // Pagination for long conversations
+        if (data.total > 200) {
+          html += '<div style="text-align:center;margin-top:0.5rem;color:var(--muted);font-size:0.85rem">Showing ' + msgs.length + ' of ' + data.total + ' messages (page ' + data.page + ')</div>';
+        }
+
+        document.getElementById('tab-chats').innerHTML = html;
+      });
+    }
+
+    function loadChatsFlagged(page) {
+      chatsFlaggedPage = page || chatsFlaggedPage;
+      var category = chatsFlaggedCategory;
+      var days = chatsFlaggedDays;
+      var url = '/api/admin/chats/flagged?page=' + chatsFlaggedPage + '&limit=50&days=' + days;
+      if (category) url += '&category=' + encodeURIComponent(category);
+
+      apiFetch(url).then(function(data) {
+        function catBtn(label, val) {
+          var active = chatsFlaggedCategory === val;
+          return '<button onclick="chatsFlaggedCategory=\'' + val + '\';chatsFlaggedPage=1;loadChatsFlagged();" style="padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;' +
+            (active ? 'background:var(--accent);color:#fff;border:1px solid var(--accent)' : 'background:var(--bg2);color:var(--text2);border:1px solid var(--border)') +
+            '">' + label + '</button>';
+        }
+
+        var html =
+          '<div class="tab-header"><h2>Chats</h2><button class="refresh-btn" onclick="loadChats()">↻ Refresh</button></div>' +
+          '<div style="display:flex;gap:0.5rem;margin-bottom:1rem">' +
+            chatViewBtn('All Chats', 'all') + chatViewBtn('Flagged', 'flagged') +
+          '</div>' +
+          '<div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">' +
+            '<span style="color:var(--muted);font-size:0.85rem">Category:</span>' +
+            catBtn('All', '') + catBtn('Wellness', 'wellness') + catBtn('Breaking Character', 'breaking') + catBtn('Bland Intimate', 'bland') +
+            '<span style="color:var(--muted);font-size:0.85rem;margin-left:1rem">Last:</span>' +
+            '<select onchange="chatsFlaggedDays=parseInt(this.value);chatsFlaggedPage=1;loadChatsFlagged();" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:0.85rem">' +
+              '<option value="7"' + (days === 7 ? ' selected' : '') + '>7 days</option>' +
+              '<option value="14"' + (days === 14 ? ' selected' : '') + '>14 days</option>' +
+              '<option value="30"' + (days === 30 ? ' selected' : '') + '>30 days</option>' +
+              '<option value="90"' + (days === 90 ? ' selected' : '') + '>90 days</option>' +
+              '<option value="365"' + (days === 365 ? ' selected' : '') + '>1 year</option>' +
+            '</select>' +
+            '<span style="color:var(--muted);font-size:0.85rem;margin-left:auto">' + (data.total || 0) + ' matches</span>' +
+          '</div>';
+
+        if (!(data.rows || []).length) {
+          html += '<div style="color:var(--muted);padding:1rem">No flagged messages found for this period</div>';
+        } else {
+          data.rows.forEach(function(r) {
+            var contextHtml = '';
+            if (r.context_before && r.context_before.length) {
+              r.context_before.forEach(function(ctx) {
+                contextHtml +=
+                  '<div style="padding:4px 8px;font-size:0.82rem;border-left:2px solid ' + (ctx.role === 'user' ? 'var(--accent)' : 'var(--border)') + ';margin-bottom:4px;color:var(--text2)">' +
+                    '<strong>' + ctx.role + ':</strong> ' + esc((ctx.content || '').substring(0, 200)) +
+                  '</div>';
+              });
+            }
+            html +=
+              '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:0.75rem">' +
+                '<div style="display:flex;justify-content:space-between;margin-bottom:0.5rem">' +
+                  '<div><strong>' + esc(r.companion_name) + '</strong> → <span style="color:var(--muted)">' + esc(r.user_name || r.user_email || '—') + '</span></div>' +
+                  '<div style="display:flex;gap:0.5rem;align-items:center">' +
+                    '<span class="mono" style="font-size:0.8rem">' + timeAgo(r.created_at) + '</span>' +
+                    '<button onclick="openChatDetail(\'' + r.conversation_id + '\')" style="padding:3px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;font-size:0.8rem">View chat</button>' +
+                  '</div>' +
+                '</div>' +
+                (contextHtml ? '<div style="margin-bottom:0.5rem">' + contextHtml + '</div>' : '') +
+                '<div style="background:rgba(255,77,106,0.08);border:1px solid rgba(255,77,106,0.2);border-radius:6px;padding:0.5rem 0.75rem;white-space:pre-wrap;font-size:0.9rem">' + esc(r.content) + '</div>' +
+              '</div>';
+          });
+        }
+        html += '<div class="pagination" id="chats-flagged-pagination"></div>';
+
+        document.getElementById('tab-chats').innerHTML = html;
+        renderPagination('chats-flagged-pagination', data.total || 0, data.page || 1, data.limit || 50, 'loadChatsFlagged');
+      });
+    }
+
     // Load cashout badge on dashboard init
     apiFetch('/api/admin/cashouts?limit=1&status=pending').then(function(data) {
       var badge = document.getElementById('cashouts-badge');

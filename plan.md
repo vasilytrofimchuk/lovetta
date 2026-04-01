@@ -10,7 +10,7 @@ AI companion app for entertaining and intimate chats with AI-generated women com
 ## Phase 1: Landing + Admin + Lead Capture — DONE
 - [x] Landing page (lovetta.ai) with social cards, OG tags, visitor tracking
 - [x] Lead capture with email + 18+ age gate (month/year of birth)
-- [x] Admin dashboard (/admin.html) — Visitors, Leads, Settings, Sentry tabs
+- [x] Admin dashboard (/admin.html) — Visitors, Leads, Settings, Sentry, Chats tabs
 - [x] App settings: text/image content levels per platform, max_companions
 - [x] Privacy policy + Terms of Service pages
 - [x] Client-side tracking.js (device, geo, UTM, referrer)
