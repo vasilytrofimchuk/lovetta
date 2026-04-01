@@ -1167,6 +1167,27 @@ const MIGRATIONS = [
       ALTER TABLE user_companions ALTER COLUMN voice_id SET DEFAULT 'b089032e45db460fb1934ece75a8c51d';
     `,
   },
+  {
+    name: 'v56_replace_bad_voices',
+    sql: `
+      -- Replace 6 low-quality fish.audio voices with better ones
+      -- Templates
+      UPDATE companion_templates SET voice_id = '933563129e564b19a115bedd57b7406a' WHERE voice_id = '7e9a17104fd644bb86b91a240b4f2055';
+      UPDATE companion_templates SET voice_id = 'c2623f0c075b4492ac367989aee1576f' WHERE voice_id = '58c1e4127a924d678a1a9d49e3751669';
+      UPDATE companion_templates SET voice_id = 'b545c585f631496c914815291da4e893' WHERE voice_id = '3c274731ecfb45e99f2dd5f65b32b518';
+      UPDATE companion_templates SET voice_id = 'e3cd384158934cc9a01029cd7d278634' WHERE voice_id = '83c19893c4974594839bd2d101b1fd66';
+      UPDATE companion_templates SET voice_id = 'b347db033a6549378b48d00acb0d06cd' WHERE voice_id = 'db841cac47164082b26fcfe54c27748d';
+      UPDATE companion_templates SET voice_id = '59e9dc1cb20c452584788a2690c80970' WHERE voice_id = '42f70c38fa054b65a6baecd4f817d696';
+
+      -- User companions
+      UPDATE user_companions SET voice_id = '933563129e564b19a115bedd57b7406a' WHERE voice_id = '7e9a17104fd644bb86b91a240b4f2055';
+      UPDATE user_companions SET voice_id = 'c2623f0c075b4492ac367989aee1576f' WHERE voice_id = '58c1e4127a924d678a1a9d49e3751669';
+      UPDATE user_companions SET voice_id = 'b545c585f631496c914815291da4e893' WHERE voice_id = '3c274731ecfb45e99f2dd5f65b32b518';
+      UPDATE user_companions SET voice_id = 'e3cd384158934cc9a01029cd7d278634' WHERE voice_id = '83c19893c4974594839bd2d101b1fd66';
+      UPDATE user_companions SET voice_id = 'b347db033a6549378b48d00acb0d06cd' WHERE voice_id = 'db841cac47164082b26fcfe54c27748d';
+      UPDATE user_companions SET voice_id = '59e9dc1cb20c452584788a2690c80970' WHERE voice_id = '42f70c38fa054b65a6baecd4f817d696';
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
