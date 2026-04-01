@@ -313,6 +313,7 @@
       <button class="tab" data-tab="cashouts" onclick="switchTab('cashouts')">Cashouts <span class="badge" id="cashouts-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="support" onclick="switchTab('support')">Support <span id="support-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="feedback" onclick="switchTab('feedback')">Feedback <span class="badge" id="feedback-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
+      <button class="tab" data-tab="chats" onclick="switchTab('chats')">Chats</button>
     </div>
 
     <!-- Overview Tab -->
@@ -546,6 +547,8 @@
       </table>
       <div class="pagination" id="feedback-pagination"></div>
     </div>
+
+    <div id="tab-chats" class="tab-content"></div>
   </div>
 
   <script>
@@ -592,6 +595,13 @@
     var supportFilter = '';
     var supportActiveChatId = null;
     var supportChatData = null;
+    var chatsPage = 1;
+    var chatsView = 'all'; // 'all' | 'flagged'
+    var chatsActiveCId = null;
+    var chatsChatData = null;
+    var chatsFlaggedPage = 1;
+    var chatsFlaggedCategory = '';
+    var chatsFlaggedDays = 30;
     var supportPollInterval = null;
     var overviewPollInterval = null;
 
@@ -628,7 +638,7 @@
     function showDashboard() {
       document.getElementById('auth-gate').style.display = 'none';
       document.getElementById('dashboard').style.display = 'block';
-      var validTabs = ['overview','visitors','users','economics','settings','reports','sentry','email','companion-emails','cashouts','support'];
+      var validTabs = ['overview','visitors','users','economics','settings','reports','sentry','email','companion-emails','cashouts','support','feedback','chats'];
       var hash = window.location.hash.slice(1);
       var initialTab = validTabs.indexOf(hash) !== -1 ? hash : 'overview';
       switchTab(initialTab);
@@ -661,6 +671,7 @@
       else if (name === 'cashouts') loadCashouts();
       else if (name === 'support') { loadSupport(); supportPollInterval = setInterval(loadSupport, 30000); }
       else if (name === 'feedback') loadFeedback();
+      else if (name === 'chats') loadChats();
     }
 
     // --- Helper functions (ported from KeyID) ---
@@ -1771,7 +1782,22 @@
         document.getElementById('detail-from').textContent = e.from_address;
         document.getElementById('detail-to').textContent = e.to_address;
         document.getElementById('detail-date').textContent = new Date(e.created_at).toLocaleString();
-        document.getElementById('detail-body').textContent = e.body_text || '(no body)';
+        var bodyEl = document.getElementById('detail-body');
+        if (e.body_html) {
+          bodyEl.innerHTML = '';
+          var iframe = document.createElement('iframe');
+          iframe.sandbox = 'allow-same-origin';
+          iframe.style.cssText = 'width:100%;border:none;min-height:400px;background:#fff;border-radius:6px;';
+          bodyEl.appendChild(iframe);
+          iframe.addEventListener('load', function() {
+            var doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open(); doc.write(e.body_html); doc.close();
+            iframe.style.height = doc.body.scrollHeight + 20 + 'px';
+          });
+          iframe.srcdoc = e.body_html;
+        } else {
+          bodyEl.textContent = e.body_text || '(no body)';
+        }
         document.getElementById('email-detail').style.display = 'block';
         document.getElementById('email-compose').style.display = 'none';
         loadEmails();
