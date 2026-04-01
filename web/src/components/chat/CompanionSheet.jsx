@@ -244,7 +244,7 @@ export default function CompanionSheet({ companion, onClose, onReport, onUpdate,
                   onChange={(e) => setNewTrait(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTrait(); } }}
                   placeholder="Add trait..."
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-brand-surface border border-brand-border text-brand-text text-xs focus:outline-none focus:border-brand-accent"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-brand-surface border border-brand-border text-brand-text text-base focus:outline-none focus:border-brand-accent"
                   maxLength={30}
                 />
                 <button type="button" onClick={addTrait} disabled={!newTrait.trim()}

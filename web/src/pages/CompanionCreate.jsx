@@ -437,7 +437,7 @@ export default function CompanionCreate() {
                     }
                   }}
                   placeholder="e.g. playful, witty, caring..."
-                  className="flex-1 p-3 rounded-lg bg-brand-surface border border-brand-border text-brand-text placeholder:text-brand-muted text-sm focus:outline-none focus:border-brand-accent"
+                  className="flex-1 p-3 rounded-lg bg-brand-surface border border-brand-border text-brand-text placeholder:text-brand-muted text-base focus:outline-none focus:border-brand-accent"
                   maxLength={30}
                 />
                 <button type="button" onClick={() => {
@@ -566,7 +566,7 @@ export default function CompanionCreate() {
                     }
                   }}
                   placeholder="Add trait..."
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-brand-surface border border-brand-border text-brand-text text-xs focus:outline-none focus:border-brand-accent"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-brand-surface border border-brand-border text-brand-text text-base focus:outline-none focus:border-brand-accent"
                   maxLength={30} />
                 <button type="button" onClick={() => {
                   const t = confirmTrait.trim().toLowerCase();
