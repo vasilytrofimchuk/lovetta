@@ -11,6 +11,7 @@
 - [x] All Chats: searchable conversation list → click to view full chat bubble view
 - [x] Flagged: filter by category (wellness/breaking/bland) and time range, with context
 - [x] Tests pass (28 API)
+- [x] Add IMMERSION RULES to system prompt — never acknowledge AI, never suggest disconnecting, no wellness/mindfulness
 
 ## Expand companion chat memory: 10→30 messages + image/tip awareness (2026-04-01)
 
