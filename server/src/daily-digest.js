@@ -13,12 +13,10 @@ const DIGEST_HOUR = 9; // 9:00 UTC
 let digestTimer = null;
 
 async function getLastDigestDate(pool) {
-  try {
-    const { rows } = await pool.query(
-      `SELECT value FROM app_settings WHERE key = 'last_digest_date'`
-    );
-    return rows.length > 0 ? rows[0].value.date : null;
-  } catch { return null; }
+  const { rows } = await pool.query(
+    `SELECT value FROM app_settings WHERE key = 'last_digest_date'`
+  );
+  return rows.length > 0 ? rows[0].value.date : null;
 }
 
 async function setLastDigestDate(pool, date) {
@@ -327,14 +325,18 @@ async function sendDailyDigest() {
 async function checkDigest() {
   const pool = getPool();
   if (!pool) return;
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  if (now.getUTCHours() >= DIGEST_HOUR) {
-    const lastDate = await getLastDigestDate(pool);
-    if (lastDate !== today) {
-      await setLastDigestDate(pool, today);
-      sendDailyDigest();
+  try {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    if (now.getUTCHours() >= DIGEST_HOUR) {
+      const lastDate = await getLastDigestDate(pool);
+      if (lastDate !== today) {
+        await setLastDigestDate(pool, today);
+        sendDailyDigest();
+      }
     }
+  } catch (err) {
+    console.error('[digest] checkDigest error (will retry next interval):', err.message);
   }
 }
 
@@ -342,7 +344,7 @@ function startDigestWorker() {
   if (digestTimer) return;
   if (process.env.NODE_ENV === 'test') return;
   console.log('[digest] Worker started');
-  checkDigest();
+  setTimeout(checkDigest, 30 * 1000);
   digestTimer = setInterval(checkDigest, INTERVAL_MS);
 }
 
