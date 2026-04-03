@@ -563,7 +563,7 @@ async function handleWebhook(rawBody, signature) {
         console.log(`[billing] Subscription created: user=${userId} plan=${plan}`);
         // Tracker event (non-blocking)
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
-          if (rows[0]) fetch('https://tracker-vt-94773e1894c9.herokuapp.com/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'purchase', userEmail: rows[0].email, meta: { plan } }) }).catch(() => {});
+          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'purchase', userEmail: rows[0].email, meta: { plan } }) }).catch(() => {});
         }).catch(() => {});
         // TrafficStars S2S pay postback (non-blocking)
         const subPrice = plan === 'yearly' ? '99.990' : '19.990';
@@ -762,6 +762,13 @@ async function handleRevenueCatWebhook(body, authHeader) {
       });
       console.log(`[revenuecat] ${rcType}: user=${userId} plan=${plan}`);
 
+      // Tracker event for initial iOS purchase
+      if (rcType === 'INITIAL_PURCHASE') {
+        pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
+          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'purchase', userEmail: rows[0].email, meta: { plan, source: 'ios' } }) }).catch(() => {});
+        }).catch(() => {});
+      }
+
       // TrafficStars S2S pay postback for initial purchase
       if (rcType === 'INITIAL_PURCHASE') {
         const rcPrice = plan === 'yearly' ? '99.990' : '19.990';
@@ -844,6 +851,9 @@ async function handleRevenueCatWebhook(body, authHeader) {
           client.release();
         }
         console.log(`[revenuecat] Tip: user=${userId} amount=${amount}`);
+        pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
+          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'purchase', userEmail: rows[0].email, meta: { plan: 'tip', amount, source: 'ios' } }) }).catch(() => {});
+        }).catch(() => {});
         try { await creditReferralCommission(pool, userId, 'tip', `rc_tip_${event.id || Date.now()}`, amount); } catch (e) { console.warn('[revenuecat] referral error:', e.message); }
       }
       break;
