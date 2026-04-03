@@ -563,7 +563,7 @@ async function handleWebhook(rawBody, signature) {
         console.log(`[billing] Subscription created: user=${userId} plan=${plan}`);
         // Tracker event (non-blocking)
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
-          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, source: 'stripe', trial: true } }) }).catch(() => {});
+          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'stripe', trial: true } }) }).catch(() => {});
         }).catch(() => {});
         // TrafficStars S2S pay postback (non-blocking)
         const subPrice = plan === 'yearly' ? '99.990' : '19.990';
@@ -771,7 +771,7 @@ async function handleRevenueCatWebhook(body, authHeader) {
       // Tracker event for initial iOS purchase
       if (rcType === 'INITIAL_PURCHASE') {
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
-          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, source: 'ios', trial: true } }) }).catch(() => {});
+          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'ios', trial: true } }) }).catch(() => {});
         }).catch(() => {});
       }
 
