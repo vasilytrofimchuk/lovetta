@@ -267,7 +267,19 @@ header {
 }
 
 .continue-button {
+  margin-bottom: 14px;
+}
+
+.appstore-badge {
+  display: flex;
+  justify-content: center;
   margin-bottom: 18px;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
+.appstore-badge:hover {
+  opacity: 1;
 }
 
 .pricing-info {
