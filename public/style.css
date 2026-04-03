@@ -205,9 +205,13 @@ header {
   max-width: 560px;
   margin: 0 auto;
   padding: 4px 0 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .feature-list {
+  width: 100%;
   display: grid;
   gap: 12px;
   margin-bottom: 24px;
@@ -267,7 +271,11 @@ header {
 }
 
 .continue-button {
+  width: auto;
+  padding: 12px 32px;
+  font-size: 0.9rem;
   margin-bottom: 14px;
+  box-shadow: none;
 }
 
 .appstore-badge {
@@ -276,6 +284,10 @@ header {
   margin-bottom: 18px;
   opacity: 0.85;
   transition: opacity 0.2s;
+}
+
+.appstore-badge svg {
+  height: 54px;
 }
 
 .appstore-badge:hover {
