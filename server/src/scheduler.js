@@ -276,7 +276,7 @@ async function runOnlineSnapshot() {
 
     // Report to central tracker (non-blocking)
     const { rows: [{ count: usersOnline }] } = await pool.query(`SELECT COUNT(*)::int AS count FROM users WHERE last_activity >= NOW() - INTERVAL '5 minutes'`);
-    fetch('https://tracker-vt-94773e1894c9.herokuapp.com/api/heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', usersOnline }) }).catch(() => {});
+    fetch('https://selectic.games/api/heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', usersOnline }) }).catch(() => {});
   } catch (err) {
     console.error('[scheduler] runOnlineSnapshot error:', err.message);
   }
