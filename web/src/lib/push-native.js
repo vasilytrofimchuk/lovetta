@@ -3,7 +3,7 @@
  * Used instead of web push when running inside Capacitor.
  * All Capacitor imports are dynamic to avoid crashes in browser context.
  */
-import api from './api'
+import { authFetch } from './api'
 
 /** Request permissions and register for native push. Returns the device token. */
 export async function registerNativePush() {
@@ -19,7 +19,7 @@ export async function registerNativePush() {
       clearTimeout(timeout)
       console.log('[push] Got device token:', token.value?.slice(0, 20) + '...')
       try {
-        await api.post('/api/user/push/subscribe-apns', { token: token.value })
+        await authFetch('/api/user/push/subscribe-apns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token.value }) })
         console.log('[push] Token saved to server')
       } catch (err) {
         console.error('[push] Failed to save token to server:', err.message)
@@ -49,7 +49,7 @@ export async function registerNativePush() {
 /** Unregister from native push notifications. */
 export async function unregisterNativePush() {
   try {
-    await api.delete('/api/user/push/unsubscribe-apns')
+    await authFetch('/api/user/push/unsubscribe-apns', { method: 'DELETE' })
   } catch {}
 }
 
