@@ -71,10 +71,24 @@ export default function CompanionList() {
     if (checkout === 'success') {
       trackPay();
       toast('Subscription activated!', { type: 'success' });
-      // Mark as subscribed locally (webhook may not have fired yet on dev)
-      setSubscription(prev => prev ? { ...prev, hasSubscription: true, plan: prev.plan || 'monthly' } : { hasSubscription: true, plan: 'monthly' });
-      // Also try to re-fetch in case webhook did fire
-      api.get('/api/billing/status').then(({ data }) => setSubscription(data)).catch(() => {});
+      window.history.replaceState({}, '', window.location.pathname);
+      setShowPlanModal(false);
+      // Poll for subscription to sync (webhook may still be processing)
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const { data } = await api.get('/api/billing/status');
+          if (data?.hasSubscription) {
+            setSubscription(data);
+            clearInterval(poll);
+          } else if (attempts >= 20) {
+            clearInterval(poll);
+          }
+        } catch {
+          if (attempts >= 20) clearInterval(poll);
+        }
+      }, 1500);
     }
     if (checkout === 'cancel') toast('Checkout canceled', { type: 'info' });
     // Tip success/cancel handled in ChatPage via server-inserted thank-you message
