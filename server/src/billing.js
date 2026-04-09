@@ -7,6 +7,7 @@
 const { getPool } = require('./db');
 const { resetTipCounter, invalidateThresholdCache } = require('./consumption');
 const { firePayPostback } = require('./trafficstars');
+const { sendTtEvent } = require('./tt-events');
 
 let stripe = null;
 function getStripe() {
@@ -563,7 +564,19 @@ async function handleWebhook(rawBody, signature) {
         console.log(`[billing] Subscription created: user=${userId} plan=${plan}`);
         // Tracker event (non-blocking)
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
-          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'stripe', trial: true } }) }).catch(() => {});
+          if (rows[0]) {
+            fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'stripe', trial: true } }) }).catch(() => {});
+            sendTtEvent({
+              eventName: 'CompletePayment',
+              eventId: session.id,
+              email: rows[0].email,
+              value: plan === 'yearly' ? 99.99 : 19.99,
+              currency: (session.currency || 'usd').toUpperCase(),
+              actionSource: 'web',
+              contentId: `lovetta_${plan}`,
+              contentName: `Lovetta ${plan} subscription`,
+            });
+          }
         }).catch(() => {});
         // TrafficStars S2S pay postback (non-blocking)
         const subPrice = plan === 'yearly' ? '99.990' : '19.990';
@@ -591,6 +604,21 @@ async function handleWebhook(rawBody, signature) {
           try { await insertTipThankYou(pool, userId, tipCompanionId, amount); } catch (e) { console.warn('[billing] thank-you error:', e.message); }
         }
         console.log(`[billing] Tip received: user=${userId} amount=${amount} companion=${tipCompanionId || 'all'}`);
+        // TikTok event for tip (non-blocking)
+        pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
+          if (rows[0]) {
+            sendTtEvent({
+              eventName: 'CompletePayment',
+              eventId: session.id,
+              email: rows[0].email,
+              value: amount / 100,
+              currency: (session.currency || 'usd').toUpperCase(),
+              actionSource: 'web',
+              contentId: 'lovetta_tip',
+              contentName: 'Lovetta tip',
+            });
+          }
+        }).catch(() => {});
         // Credit referral commission
         try { await creditReferralCommission(pool, userId, 'tip', paymentIntent, amount); } catch (e) { console.warn('[billing] referral commission error:', e.message); }
       }
@@ -638,7 +666,19 @@ async function handleWebhook(rawBody, signature) {
           const plan = rows[0].plan;
           const userId = rows[0].user_id;
           pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
-            if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan: plan || 'subscription', amount: (invoice.amount_paid || 0) / 100, source: 'stripe' } }) }).catch(() => {});
+            if (rows[0]) {
+              fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan: plan || 'subscription', amount: (invoice.amount_paid || 0) / 100, source: 'stripe' } }) }).catch(() => {});
+              sendTtEvent({
+                eventName: 'CompletePayment',
+                eventId: `inv:${invoice.id}`,
+                email: rows[0].email,
+                value: (invoice.amount_paid || 0) / 100,
+                currency: (invoice.currency || 'usd').toUpperCase(),
+                actionSource: 'web',
+                contentId: `lovetta_${plan || 'subscription'}_renewal`,
+                contentName: `Lovetta ${plan || 'subscription'} renewal`,
+              });
+            }
           }).catch(() => {});
         }
       }
@@ -771,14 +811,38 @@ async function handleRevenueCatWebhook(body, authHeader) {
       // Tracker event for initial iOS purchase
       if (rcType === 'INITIAL_PURCHASE') {
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
-          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'ios', trial: true } }) }).catch(() => {});
+          if (rows[0]) {
+            fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'ios', trial: true } }) }).catch(() => {});
+            sendTtEvent({
+              eventName: 'CompletePayment',
+              eventId: `rc:${event.id || `${userId}_${rcType}`}`,
+              email: rows[0].email,
+              value: plan === 'yearly' ? 99.99 : 19.99,
+              currency: 'USD',
+              actionSource: 'web',
+              contentId: `lovetta_${plan}_ios`,
+              contentName: `Lovetta ${plan} subscription (iOS)`,
+            });
+          }
         }).catch(() => {});
       }
 
       // Tracker event for iOS renewal payment
       if (rcType === 'RENEWAL') {
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
-          if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'ios' } }) }).catch(() => {});
+          if (rows[0]) {
+            fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'ios' } }) }).catch(() => {});
+            sendTtEvent({
+              eventName: 'CompletePayment',
+              eventId: `rc:${event.id || `${userId}_${rcType}_${Date.now()}`}`,
+              email: rows[0].email,
+              value: plan === 'yearly' ? 99.99 : 19.99,
+              currency: 'USD',
+              actionSource: 'web',
+              contentId: `lovetta_${plan}_ios_renewal`,
+              contentName: `Lovetta ${plan} renewal (iOS)`,
+            });
+          }
         }).catch(() => {});
       }
 
