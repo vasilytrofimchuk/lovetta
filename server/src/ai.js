@@ -760,23 +760,30 @@ async function getFishAudioBalance() {
 }
 
 /**
- * Convert AAC (ADTS) audio to WAV via ffmpeg.
- * iOS native recordings use AAC which OpenAI doesn't support.
+ * Convert any audio format to WAV via ffmpeg.
+ * Requires ffmpeg buildpack on Heroku.
+ * @param {Buffer} audioBuffer - Raw audio bytes
+ * @param {string} inputExt - File extension hint for ffmpeg (e.g. 'webm', 'aac', 'mp4')
  */
-function convertAacToWav(audioBuffer) {
+function convertToWav(audioBuffer, inputExt = 'webm') {
   const { execFile } = require('child_process');
   const { writeFileSync, readFileSync, unlinkSync } = require('fs');
   const { join } = require('path');
   const { tmpdir } = require('os');
 
-  const tmpIn = join(tmpdir(), `stt-in-${Date.now()}.aac`);
-  const tmpOut = join(tmpdir(), `stt-out-${Date.now()}.wav`);
+  const ts = Date.now();
+  const tmpIn = join(tmpdir(), `stt-in-${ts}.${inputExt}`);
+  const tmpOut = join(tmpdir(), `stt-out-${ts}.wav`);
   writeFileSync(tmpIn, audioBuffer);
 
   return new Promise((resolve, reject) => {
     execFile('ffmpeg', ['-y', '-i', tmpIn, '-ar', '16000', '-ac', '1', '-f', 'wav', tmpOut], (err) => {
       try { unlinkSync(tmpIn); } catch {}
-      if (err) { try { unlinkSync(tmpOut); } catch {}; return reject(err); }
+      if (err) {
+        try { unlinkSync(tmpOut); } catch {};
+        console.error(`[stt] ffmpeg failed for .${inputExt} (${audioBuffer.length} bytes):`, err.message);
+        return reject(new Error(`Audio conversion failed (${inputExt}, ${audioBuffer.length} bytes)`));
+      }
       const wav = readFileSync(tmpOut);
       try { unlinkSync(tmpOut); } catch {}
       resolve(wav);
@@ -793,12 +800,16 @@ function convertAacToWav(audioBuffer) {
 async function transcribeSpeech(audioBuffer, fileName = 'audio.webm') {
   if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
 
-  // iOS native recordings are ADTS AAC — OpenAI doesn't support raw AAC
-  let finalBuffer = audioBuffer;
-  let finalName = fileName;
-  if (fileName.endsWith('.aac')) {
-    finalBuffer = await convertAacToWav(audioBuffer);
-    finalName = fileName.replace(/\.aac$/i, '.wav');
+  // Normalize all audio to WAV via ffmpeg — handles codec quirks across browsers/platforms
+  const inputExt = (fileName.match(/\.(\w+)$/)?.[1] || 'webm').toLowerCase();
+  let finalBuffer, finalName;
+  try {
+    finalBuffer = await convertToWav(audioBuffer, inputExt);
+    finalName = 'voice.wav';
+  } catch (convErr) {
+    console.error('[stt] ffmpeg conversion failed, sending raw:', convErr.message);
+    finalBuffer = audioBuffer;
+    finalName = fileName;
   }
 
   const boundary = '----OAIBoundary' + Date.now();
