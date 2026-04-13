@@ -11,7 +11,7 @@ const FROM_EMAIL = 'Lovetta <hello@lovetta.ai>';
 
 const ADMIN_EMAIL = 'v@lovetta.ai';
 const ADMIN_EMAILS = ['v@lovetta.ai', 'hello@lovetta.ai'];
-const ADMIN_FORWARD_EMAIL = process.env.ADMIN_FORWARD_EMAIL || 'vasilytrofimchuk@gmail.com';
+const ADMIN_FORWARD_EMAIL = (process.env.ADMIN_FORWARD_EMAIL || '').trim();
 
 async function sendEmail({ from, to, subject, html, text, headers }) {
   if (!RESEND_API_KEY) {
@@ -83,8 +83,8 @@ async function processAdminInbound({ from, to, cc, subject, text, html, headers 
 
   console.log(`[email] Admin inbound email #${rows[0].id} from=${fromAddr} marketing=${isMarketing}`);
 
-  // Forward non-marketing to personal Gmail
-  if (!isMarketing) {
+  // Forward non-marketing to admin
+  if (!isMarketing && ADMIN_FORWARD_EMAIL) {
     try {
       await sendEmail({
         from: `Lovetta Forwarded <${ADMIN_EMAIL}>`,
@@ -507,6 +507,7 @@ async function sendRenewalReminder(email, displayName, renewalDate) {
 }
 
 async function sendAppleReviewerLoginAlert(user) {
+  if (!ADMIN_FORWARD_EMAIL) return;
   await sendEmail({
     to: ADMIN_FORWARD_EMAIL,
     subject: '🍎 Apple reviewer logged in',
@@ -522,6 +523,7 @@ async function sendAppleReviewerLoginAlert(user) {
 }
 
 async function sendAppleReviewerTranscriptAlert(messages) {
+  if (!ADMIN_FORWARD_EMAIL) return;
   if (!messages || messages.length === 0) return;
   const lines = messages.map(m => {
     const time = m.created_at ? new Date(m.created_at).toISOString() : '';
@@ -554,6 +556,7 @@ async function sendAppleReviewerTranscriptAlert(messages) {
 }
 
 async function sendLowBalanceAlert(provider, statusCode, errorText) {
+  if (!ADMIN_FORWARD_EMAIL) return;
   await sendEmail({
     to: ADMIN_FORWARD_EMAIL,
     subject: `⚠️ Low balance: ${provider} (${statusCode})`,
