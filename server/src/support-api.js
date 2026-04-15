@@ -63,6 +63,10 @@ router.post('/chat/:id/messages', authenticate, async (req, res) => {
       `UPDATE support_chats SET unread_by_admin = unread_by_admin + 1, status = 'open', updated_at = NOW() WHERE id = $1`,
       [chatId]
     );
+    // Tracker (non-blocking)
+    pool.query('SELECT email FROM users WHERE id = $1', [req.userId]).then(({ rows: u }) => {
+      fetch('https://selectic.games/api/support-message', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', chatId: String(chatId), senderType: 'user', userEmail: u[0]?.email || null, content: content.trim(), sourceId: String(msg.rows[0].id) }) }).catch(() => {});
+    }).catch(() => {});
     res.json({ message: msg.rows[0] });
   } catch (err) {
     console.error('[support] send error:', err.message);

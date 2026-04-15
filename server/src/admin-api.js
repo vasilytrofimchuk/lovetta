@@ -879,6 +879,8 @@ router.post('/support/chats/:id/reply', async (req, res) => {
       `UPDATE support_chats SET status = 'waiting', unread_by_admin = 0, unread_by_user = unread_by_user + 1, updated_at = NOW() WHERE id = $1`,
       [chatId]
     );
+    // Tracker (non-blocking)
+    fetch('https://selectic.games/api/support-message', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', chatId: String(chatId), senderType: 'admin', content: content.trim(), sourceId: String(msg.rows[0].id) }) }).catch(() => {});
     res.json({ message: msg.rows[0] });
   } catch (err) {
     console.error('[admin] support reply error:', err.message);
