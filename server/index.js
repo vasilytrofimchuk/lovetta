@@ -186,6 +186,23 @@ app.get('/api/unsubscribe', async (req, res) => {
   }
 });
 
+// -- Support reply webhook (from tracker) --
+app.post('/api/support-reply-webhook', async (req, res) => {
+  const token = (req.get('X-Tracker-Token') || '').trim();
+  if (!token || token !== (process.env.TRACKER_TOKEN || '').trim()) return res.status(401).json({ error: 'Unauthorized' });
+  const pool = require('./src/db').getPool();
+  if (!pool) return res.status(503).json({ error: 'DB not configured' });
+  try {
+    const { chatId, content, sourceId } = req.body;
+    if (!chatId || !content) return res.status(400).json({ error: 'chatId and content required' });
+    const { rows: chats } = await pool.query('SELECT id FROM support_chats WHERE id = $1', [parseInt(chatId, 10)]);
+    if (!chats.length) return res.status(404).json({ error: 'Chat not found' });
+    await pool.query(`INSERT INTO support_messages (chat_id, content, sender_type) VALUES ($1, $2, 'admin')`, [parseInt(chatId, 10), content.trim()]);
+    await pool.query(`UPDATE support_chats SET status = 'waiting', unread_by_admin = 0, unread_by_user = unread_by_user + 1, updated_at = NOW() WHERE id = $1`, [parseInt(chatId, 10)]);
+    res.json({ ok: true });
+  } catch (err) { console.error('[support-webhook] error:', err.message); res.status(500).json({ error: err.message }); }
+});
+
 // -- Resend inbound webhook --
 const RESEND_INBOUND_SECRET = (process.env.RESEND_INBOUND_SECRET || '').trim();
 
