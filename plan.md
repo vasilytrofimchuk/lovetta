@@ -1050,3 +1050,14 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Admin dashboard updated: fish.audio wallet balance + TTS usage, ElevenLabs STT section.
 - Voice previews and template demos regenerated via fish.audio.
 - Files: ai.js, tts-api.js, companion-api.js, migrate.js, voices.js, admin-api.js, consumption.js, admin.html, generate-voice-previews.js, generate-demo-audio.js.
+
+## Fix "videos only show as a link that does nothing" — DONE
+- Root cause: LLM hallucinated fake media URLs like `[I sent a photo: https://.../fake-uuid.png]` in message text, which iOS auto-linkified as dead tappable URLs.
+- Source of hallucination: `formatMessagesForAI` was injecting real media URLs into AI context for past messages; LLM learned the pattern and mimicked it with invented URLs.
+- Secondary bug: when media generation failed, `media_type` stayed set but `media_url` was NULL → UI promised media that never arrived.
+- Fix:
+  1. `chat-api.js` `formatMessagesForAI`: drop URL from the `[I sent a ${label}]` annotation.
+  2. `media-chat.js` `parseMediaTags`: strip any `[I sent a (photo|video)[: ...]]` echoes from LLM output before saving.
+  3. `chat-api.js` `generateMediaInBackground`: clear `media_type = NULL` on failure AND on no-result so MessageBubble doesn't render a ghost slot.
+- Files: server/src/chat-api.js, server/src/media-chat.js.
+- Verification: `npm run test:e2e:ai` + prod SQL spot-check 24h after deploy.

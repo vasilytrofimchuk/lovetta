@@ -61,6 +61,10 @@ function parseMediaTags(text) {
   const cleanText = text
     .replace(/\[SEND_IMAGE:\s*.+?\]/gi, '')
     .replace(/\[SEND_VIDEO:\s*.+?\]/gi, '')
+    // Strip hallucinated echoes of past media annotations — the LLM sometimes
+    // mimics the "[I sent a photo/video ...]" marker from context with fake URLs,
+    // which iOS then auto-linkifies into tappable dead links.
+    .replace(/\[I sent a (?:photo|video)(?::[^\]]*)?\]\s*/gi, '')
     .trim();
 
   const mediaRequest = imageMatch

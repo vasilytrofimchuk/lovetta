@@ -32,7 +32,9 @@ function formatMessagesForAI(rows) {
     let content = m.content || '';
     if (m.media_url && m.role === 'assistant') {
       const label = m.media_type === 'video' ? 'video' : 'photo';
-      content += `\n[I sent a ${label}: ${m.media_url}]`;
+      // NOTE: no URL — otherwise the LLM mimics this pattern and hallucinates
+      // fake URLs in its own responses, which render as dead links to the user.
+      content += `\n[I sent a ${label}]`;
     }
     return { role: m.role, content };
   });
@@ -64,8 +66,10 @@ function generateMediaInBackground(pool, messageId, companion, mediaRequest, opt
         );
         console.log(`[media-bg] ${mediaResult.type} ready for message ${messageId}: ${mediaResult.url}`);
       } else {
+        // No result (rate-limited, etc.) — clear media_type so the UI doesn't
+        // render an empty media slot promising a pic/video that never arrives.
         await pool.query(
-          `UPDATE messages SET media_pending = FALSE WHERE id = $1`,
+          `UPDATE messages SET media_pending = FALSE, media_type = NULL WHERE id = $1`,
           [messageId]
         );
       }
@@ -74,7 +78,7 @@ function generateMediaInBackground(pool, messageId, companion, mediaRequest, opt
       console.error(`[media-bg] generation failed for message ${messageId}:`, err.message);
       try {
         await pool.query(
-          `UPDATE messages SET media_pending = FALSE WHERE id = $1`,
+          `UPDATE messages SET media_pending = FALSE, media_type = NULL WHERE id = $1`,
           [messageId]
         );
       } catch {}

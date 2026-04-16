@@ -772,6 +772,44 @@ test.describe('Media Tags — parseMediaTags', () => {
     const { mediaRequest } = parseMediaTags('[send_image: casual outfit]');
     expect(mediaRequest).toEqual({ type: 'image', description: 'casual outfit' });
   });
+
+  // Regression: support ticket #22 ("videos only show as a link that does nothing").
+  // LLM was hallucinating `[I sent a photo/video: URL]` echoes with fake URLs, which
+  // iOS auto-linkified into dead tappable links. parseMediaTags must strip them.
+  test('strips hallucinated [I sent a photo: URL] echoes', () => {
+    const { cleanText, mediaRequest } = parseMediaTags(
+      'Here you go [I sent a photo: https://pub-abc.r2.dev/images/fake/a1b2c3d4-e5f6-7890-1234-567890abcdef.png] hope you like it'
+    );
+    expect(cleanText).toBe('Here you go hope you like it');
+    expect(mediaRequest).toBeNull();
+  });
+
+  test('strips hallucinated [I sent a video: URL] echoes', () => {
+    const { cleanText } = parseMediaTags(
+      'watch me [I sent a video: https://pub-abc.r2.dev/videos/fake/9c9d9e9f-a0a1-a2a3-a4a5-a6a7a8a9aaab.mp4]'
+    );
+    expect(cleanText).toBe('watch me');
+  });
+
+  test('strips bare [I sent a photo] marker from AI context', () => {
+    const { cleanText } = parseMediaTags('enjoy [I sent a photo] xx');
+    expect(cleanText).toBe('enjoy xx');
+  });
+
+  test('strips multiple hallucinated echoes in one message', () => {
+    const { cleanText } = parseMediaTags(
+      'raw and real [I sent a photo: https://x/p.png] [I sent a video: https://x/v.mp4] for you'
+    );
+    expect(cleanText).toBe('raw and real for you');
+  });
+
+  test('SEND tag coexists with a stripped hallucinated echo', () => {
+    const { cleanText, mediaRequest } = parseMediaTags(
+      '[SEND_IMAGE: selfie] look [I sent a photo: https://x/fake.png]'
+    );
+    expect(cleanText).toBe('look');
+    expect(mediaRequest).toEqual({ type: 'image', description: 'selfie' });
+  });
 });
 
 // ============================================================

@@ -1240,3 +1240,12 @@ Based on analysis of 35 real prod users (891 messages):
 - [x] Run `npm run build:ios`
 - [x] Run `xcodebuild -workspace /Users/vasily/projects/lovetta/web/ios/App/App.xcworkspace -scheme AppUITests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' CODE_SIGNING_ALLOWED=NO build`
 - [x] Update `plan.md` and `PROGRESS.md` with final status, root cause, and verification notes
+
+## Fix "videos only show as a link that does nothing" (support #22)
+- [x] Update `plan.md` and `PROGRESS.md` before code changes
+- [x] Drop URL from `formatMessagesForAI` annotation (removes hallucination source)
+- [x] Strip `[I sent a (photo|video)[: ...]]` echoes in `parseMediaTags` (safety net)
+- [x] Clear `media_type = NULL` on media generation failure/no-result (kills ghost-media slots)
+- [x] Add regression tests in `e2e/ai.test.js` for the new strip behavior (5 cases)
+- [x] Run `npm run test:e2e:ai` — 102/102 passed
+- [ ] Commit and push
