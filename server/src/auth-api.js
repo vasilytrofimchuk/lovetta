@@ -580,6 +580,7 @@ router.get('/google/callback', async (req, res) => {
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
+        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
         if (stateTsClickId) fireSignupPostback(stateTsClickId, newUser.id);
       }
     }
@@ -682,6 +683,7 @@ router.post('/google/token', async (req, res) => {
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
+        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       }
     }
@@ -826,6 +828,7 @@ router.post('/apple', authLimiter, async (req, res) => {
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
+        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       }
     } else {
@@ -860,6 +863,7 @@ router.post('/apple', authLimiter, async (req, res) => {
       );
       user = newUser;
       sendNewRegistrationNotification(newUser).catch(() => {});
+      fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
       if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
     }
 
@@ -965,6 +969,7 @@ router.post('/telegram', authLimiter, async (req, res) => {
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
+        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
 
         // Create telegram_users record
