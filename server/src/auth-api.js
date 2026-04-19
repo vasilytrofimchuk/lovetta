@@ -161,7 +161,7 @@ router.post('/signup', authLimiter, async (req, res) => {
     if (tsClickId) fireSignupPostback(tsClickId, user.id);
 
     // Tracker event (non-blocking)
-    fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: user.email }) }).catch(() => {});
+    fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: user.email, meta: { utm_source: user.utm_source, utm_medium: user.utm_medium, utm_campaign: user.utm_campaign, auth_provider: user.auth_provider, ts_click_id: user.ts_click_id } }) }).catch(() => {});
 
     res.json({ user: sanitizeUser(user), accessToken, refreshToken });
   } catch (err) {
@@ -580,7 +580,7 @@ router.get('/google/callback', async (req, res) => {
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
-        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
+        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         if (stateTsClickId) fireSignupPostback(stateTsClickId, newUser.id);
       }
     }
@@ -683,7 +683,7 @@ router.post('/google/token', async (req, res) => {
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
-        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
+        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       }
     }
@@ -828,7 +828,7 @@ router.post('/apple', authLimiter, async (req, res) => {
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
-        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
+        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       }
     } else {
@@ -863,7 +863,7 @@ router.post('/apple', authLimiter, async (req, res) => {
       );
       user = newUser;
       sendNewRegistrationNotification(newUser).catch(() => {});
-      fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
+      fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
       if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
     }
 
@@ -969,7 +969,7 @@ router.post('/telegram', authLimiter, async (req, res) => {
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
-        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email }) }).catch(() => {});
+        fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
 
         // Create telegram_users record
