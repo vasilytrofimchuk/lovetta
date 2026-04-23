@@ -13,7 +13,8 @@ const { sendCompanionEmail, sendAppleReviewerTranscriptAlert } = require('./emai
 
 const APPLE_REVIEWER_ID = '00000000-0000-0000-0000-000000001234';
 let reviewerTranscriptTimer = null;
-const { buildMemoryContext, processMemory } = require('./memory');
+const { buildMemoryContext, buildUserContext, processMemory } = require('./memory');
+const { getEffectiveTextLevel } = require('./content-levels');
 const { parseMediaTags, generateOrReuseMedia, getMediaFailureLine } = require('./media-chat');
 const { checkMediaBlocked, checkFreeLimit } = require('./consumption');
 const { getRedis } = require('./redis');
@@ -392,15 +393,18 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     ]);
     const actionsEnabled = actionsPref.rows[0]?.show_actions ?? true;
     const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled, videoEnabled, actionsEnabled });
-    const memoryContext = await buildMemoryContext(conversation.id);
-    let systemPrompt = basePrompt + memoryContext;
+    const platform = detectPlatform(req);
+    const level = await getEffectiveTextLevel(platform, req.userId);
+    const [memoryContext, userContext] = await Promise.all([
+      buildMemoryContext(conversation.id, { level }),
+      buildUserContext(req.userId, { level }),
+    ]);
+    let systemPrompt = basePrompt + userContext + memoryContext;
 
     // When we know nothing about the user yet, guide AI to ask discovery questions
-    if (!memoryContext) {
+    if (!memoryContext && !userContext) {
       systemPrompt += '\n\nYou are still getting to know this person. Ask genuine questions about them — their name, interests, what they do, what they enjoy. Be curious and attentive. Do NOT invent or assume any details about their life.';
     }
-
-    const platform = detectPlatform(req);
 
     let fullText = '';
     let doneData = null;
@@ -567,15 +571,21 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
     const { rows: actionsPrefRows } = await pool.query('SELECT show_actions FROM user_preferences WHERE user_id = $1', [req.userId]);
     const actionsEnabled = actionsPrefRows[0]?.show_actions ?? true;
     const basePrompt = buildCompanionSystemPrompt(companion, { actionsEnabled });
-    const memoryContext = await buildMemoryContext(conversation.id);
-    let systemPrompt = basePrompt + memoryContext;
+    const nextPlatform = detectPlatform(req);
+    const nextLevel = await getEffectiveTextLevel(nextPlatform, req.userId);
+    const [memoryContext, userContext] = await Promise.all([
+      buildMemoryContext(conversation.id, { level: nextLevel }),
+      buildUserContext(req.userId, { level: nextLevel }),
+    ]);
+    let systemPrompt = basePrompt + userContext + memoryContext;
 
     // Discovery mode vs normal mode based on memory state
-    const syntheticContent = memoryContext
+    const hasMemory = !!(memoryContext || userContext);
+    const syntheticContent = hasMemory
       ? '[The user hasn\'t said anything yet. Reach out naturally — reference something from your conversations or flirt playfully.]'
       : '[The user hasn\'t said anything yet. Reach out warmly and ask a genuine question to get to know them better.]';
 
-    if (!memoryContext) {
+    if (!hasMemory) {
       systemPrompt += '\n\nYou are still getting to know this person. Ask genuine questions about them. Do NOT invent or assume any details about their life.';
     }
 
@@ -741,9 +751,13 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     const { rows: actionsPrefRows3 } = await pool.query('SELECT show_actions FROM user_preferences WHERE user_id = $1', [req.userId]);
     const actionsEnabled = actionsPrefRows3[0]?.show_actions ?? true;
     const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled: true, videoEnabled: videoEnabledForMedia, actionsEnabled });
-    const memoryContext = await buildMemoryContext(conversation.id);
-    const systemPrompt = basePrompt + memoryContext;
     const platform = detectPlatform(req);
+    const level = await getEffectiveTextLevel(platform, req.userId);
+    const [memoryContext, userContext] = await Promise.all([
+      buildMemoryContext(conversation.id, { level }),
+      buildUserContext(req.userId, { level }),
+    ]);
+    const systemPrompt = basePrompt + userContext + memoryContext;
 
     res.write(`data: ${JSON.stringify({ type: 'typing' })}\n\n`);
 

@@ -296,10 +296,16 @@ Example: *leans closer with a playful smile* Hey, I was just thinking about you.
 Stay in character at all times. Be engaging, expressive, and emotionally present. Remember details the user shares.
 This conversation is happening via email. Keep responses natural but don't mention email explicitly.`;
 
-  // Load memory context + recent messages
-  const { buildMemoryContext, processMemory } = require('./memory');
-  const memoryContext = await buildMemoryContext(conversation.id);
-  const fullSystemPrompt = systemPrompt + memoryContext;
+  // Load memory context + recent messages. Email replies have no platform
+  // context — use the user's effective web-level.
+  const { buildMemoryContext, buildUserContext, processMemory } = require('./memory');
+  const { getEffectiveTextLevel } = require('./content-levels');
+  const emailLevel = await getEffectiveTextLevel('web', userId);
+  const [memoryContext, userContext] = await Promise.all([
+    buildMemoryContext(conversation.id, { level: emailLevel }),
+    buildUserContext(userId, { level: emailLevel }),
+  ]);
+  const fullSystemPrompt = systemPrompt + userContext + memoryContext;
 
   const { rows: recentMessages } = await pool.query(
     `SELECT role, content FROM messages WHERE conversation_id = $1

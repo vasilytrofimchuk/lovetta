@@ -5,7 +5,8 @@
 
 const { getPool } = require('./db');
 const { plainChatCompletion, getAISettings } = require('./ai');
-const { buildMemoryContext } = require('./memory');
+const { buildMemoryContext, buildUserContext } = require('./memory');
+const { getEffectiveTextLevel } = require('./content-levels');
 const { sendCompanionEmail } = require('./email');
 const { sendPushNotification } = require('./push');
 const { sendMessage: sendTelegramMessage } = require('./telegram');
@@ -181,10 +182,16 @@ async function runProactiveMessages() {
         const blocked = await checkMediaBlocked(row.user_id, sub);
         if (blocked) continue;
 
-        // Generate proactive message
+        // Generate proactive message. Proactive has no explicit platform — use
+        // the user's effective web-level as a safe default (least restrictive
+        // that's still capped by their preference). Level 0 still skips kinks.
         const actionsEnabled = row.show_actions ?? true;
-        const memoryContext = await buildMemoryContext(row.conversation_id);
-        const prompt = buildProactivePrompt(row, memoryContext, slot, { actionsEnabled });
+        const proLevel = await getEffectiveTextLevel('web', row.user_id);
+        const [memoryContext, userContext] = await Promise.all([
+          buildMemoryContext(row.conversation_id, { level: proLevel }),
+          buildUserContext(row.user_id, { level: proLevel }),
+        ]);
+        const prompt = buildProactivePrompt(row, (userContext || '') + memoryContext, slot, { actionsEnabled });
         const proSettings = await getAISettings();
         const proModel = proSettings.proactive_model || 'qwen/qwen3-235b-a22b-2507';
         const result = await plainChatCompletion(prompt, [], { model: proModel });

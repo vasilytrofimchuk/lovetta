@@ -1192,6 +1192,24 @@ const MIGRATIONS = [
     name: 'v57_messages_media_error',
     sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_error TEXT;`,
   },
+  {
+    name: 'v58_user_profile',
+    sql: `
+      CREATE TABLE IF NOT EXISTS user_profile (
+        user_id                UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        display_name           TEXT,
+        age_band               TEXT,
+        timezone               TEXT,
+        preferred_style        TEXT,
+        kink_tags              TEXT[] DEFAULT '{}'::TEXT[],
+        narrative_voice        TEXT,
+        typical_message_length TEXT,
+        created_at             TIMESTAMPTZ DEFAULT NOW(),
+        updated_at             TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_profile_user ON user_profile(user_id);
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

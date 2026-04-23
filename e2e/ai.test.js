@@ -824,6 +824,179 @@ test.describe('Media Generation — rate-limit return shape', () => {
 });
 
 // ============================================================
+// Memory — display-name detection (detectDisplayName)
+// ============================================================
+
+test.describe('Memory — detectDisplayName', () => {
+  const { detectDisplayName, isPlausibleName } = require('../server/src/memory');
+
+  test('catches user-side "I\'m X, nice to meet"', () => {
+    const r = detectDisplayName([
+      { role: 'user', content: "Hey, I'm Virdi, nice to meet you!" },
+    ], 'Skylar');
+    expect(r).not.toBeNull();
+    expect(r.name).toBe('Virdi');
+    expect(r.source).toBe('user_self');
+  });
+
+  test('catches user-side "call me X"', () => {
+    const r = detectDisplayName([
+      { role: 'user', content: "You can call me Alex btw" },
+    ], 'Emma');
+    expect(r && r.name).toBe('Alex');
+  });
+
+  test('catches user-side "my name is X"', () => {
+    const r = detectDisplayName([
+      { role: 'user', content: "my name is Marcus and I’m 24" },
+    ], 'Lexi');
+    expect(r && r.name).toBe('Marcus');
+  });
+
+  test('catches assistant-side repeated address (Hey X)', () => {
+    const r = detectDisplayName([
+      { role: 'assistant', content: "Hey Virdi, miss me already?" },
+      { role: 'user', content: 'yeah :)' },
+      { role: 'assistant', content: "Oh Virdi, you're so sweet tonight" },
+      { role: 'user', content: 'thanks sis' },
+      { role: 'assistant', content: "Hi Virdi, what's on your mind?" },
+    ], 'Skylar');
+    expect(r).not.toBeNull();
+    expect(r.name).toBe('Virdi');
+    expect(r.source).toBe('assistant_addr');
+  });
+
+  test('does NOT commit on single assistant address (threshold is 3)', () => {
+    const r = detectDisplayName([
+      { role: 'assistant', content: "Hey Virdi, how are you?" },
+    ], 'Skylar');
+    expect(r).toBeNull();
+  });
+
+  test('does NOT confuse companion name with user name', () => {
+    const r = detectDisplayName([
+      { role: 'user', content: "Hey Skylar, how are you?" },
+      { role: 'user', content: "Skylar, tell me a secret" },
+      { role: 'user', content: "Skylar!" },
+    ], 'Skylar');
+    expect(r).toBeNull();
+  });
+
+  test('does NOT flag pet names (baby, honey, love)', () => {
+    const r = detectDisplayName([
+      { role: 'assistant', content: "Hey Baby, miss me?" },
+      { role: 'assistant', content: "Oh Honey, you're cute" },
+      { role: 'assistant', content: "Hi Love, what's up?" },
+    ], 'Skylar');
+    expect(r).toBeNull();
+  });
+
+  test('isPlausibleName rejects lowercase, stopwords, too short/long', () => {
+    expect(isPlausibleName('virdi')).toBe(false);
+    expect(isPlausibleName('Baby')).toBe(false);
+    expect(isPlausibleName('X')).toBe(false);
+    expect(isPlausibleName('Alexandrina123')).toBe(false);
+    expect(isPlausibleName('Virdi')).toBe(true);
+    expect(isPlausibleName('Alex')).toBe(true);
+  });
+});
+
+// ============================================================
+// Memory — extraction categories + level gating
+// ============================================================
+
+test.describe('Memory — level-gated injection', () => {
+  const { buildMemoryContext, buildUserContext } = require('../server/src/memory');
+  const { getPool } = require('../server/src/db');
+  let pool, userId, companionId, conversationId;
+
+  test.beforeAll(async () => {
+    pool = getPool();
+
+    // Seed a user directly (no HTTP signup needed — we only test memory modules)
+    const { rows: userRows } = await pool.query(
+      `INSERT INTO users (email, password_hash, birth_month, birth_year, ai_consent_at)
+       VALUES ($1, 'x', 6, 1995, NOW()) RETURNING id`,
+      [`conativer+memtest_${Date.now()}@gmail.com`]
+    );
+    userId = userRows[0].id;
+
+    const { rows: cc } = await pool.query(
+      `INSERT INTO user_companions (user_id, name, personality, backstory, traits, communication_style, age, avatar_url)
+       VALUES ($1, 'Skylar', 'witty', '', '[]'::jsonb, 'playful', 22, 'https://example.com/x.jpg')
+       RETURNING id`,
+      [userId]
+    );
+    companionId = cc[0].id;
+
+    const { rows: cv } = await pool.query(
+      `INSERT INTO conversations (user_id, companion_id) VALUES ($1, $2) RETURNING id`,
+      [userId, companionId]
+    );
+    conversationId = cv[0].id;
+
+    await pool.query(
+      `INSERT INTO companion_memories (conversation_id, category, fact)
+       VALUES ($1, 'identity', 'User''s name is Virdi'),
+              ($1, 'intimacy', 'User enjoys sibling roleplay scenarios'),
+              ($1, 'relationship', 'User calls Skylar big sis')`,
+      [conversationId]
+    );
+
+    await pool.query(
+      `INSERT INTO user_profile (user_id, display_name, kink_tags, preferred_style)
+       VALUES ($1, 'Virdi', ARRAY['family_rp','hypnosis']::text[], 'roleplay_heavy')
+       ON CONFLICT (user_id) DO UPDATE SET display_name=EXCLUDED.display_name,
+         kink_tags=EXCLUDED.kink_tags, preferred_style=EXCLUDED.preferred_style`,
+      [userId]
+    );
+  });
+
+  test('level 2 injects intimacy fact and kink_tags', async () => {
+    const ctx = await buildMemoryContext(conversationId, { level: 2 });
+    expect(ctx).toContain('sibling roleplay');
+    const ucx = await buildUserContext(userId, { level: 2 });
+    expect(ucx).toContain('Virdi');
+    expect(ucx).toContain('family_rp');
+  });
+
+  test('level 0 strips intimacy fact and kink_tags from injection', async () => {
+    const ctx = await buildMemoryContext(conversationId, { level: 0 });
+    expect(ctx).not.toContain('sibling roleplay');
+    // relationship category is still there — address style is safe at any level
+    expect(ctx).toContain('big sis');
+    const ucx = await buildUserContext(userId, { level: 0 });
+    expect(ucx).toContain('Virdi');
+    expect(ucx).not.toContain('family_rp');
+    expect(ucx).not.toContain('hypnosis');
+  });
+
+  test('intimacy facts remain stored in DB at level 0 (level-agnostic storage)', async () => {
+    const { rows } = await pool.query(
+      `SELECT category, fact FROM companion_memories
+       WHERE conversation_id = $1 AND category = 'intimacy'`,
+      [conversationId]
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    expect(rows[0].fact).toContain('sibling roleplay');
+  });
+
+  test('accepts relationship + intimacy as valid categories (schema check)', async () => {
+    await pool.query(
+      `INSERT INTO companion_memories (conversation_id, category, fact)
+       VALUES ($1, 'intimacy', 'User prefers long narrative scenes')`,
+      [conversationId]
+    );
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM companion_memories
+       WHERE conversation_id=$1 AND category='intimacy'`,
+      [conversationId]
+    );
+    expect(rows[0].n).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ============================================================
 // Media Tags — extractTags
 // ============================================================
 

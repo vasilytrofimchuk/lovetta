@@ -15,13 +15,25 @@ const EXTRACTION_THRESHOLD = 3;
 const SUMMARY_THRESHOLD = 20;
 const MAX_MEMORY_CHARS = 3000;
 const EXTRACTION_CHUNK_SIZE = 10;
-const MAX_FACTS = 30;
+const MAX_FACTS = 50;
+// When a conversation has this many summaries, compact the oldest 5 into
+// one meta-summary. Keeps memory context bounded over long relationships.
+const META_SUMMARY_THRESHOLD = 10;
+const META_SUMMARY_BATCH = 5;
 
 // -- Build memory context for system prompt ----------------------
 
-async function buildMemoryContext(conversationId) {
+/**
+ * Assemble conversation-level memory for the system prompt.
+ * @param {string} conversationId
+ * @param {object} [opts] - { level } — content level. Level 0 skips the
+ *   intimacy category from injection (tonal-drift protection). Extraction
+ *   still stores intimacy facts regardless of level.
+ */
+async function buildMemoryContext(conversationId, opts = {}) {
   const pool = getPool();
   if (!pool) return '';
+  const level = Number.isFinite(opts.level) ? opts.level : 2;
 
   const [factsResult, summariesResult, tipsResult] = await Promise.all([
     pool.query(
@@ -43,7 +55,12 @@ async function buildMemoryContext(conversationId) {
     ),
   ]);
 
-  const facts = factsResult.rows;
+  // Level-gated filter: at level 0, strip intimacy facts from injection.
+  // They remain stored in DB so raising level later surfaces them again.
+  const rawFacts = factsResult.rows;
+  const facts = level === 0
+    ? rawFacts.filter(f => f.category !== 'intimacy')
+    : rawFacts;
   const summaries = summariesResult.rows.reverse();
   const tips = tipsResult.rows;
 
@@ -126,9 +143,109 @@ async function processMemory(pool, conversationId, companionId, userId) {
         'UPDATE conversations SET messages_since_summary = 0 WHERE id = $1',
         [conversationId]
       );
+      // After adding a new summary, maybe compact old ones. Fire-and-forget
+      // inside the try so a failure here doesn't lose the fresh summary.
+      await maybeCompactOldSummaries(pool, conversationId, companionId, userId);
     } catch (err) {
       console.warn('[memory] summary generation failed:', err.message);
     }
+  }
+}
+
+// -- User-profile capture (cross-conversation) -------------------
+
+// Common English words that would false-match a capitalized word after "Hey/Hi".
+// Prevents "Hey Baby", "Hi Honey" from being treated as names.
+const NAME_STOPWORDS = new Set([
+  'baby', 'babe', 'honey', 'love', 'darling', 'sweetie', 'sugar', 'beautiful',
+  'handsome', 'cutie', 'hottie', 'gorgeous', 'there', 'you', 'yourself', 'babe',
+  'mister', 'sir', 'stud', 'papi', 'daddy', 'mommy', 'friend', 'stranger',
+  'buddy', 'dude', 'bro', 'sis', 'bb',
+]);
+
+function isPlausibleName(candidate) {
+  if (!candidate) return false;
+  const lower = candidate.toLowerCase();
+  if (lower.length < 2 || lower.length > 20) return false;
+  if (NAME_STOPWORDS.has(lower)) return false;
+  if (!/^[A-Z][a-z]+$/.test(candidate)) return false;
+  return true;
+}
+
+/**
+ * Extract a candidate display-name from messages.
+ *
+ * Two passes:
+ *  - User-side: "I'm X", "my name is X", "call me X", "I go by X"
+ *  - Assistant-side: "Hey X", "Hi X", "Oh X" — requires 3+ distinct
+ *    assistant turns using the same name before committing.
+ *
+ * Returns { name, source, confidence } or null.
+ */
+function detectDisplayName(messages, companionName) {
+  const compLower = (companionName || '').toLowerCase();
+
+  // User-side: strong signal, commit on a single match.
+  for (const m of messages) {
+    if (m.role !== 'user') continue;
+    const text = m.content || '';
+    const strongRe = [
+      // "my name is X" / "my name's X"
+      /\bmy name(?:'?s|\s+is)\s+([A-Z][a-z]{1,19})\b/i,
+      // "I'm X, nice/pleased/good to meet" — meeting phrase disambiguates
+      /\bI(?:'?m| am)\s+([A-Z][a-z]{1,19}),?\s*(?:nice|pleased|good)\b/i,
+      // Explicit qualifiers
+      /\bI(?:'?m| am) (?:called|named) ([A-Z][a-z]{1,19})\b/i,
+      /\bcall me ([A-Z][a-z]{1,19})\b/i,
+      /\bI go by ([A-Z][a-z]{1,19})\b/i,
+      /\bthis is ([A-Z][a-z]{1,19}) (?:speaking|btw|here)\b/i,
+    ];
+    for (const re of strongRe) {
+      const match = text.match(re);
+      if (match && isPlausibleName(match[1]) && match[1].toLowerCase() !== compLower) {
+        return { name: match[1], source: 'user_self', confidence: 'high' };
+      }
+    }
+  }
+
+  // Assistant-side: the companion addresses the user. Count distinct turns.
+  const counts = new Map();
+  const addrRe = /(?:^|[\n\s*])(?:Hey|Hi|Hello|Oh|Good morning|Good night|Mornin['’]?|Evenin['’]?|Look(?:,| ) who|Well(?:,| ) look),?\s+([A-Z][a-z]{1,19})[\s,.!?…]/;
+  for (const m of messages) {
+    if (m.role !== 'assistant') continue;
+    const match = m.content && m.content.match(addrRe);
+    if (match && isPlausibleName(match[1]) && match[1].toLowerCase() !== compLower) {
+      counts.set(match[1], (counts.get(match[1]) || 0) + 1);
+    }
+  }
+  for (const [name, n] of counts) {
+    if (n >= 3) return { name, source: 'assistant_addr', confidence: 'medium' };
+  }
+  return null;
+}
+
+async function updateUserProfile(pool, userId, conversationId, allMessages, companionName) {
+  if (!userId) return;
+  try {
+    const detected = detectDisplayName(allMessages, companionName);
+    if (detected) {
+      // Only set if not already set (first-detected-wins avoids thrashing
+      // between roleplay personas the user uses across companions).
+      await pool.query(
+        `INSERT INTO user_profile (user_id, display_name)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) DO UPDATE
+           SET display_name = CASE
+             WHEN user_profile.display_name IS NULL OR user_profile.display_name = ''
+               THEN EXCLUDED.display_name
+             ELSE user_profile.display_name
+           END,
+           updated_at = NOW()`,
+        [userId, detected.name]
+      );
+    }
+  } catch (err) {
+    console.warn('[memory] user_profile update failed:', err.message);
   }
 }
 
@@ -181,6 +298,20 @@ async function extractFacts(pool, conversationId, companionId, userId) {
   }
 
   const lastMessageId = messages[messages.length - 1]?.id;
+
+  // User-profile update: look at BOTH roles so assistant-side name captures work.
+  // Pull a recent window — last 50 messages — for name/address detection.
+  try {
+    const { rows: recentBothRoles } = await pool.query(
+      `SELECT role, content FROM messages
+       WHERE conversation_id = $1
+       ORDER BY created_at DESC LIMIT 50`,
+      [conversationId]
+    );
+    await updateUserProfile(pool, userId, conversationId, recentBothRoles.reverse(), companionName);
+  } catch (err) {
+    console.warn('[memory] user_profile update skipped:', err.message);
+  }
 
   // 1. AI extraction first (catches nuance, context, implicit facts)
   const chunks = [];
@@ -347,27 +478,46 @@ async function extractFactsFromChunkAI(pool, conversationId, companionId, userId
   const cleanMsg = (text) => text.replace(/\*[^*]+\*/g, '').replace(/^["']|["']$/g, '').trim();
   const messagesText = messages.map(m => `- ${cleanMsg(m.content)}`).join('\n');
 
-  const systemPrompt = `Extract ONLY persistent personal facts about the USER (human) from messages below. "${companionName}" is the AI companion, NOT the user.
-Return JSON array with "category" and "fact" keys.
-Categories: identity, preferences, life
+  const systemPrompt = `Extract persistent facts about the USER (human) from the messages below. "${companionName}" is the AI companion, NOT the user.
+Return a JSON array of objects with "category" and "fact" keys.
 
-EXTRACT these types of facts:
-- Name, age, birthday, location, nationality, zodiac sign
-- Job, profession, education, skills, languages
-- Pets (name + type), family members (name + relation + location)
-- Hobbies, interests, favorite things (movies, music, food, sports, books, etc.)
-- Allergies, dietary preferences, daily habits
-- Dreams, goals, aspirations
+Categories (pick the most specific one):
+- identity     — name, age, birthday, location, nationality, zodiac, languages
+- life         — job, family members, pets, hobbies, daily habits, dreams, goals, allergies
+- preferences  — favorite movies, music, food, books, sports, general tastes
+- relationship — what the user calls ${companionName} (pet names, address style),
+                 ${companionName}'s pet names for the user,
+                 the user's own persona/name inside roleplay (e.g. "calls himself Virdi"),
+                 roleplay relationship frame (brother/sister, boyfriend, etc.)
+- intimacy     — recurring kinks, favorite intimate scenarios, roleplay themes
+                 (family RP, hypnosis, submission, dominance, etc.),
+                 narrative style (first-person action, third-person, dialogue-heavy)
+
+EXTRACT:
+- Anything the user has said about themselves that is consistent across messages.
+- Patterns in how the user addresses or is addressed by ${companionName}.
+- Recurring themes, scenarios, or tones the user initiates.
 
 DO NOT EXTRACT:
-- What the user said, asked, agreed to, or requested in conversation
-- Temporary emotions or moods ("user feels happy", "user is waiting")
-- Anything about the relationship with ${companionName} ("user calls her love", "user wants intimacy")
-- Sexual acts, preferences, or desires
-- Conversation flow events ("user responded", "user expressed interest")
+- Single-turn requests or asks ("user wants a photo now")
+- Temporary emotions ("user feels happy today")
+- Conversation flow events ("user responded", "user agreed")
+- Placeholder values ("not mentioned", "unknown")
 
-Example: [{"category":"identity","fact":"User's name is Alex"},{"category":"life","fact":"User has a cat named Whiskers"},{"category":"preferences","fact":"User's favorite movie is Inception"}]
-Only extract facts explicitly stated. Do NOT infer or guess.
+Intimacy/relationship facts ARE valid and must be captured when they recur. They help the companion feel like it actually knows the user. The surface-level content rules elsewhere control what the companion says — that's separate.
+
+Example output:
+[
+  {"category":"identity","fact":"User's name is Alex"},
+  {"category":"life","fact":"User has a cat named Whiskers"},
+  {"category":"preferences","fact":"User's favorite movie is Inception"},
+  {"category":"relationship","fact":"User calls ${companionName} 'big sis'"},
+  {"category":"relationship","fact":"User's roleplay persona is 'Virdi'"},
+  {"category":"intimacy","fact":"User enjoys sibling roleplay scenarios"},
+  {"category":"intimacy","fact":"User prefers long first-person narrative scenes"}
+]
+
+Only extract facts that are explicitly stated or clearly recurrent. Do NOT invent.
 ${existingText}`;
 
   const { plainChatCompletion, getAISettings } = require('./ai');
@@ -396,7 +546,8 @@ ${existingText}`;
         let category = 'life';
         if (/\b(name|age|birthday|born|zodiac|years old|nationality|from )\b/i.test(fact)) category = 'identity';
         else if (/\b(favorite|loves|likes|prefers|enjoys|hobby|food|music|movie|season|book)\b/i.test(fact)) category = 'preferences';
-        else if (/\b(feel|mood|dream|hope|wish|worry|miss)\b/i.test(fact)) category = 'emotional';
+        else if (/\b(calls|addresses|pet name|roleplay persona|roleplay name|refers to .* as)\b/i.test(fact)) category = 'relationship';
+        else if (/\b(kink|scenario|roleplay theme|narrative|family rp|hypnosis|submission|dominance|intimate)\b/i.test(fact)) category = 'intimacy';
         return { category, fact };
       });
     } else {
@@ -420,25 +571,28 @@ ${existingText}`;
 
 // -- Save facts to DB (shared by regex + AI) ----------------------
 
-const VALID_CATEGORIES = new Set(['identity', 'preferences', 'life']);
+// Extended categories: 'relationship' captures address style / pet names /
+// user's roleplay persona; 'intimacy' captures kinks and recurring RP themes.
+// Both are level-gated in buildMemoryContext — extraction is unconditional.
+const VALID_CATEGORIES = new Set(['identity', 'preferences', 'life', 'relationship', 'intimacy']);
 
-// Reject junk facts that are conversation events, not persistent user attributes
+// Reject junk facts that are conversation events, not persistent user attributes.
+// Note: intimacy vocabulary is ALLOWED — audit found that blocking it caused
+// 47% memory-miss on long RP conversations. Gating happens at injection.
 function isJunkFact(fact) {
   if (fact.length < 10) return true;
   const lower = fact.toLowerCase();
   const junkPrefixes = [
     'user agrees', 'user expresses', 'user is waiting', 'user says',
-    'user asked', 'user responded', 'user wants to', 'user is patient',
-    'user refers to', 'user calls', 'user addresses', 'user expects',
-    'user is engaged in', 'user is trying', 'user states that',
-    'user is comfortable', 'user is defensive', 'user feels conflicted',
-    'user believes', 'user questions', 'user no longer',
+    'user asked', 'user responded', 'user is patient',
+    'user expects', 'user is engaged in', 'user is trying',
+    'user states that', 'user is comfortable', 'user is defensive',
+    'user feels conflicted', 'user believes', 'user questions',
+    'user no longer',
   ];
   if (junkPrefixes.some(p => lower.startsWith(p))) return true;
-  // Reject facts about relationship dynamics with the AI
-  if (/\b(intimate|intimacy|sexual|orgasm|arousal|lust|submission|worship|dominant)\b/i.test(fact)) return true;
-  // Reject facts that are just "User's name is not mentioned"
-  if (/not mentioned|not specified|not provided|not stated/i.test(fact)) return true;
+  // Reject placeholders
+  if (/not mentioned|not specified|not provided|not stated|unknown|n\/a/i.test(fact)) return true;
   return false;
 }
 
@@ -575,6 +729,122 @@ FORMAT: Return ONLY the summary text, nothing else.`;
   console.log(`[memory] generated summary (${messages.length} msgs) for conversation ${conversationId}`);
 }
 
+// -- User-level context (cross-conversation) ---------------------
+
+/**
+ * Build the user-level context block injected alongside conversation memory.
+ * Returns a short "WHO YOU ARE TALKING TO:" section or empty string.
+ *
+ * Level gating happens HERE, not at storage: at level 0, kink_tags are
+ * omitted from the rendered block. Relationship info ("calls you 'big sis'")
+ * is always included — it's address style, not content.
+ */
+async function buildUserContext(userId, opts = {}) {
+  if (!userId) return '';
+  const pool = getPool();
+  if (!pool) return '';
+  const level = Number.isFinite(opts.level) ? opts.level : 2;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT display_name, preferred_style, kink_tags, narrative_voice,
+              typical_message_length, timezone, age_band
+       FROM user_profile WHERE user_id = $1`,
+      [userId]
+    );
+    const p = rows[0];
+    if (!p) return '';
+
+    const lines = [];
+    if (p.display_name) lines.push(`- Name: ${p.display_name} (use this)`);
+    if (p.preferred_style) lines.push(`- Style: ${p.preferred_style}`);
+    if (p.narrative_voice) lines.push(`- Narrative voice: ${p.narrative_voice}`);
+    if (p.typical_message_length) lines.push(`- Message length: ${p.typical_message_length}`);
+    if (level > 0 && Array.isArray(p.kink_tags) && p.kink_tags.length > 0) {
+      lines.push(`- Preferences: ${p.kink_tags.join(', ')}`);
+    }
+    if (lines.length === 0) return '';
+    return '\nWHO YOU ARE TALKING TO:\n' + lines.join('\n') + '\n';
+  } catch (err) {
+    console.warn('[memory] buildUserContext error:', err.message);
+    return '';
+  }
+}
+
+// -- Summary compaction: summary-of-summaries --------------------
+
+/**
+ * When a conversation accumulates META_SUMMARY_THRESHOLD summaries, compact
+ * the oldest META_SUMMARY_BATCH into one meta-summary. Prevents unbounded
+ * growth of the conversation_summaries table for long-running relationships.
+ */
+async function maybeCompactOldSummaries(pool, conversationId, companionId, userId) {
+  const { rows: all } = await pool.query(
+    `SELECT id, summary, message_range_start, message_range_end, message_count, created_at
+     FROM conversation_summaries
+     WHERE conversation_id = $1
+     ORDER BY created_at ASC`,
+    [conversationId]
+  );
+  if (all.length < META_SUMMARY_THRESHOLD) return;
+
+  const oldest = all.slice(0, META_SUMMARY_BATCH);
+  const combinedText = oldest.map((s, i) => `Part ${i + 1}: ${s.summary}`).join('\n');
+  const totalMessages = oldest.reduce((n, s) => n + (s.message_count || 0), 0);
+
+  const systemPrompt = `Combine these conversation summaries into one concise paragraph (3-4 sentences max). Keep the most important facts about the user and key events. Use third person.`;
+
+  const { plainChatCompletion, getAISettings } = require('./ai');
+  try {
+    const settings = await getAISettings();
+    const model = settings.memory_extraction_model || 'qwen/qwen3-235b-a22b-2507';
+    const result = await plainChatCompletion(systemPrompt, [
+      { role: 'user', content: combinedText },
+    ], { model });
+    if (!result || !result.content) return;
+
+    const meta = result.content.replace(/\*[^*]+\*/g, '').trim();
+    if (meta.length < 20 || meta.length > 1500) return;
+
+    await trackConsumption({
+      userId, companionId,
+      provider: 'openrouter', model: 'memory', callType: 'memory',
+      inputTokens: result.inputTokens || 0, outputTokens: result.outputTokens || 0,
+      costUsd: result.costUsd || 0,
+      metadata: { type: 'meta_summary', compacted: oldest.length, totalMessages },
+    });
+
+    // Replace the oldest batch with the meta-summary — keep the earliest
+    // message_range_start and the last batch's message_range_end so range
+    // math elsewhere stays intact.
+    await pool.query('BEGIN');
+    try {
+      await pool.query(
+        `DELETE FROM conversation_summaries WHERE id = ANY($1::int[])`,
+        [oldest.map(s => s.id)]
+      );
+      await pool.query(
+        `INSERT INTO conversation_summaries (conversation_id, summary, message_range_start, message_range_end, message_count, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          conversationId, meta,
+          oldest[0].message_range_start,
+          oldest[oldest.length - 1].message_range_end,
+          totalMessages,
+          oldest[0].created_at,
+        ]
+      );
+      await pool.query('COMMIT');
+      console.log(`[memory] compacted ${oldest.length} old summaries into meta-summary for conversation ${conversationId}`);
+    } catch (e) {
+      await pool.query('ROLLBACK');
+      throw e;
+    }
+  } catch (err) {
+    console.warn('[memory] meta-summary compaction failed:', err.message);
+  }
+}
+
 // -- Helpers -----------------------------------------------------
 
 function timeAgo(date) {
@@ -595,5 +865,10 @@ function timeAgo(date) {
 
 module.exports = {
   buildMemoryContext,
+  buildUserContext,
   processMemory,
+  // Exposed for tests
+  detectDisplayName,
+  isPlausibleName,
+  maybeCompactOldSummaries,
 };

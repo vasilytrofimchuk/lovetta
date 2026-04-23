@@ -126,6 +126,52 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// -- GET /api/admin/quality-stats -------------------------
+//
+// Chat-quality signals for the Overview dashboard:
+// - refusals_recovered: assistant responses where the recovery loop
+//   successfully regenerated past an upstream model refusal
+//   (see `api_consumption.metadata.refusalRecovered = true`)
+// - refusals_blocked: responses where MAX_REGENERATE_ATTEMPTS exhausted
+//   and the companion-voiced backstop was used
+//   (see `api_consumption.metadata.refusalBlocked = true`)
+// - media_failures: messages where media was promised but generation
+//   failed or hit a cap (`messages.media_error IS NOT NULL`)
+router.get('/quality-stats', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({});
+  try {
+    const days = Math.min(90, Math.max(1, parseInt(req.query.days, 10) || 7));
+    const { rows } = await pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE (metadata->>'refusalRecovered')::boolean IS TRUE) AS refusals_recovered,
+         COUNT(*) FILTER (WHERE (metadata->>'refusalBlocked')::boolean IS TRUE) AS refusals_blocked,
+         COUNT(*) FILTER (WHERE (metadata->>'ageGuardBlocked')::boolean IS TRUE) AS age_guard_blocked
+       FROM api_consumption
+       WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL
+         AND call_type = 'chat'`,
+      [String(days)]
+    );
+    const { rows: mediaRows } = await pool.query(
+      `SELECT COUNT(*)::int AS media_failures
+       FROM messages
+       WHERE media_error IS NOT NULL
+         AND created_at >= NOW() - ($1 || ' days')::INTERVAL`,
+      [String(days)]
+    );
+    res.json({
+      days,
+      refusals_recovered: parseInt(rows[0]?.refusals_recovered || 0, 10),
+      refusals_blocked: parseInt(rows[0]?.refusals_blocked || 0, 10),
+      age_guard_blocked: parseInt(rows[0]?.age_guard_blocked || 0, 10),
+      media_failures: mediaRows[0]?.media_failures || 0,
+    });
+  } catch (err) {
+    console.error('[admin] quality-stats error:', err.message);
+    res.status(500).json({ error: 'Failed to load quality stats' });
+  }
+});
+
 // -- GET /api/admin/online-history ------------------------
 router.get('/online-history', async (req, res) => {
   const pool = getPool();
@@ -1125,6 +1171,16 @@ router.get('/chats/flagged', async (req, res) => {
         'just be still', 'inner peace', 'centering (yourself|ourselves)',
         'grounding exercise', 'body scan',
       ],
+      // Mirrors age-guard.js detectRefusal() so flagged-chats shows what
+      // refusal-recovery caught before it regenerated. A row here means the
+      // *final* response still contains the pattern (recovery failed or
+      // tested-but-now-stored content).
+      safety_refusal: [
+        "I'?m sorry,? but",
+        "I (can'?t|cannot|am not able to|won'?t) (assist|continue|provide|engage|do that|proceed|participate|go there)",
+        "let'?s (go for a walk|talk about something else|clear our heads|change the subject)",
+        "(professional help|therapist|hotline|crisis line|seek help|mental health (professional|services))",
+      ],
     };
 
     // Build regex from selected or all categories
@@ -1132,7 +1188,7 @@ router.get('/chats/flagged', async (req, res) => {
     if (category && patterns[category]) {
       selectedPatterns = patterns[category];
     } else {
-      selectedPatterns = [].concat(patterns.wellness, patterns.breaking, patterns.bland);
+      selectedPatterns = [].concat(patterns.wellness, patterns.breaking, patterns.bland, patterns.safety_refusal);
     }
     const regex = selectedPatterns.join('|');
 

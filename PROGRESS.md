@@ -21,16 +21,17 @@ Plan: `/Users/vasily/.claude/plans/analize-las-week-chats-gleaming-tome.md`.
 
 ### Batch 2 — P1 (memory + admin)
 
-- [ ] Track 3: migration — `user_profile` table; raise fact cap 30→50
-- [ ] Track 3: rewrite extraction prompt (remove "DO NOT EXTRACT" rules), add `relationship` + `intimacy` categories
-- [ ] Track 3: deterministic name regex (user-side + assistant-side)
-- [ ] Track 3: fact dedup+merge (similarity 0.75)
-- [ ] Track 3: `buildUserContext(userId, level)` — level-0 skips `intimacy` injection
-- [ ] Track 3: summary-of-summaries at 10 summaries
-- [ ] Track 4: `/api/admin/chats/flagged` new `safety_refusal` category
-- [ ] Track 4: Overview cards — refusals recovered, media failures, empty-extractions
-- [ ] E2E tests: memory + admin
-- [ ] `npm run test:e2e:ai` + `test:e2e:api` green
+- [x] Track 3: migration v58 — `user_profile` table; raise `MAX_FACTS` 30→50
+- [x] Track 3: rewrite extraction prompt (removed "DO NOT EXTRACT" blanket), added `relationship` + `intimacy` categories to `VALID_CATEGORIES`, loosened `isJunkFact`
+- [x] Track 3: deterministic name capture — user-side patterns ("my name is X", "I'm X, nice to meet", "call me X") + assistant-side 3+ turn detection ("Hey X")
+- [x] Track 3: `buildUserContext(userId, {level})` — level-0 skips `intimacy` facts + `kink_tags`, stores everything
+- [x] Track 3: `buildMemoryContext` accepts `{level}` and filters intimacy category at level 0
+- [x] Track 3: `maybeCompactOldSummaries` — compacts oldest 5 summaries into 1 meta-summary at 10+ summaries
+- [x] Track 3: wired level-aware injection in `chat-api.js` (3 call sites), `proactive.js`, `email.js`
+- [x] Track 4: `/api/admin/chats/flagged` adds `safety_refusal` category with refusal regex
+- [x] Track 4: new endpoint `/api/admin/quality-stats?days=7` + Overview cards (refusals recovered, refusals blocked, media failures)
+- [x] E2E tests: detectDisplayName (8 patterns), level-gated memory injection (4 DB-backed tests)
+- [x] `npm run test:e2e:ai` (131 passed) + `test:e2e:api` (28 passed) green
 - [ ] Commit + push Batch 2
 
 ## Chat Quality Audit — last 7 days of prod chats (2026-04-22)

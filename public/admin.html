@@ -764,10 +764,12 @@
       var allCards = document.getElementById('overview-all-cards');
       var statsP = apiFetch('/api/admin/stats');
       var econP = apiFetch('/api/admin/consumption/summary?period=7d');
+      var qualityP = apiFetch('/api/admin/quality-stats?days=7').catch(function() { return {}; });
 
-      Promise.all([statsP, econP]).then(function(results) {
+      Promise.all([statsP, econP, qualityP]).then(function(results) {
         var data = results[0];
         var econ = results[1];
+        var q = results[2] || {};
         var v = data.visitors || {};
         var o = data.online || {};
         var u = data.users || {};
@@ -786,7 +788,10 @@
           card('Today', u.today || 0) +
           card('API Cost (7d)', '$' + cost.toFixed(2)) +
           card('Tips (7d)', '$' + tips.toFixed(2)) +
-          card('Net (7d)', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>');
+          card('Net (7d)', '<span class="' + (margin >= 0 ? 'profit' : 'loss') + '">$' + margin.toFixed(2) + '</span>') +
+          card('Refusals recovered (7d)', q.refusals_recovered || 0, 'upstream safety refusals regen\'d') +
+          card('Refusals blocked (7d)', q.refusals_blocked || 0, 'backstop line shown') +
+          card('Media failures (7d)', q.media_failures || 0, 'image/video cap or gen error');
 
         var breakdowns = '';
         breakdowns += breakdownTable('Countries', 'country', data.countries || []);
