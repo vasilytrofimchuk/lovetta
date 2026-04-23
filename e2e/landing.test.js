@@ -116,7 +116,7 @@ test.describe('Landing page', () => {
 
     await page.goto(`${BASE}/my/welcome`);
 
-    await expect(page.getByRole('heading', { name: 'Your AI Girlfriend' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your Girlfriend' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Privacy Policy' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Terms of Service' })).toBeVisible();
