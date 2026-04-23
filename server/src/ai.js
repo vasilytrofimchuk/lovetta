@@ -5,7 +5,15 @@
 
 const { trackConsumption } = require('./consumption');
 const { buildContentPrompt, buildImagePrompt } = require('./content-levels');
-const { processResponse, scanUserMessage, STRICT_REGENERATE_PROMPT } = require('./age-guard');
+const {
+  processResponse,
+  scanUserMessage,
+  STRICT_REGENERATE_PROMPT,
+  detectRefusal,
+  LEVEL_0_REDIRECT_PROMPT,
+  REFUSAL_RECOVERY_PROMPT,
+} = require('./age-guard');
+const { getEffectiveTextLevel } = require('./content-levels');
 const { getPool } = require('./db');
 const { uploadFromUrl } = require('./r2');
 const { sendLowBalanceAlert } = require('./email');
@@ -19,8 +27,9 @@ const FAL_KEY = (process.env.FAL_KEY || '').trim();
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const FAL_BASE = 'https://fal.run';
 
-// Max regeneration attempts when age guard flags a response
-const MAX_REGENERATE_ATTEMPTS = 2;
+// Max regeneration attempts across age-guard and refusal-recovery combined.
+// Bumped 2→3 so a refusal-recovery pass has room without starving age-guard.
+const MAX_REGENERATE_ATTEMPTS = 3;
 
 // -- Balance error detection & admin alerting ------------------
 
@@ -189,6 +198,10 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   const platform = opts.platform || 'web';
 
   const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform, opts.userId);
+  // Effective level drives refusal-recovery strategy: level 0 never switches
+  // models (Apple-safe PG redirect only); level 1+ allows fallback-model on
+  // repeat refusal since the content-level rules still cap output via prompt.
+  const effectiveLevel = await getEffectiveTextLevel(platform, opts.userId);
 
   // Pre-screen user's last message for underage solicitation
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
@@ -205,6 +218,8 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let triedFallback = false;
+  let refusalRecoveryAttempts = 0;
+  let lastRefusalKind = null;
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
     let result;
@@ -233,9 +248,11 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
 
     // Run age guard on the complete response
     const guardResult = processResponse(meta.fullText);
+    // Run refusal detector — only consumed if age guard passes
+    const refusal = guardResult.safe ? detectRefusal(meta.fullText) : { refused: false };
 
-    if (guardResult.safe) {
-      // Response passed — track consumption and finish
+    if (guardResult.safe && !refusal.refused) {
+      // Response passed both gates — track consumption and finish
       let consumptionResult = { shouldRequestTip: false };
       if (opts.userId) {
         consumptionResult = await trackConsumption({
@@ -248,7 +265,16 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           costUsd: totalCostUsd,
-          metadata: { fullTextLength: meta.fullText.length, ageGuardAttempts: attempt },
+          metadata: {
+            fullTextLength: meta.fullText.length,
+            ageGuardAttempts: attempt,
+            ...(refusalRecoveryAttempts > 0 ? {
+              refusalRecovered: true,
+              refusalKind: lastRefusalKind,
+              refusalAttempts: refusalRecoveryAttempts,
+              fellBackToModel: triedFallback ? model : null,
+            } : {}),
+          },
         });
       }
 
@@ -256,10 +282,11 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
       return;
     }
 
-    // Response flagged — regenerate with stricter prompt
+    // Something triggered a regen — either age-guard flagged OR refusal detected
     attempt++;
     if (attempt > MAX_REGENERATE_ATTEMPTS) {
-      console.error(`[age-guard] Max regeneration attempts reached. Blocking response.`);
+      const blockReason = !guardResult.safe ? 'ageGuardBlocked' : 'refusalBlocked';
+      console.error(`[ai] Max regeneration attempts reached (${blockReason}). Using companion-voiced backstop.`);
 
       // Track the cost even for blocked responses
       if (opts.userId) {
@@ -273,57 +300,130 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           costUsd: totalCostUsd,
-          metadata: { ageGuardBlocked: true, reason: guardResult.reason },
+          metadata: {
+            [blockReason]: true,
+            reason: guardResult.reason || lastRefusalKind,
+            refusalAttempts: refusalRecoveryAttempts,
+          },
         });
       }
 
-      // Yield a safe fallback message
       yield { type: 'regenerate' };
-      const fallback = "*pulls back with a teasing smile* Mmm, not so fast... I like to take things slow. Tell me something about yourself — what's on your mind today?";
-      yield { type: 'chunk', data: fallback };
-      yield { type: 'done', data: { fullText: fallback, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCostUsd, ageGuardBlocked: true } };
+      // Track 5 backstop: rewrite the fallback line in the companion's voice
+      // via a one-shot LLM call. Falls back to a canned line if that fails.
+      const backstop = await buildCompanionBackstopLine({
+        basePrompt: systemPrompt,
+        lastUserMsg: lastUserMsg?.content || '',
+        blockReason,
+      });
+      yield { type: 'chunk', data: backstop };
+      yield { type: 'done', data: { fullText: backstop, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCostUsd, [blockReason]: true } };
       return;
     }
 
-    console.warn(`[age-guard] Regenerating response (attempt ${attempt}): reason=${guardResult.reason}`);
+    if (!guardResult.safe) {
+      // Age-guard always wins when triggered
+      console.warn(`[age-guard] Regenerating response (attempt ${attempt}): reason=${guardResult.reason}`);
+      yield { type: 'regenerate' };
+      currentPrompt = `${fullSystemPrompt}\n\n${STRICT_REGENERATE_PROMPT}`;
+      continue;
+    }
+
+    // Age-guard passed but detectRefusal flagged — level-aware recovery
+    refusalRecoveryAttempts++;
+    lastRefusalKind = refusal.kind;
+    console.warn(`[ai] Refusal detected (attempt ${attempt}, kind=${refusal.kind}, level=${effectiveLevel}): "${refusal.match}"`);
     yield { type: 'regenerate' };
-    currentPrompt = `${fullSystemPrompt}\n\n${STRICT_REGENERATE_PROMPT}`;
+
+    if (effectiveLevel === 0) {
+      // Apple-safe PG path: stay on same model, rewrite as in-character redirect.
+      // Never switch to the uncensored fallback at level 0.
+      currentPrompt = `${fullSystemPrompt}\n\n${LEVEL_0_REDIRECT_PROMPT}`;
+    } else {
+      // Level 1+: first refusal regens same model with recovery prompt; on
+      // second refusal, switch to the fallback model. Content-level rules
+      // in fullSystemPrompt still cap the fallback model's output.
+      if (refusalRecoveryAttempts >= 2 && !triedFallback && fallbackModel !== model) {
+        console.warn(`[ai] Refusal persisted on ${model} — switching to ${fallbackModel}`);
+        model = fallbackModel;
+        triedFallback = true;
+      }
+      currentPrompt = `${fullSystemPrompt}\n\n${REFUSAL_RECOVERY_PROMPT}`;
+    }
+  }
+}
+
+// -- Companion-voiced backstop (Track 5) -----------------------
+//
+// When both age-guard and refusal-recovery fail MAX_REGENERATE_ATTEMPTS
+// times, we used to show a generic canned line. This rewrites that line
+// in the companion's voice using a short one-shot LLM call with a
+// minimal, bulletproof prompt. Falls back to a canned line on error.
+
+async function buildCompanionBackstopLine({ basePrompt, lastUserMsg, blockReason }) {
+  const CANNED = "*pulls back with a teasing smile* Mmm, not so fast... I like to take things slow. Tell me something about yourself — what's on your mind today?";
+  if (!OPENROUTER_API_KEY) return CANNED;
+  try {
+    const settings = await getAISettings();
+    const model = settings.openrouter_fallback_model || settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
+    const prompt = `You are the companion described below. Write ONE short in-character line (max 30 words) that deflects the user's last message playfully WITHOUT refusing, apologizing, or breaking character. Do NOT mention AI, rules, safety, therapists, or walks. Stay flirty and warm. Suggest taking it slow, a kiss, a compliment, or changing the pace.
+
+${basePrompt.split('\n').slice(0, 8).join('\n')}
+
+User's last message: "${String(lastUserMsg || '').slice(0, 200)}"
+
+Respond with just the in-character line, nothing else.`;
+    const result = await _chatRequest(prompt, [], model, { max_tokens: 120 });
+    const text = String(result.fullText || '').trim();
+    if (!text) return CANNED;
+    // If the backstop itself tripped a refusal detector, fall back to canned.
+    if (detectRefusal(text).refused) return CANNED;
+    return text;
+  } catch (err) {
+    console.warn('[ai] companion-voiced backstop failed, using canned line:', err.message);
+    return CANNED;
   }
 }
 
 /**
- * Non-streaming chat completion with content levels and age guard.
- * Used for summaries, fact extraction, etc.
+ * Non-streaming chat completion with content levels, age guard, and
+ * level-aware refusal recovery.
+ * Used as the main chat-message path from chat-api.js and internal callers.
  */
 async function chatCompletion(systemPrompt, messages, opts = {}) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
 
   const settings = await getAISettings();
-  const model = opts.model || settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
+  const primaryModel = opts.model || settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
+  const fallbackModel = settings.openrouter_fallback_model || 'thedrummer/rocinante-12b';
+  let model = primaryModel;
   const platform = opts.platform || 'web';
 
   const fullSystemPrompt = await buildSystemPrompt(systemPrompt, platform, opts.userId);
+  const effectiveLevel = await getEffectiveTextLevel(platform, opts.userId);
+
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
 
   let attempt = 0;
   let currentPrompt = fullSystemPrompt;
   let totalCostUsd = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let triedFallback = false;
+  let refusalRecoveryAttempts = 0;
+  let lastRefusalKind = null;
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
     const result = await _chatRequest(currentPrompt, messages, model);
     const content = result.fullText;
-    const inputTokens = result.inputTokens;
-    const outputTokens = result.outputTokens;
-    const costUsd = result.costUsd;
-
-    totalCostUsd += costUsd;
-    totalInputTokens += inputTokens;
-    totalOutputTokens += outputTokens;
+    totalCostUsd += result.costUsd;
+    totalInputTokens += result.inputTokens;
+    totalOutputTokens += result.outputTokens;
 
     const guardResult = processResponse(content);
+    const refusal = guardResult.safe ? detectRefusal(content) : { refused: false };
 
-    if (guardResult.safe) {
+    if (guardResult.safe && !refusal.refused) {
       let consumptionResult = { shouldRequestTip: false };
       if (opts.userId) {
         consumptionResult = await trackConsumption({
@@ -336,7 +436,15 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           costUsd: totalCostUsd,
-          metadata: { ageGuardAttempts: attempt },
+          metadata: {
+            ageGuardAttempts: attempt,
+            ...(refusalRecoveryAttempts > 0 ? {
+              refusalRecovered: true,
+              refusalKind: lastRefusalKind,
+              refusalAttempts: refusalRecoveryAttempts,
+              fellBackToModel: triedFallback ? model : null,
+            } : {}),
+          },
         });
       }
       return { content, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCostUsd, ...consumptionResult };
@@ -344,7 +452,8 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
 
     attempt++;
     if (attempt > MAX_REGENERATE_ATTEMPTS) {
-      console.error(`[age-guard] Max regeneration attempts reached for chatCompletion. Returning safe fallback.`);
+      const blockReason = !guardResult.safe ? 'ageGuardBlocked' : 'refusalBlocked';
+      console.error(`[ai] chatCompletion: Max regeneration attempts reached (${blockReason}). Using companion-voiced backstop.`);
       if (opts.userId) {
         await trackConsumption({
           userId: opts.userId,
@@ -356,14 +465,41 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           costUsd: totalCostUsd,
-          metadata: { ageGuardBlocked: true },
+          metadata: {
+            [blockReason]: true,
+            reason: guardResult.reason || lastRefusalKind,
+            refusalAttempts: refusalRecoveryAttempts,
+          },
         });
       }
-      return { content: '', inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCostUsd, ageGuardBlocked: true };
+      const backstop = await buildCompanionBackstopLine({
+        basePrompt: systemPrompt,
+        lastUserMsg: lastUserMsg?.content || '',
+        blockReason,
+      });
+      return { content: backstop, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCostUsd, [blockReason]: true };
     }
 
-    console.warn(`[age-guard] Regenerating chatCompletion (attempt ${attempt}): reason=${guardResult.reason}`);
-    currentPrompt = `${fullSystemPrompt}\n\n${STRICT_REGENERATE_PROMPT}`;
+    if (!guardResult.safe) {
+      console.warn(`[age-guard] Regenerating chatCompletion (attempt ${attempt}): reason=${guardResult.reason}`);
+      currentPrompt = `${fullSystemPrompt}\n\n${STRICT_REGENERATE_PROMPT}`;
+      continue;
+    }
+
+    refusalRecoveryAttempts++;
+    lastRefusalKind = refusal.kind;
+    console.warn(`[ai] chatCompletion: refusal detected (attempt ${attempt}, kind=${refusal.kind}, level=${effectiveLevel}): "${refusal.match}"`);
+
+    if (effectiveLevel === 0) {
+      currentPrompt = `${fullSystemPrompt}\n\n${LEVEL_0_REDIRECT_PROMPT}`;
+    } else {
+      if (refusalRecoveryAttempts >= 2 && !triedFallback && fallbackModel !== model) {
+        console.warn(`[ai] chatCompletion: refusal persisted on ${model} — switching to ${fallbackModel}`);
+        model = fallbackModel;
+        triedFallback = true;
+      }
+      currentPrompt = `${fullSystemPrompt}\n\n${REFUSAL_RECOVERY_PROMPT}`;
+    }
   }
 }
 

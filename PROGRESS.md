@@ -2,6 +2,50 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Chat Quality Fixes — refusal recovery + media-failure line + memory extension (2026-04-22)
+
+Plan: `/Users/vasily/.claude/plans/analize-las-week-chats-gleaming-tome.md`.
+
+### Batch 1 — P0 (user-visible fixes)
+
+- [x] Track 1: `detectRefusal()` + prompts in `server/src/age-guard.js`
+- [x] Track 1: streamChat + chatCompletion regen loops in `server/src/ai.js` — level-aware fallback (level 0 no switch, level 1+ switches to rocinante-12b on 2nd refusal)
+- [x] Track 1: bump `MAX_REGENERATE_ATTEMPTS` 2→3, wire effective level via `getEffectiveTextLevel`
+- [x] Track 2: migration v57 — `ALTER TABLE messages ADD COLUMN media_error TEXT`
+- [x] Track 2: `getMediaFailureLine(reason, companion)` helper in `media-chat.js` — style-matched pools per reason
+- [x] Track 2: `generateOrReuseMedia` returns `{failed, reason}` on rate-limit; bg media job in `chat-api.js` appends in-character line + persists `media_error`
+- [x] Track 5: `buildCompanionBackstopLine()` one-shot LLM call on MAX_REGENERATE hit, falls back to canned line
+- [x] E2E tests: detectRefusal pattern coverage + getMediaFailureLine + updated rate-limit return-shape test
+- [x] `npm run test:e2e:ai` (119 passed) + `test:e2e:api` (28 passed) green
+- [ ] Commit + push Batch 1
+
+### Batch 2 — P1 (memory + admin)
+
+- [ ] Track 3: migration — `user_profile` table; raise fact cap 30→50
+- [ ] Track 3: rewrite extraction prompt (remove "DO NOT EXTRACT" rules), add `relationship` + `intimacy` categories
+- [ ] Track 3: deterministic name regex (user-side + assistant-side)
+- [ ] Track 3: fact dedup+merge (similarity 0.75)
+- [ ] Track 3: `buildUserContext(userId, level)` — level-0 skips `intimacy` injection
+- [ ] Track 3: summary-of-summaries at 10 summaries
+- [ ] Track 4: `/api/admin/chats/flagged` new `safety_refusal` category
+- [ ] Track 4: Overview cards — refusals recovered, media failures, empty-extractions
+- [ ] E2E tests: memory + admin
+- [ ] `npm run test:e2e:ai` + `test:e2e:api` green
+- [ ] Commit + push Batch 2
+
+## Chat Quality Audit — last 7 days of prod chats (2026-04-22)
+
+Deliverable only (no code changes). Full report: `/tmp/lovetta-audit-2026-04-22/report.md`.
+
+- [x] Baseline activity + topic buckets (24 users, 57 convs, 4,732 msgs last 7d)
+- [x] Image-failure queries (0 stuck pending; 44 hallucinated URLs all on 2026-04-16 — already fixed by 9f35a91)
+- [x] Memory-failure queries (7 of 15 long convs have ≤4 facts — extraction under-returns on NSFW RP)
+- [x] Refusal / break-character scan (16 "I'm sorry but" upstream refusals leak past age-guard)
+- [x] Rate-limit hotspot identification (Dani 14 imgs/day over cap; 6 companions hit video cap)
+- [x] Spot-check worst conversations (`d04cbd30`, `0dc96a2c`, `1942a65e`, `ed0f4e98`, `0dd363a5`)
+- [x] Report written with P0-P3 fix proposals
+- [ ] User selects which fixes to pursue → separate plan per selection
+
 ## Admin Chat Viewer + Breaking-Character Analysis (2026-04-01)
 
 - [x] Add `GET /api/admin/chats` endpoint — list all conversations with search, pagination

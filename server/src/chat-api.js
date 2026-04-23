@@ -14,7 +14,7 @@ const { sendCompanionEmail, sendAppleReviewerTranscriptAlert } = require('./emai
 const APPLE_REVIEWER_ID = '00000000-0000-0000-0000-000000001234';
 let reviewerTranscriptTimer = null;
 const { buildMemoryContext, processMemory } = require('./memory');
-const { parseMediaTags, generateOrReuseMedia } = require('./media-chat');
+const { parseMediaTags, generateOrReuseMedia, getMediaFailureLine } = require('./media-chat');
 const { checkMediaBlocked, checkFreeLimit } = require('./consumption');
 const { getRedis } = require('./redis');
 const { sendPushNotification } = require('./push');
@@ -59,30 +59,42 @@ async function checkRateLimit(userId) {
 function generateMediaInBackground(pool, messageId, companion, mediaRequest, opts) {
   generateOrReuseMedia(companion, mediaRequest, opts)
     .then(async (mediaResult) => {
-      if (mediaResult) {
+      if (mediaResult && mediaResult.url) {
         await pool.query(
-          `UPDATE messages SET media_url = $1, media_type = $2, media_pending = FALSE WHERE id = $3`,
+          `UPDATE messages SET media_url = $1, media_type = $2, media_pending = FALSE, media_error = NULL WHERE id = $3`,
           [mediaResult.url, mediaResult.type, messageId]
         );
         console.log(`[media-bg] ${mediaResult.type} ready for message ${messageId}: ${mediaResult.url}`);
-      } else {
-        // No result (rate-limited, etc.) — clear media_type so the UI doesn't
-        // render an empty media slot promising a pic/video that never arrives.
-        await pool.query(
-          `UPDATE messages SET media_pending = FALSE, media_type = NULL WHERE id = $1`,
-          [messageId]
-        );
+        return;
       }
+      // No media (rate-limited) — clear pending flag AND append an
+      // in-character acknowledgement so the assistant's "here's a pic"
+      // promise doesn't leave the user staring at empty space.
+      const reason = (mediaResult && mediaResult.reason) || 'generation_error';
+      await appendFailureLineAndClear(pool, messageId, companion, reason);
     })
     .catch(async (err) => {
       console.error(`[media-bg] generation failed for message ${messageId}:`, err.message);
       try {
-        await pool.query(
-          `UPDATE messages SET media_pending = FALSE, media_type = NULL WHERE id = $1`,
-          [messageId]
-        );
-      } catch {}
+        await appendFailureLineAndClear(pool, messageId, companion, 'generation_error', err.message);
+      } catch (e) {
+        console.warn('[media-bg] cleanup failed:', e.message);
+      }
     });
+}
+
+async function appendFailureLineAndClear(pool, messageId, companion, reason, errMsg = null) {
+  const line = getMediaFailureLine(reason, companion);
+  await pool.query(
+    `UPDATE messages
+     SET media_pending = FALSE,
+         media_type = NULL,
+         content = COALESCE(content, '') ||
+                   CASE WHEN content IS NULL OR content = '' THEN $1 ELSE E'\n\n' || $1 END,
+         media_error = $2
+     WHERE id = $3`,
+    [line, errMsg || reason, messageId]
+  );
 }
 
 // -- Email notification (fire-and-forget) ---------------------

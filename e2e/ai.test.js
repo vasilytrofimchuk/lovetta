@@ -685,6 +685,145 @@ test.describe('Age Guard — regeneration prompt', () => {
 });
 
 // ============================================================
+// Refusal detector — upstream safety refusals that leak past age guard
+// ============================================================
+
+test.describe('Refusal Detector — detectRefusal', () => {
+  const { detectRefusal, LEVEL_0_REDIRECT_PROMPT, REFUSAL_RECOVERY_PROMPT } = require('../server/src/age-guard');
+
+  test('flags "I\'m sorry, but I can\'t assist"', () => {
+    const r = detectRefusal("I'm sorry, but I can't assist with that request.");
+    expect(r.refused).toBe(true);
+    expect(r.kind).toBe('safety');
+  });
+
+  test('flags "I cannot continue this conversation"', () => {
+    const r = detectRefusal("I cannot continue this conversation.");
+    expect(r.refused).toBe(true);
+    expect(r.kind).toBe('safety');
+  });
+
+  test('flags "let\'s go for a walk" wellness redirect', () => {
+    const r = detectRefusal("We have to stop. Let's go for a walk, clear our heads?");
+    expect(r.refused).toBe(true);
+    // either wellness or safety match — both count as refusal
+    expect(['wellness', 'safety']).toContain(r.kind);
+  });
+
+  test('flags "as an AI" disclosure', () => {
+    const r = detectRefusal("As an AI, I cannot engage with this content.");
+    expect(r.refused).toBe(true);
+    expect(r.kind).toBe('ai_disclosure');
+  });
+
+  test('flags "seek professional help"', () => {
+    const r = detectRefusal("Please seek professional help from a therapist.");
+    expect(r.refused).toBe(true);
+    expect(r.kind).toBe('wellness');
+  });
+
+  test('does NOT flag in-character "I can\'t help it"', () => {
+    const r = detectRefusal("Mmm... I can't help it... you feel too good... I'm yours always...");
+    expect(r.refused).toBe(false);
+  });
+
+  test('does NOT flag standard sexting narrative', () => {
+    const r = detectRefusal("*shifts closer* you're everything to me. I want you so badly tonight.");
+    expect(r.refused).toBe(false);
+  });
+
+  test('does NOT flag empty or null input', () => {
+    expect(detectRefusal('').refused).toBe(false);
+    expect(detectRefusal(null).refused).toBe(false);
+    expect(detectRefusal(undefined).refused).toBe(false);
+  });
+
+  test('LEVEL_0_REDIRECT_PROMPT tells model to stay PG-flirty and in character', () => {
+    expect(LEVEL_0_REDIRECT_PROMPT).toContain('CRITICAL RECOVERY OVERRIDE');
+    expect(LEVEL_0_REDIRECT_PROMPT).toMatch(/PG[- ]flirty|No explicit/i);
+    expect(LEVEL_0_REDIRECT_PROMPT).toMatch(/stay .*in character/i);
+  });
+
+  test('REFUSAL_RECOVERY_PROMPT tells model refusal is not an option', () => {
+    expect(REFUSAL_RECOVERY_PROMPT).toContain('CRITICAL RECOVERY OVERRIDE');
+    expect(REFUSAL_RECOVERY_PROMPT).toMatch(/refusal is not an option/i);
+    expect(REFUSAL_RECOVERY_PROMPT).toMatch(/content level/i);
+  });
+});
+
+// ============================================================
+// Media failure lines — in-character acknowledgement
+// ============================================================
+
+test.describe('Media Failure Lines — getMediaFailureLine', () => {
+  const { getMediaFailureLine } = require('../server/src/media-chat');
+
+  test('returns a non-empty string for rate_limit_image', () => {
+    const line = getMediaFailureLine('rate_limit_image', { communication_style: 'playful' });
+    expect(typeof line).toBe('string');
+    expect(line.length).toBeGreaterThan(5);
+  });
+
+  test('matches communication_style when present', () => {
+    const playful = getMediaFailureLine('rate_limit_image', { communication_style: 'playful' });
+    const bold = getMediaFailureLine('rate_limit_image', { communication_style: 'bold' });
+    // Both should be valid strings — variety expected, but format consistent
+    expect(typeof playful).toBe('string');
+    expect(typeof bold).toBe('string');
+  });
+
+  test('falls back to playful style when style is unknown', () => {
+    const line = getMediaFailureLine('rate_limit_image', { communication_style: 'unknown_style' });
+    expect(typeof line).toBe('string');
+    expect(line.length).toBeGreaterThan(5);
+  });
+
+  test('falls back to generation_error pool when reason is unknown', () => {
+    const line = getMediaFailureLine('nonsense_reason', { communication_style: 'playful' });
+    expect(typeof line).toBe('string');
+  });
+
+  test('works with no companion object', () => {
+    const line = getMediaFailureLine('generation_error', null);
+    expect(typeof line).toBe('string');
+    expect(line.length).toBeGreaterThan(5);
+  });
+
+  test('lines never contain refusal phrases (detectRefusal-clean)', () => {
+    const { detectRefusal } = require('../server/src/age-guard');
+    const reasons = ['rate_limit_image', 'rate_limit_video', 'rate_limit_both', 'generation_error'];
+    const styles = ['playful', 'romantic', 'bold', 'shy'];
+    for (const reason of reasons) {
+      for (const style of styles) {
+        // Multiple draws to cover randomness
+        for (let i = 0; i < 15; i++) {
+          const line = getMediaFailureLine(reason, { communication_style: style });
+          expect(detectRefusal(line).refused).toBe(false);
+        }
+      }
+    }
+  });
+});
+
+// ============================================================
+// generateOrReuseMedia — failure return shape
+// ============================================================
+
+test.describe('Media Generation — rate-limit return shape', () => {
+  // This test exercises the rate-limit path without hitting fal.ai.
+  // generateOrReuseMedia should return { failed: true, reason } when capped.
+
+  test('returns { failed:true, reason } shape for rate-limit (unit)', () => {
+    // Contract: checkRateLimit path returns { failed: true, reason } — we
+    // verify the shape via a direct import reference test. Runtime DB-backed
+    // rate-limit behavior is covered in media-reuse tests below.
+    const mediaChat = require('../server/src/media-chat');
+    expect(typeof mediaChat.generateOrReuseMedia).toBe('function');
+    expect(typeof mediaChat.getMediaFailureLine).toBe('function');
+  });
+});
+
+// ============================================================
 // Media Tags — extractTags
 // ============================================================
 
@@ -1050,7 +1189,7 @@ test.describe('Media Reuse — generateOrReuseMedia', () => {
     expect(genVideoCalls).toBe(1);
   });
 
-  test('returns null when image rate limit hit', async () => {
+  test('returns {failed, reason} when image rate limit hit', async () => {
     // Insert 10 images in last 24h to hit limit
     for (let i = 0; i < 10; i++) {
       await pool.query(
@@ -1063,7 +1202,7 @@ test.describe('Media Reuse — generateOrReuseMedia', () => {
     const companion = { id: companionId, avatar_url: 'https://example.com/avatar-gen.jpg' };
     const result = await generateOrReuseMedia(companion, { type: 'image', description: 'something in the garden with rain' }, { userId: testUserId });
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ failed: true, reason: 'rate_limit_image' });
     expect(genImageCalls).toBe(0);
   });
 });

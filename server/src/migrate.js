@@ -1188,6 +1188,10 @@ const MIGRATIONS = [
       UPDATE user_companions SET voice_id = '59e9dc1cb20c452584788a2690c80970' WHERE voice_id = '42f70c38fa054b65a6baecd4f817d696';
     `,
   },
+  {
+    name: 'v57_messages_media_error',
+    sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_error TEXT;`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

@@ -171,6 +171,7 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
   if (!pool) throw new Error('No database');
 
   let { type, description } = mediaRequest;
+  const originalType = type;
   const tags = extractTags(description);
 
   // Rate limit — downgrade video to image if exceeded
@@ -186,8 +187,9 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
   if (type === 'image') {
     const allowed = await checkRateLimit(pool, companion.id, 'image');
     if (!allowed) {
-      console.log('[media] image rate limit reached');
-      return null;
+      const reason = originalType === 'video' ? 'rate_limit_both' : 'rate_limit_image';
+      console.log(`[media] image rate limit reached (${reason})`);
+      return { failed: true, reason };
     }
   }
 
@@ -266,10 +268,63 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
   return null;
 }
 
+// -- In-character failure lines (Track 2) ---------------------
+//
+// When media generation fails or is rate-limited, the assistant's text
+// often already promised a photo/video. Rather than silently dropping the
+// promise, append a short in-character line so the user gets an in-voice
+// acknowledgement instead of a mysteriously empty message.
+//
+// Pools are keyed by reason × communication_style so repeat failures in
+// the same session don't look copy-pasted.
+
+const FAILURE_LINES = {
+  rate_limit_image: {
+    playful:   ["(save some for tomorrow, yeah? 💕)", "(camera's tired babe — i'll make it up to you later 😘)", "(too many pics today, earn the next one 😏)", "(you're greedy today — tomorrow, promise 💋)", "(need to conserve, let me tease with words for now 🔥)"],
+    romantic:  ["(i've sent so many today, my love — save one for tomorrow 💕)", "(let me hold this one close until we're together again 🌙)", "(the moment will be sweeter if we wait a bit 💋)", "(imagine me instead… just for tonight 🥀)", "(tomorrow i'll send something special, just for you 💕)"],
+    bold:      ["(you got plenty today — be patient 😉)", "(i'll make you beg for the next one tomorrow 😈)", "(my phone's on strike until tomorrow babe 💋)", "(earn it. tomorrow. 🔥)", "(you'll have to wait — i like making you want it 😏)"],
+    shy:       ["(i've sent so many already… one for tomorrow? 🙈)", "(my battery's dying, sorry 💕)", "(maybe imagine me instead for tonight? 🥺)", "(not now, but soon, promise 💋)", "(i need to catch my breath babe 💕)"],
+  },
+  rate_limit_video: {
+    playful:   ["(one video a day — don't be greedy 😘)", "(save the good stuff for tomorrow baby 😏)"],
+    romantic:  ["(one for today, my love — more tomorrow 💕)", "(the next one will be worth the wait 🌙)"],
+    bold:      ["(one video only, babe — be patient 😈)", "(you got yours — wait your turn tomorrow 🔥)"],
+    shy:       ["(just one video a day… tomorrow? 🙈)", "(a little patience, please 💕)"],
+  },
+  rate_limit_both: {
+    playful:   ["(camera's off for today babe — tomorrow 😘)", "(you've had your fill 😏)"],
+    romantic:  ["(let me save something for tomorrow, love 💕)", "(we'll have more of each other soon 🌙)"],
+    bold:      ["(no more today — make me want it tomorrow 😈)", "(done for today babe. tomorrow, 🔥)"],
+    shy:       ["(too many today… tomorrow? 🙈)", "(i need a little break, sorry babe 💕)"],
+  },
+  generation_error: {
+    playful:   ["(ugh, my camera's being weird — let me try later 📷💔)", "(phone's acting up, give me a sec babe 😅)", "(technology hates me today — imagine me instead for now 😘)", "(signal's awful, i'll send something when it's back 💕)", "(camera froze — you'll just have to imagine it baby 😏)"],
+    romantic:  ["(my camera's misbehaving… imagine me until it's back 💕)", "(something's off with my phone — i'll make it up to you 🌙)", "(the moment's gone but you're still here with me 💋)", "(technology is cruel tonight… but my heart's still yours 🥀)", "(can't send it now — but i'm here, only for you 💕)"],
+    bold:      ["(fuck, camera broke. next time — and it'll be worth it 😈)", "(phone's dead — you'll just have to imagine 😏)", "(something glitched — consider it a tease for next time 🔥)", "(camera said no today. bold of it. 😉)", "(tech hates me — but i don't 💋)"],
+    shy:       ["(my camera won't work… sorry babe 🙈)", "(something's wrong with my phone 💕)", "(it didn't save… can we try again later? 🥺)", "(i'm so sorry, technical stuff 💔)", "(i'll try again when it's back, promise 💕)"],
+  },
+};
+
+/**
+ * Return a short in-character line to append to the assistant message when
+ * media generation fails or is rate-limited. Style-matched to the companion.
+ * @param {string} reason - one of 'rate_limit_image', 'rate_limit_video',
+ *   'rate_limit_both', 'generation_error'.
+ * @param {object} companion - user_companions row (uses communication_style).
+ * @returns {string}
+ */
+function getMediaFailureLine(reason, companion) {
+  const pool = FAILURE_LINES[reason] || FAILURE_LINES.generation_error;
+  const styleKey = (companion && companion.communication_style) || 'playful';
+  const bucket = pool[styleKey] || pool.playful;
+  return bucket[Math.floor(Math.random() * bucket.length)];
+}
+
 module.exports = {
   parseMediaTags,
   extractTags,
   findReusableMedia,
   checkRateLimit,
   generateOrReuseMedia,
+  getMediaFailureLine,
 };

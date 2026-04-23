@@ -45,6 +45,50 @@ AI companion app for entertaining and intimate chats with AI-generated women com
 
 ---
 
+## Chat Quality Fixes — level-aware recovery + memory extension (2026-04-22) — IN PROGRESS
+
+Plan approved. Two batches.
+
+### Batch 1 (P0): refusal recovery + media-failure acknowledgement + companion-voiced backstop
+
+- Track 1: detect upstream model refusals ("I'm sorry, but I can't…", "as an AI", wellness drift) and regenerate. Level-gated fallback: level 0 → in-character redirect, never switch models; level 1+ → 2nd refusal switches to `openrouter_fallback_model` (rocinante-12b) with level rules still appended. Files: `server/src/age-guard.js`, `server/src/ai.js`.
+- Track 2: when image/video gen is rate-limited or fails, append an in-character line to the assistant message ("camera's being weird — let me try later"), style-matched to `companion.communication_style`. Add `messages.media_error` column. Files: `server/src/media-chat.js`, `server/src/chat-api.js`, `server/src/migrate.js`.
+- Track 5: if refusal recovery exhausts regen attempts, rewrite the canned fallback in the companion's voice via a one-shot LLM call. Files: `server/src/ai.js`.
+
+### Batch 2 (P1): memory extension + admin visibility
+
+- Track 3: memory is private context — extract everything at every level, gate only the injection into the system prompt. Rewrite extraction prompt (remove "DO NOT EXTRACT relationship/sexual" rule that caused 47% memory-miss). Add deterministic name capture from both user and assistant sides (covers the "Virdi" case). Add cross-conversation `user_profile` table. Raise fact cap 30→50 with dedup+merge. Summary-of-summaries at 10 summaries. Files: `server/src/memory.js`, `server/src/migrate.js`, `server/src/chat-api.js`, `server/src/proactive.js`.
+- Track 4: admin visibility — extend `/api/admin/chats/flagged` with `safety_refusal` category; Overview cards for refusals recovered, media failures, empty-extractions. Files: `server/src/admin-api.js`, `public/admin.html`.
+
+### Apple defense
+
+Output is gated by level rules in the system prompt (already exists). Memory stores everything at every level — Apple audits output, not context. Level-0 skips injecting `intimacy` facts as tonal-drift protection, but they're still stored and become available if level is raised.
+
+### Non-scope
+
+- Raising iOS from level 1 → 2 (separate App Store conversation)
+
+## Chat Quality Audit (2026-04-22) — REPORT DELIVERED
+
+Read-only audit of last 7 days of prod chats. Findings at `/tmp/lovetta-audit-2026-04-22/report.md`.
+
+**Scope**: what users talk about + where the AI failed (refusals, memory, images).
+
+**Key findings**:
+- Dominant usage: 20% family/taboo roleplay, 21% sexting (heavily narrative, long convs)
+- 0% emotional-support traffic, 0.3% wellness keywords → users come for intimacy, not chit-chat
+- **16 upstream refusals leak to user** ("I'm sorry, but I can't continue") — age-guard regen loop only catches age flags, not generic model safety refusals
+- **47% memory miss on long conversations** (7 of 15 convs with >50 msgs have ≤4 stored facts) — extractor returns empty for NSFW RP even when user name is obvious
+- **Rate-limit silent suppression** on ~6 companion-days — AI promises photo, none arrives, no in-character acknowledgement
+- Historical hallucinated-URL issue (44 cases on 2026-04-16) already fixed by commit 9f35a91 — zero occurrences since
+
+**Proposed fixes (awaiting user selection):**
+- P0: extend age-guard to detect/regen upstream refusals + try fallback model (`server/src/ai.js`, `server/src/age-guard.js`)
+- P0: in-character acknowledgement when media is rate-limited or fails (`server/src/chat-api.js`, `server/src/media-chat.js`)
+- P1: force name/identity extraction with regex + rewrite extraction prompt (`server/src/memory.js`)
+- P2: admin visibility for safety refusals (new card + flagged-chats regex additions)
+- P3 (strategic): decide whether incest-RP is in-scope product-wise, then pick a less-censored model or graceful-refusal pattern accordingly
+
 ## Audio Features: Demo Voice on Templates + Auto-Play in Chat — IN PROGRESS
 
 ### What
