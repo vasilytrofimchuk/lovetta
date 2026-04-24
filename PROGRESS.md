@@ -2,6 +2,13 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Auth heartbeat 401 loop + companion-create skeleton (2026-04-24)
+
+Backport of fixes from Mystery Lab (bugs inherited from shared code lineage).
+
+- [x] `web/src/lib/api.js` — narrowed interceptor skip list from blanket `/api/auth/*` to only `/api/auth/{refresh,login,signup}`. Stops the 60s `/api/auth/me` heartbeat from looping on 401 once the access token expires.
+- [x] `web/src/pages/CompanionCreate.jsx` — 12-card pulsing skeleton while `/api/companions/templates` loads, so the grid doesn't paint blank.
+
 ## Chat Quality Fixes — refusal recovery + media-failure line + memory extension (2026-04-22)
 
 Plan: `/Users/vasily/.claude/plans/analize-las-week-chats-gleaming-tome.md`.

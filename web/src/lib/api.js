@@ -48,6 +48,14 @@ function redirectToLogin() {
   }
 }
 
+// Auth routes that must NOT go through refresh-on-401: /refresh would loop
+// on itself; /login and /signup are public and must reject wrong creds as-is.
+// /me, /logout, etc. are authed and should participate in the refresh cycle.
+const AUTH_NO_INTERCEPT = ['/api/auth/refresh', '/api/auth/login', '/api/auth/signup']
+function skipAuthIntercept(url) {
+  return !!url && AUTH_NO_INTERCEPT.some((p) => url.endsWith(p))
+}
+
 const api = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
@@ -124,7 +132,7 @@ export async function authFetch(path, init = {}) {
 
   let response = await run(localStorage.getItem('lovetta-token'))
 
-  if (response.status === 401 && !url.includes('/api/auth/')) {
+  if (response.status === 401 && !skipAuthIntercept(url)) {
     const newToken = await refreshAccessToken()
     if (!newToken) {
       redirectToLogin()
@@ -159,8 +167,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 
-      // Skip refresh for auth endpoints
-      if (originalRequest.url?.includes('/api/auth/')) {
+      // Skip refresh for session-establishing auth endpoints
+      if (skipAuthIntercept(originalRequest.url)) {
         return Promise.reject(error)
       }
 

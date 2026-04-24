@@ -301,9 +301,13 @@ export default function CompanionCreate() {
               ))}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {templates.filter(t => templateFilter === 'all' || (templateFilter === 'anime' ? t.style === 'anime' : t.style !== 'anime')).map(t => (
-                <TemplateCard key={t.id} t={t} onSelect={selectTemplate} />
-              ))}
+              {templates.length === 0
+                ? Array.from({ length: 12 }).map((_, i) => (
+                    <div key={i} className="rounded-2xl aspect-[3/4] bg-brand-card animate-pulse" />
+                  ))
+                : templates.filter(t => templateFilter === 'all' || (templateFilter === 'anime' ? t.style === 'anime' : t.style !== 'anime')).map(t => (
+                    <TemplateCard key={t.id} t={t} onSelect={selectTemplate} />
+                  ))}
             </div>
             <button onClick={() => setStep('custom')}
               className="w-full mt-4 p-4 rounded-xl border border-dashed border-brand-accent/40 text-brand-accent hover:bg-brand-accent/10 transition-colors flex items-center justify-center gap-2">
