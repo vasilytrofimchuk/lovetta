@@ -1105,3 +1105,13 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
   3. `chat-api.js` `generateMediaInBackground`: clear `media_type = NULL` on failure AND on no-result so MessageBubble doesn't render a ghost slot.
 - Files: server/src/chat-api.js, server/src/media-chat.js.
 - Verification: `npm run test:e2e:ai` + prod SQL spot-check 24h after deploy.
+
+## Daily Admin Digest — Add Kill-Switch — DONE
+- Problem: user reports daily admin-digest emails still arrive despite "turning it off." No local server is running (verified via `lsof`/`ps`); production is the source. The digest worker had no off-switch and no admin UI toggle — only `NODE_ENV=test` skipped it.
+- Fix:
+  1. `server/src/daily-digest.js` `checkDigest()`: gate on `app_settings.digest_enabled` (returns early + logs `[digest] disabled via app_settings.digest_enabled, skipping` when not strictly `true`).
+  2. `server/src/migrate.js` migration `v59_digest_enabled_setting`: seeds the row to `false` via `INSERT … ON CONFLICT DO NOTHING` so deploys don't override admin toggles.
+  3. `public/admin.html` `TOGGLE_SETTING_DEFS`: added "Daily Admin Digest" toggle that round-trips through `GET/PUT /api/admin/settings`.
+- Files: server/src/daily-digest.js, server/src/migrate.js, public/admin.html.
+- Verification: `npm run test:e2e:api` — 28/28 passed, migration v59 applied cleanly.
+- Manual `POST /api/admin/digest/send` keeps bypassing the gate (it calls `sendDailyDigest()` directly), which is correct for explicit admin actions.

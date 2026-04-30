@@ -1210,6 +1210,14 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_user_profile_user ON user_profile(user_id);
     `,
   },
+  {
+    name: 'v59_digest_enabled_setting',
+    sql: `
+      INSERT INTO app_settings (key, value)
+      VALUES ('digest_enabled', 'false'::jsonb)
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

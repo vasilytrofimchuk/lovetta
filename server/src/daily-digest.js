@@ -19,6 +19,13 @@ async function getLastDigestDate(pool) {
   return rows.length > 0 ? rows[0].value.date : null;
 }
 
+async function isDigestEnabled(pool) {
+  const { rows } = await pool.query(
+    `SELECT value FROM app_settings WHERE key = 'digest_enabled'`
+  );
+  return rows.length > 0 && rows[0].value === true;
+}
+
 async function setLastDigestDate(pool, date) {
   await pool.query(
     `INSERT INTO app_settings (key, value) VALUES ('last_digest_date', $1)
@@ -326,6 +333,10 @@ async function checkDigest() {
   const pool = getPool();
   if (!pool) return;
   try {
+    if (!(await isDigestEnabled(pool))) {
+      console.log('[digest] disabled via app_settings.digest_enabled, skipping');
+      return;
+    }
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
     if (now.getUTCHours() >= DIGEST_HOUR) {

@@ -1301,3 +1301,13 @@ Based on analysis of 35 real prod users (891 messages):
 - [x] Add regression tests in `e2e/ai.test.js` for the new strip behavior (5 cases)
 - [x] Run `npm run test:e2e:ai` — 102/102 passed
 - [ ] Commit and push
+
+## Daily Admin Digest — Add Kill-Switch
+- [x] Update `plan.md` and `PROGRESS.md` before code changes
+- [x] Gate `checkDigest()` in `server/src/daily-digest.js` on `app_settings.digest_enabled` (skip + log when not true)
+- [x] Add migration `v59_digest_enabled_setting` in `server/src/migrate.js` seeding `digest_enabled=false` (`ON CONFLICT DO NOTHING`)
+- [x] Add "Daily admin digest" toggle in `public/admin.html` Settings tab via `TOGGLE_SETTING_DEFS`
+- [x] Run `npm run test:e2e:api` — 28/28 passed, migration v59 applied cleanly
+- [x] Update `plan.md` and `PROGRESS.md` with final status
+- Local server check: no node process on 3900 — production (Heroku) was the source.
+- After deploy, the next 9:00 UTC tick logs `[digest] disabled via app_settings.digest_enabled, skipping` instead of sending. Toggle in Settings tab can re-enable.
