@@ -2,6 +2,27 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Funnel instrumentation: events, device_type, paywall logging (2026-04-29)
+
+Triggered by 7-day funnel analysis (`/Users/vasily/.claude/plans/analize-hwy-user-ignup-serialized-alpaca.md`):
+51 signups, 0 paid, 47 non-payers, **paywall trigger has zero metadata signal** for any of the 7 heavy
+non-payers (top user: 263 msgs / $2.11 model spend / never asked). Instrumenting the funnel so future
+analysis can answer the question without reading transcripts by hand.
+
+- [x] Migration v60 — `user_events` table for funnel events (signup / companion_created / first_message_sent / paywall_blocked / tip_requested)
+- [x] `server/src/device.js` — server-side User-Agent → device_type parser (ios/android/web-mobile/web-tablet/web-desktop)
+- [x] `server/src/events.js` — `logEvent(userId, eventType, metadata)` helper + named convenience fns
+- [x] Wire device_type into all 5 user INSERTs in `server/src/auth-api.js` (email, google web/native, apple email/synthetic, telegram)
+- [x] Emit `signup` event from each signup path
+- [x] Emit `companion_created` event in `server/src/companion-api.js`
+- [x] Emit `first_message_sent` event in `server/src/chat-api.js` (only on first user message ever, gated by `hasEvent`)
+- [x] Emit `paywall_blocked` event at both `free_limit_reached` sites + `tip_requested` at `media_blocked` site
+- [x] Emit `tip_requested` event when `_checkThreshold` exceeds (paying-user paywall, deduped via existing Redis cache)
+- [x] `npm run test:e2e:api` — 28/28 green
+- [x] `npm run test:e2e:ai` — 131/131 green
+- [x] node syntax check — all modified modules load
+- [ ] Commit + push (deploy applies migration v60 on Heroku boot)
+
 ## Auth heartbeat 401 loop + companion-create skeleton (2026-04-24)
 
 Backport of fixes from Mystery Lab (bugs inherited from shared code lineage).

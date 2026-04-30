@@ -1218,6 +1218,20 @@ const MIGRATIONS = [
       ON CONFLICT (key) DO NOTHING;
     `,
   },
+  {
+    name: 'v60_user_events',
+    sql: `
+      CREATE TABLE IF NOT EXISTS user_events (
+        id          BIGSERIAL PRIMARY KEY,
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        event_type  TEXT NOT NULL,
+        metadata    JSONB DEFAULT '{}'::jsonb,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_events_user ON user_events(user_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_user_events_type ON user_events(event_type, created_at);
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

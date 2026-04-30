@@ -19,6 +19,7 @@ const { parseMediaTags, generateOrReuseMedia, getMediaFailureLine } = require('.
 const { checkMediaBlocked, checkFreeLimit } = require('./consumption');
 const { getRedis } = require('./redis');
 const { sendPushNotification } = require('./push');
+const { logEvent, hasEvent, EVENT_TYPES } = require('./events');
 
 const router = Router();
 
@@ -339,6 +340,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     if (!isSubscriptionActive(sub)) {
       const blocked = await checkFreeLimit(req.userId);
       if (blocked) {
+        logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'chat_message', companion_id: req.params.companionId });
         res.write(`data: ${JSON.stringify({ type: 'error', code: 'free_limit_reached' })}\n\n`);
         return res.end();
       }
@@ -358,11 +360,17 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       return res.end();
     }
 
+    const isFirstMessage = !(await hasEvent(req.userId, EVENT_TYPES.FIRST_MESSAGE_SENT));
+
     // Save user message
     await pool.query(
       `INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
       [conversation.id, content.trim()]
     );
+
+    if (isFirstMessage) {
+      logEvent(req.userId, EVENT_TYPES.FIRST_MESSAGE_SENT, { companion_id: companion.id, conversation_id: conversation.id });
+    }
 
     // Apple reviewer monitoring: debounced transcript email (one email per session)
     if (req.userId === APPLE_REVIEWER_ID) {
@@ -547,6 +555,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
     if (!isSubscriptionActive(sub)) {
       const blocked = await checkFreeLimit(req.userId);
       if (blocked) {
+        logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'chat_next', companion_id: req.params.companionId });
         res.write(`data: ${JSON.stringify({ type: 'error', code: 'free_limit_reached' })}\n\n`);
         return res.end();
       }
@@ -732,6 +741,7 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     // Check media block BEFORE calling LLM — no point generating text if media will be blocked
     const blocked = await checkMediaBlocked(req.userId, sub);
     if (blocked) {
+      logEvent(req.userId, EVENT_TYPES.TIP_REQUESTED, { source: 'media_blocked', companion_id: req.params.companionId });
       res.write(`data: ${JSON.stringify({ type: 'media_blocked', shouldRequestTip: true })}\n\n`);
       return res.end();
     }

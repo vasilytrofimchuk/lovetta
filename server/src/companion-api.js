@@ -7,6 +7,7 @@ const { Router } = require('express');
 const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
 const { chatCompletion, plainChatCompletion } = require('./ai');
+const { logEvent, EVENT_TYPES } = require('./events');
 
 function truncateNatural(text, maxWords) {
   const words = text.split(/\s+/);
@@ -168,6 +169,13 @@ router.post('/', authenticate, async (req, res) => {
        JSON.stringify(companionData.traits), companionData.communication_style, companionData.age,
        companionData.style || 'realistic', companionData.voice_id || 'b089032e45db460fb1934ece75a8c51d']
     );
+
+    logEvent(req.userId, EVENT_TYPES.COMPANION_CREATED, {
+      companion_id: companion.id,
+      template_id: companionData.template_id || null,
+      style: companionData.style || 'realistic',
+      is_custom: !companionData.template_id,
+    });
 
     // Create conversation
     const { rows: [conversation] } = await pool.query(

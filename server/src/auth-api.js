@@ -16,6 +16,8 @@ const {
 const { authenticate } = require('./auth-middleware');
 const { sendVerificationEmail, sendResetEmail, sendNewRegistrationNotification, sendAppleReviewerLoginAlert } = require('./email');
 const { fireSignupPostback } = require('./trafficstars');
+const { classifyDevice } = require('./device');
+const { logEvent, EVENT_TYPES } = require('./events');
 
 const APPLE_REVIEWER_ID = '00000000-0000-0000-0000-000000001234';
 
@@ -137,14 +139,17 @@ router.post('/signup', authLimiter, async (req, res) => {
     const refCode = generateReferralCode();
     const referredBy = await resolveReferrer(pool, referralCode);
 
+    const userAgent = req.get('User-Agent') || null;
+    const deviceType = classifyDevice(userAgent, req.body?.deviceType);
+
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (email, password_hash, birth_month, birth_year, terms_accepted, privacy_accepted,
-                          ai_consent_at, verify_token, ip_address, country, city, timezone, user_agent, auth_provider,
+                          ai_consent_at, verify_token, ip_address, country, city, timezone, user_agent, device_type, auth_provider,
                           referral_code, referred_by, ts_click_id, utm_source, utm_medium, utm_campaign)
-       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, 'email', $13, $14, $15, $16, $17, $18)
+       VALUES (LOWER($1), $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, $12, $13, 'email', $14, $15, $16, $17, $18, $19)
        RETURNING *`,
       [email.trim(), passwordHash, month, year, true, true,
-       verifyToken, ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
+       verifyToken, ip, geo.country || null, geo.city || null, geo.timezone || null, userAgent, deviceType,
        refCode, referredBy, tsClickId || null, utmSource || null, utmMedium || null, utmCampaign || null]
     );
 
@@ -162,6 +167,8 @@ router.post('/signup', authLimiter, async (req, res) => {
 
     // Tracker event (non-blocking)
     fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: user.email, meta: { utm_source: user.utm_source, utm_medium: user.utm_medium, utm_campaign: user.utm_campaign, auth_provider: user.auth_provider, ts_click_id: user.ts_click_id } }) }).catch(() => {});
+
+    logEvent(user.id, EVENT_TYPES.SIGNUP, { auth_provider: 'email', device_type: deviceType, utm_source: utmSource || null });
 
     res.json({ user: sanitizeUser(user), accessToken, refreshToken });
   } catch (err) {
@@ -567,20 +574,23 @@ router.get('/google/callback', async (req, res) => {
         const geo = await geoFromIp(ip).catch(() => ({}));
         const refCode = generateReferralCode();
         const referredBy = await resolveReferrer(pool, stateRefCode);
+        const userAgent = req.get('User-Agent') || null;
+        const deviceType = classifyDevice(userAgent, null);
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, device_type, auth_provider,
                               referral_code, referred_by, ts_click_id, utm_source, utm_medium, utm_campaign)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'google', $12, $13, $14, $15, $16, $17)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, $12, 'google', $13, $14, $15, $16, $17, $18)
            RETURNING *`,
           [email, googleId, name, picture, birthMonth, birthYear,
-           ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
+           ip, geo.country || null, geo.city || null, geo.timezone || null, userAgent, deviceType,
            refCode, referredBy, stateTsClickId || null, stateUtmSource || null, stateUtmMedium || null, stateUtmCampaign || null]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
+        logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'google', device_type: deviceType, utm_source: stateUtmSource || null });
         if (stateTsClickId) fireSignupPostback(stateTsClickId, newUser.id);
       }
     }
@@ -670,20 +680,23 @@ router.post('/google/token', async (req, res) => {
         const geo = await geoFromIp(ip).catch(() => ({}));
         const refCode = generateReferralCode();
         const referredBy = await resolveReferrer(pool, referralCode);
+        const userAgent = req.get('User-Agent') || null;
+        const deviceType = classifyDevice(userAgent, req.body?.deviceType);
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, device_type, auth_provider,
                               referral_code, referred_by, ts_click_id, utm_source, utm_medium, utm_campaign)
-           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'google', $12, $13, $14, $15, $16, $17)
+           VALUES (LOWER($1), $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, $12, 'google', $13, $14, $15, $16, $17, $18)
            RETURNING *`,
           [email, googleId, name, picture, bMonth, bYear,
-           ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
+           ip, geo.country || null, geo.city || null, geo.timezone || null, userAgent, deviceType,
            refCode, referredBy, tsClickId || null, utmSource || null, utmMedium || null, utmCampaign || null]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
+        logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'google', device_type: deviceType, utm_source: utmSource || null });
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       }
     }
@@ -815,20 +828,23 @@ router.post('/apple', authLimiter, async (req, res) => {
         const geo = await geoFromIp(ip).catch(() => ({}));
         const refCode = generateReferralCode();
         const referredBy = await resolveReferrer(pool, referralCode);
+        const userAgent = req.get('User-Agent') || null;
+        const deviceType = classifyDevice(userAgent, req.body?.deviceType) || 'ios';
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, device_type, auth_provider,
                               referral_code, referred_by, email_type, ts_click_id, utm_source, utm_medium, utm_campaign)
-           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12, $13, $14, $15, $16, $17)
+           VALUES (LOWER($1), $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, $11, 'apple', $12, $13, $14, $15, $16, $17, $18)
            RETURNING *`,
           [email, appleId, displayName, month, year,
-           ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
+           ip, geo.country || null, geo.city || null, geo.timezone || null, userAgent, deviceType,
            refCode, referredBy, classifyEmail(email), tsClickId || null, utmSource || null, utmMedium || null, utmCampaign || null]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
+        logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'apple', device_type: deviceType, utm_source: utmSource || null });
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       }
     } else {
@@ -850,20 +866,23 @@ router.post('/apple', authLimiter, async (req, res) => {
       const geo = await geoFromIp(ip).catch(() => ({}));
       const refCode = generateReferralCode();
       const referredBy = await resolveReferrer(pool, referralCode);
+      const userAgent = req.get('User-Agent') || null;
+      const deviceType = classifyDevice(userAgent, req.body?.deviceType) || 'ios';
 
       const { rows: [newUser] } = await pool.query(
         `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
-                            terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
+                            terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, device_type, auth_provider,
                             referral_code, referred_by, email_type, ts_click_id, utm_source, utm_medium, utm_campaign)
-         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, 'apple', $11, $12, 'synthetic', $13, $14, $15, $16)
+         VALUES ($1, $2, $3, TRUE, $4, $5, TRUE, TRUE, NOW(), $6, $7, $8, $9, $10, $11, 'apple', $12, $13, 'synthetic', $14, $15, $16, $17)
          RETURNING *`,
         [syntheticEmail, appleId, displayName, month, year,
-         ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
+         ip, geo.country || null, geo.city || null, geo.timezone || null, userAgent, deviceType,
          refCode, referredBy, tsClickId || null, utmSource || null, utmMedium || null, utmCampaign || null]
       );
       user = newUser;
       sendNewRegistrationNotification(newUser).catch(() => {});
       fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
+      logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'apple', device_type: deviceType, utm_source: utmSource || null });
       if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
     }
 
@@ -956,20 +975,23 @@ router.post('/telegram', authLimiter, async (req, res) => {
         const geo = await geoFromIp(ip).catch(() => ({}));
         const refCode = generateReferralCode();
         const referredBy = await resolveReferrer(pool, tgRefCode);
+        const userAgent = req.get('User-Agent') || null;
+        const deviceType = classifyDevice(userAgent, req.body?.deviceType);
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
-                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, auth_provider,
+                              terms_accepted, privacy_accepted, ai_consent_at, ip_address, country, city, timezone, user_agent, device_type, auth_provider,
                               referral_code, referred_by, email_type, ts_click_id, utm_source, utm_medium, utm_campaign)
-           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, 'telegram', $12, $13, 'synthetic', $14, $15, $16, $17)
+           VALUES ($1, $2, $3, $4, TRUE, $5, $6, TRUE, TRUE, NOW(), $7, $8, $9, $10, $11, $12, 'telegram', $13, $14, 'synthetic', $15, $16, $17, $18)
            RETURNING *`,
           [syntheticEmail, telegramId, displayName, tgUser.photoUrl, month, year,
-           ip, geo.country || null, geo.city || null, geo.timezone || null, req.get('User-Agent') || null,
+           ip, geo.country || null, geo.city || null, geo.timezone || null, userAgent, deviceType,
            refCode, referredBy, tsClickId || null, utmSource || null, utmMedium || null, utmCampaign || null]
         );
         user = newUser;
         sendNewRegistrationNotification(newUser).catch(() => {});
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
+        logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'telegram', device_type: deviceType, utm_source: utmSource || null });
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
 
         // Create telegram_users record

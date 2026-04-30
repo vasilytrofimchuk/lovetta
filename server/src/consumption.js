@@ -5,6 +5,7 @@
 
 const { getPool } = require('./db');
 const { getRedis } = require('./redis');
+const { logEvent, EVENT_TYPES } = require('./events');
 
 const THRESHOLD_CACHE_TTL = 60; // seconds
 
@@ -103,6 +104,17 @@ async function _checkThreshold(pool, userId, subscription) {
   // Cache in Redis
   if (redis) {
     try { await redis.setex(cacheKey, THRESHOLD_CACHE_TTL, JSON.stringify(result)); } catch {}
+  }
+
+  // Log first tip-request crossing this month (Redis cache prevents spam — same
+  // user keeps hitting cached `exceeded=true` until they tip or month rolls).
+  if (exceeded) {
+    logEvent(userId, EVENT_TYPES.TIP_REQUESTED, {
+      source: 'monthly_threshold',
+      isTrial: !!isTrial,
+      threshold,
+      net_cost: Number(netCost.toFixed(4)),
+    });
   }
 
   return result;
