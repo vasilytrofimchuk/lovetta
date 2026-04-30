@@ -305,6 +305,7 @@
       <button class="tab" data-tab="visitors" onclick="switchTab('visitors')">Visitors</button>
       <button class="tab" data-tab="users" onclick="switchTab('users')">Users <span class="badge" id="users-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="economics" onclick="switchTab('economics')">Economics</button>
+      <button class="tab" data-tab="funnel" onclick="switchTab('funnel')">Funnel</button>
       <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
       <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="sentry" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
@@ -415,6 +416,46 @@
         <h3>All Payments</h3>
         <div id="econ-payments-table"></div>
         <div class="pagination" id="econ-payments-pagination"></div>
+      </div>
+    </div>
+
+    <!-- Funnel Tab -->
+    <div id="tab-funnel" class="tab-content">
+      <div class="tab-header"><h2>Funnel</h2><button class="refresh-btn" onclick="loadFunnel(funnelDays||7)">↻ Refresh</button></div>
+      <div style="display:flex;gap:8px;margin-bottom:20px;">
+        <button class="econ-period" onclick="loadFunnel(1, this)">1d</button>
+        <button class="econ-period active" onclick="loadFunnel(7, this)">7d</button>
+        <button class="econ-period" onclick="loadFunnel(30, this)">30d</button>
+        <button class="econ-period" onclick="loadFunnel(90, this)">90d</button>
+        <button class="econ-period" onclick="loadFunnel(365, this)">1y</button>
+      </div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px;">
+        Cohort = users who signed up in this window. Test emails (@example.com, @test.com, conativer+*) are excluded.
+        Event-based stages (paywall_blocked, tip_requested) only fire for users who signed up after instrumentation deployed.
+      </div>
+      <div class="section" style="margin-bottom:24px;">
+        <h3>Activation funnel</h3>
+        <div id="funnel-stages"></div>
+      </div>
+      <div class="breakdown-grid">
+        <div class="section">
+          <h3>By auth provider</h3>
+          <div id="funnel-by-provider"></div>
+        </div>
+        <div class="section">
+          <h3>By device type</h3>
+          <div id="funnel-by-device"></div>
+        </div>
+      </div>
+      <div class="breakdown-grid" style="margin-top:24px;">
+        <div class="section">
+          <h3>Non-payer message histogram</h3>
+          <div id="funnel-histogram"></div>
+        </div>
+        <div class="section">
+          <h3>Raw event counts (window)</h3>
+          <div id="funnel-events"></div>
+        </div>
       </div>
     </div>
 
@@ -666,6 +707,7 @@
       else if (name === 'reports') loadReports();
       else if (name === 'sentry') loadSentry();
       else if (name === 'economics') loadEconomics(econPeriod || '7d');
+      else if (name === 'funnel') loadFunnel(funnelDays || 7);
       else if (name === 'email') loadEmails();
       else if (name === 'companion-emails') loadCompanionEmails();
       else if (name === 'cashouts') loadCashouts();
@@ -1620,6 +1662,131 @@
         // Load payments table
         loadPayments(1);
 
+      });
+    }
+
+    var funnelDays = 7;
+
+    function loadFunnel(days, btn) {
+      funnelDays = parseInt(days, 10) || 7;
+      document.querySelectorAll('#tab-funnel .econ-period').forEach(function(b) { b.classList.remove('active'); });
+      if (btn) btn.classList.add('active');
+      else {
+        document.querySelectorAll('#tab-funnel .econ-period').forEach(function(b) {
+          var label = b.textContent.trim();
+          var bd = label === '1y' ? 365 : parseInt(label, 10);
+          if (bd === funnelDays) b.classList.add('active');
+        });
+      }
+
+      var stagesEl = document.getElementById('funnel-stages');
+      stagesEl.innerHTML = '<p style="color:var(--muted);padding:16px;">Loading...</p>';
+      document.getElementById('funnel-by-provider').innerHTML = '';
+      document.getElementById('funnel-by-device').innerHTML = '';
+      document.getElementById('funnel-histogram').innerHTML = '';
+      document.getElementById('funnel-events').innerHTML = '';
+
+      apiFetch('/api/admin/funnel?days=' + funnelDays).then(function(data) {
+        var f = data.funnel || {};
+        var signups = f.signups || 0;
+        var pct = function(n) {
+          if (!signups) return '-';
+          return (100 * (n || 0) / signups).toFixed(1) + '%';
+        };
+
+        var stages = [
+          { label: 'Signups', n: signups, hint: 'cohort = users who created accounts in this window' },
+          { label: 'Returned (>5 min after signup)', n: f.returned, hint: 'last_activity later than signup_at + 5 min' },
+          { label: 'Created a companion', n: f.companion_created, hint: 'has any user_companions row' },
+          { label: 'Sent first message', n: f.first_message_sent, hint: 'has any role=user message' },
+          { label: 'Sent ≥5 messages', n: f.msgs_5plus, hint: '' },
+          { label: 'Sent ≥20 messages', n: f.msgs_20plus, hint: 'engaged but possibly not paying' },
+          { label: 'Hit paywall (free_limit_reached)', n: f.paywall_blocked, hint: 'event-based; only fires post-deploy' },
+          { label: 'Asked to tip (monthly threshold)', n: f.tip_requested, hint: 'event-based; only fires post-deploy' },
+          { label: 'Subscribed (active/trialing)', n: f.subscribed, hint: '' },
+          { label: 'Tipped', n: f.tipped, hint: '' },
+          { label: 'Subscription churned', n: f.sub_churned, hint: 'started a sub then canceled — Apple 72h refund pattern' },
+        ];
+
+        var html = '<table style="font-size:0.85rem;"><tr><th>Stage</th><th style="text-align:right;">Users</th><th style="text-align:right;">% of signups</th><th style="text-align:right;">Drop from prev</th></tr>';
+        var prev = signups;
+        stages.forEach(function(s, i) {
+          var n = s.n || 0;
+          var dropFromPrev = (i === 0 || !prev) ? '' :
+            ((100 * (1 - n / prev)).toFixed(1) + '%');
+          var label = esc(s.label) + (s.hint ? ' <span style="color:var(--muted);font-size:0.7rem;">— ' + esc(s.hint) + '</span>' : '');
+          html += '<tr><td>' + label + '</td>' +
+            '<td style="text-align:right;">' + formatNumber(n) + '</td>' +
+            '<td style="text-align:right;color:var(--muted);">' + pct(n) + '</td>' +
+            '<td style="text-align:right;color:var(--error);">' + dropFromPrev + '</td></tr>';
+          prev = n;
+        });
+        html += '</table>';
+        stagesEl.innerHTML = html;
+
+        // By provider
+        var byProvider = data.byProvider || [];
+        if (byProvider.length) {
+          var ph = '<table style="font-size:0.85rem;"><tr><th>Auth</th><th>Signups</th><th>Sent msg</th><th>Subscribed</th><th>Sub %</th></tr>';
+          byProvider.forEach(function(r) {
+            var subRate = r.signups ? (100 * (r.subscribed || 0) / r.signups).toFixed(1) + '%' : '-';
+            ph += '<tr><td>' + esc(r.auth_provider) + '</td>' +
+              '<td>' + formatNumber(r.signups) + '</td>' +
+              '<td>' + formatNumber(r.sent_msg) + '</td>' +
+              '<td>' + formatNumber(r.subscribed) + '</td>' +
+              '<td style="color:var(--muted);">' + subRate + '</td></tr>';
+          });
+          ph += '</table>';
+          document.getElementById('funnel-by-provider').innerHTML = ph;
+        } else {
+          document.getElementById('funnel-by-provider').innerHTML = '<p style="color:var(--muted);padding:16px;">No data</p>';
+        }
+
+        // By device
+        var byDevice = data.byDevice || [];
+        if (byDevice.length) {
+          var dh = '<table style="font-size:0.85rem;"><tr><th>Device</th><th>Signups</th><th>Sent msg</th><th>Subscribed</th></tr>';
+          byDevice.forEach(function(r) {
+            dh += '<tr><td>' + esc(r.device_type) + '</td>' +
+              '<td>' + formatNumber(r.signups) + '</td>' +
+              '<td>' + formatNumber(r.sent_msg) + '</td>' +
+              '<td>' + formatNumber(r.subscribed) + '</td></tr>';
+          });
+          dh += '</table>';
+          document.getElementById('funnel-by-device').innerHTML = dh;
+        } else {
+          document.getElementById('funnel-by-device').innerHTML = '<p style="color:var(--muted);padding:16px;">No data</p>';
+        }
+
+        // Histogram
+        var hist = data.histogram || [];
+        if (hist.length) {
+          var hh = '<table style="font-size:0.85rem;"><tr><th>Messages</th><th>Users</th></tr>';
+          hist.forEach(function(r) {
+            hh += '<tr><td>' + esc(r.bucket) + '</td><td>' + formatNumber(r.users) + '</td></tr>';
+          });
+          hh += '</table>';
+          document.getElementById('funnel-histogram').innerHTML = hh;
+        } else {
+          document.getElementById('funnel-histogram').innerHTML = '<p style="color:var(--muted);padding:16px;">No data</p>';
+        }
+
+        // Event counts
+        var events = data.eventCounts || [];
+        if (events.length) {
+          var eh = '<table style="font-size:0.85rem;"><tr><th>Event</th><th>Total</th><th>Unique users</th></tr>';
+          events.forEach(function(r) {
+            eh += '<tr><td>' + esc(r.event_type) + '</td>' +
+              '<td>' + formatNumber(r.total) + '</td>' +
+              '<td>' + formatNumber(r.unique_users) + '</td></tr>';
+          });
+          eh += '</table>';
+          document.getElementById('funnel-events').innerHTML = eh;
+        } else {
+          document.getElementById('funnel-events').innerHTML = '<p style="color:var(--muted);padding:16px;">No events logged in this window yet.</p>';
+        }
+      }).catch(function(err) {
+        stagesEl.innerHTML = '<p style="color:var(--error);padding:16px;">Failed to load funnel: ' + esc(err.message || 'unknown error') + '</p>';
       });
     }
 

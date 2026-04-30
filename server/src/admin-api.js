@@ -172,6 +172,164 @@ router.get('/quality-stats', async (req, res) => {
   }
 });
 
+// -- GET /api/admin/funnel --------------------------------
+// Signup -> activation -> conversion funnel for a date range.
+// Excludes obvious test users (@example.com, @test.com, conativer+*@gmail.com, conativer@gmail.com).
+router.get('/funnel', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({});
+  try {
+    const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 7));
+    const interval = `${days} days`;
+
+    const TEST_FILTER = `(
+      u.email IS NULL OR (
+        u.email NOT ILIKE '%@example.com'
+        AND u.email NOT ILIKE '%@test.com'
+        AND u.email NOT ILIKE 'conativer+%@gmail.com'
+        AND u.email <> 'conativer@gmail.com'
+        AND u.email NOT ILIKE '%+test%@%'
+        AND u.email NOT ILIKE '%+e2e%@%'
+      )
+    )`;
+
+    const { rows: [funnel] } = await pool.query(
+      `WITH cohort AS (
+         SELECT u.id, u.created_at, u.last_activity, u.auth_provider, u.device_type
+         FROM users u
+         WHERE u.created_at >= NOW() - INTERVAL '${interval}'
+           AND u.deleted_at IS NULL AND ${TEST_FILTER}
+       )
+       SELECT
+         (SELECT COUNT(*) FROM cohort) AS signups,
+         (SELECT COUNT(*) FROM cohort WHERE last_activity > created_at + INTERVAL '5 minutes') AS returned,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE EXISTS (SELECT 1 FROM user_companions uc WHERE uc.user_id = c.id)) AS companion_created,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE EXISTS (SELECT 1 FROM messages m JOIN conversations cv ON cv.id=m.conversation_id
+                          WHERE cv.user_id = c.id AND m.role='user')) AS first_message_sent,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE (SELECT COUNT(*) FROM messages m JOIN conversations cv ON cv.id=m.conversation_id
+                   WHERE cv.user_id = c.id AND m.role='user') >= 5) AS msgs_5plus,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE (SELECT COUNT(*) FROM messages m JOIN conversations cv ON cv.id=m.conversation_id
+                   WHERE cv.user_id = c.id AND m.role='user') >= 20) AS msgs_20plus,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE EXISTS (SELECT 1 FROM user_events e WHERE e.user_id = c.id AND e.event_type = 'paywall_blocked')) AS paywall_blocked,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE EXISTS (SELECT 1 FROM user_events e WHERE e.user_id = c.id AND e.event_type = 'tip_requested')) AS tip_requested,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE EXISTS (SELECT 1 FROM subscriptions s
+                          WHERE s.user_id = c.id AND s.status IN ('active','trialing','past_due'))) AS subscribed,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE EXISTS (SELECT 1 FROM tips t WHERE t.user_id = c.id AND t.status='succeeded')) AS tipped,
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c
+            WHERE EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = c.id)
+              AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = c.id
+                              AND s.status IN ('active','trialing','past_due'))) AS sub_churned`
+    );
+
+    const { rows: byProvider } = await pool.query(
+      `SELECT COALESCE(u.auth_provider, '(none)') AS auth_provider,
+              COUNT(*) AS signups,
+              COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM messages m JOIN conversations cv ON cv.id=m.conversation_id
+                                             WHERE cv.user_id = u.id AND m.role='user')) AS sent_msg,
+              COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM subscriptions s
+                                             WHERE s.user_id = u.id AND s.status IN ('active','trialing','past_due'))) AS subscribed
+       FROM users u
+       WHERE u.created_at >= NOW() - INTERVAL '${interval}'
+         AND u.deleted_at IS NULL AND ${TEST_FILTER}
+       GROUP BY u.auth_provider ORDER BY signups DESC`
+    );
+
+    const { rows: byDevice } = await pool.query(
+      `SELECT COALESCE(u.device_type, '(unknown)') AS device_type,
+              COUNT(*) AS signups,
+              COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM messages m JOIN conversations cv ON cv.id=m.conversation_id
+                                             WHERE cv.user_id = u.id AND m.role='user')) AS sent_msg,
+              COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM subscriptions s
+                                             WHERE s.user_id = u.id AND s.status IN ('active','trialing','past_due'))) AS subscribed
+       FROM users u
+       WHERE u.created_at >= NOW() - INTERVAL '${interval}'
+         AND u.deleted_at IS NULL AND ${TEST_FILTER}
+       GROUP BY u.device_type ORDER BY signups DESC`
+    );
+
+    const { rows: histogram } = await pool.query(
+      `WITH counted AS (
+         SELECT u.id,
+                COALESCE((SELECT COUNT(*) FROM messages m JOIN conversations cv ON cv.id=m.conversation_id
+                          WHERE cv.user_id = u.id AND m.role='user'), 0) AS msgs
+         FROM users u
+         WHERE u.created_at >= NOW() - INTERVAL '${interval}'
+           AND u.deleted_at IS NULL AND ${TEST_FILTER}
+           AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = u.id)
+       )
+       SELECT bucket, COUNT(*)::int AS users
+       FROM (
+         SELECT CASE
+           WHEN msgs = 0 THEN '0'
+           WHEN msgs BETWEEN 1 AND 2 THEN '1-2'
+           WHEN msgs BETWEEN 3 AND 5 THEN '3-5'
+           WHEN msgs BETWEEN 6 AND 10 THEN '6-10'
+           WHEN msgs BETWEEN 11 AND 20 THEN '11-20'
+           ELSE '20+'
+         END AS bucket
+         FROM counted
+       ) t
+       GROUP BY bucket
+       ORDER BY MIN(CASE bucket WHEN '0' THEN 0 WHEN '1-2' THEN 1 WHEN '3-5' THEN 2
+                                WHEN '6-10' THEN 3 WHEN '11-20' THEN 4 ELSE 5 END)`
+    );
+
+    const { rows: eventCounts } = await pool.query(
+      `SELECT event_type, COUNT(*)::int AS total, COUNT(DISTINCT user_id)::int AS unique_users
+       FROM user_events
+       WHERE created_at >= NOW() - INTERVAL '${interval}'
+       GROUP BY event_type ORDER BY total DESC`
+    );
+
+    const toInt = (v) => parseInt(v || 0, 10);
+    res.json({
+      days,
+      funnel: {
+        signups: toInt(funnel.signups),
+        returned: toInt(funnel.returned),
+        companion_created: toInt(funnel.companion_created),
+        first_message_sent: toInt(funnel.first_message_sent),
+        msgs_5plus: toInt(funnel.msgs_5plus),
+        msgs_20plus: toInt(funnel.msgs_20plus),
+        paywall_blocked: toInt(funnel.paywall_blocked),
+        tip_requested: toInt(funnel.tip_requested),
+        subscribed: toInt(funnel.subscribed),
+        tipped: toInt(funnel.tipped),
+        sub_churned: toInt(funnel.sub_churned),
+      },
+      byProvider: byProvider.map(r => ({
+        auth_provider: r.auth_provider,
+        signups: toInt(r.signups),
+        sent_msg: toInt(r.sent_msg),
+        subscribed: toInt(r.subscribed),
+      })),
+      byDevice: byDevice.map(r => ({
+        device_type: r.device_type,
+        signups: toInt(r.signups),
+        sent_msg: toInt(r.sent_msg),
+        subscribed: toInt(r.subscribed),
+      })),
+      histogram: histogram.map(r => ({ bucket: r.bucket, users: r.users })),
+      eventCounts: eventCounts.map(r => ({
+        event_type: r.event_type,
+        total: r.total,
+        unique_users: r.unique_users,
+      })),
+    });
+  } catch (err) {
+    console.error('[admin] funnel error:', err.message);
+    res.status(500).json({ error: 'Failed to load funnel' });
+  }
+});
+
 // -- GET /api/admin/online-history ------------------------
 router.get('/online-history', async (req, res) => {
   const pool = getPool();

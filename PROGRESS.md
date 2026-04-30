@@ -21,7 +21,10 @@ analysis can answer the question without reading transcripts by hand.
 - [x] `npm run test:e2e:api` — 28/28 green
 - [x] `npm run test:e2e:ai` — 131/131 green
 - [x] node syntax check — all modified modules load
-- [ ] Commit + push (deploy applies migration v60 on Heroku boot)
+- [x] Commit + push (9434f3e); migration v60 applied on Heroku boot
+- [x] Admin: `GET /api/admin/funnel?days=N` endpoint with funnel stages, by-provider, by-device, histogram, eventCounts (test-user filtered)
+- [x] Admin: new "Funnel" tab in `public/admin.html` with 1d/7d/30d/90d/1y period selector, drop-off table, breakdowns
+- [x] Verified shape locally + funnel SQL against prod (51 signups, 4 sub_churned matches prior analysis; 2 first_message_sent events already captured post-deploy)
 
 ## Auth heartbeat 401 loop + companion-create skeleton (2026-04-24)
 
