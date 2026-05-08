@@ -2,15 +2,33 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## QA fixes round 2: subscription label + deliverability tests (2026-05-08)
+
+QA report v2: `.mystack/qa-reports/qa-report-lovetta-local-2026-05-08-v2.md` (health 92/100). The one observation (Profile shows "Active" for free users in dev) is fixed plus the suggested unit-test gap is filled.
+
+- [x] `web/src/pages/Profile.jsx` — Subscription card now requires `subscription.plan` (not just `hasSubscription`) before rendering "Active"; falls through to "No active plan / Try Free" otherwise. Fixes the dev-mode mislabel where `isSubscriptionActive` returns true for unpaid users to allow access.
+- [x] `web/src/pages/Home.jsx` — Same condition tightening on the Subscription card label and Manage/Subscribe button.
+- [x] `e2e/ai.test.js` — Added 10 unit tests for `isCompanionEmailDeliverable`: empty/whitespace, test+QA emails, relay (telegram/apple) emails, `email_disabled`, `marketing_unsubscribed`, synthetic with/without `real_email`, normal emails, `to_email` fallback shape, case insensitivity.
+- [x] `npm run test:e2e:ai` — 146/146 green (was 136 before)
+
+## Test Email Send (2026-05-08)
+
+- [x] Confirm email helper export and current worktree state
+- [x] Send one internal test email
+- [x] Record send result
+- Result: accepted by email provider with id `d0b9c7ff-df1b-4ffa-864a-49526cc1eb45`.
+
 ## Email Notification Default-On Fix (2026-05-08)
 
 - [x] Update `plan.md` and `PROGRESS.md` with implementation scope before code changes
-- [ ] Add a migration that sets `notify_new_messages` default to `true` and backfills existing users
-- [ ] Make missing preference rows behave as email notifications enabled in the API and notification send paths
-- [ ] Add deliverability/opt-out guards before sending companion notification emails
-- [ ] Send reactivation companion emails for eligible dormant free users, with the existing reactivation cooldown
-- [ ] Run the smallest relevant test bucket
-- [ ] Update `plan.md` and `PROGRESS.md` with final status and verification
+- [x] Add a migration that sets `notify_new_messages` default to `true` and backfills existing users
+- [x] Make missing preference rows behave as email notifications enabled in the API and notification send paths
+- [x] Add deliverability/opt-out guards before sending companion notification emails
+- [x] Send reactivation companion emails for eligible dormant free users, with the existing reactivation cooldown
+- [x] Run the smallest relevant test bucket
+- [x] Update `plan.md` and `PROGRESS.md` with final status and verification
+- Notes: Added `v62_email_notifications_default_on`, defaulted missing preference rows to email-on, upserted `last_notification_at` for missing rows, added companion email deliverability guards, and added email delivery to free-user reactivation.
+- Verification: syntax checks passed for touched server files; `npm run test:e2e:api` passed (30/30).
 
 ## QA fixes for `62c260e` chat research improvements (2026-05-08)
 

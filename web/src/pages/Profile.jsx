@@ -410,7 +410,7 @@ export default function Profile() {
           <h3 className="text-sm font-semibold text-brand-text mb-3">Subscription</h3>
           {subLoading ? (
             <p className="text-sm text-brand-muted">Loading...</p>
-          ) : subscription?.hasSubscription ? (
+          ) : subscription?.hasSubscription && subscription?.plan ? (
             <>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-brand-success font-semibold">Active</span>

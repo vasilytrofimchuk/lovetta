@@ -1550,3 +1550,78 @@ test.describe('Chat Intelligence — intent, pacing, and safety', () => {
     expect(text).toContain('imagine');
   });
 });
+
+// ============================================================
+// Email deliverability — isCompanionEmailDeliverable
+// ============================================================
+
+test.describe('Email Deliverability — isCompanionEmailDeliverable', () => {
+  const { isCompanionEmailDeliverable } = require('../server/src/email-deliverability');
+
+  test('rejects empty email', () => {
+    expect(isCompanionEmailDeliverable({ email: '' })).toBe(false);
+    expect(isCompanionEmailDeliverable({})).toBe(false);
+    expect(isCompanionEmailDeliverable({ email: '   ' })).toBe(false);
+  });
+
+  test('rejects test/QA emails', () => {
+    expect(isCompanionEmailDeliverable({ email: 'conativer+qa@gmail.com' })).toBe(false);
+    expect(isCompanionEmailDeliverable({ email: 'conativer@gmail.com' })).toBe(false);
+    expect(isCompanionEmailDeliverable({ email: 'foo@example.com' })).toBe(false);
+    expect(isCompanionEmailDeliverable({ email: 'foo@test.com' })).toBe(false);
+  });
+
+  test('rejects relay emails (telegram, apple)', () => {
+    expect(isCompanionEmailDeliverable({ email: 'tg-12345@telegram.lovetta.ai' })).toBe(false);
+    expect(isCompanionEmailDeliverable({ email: 'apple_xyz@apple.lovetta.ai' })).toBe(false);
+  });
+
+  test('rejects when email_disabled is true', () => {
+    expect(isCompanionEmailDeliverable({
+      email: 'real@user.com', email_disabled: true,
+    })).toBe(false);
+  });
+
+  test('rejects when marketing_unsubscribed is true', () => {
+    expect(isCompanionEmailDeliverable({
+      email: 'real@user.com', marketing_unsubscribed: true,
+    })).toBe(false);
+  });
+
+  test('rejects synthetic email_type without real_email', () => {
+    expect(isCompanionEmailDeliverable({
+      email: 'synth@apple.lovetta.ai', email_type: 'synthetic',
+    })).toBe(false);
+    expect(isCompanionEmailDeliverable({
+      email: 'fallback@user.com', email_type: 'synthetic', real_email: null,
+    })).toBe(false);
+  });
+
+  test('accepts synthetic email_type when row.email matches real_email', () => {
+    expect(isCompanionEmailDeliverable({
+      email: 'real@user.com',
+      email_type: 'synthetic',
+      real_email: 'real@user.com',
+    })).toBe(true);
+  });
+
+  test('accepts a normal user email', () => {
+    expect(isCompanionEmailDeliverable({
+      email: 'real@user.com',
+      email_disabled: false,
+      marketing_unsubscribed: false,
+      email_type: 'real',
+    })).toBe(true);
+  });
+
+  test('handles to_email field as fallback for email', () => {
+    // Production callers sometimes pass { to_email } shape
+    expect(isCompanionEmailDeliverable({ to_email: 'real@user.com' })).toBe(true);
+    expect(isCompanionEmailDeliverable({ to_email: 'foo@example.com' })).toBe(false);
+  });
+
+  test('is case-insensitive on email', () => {
+    expect(isCompanionEmailDeliverable({ email: 'CONATIVER+QA@GMAIL.COM' })).toBe(false);
+    expect(isCompanionEmailDeliverable({ email: 'Real@USER.com' })).toBe(true);
+  });
+});

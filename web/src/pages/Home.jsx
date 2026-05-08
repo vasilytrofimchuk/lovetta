@@ -58,15 +58,15 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-sm text-brand-text-secondary">Subscription</span>
-                <p className={`font-semibold ${subscription.hasSubscription ? 'text-brand-success' : 'text-brand-muted'}`}>
-                  {subscription.hasSubscription ? `${subscription.plan} — Active` : 'No subscription'}
+                <p className={`font-semibold ${subscription.hasSubscription && subscription.plan ? 'text-brand-success' : 'text-brand-muted'}`}>
+                  {subscription.hasSubscription && subscription.plan ? `${subscription.plan} — Active` : 'No subscription'}
                 </p>
               </div>
               <button
                 onClick={() => setShowPricing(true)}
                 className="px-4 py-2 rounded-lg bg-brand-accent text-white text-sm font-medium hover:bg-brand-accent-hover transition-colors"
               >
-                {subscription.hasSubscription ? 'Manage' : 'Subscribe'}
+                {subscription.hasSubscription && subscription.plan ? 'Manage' : 'Subscribe'}
               </button>
             </div>
           </div>
