@@ -2,6 +2,44 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Email Notification Default-On Fix (2026-05-08)
+
+- [x] Update `plan.md` and `PROGRESS.md` with implementation scope before code changes
+- [ ] Add a migration that sets `notify_new_messages` default to `true` and backfills existing users
+- [ ] Make missing preference rows behave as email notifications enabled in the API and notification send paths
+- [ ] Add deliverability/opt-out guards before sending companion notification emails
+- [ ] Send reactivation companion emails for eligible dormant free users, with the existing reactivation cooldown
+- [ ] Run the smallest relevant test bucket
+- [ ] Update `plan.md` and `PROGRESS.md` with final status and verification
+
+## QA fixes for `62c260e` chat research improvements (2026-05-08)
+
+QA report: `.mystack/qa-reports/qa-report-lovetta-local-2026-05-08.md` (health 84/100).
+
+- [x] Issue 1 (medium): gate value prompt on `userMessageCount >= 3` so free users don't get an upgrade card on the very first message
+  - `server/src/chat-api.js:pickValuePromptReason` — short-circuit when under threshold
+  - `server/src/chat-intelligence.js:maybeCreateValuePrompt` — centralized gate (defense-in-depth, also covers `/request-media` call site)
+- [x] Issue 2 (low): admin `chat-insights` `valuePrompts` + `mediaFailures` queries didn't apply `testUserFilter` — joined `users` and added the filter so QA traffic doesn't pollute prod analytics
+- [x] Issue 3 (low): perceived media-placeholder latency on first turn — partly mitigated by Issue 1 fix (no value-prompt card now stacks under the placeholder), no further code change
+- [x] Syntax checks pass on all 3 modified files
+- [x] `npm run test:e2e:ai` — 136/136 green
+- [x] `npm run test:e2e:api` — 29/29 green
+- [x] Verified in browser: fresh signup → 1st msg gets clean reply (no Unlock card) → 3rd msg with media intent → "Unlock Premium" fires. Screenshots: `screenshots/17-fixed-first-msg.png`, `screenshots/18-fixed-3rd-msg.png`
+- [x] Verified admin filter: 2 value_prompt_events exist in DB (both from QA test users), `/api/admin/chat-insights` returns `valuePrompts: []`
+
+## Email + Push Return Analysis (2026-05-08)
+
+- [x] Update `plan.md` and `PROGRESS.md` with research scope before analysis
+- [x] Trace email notification, push notification, proactive, and reactivation code paths
+- [x] Identify the production tables/columns that can measure notification reach
+- [x] Run read-only aggregate SQL for opt-in, token availability, notification sends, and returns
+- [x] Interpret whether notifications correlate with users returning
+- [x] Update `plan.md` and `PROGRESS.md` with final findings
+- Findings: prod snapshot 2026-05-08 15:51 UTC shows 527 real users, 4 with `notify_new_messages`, 4 deliverable by email, 38 with APNs tokens, 0 with web push tokens, 3 with both notify+push, and only 1 user ever marked with `last_notification_at`.
+- Return signal: matured proactive messages had 7/110 replies within 72h (6.4%); subset with a push token at send time had 6/32 replies (18.8%), versus 1/78 (1.3%) without push-token availability. This is directional only because push sends are not logged and the push-token cohort is tiny.
+- Reactivation: 16 `reactivation_messages` rows exist from the new reactivation job, with 0 `responded_at` so far; the real-user proactive-slot view counted 10 reactivation messages and 0 replies. Too early to judge.
+- Verification: read-only aggregate production SQL only; no runtime code changed, tests skipped.
+
 ## Execute Chat Research Improvements P0-P2 (2026-05-08)
 
 - [x] Update `plan.md` and `PROGRESS.md` with full implementation scope before code changes

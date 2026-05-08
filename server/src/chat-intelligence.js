@@ -284,6 +284,10 @@ async function updateUserStyleProfile(pool, { userId, analysis, recentMessages =
   }
 }
 
+// Free users shouldn't see the upgrade card before they've engaged.
+// Centralized so every call site (regular send, /request-media, etc.) is gated.
+const VALUE_PROMPT_MIN_USER_MESSAGES = 3;
+
 async function maybeCreateValuePrompt(pool, { userId, companionId, conversationId, subscription, reason, metadata = {} } = {}) {
   if (!pool || !userId || !companionId || !conversationId || !reason || subscription?.status === 'active' || subscription?.status === 'trialing' || subscription?.status === 'canceling') {
     return null;
@@ -292,6 +296,13 @@ async function maybeCreateValuePrompt(pool, { userId, companionId, conversationI
     const { rows: settings } = await pool.query(`SELECT value FROM app_settings WHERE key = 'value_prompt_enabled'`);
     const enabled = settings.length ? settings[0].value !== false && settings[0].value !== 'false' : true;
     if (!enabled) return null;
+
+    const { rows: [counts] } = await pool.query(
+      `SELECT COUNT(*)::int AS user_messages FROM messages
+       WHERE conversation_id = $1 AND role = 'user'`,
+      [conversationId]
+    );
+    if ((counts?.user_messages || 0) < VALUE_PROMPT_MIN_USER_MESSAGES) return null;
 
     const { rows: recent } = await pool.query(
       `SELECT 1 FROM value_prompt_events

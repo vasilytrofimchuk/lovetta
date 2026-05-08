@@ -88,6 +88,32 @@ Implement the research recommendations across chat quality, memory, media, monet
 
 ---
 
+## Email + Push Return Analysis (2026-05-08) — DONE
+
+Measure how Lovetta notification channels currently work and whether they bring users back.
+
+- Code-path result: normal chat notifications are gated by `notify_new_messages`, email presence, 5+ minutes inactive, and a 30-minute notification cap; after sending the companion email, the app also attempts web/APNs push.
+- Proactive subscribed-user messages always attempt push and optionally send email if the user is email-reachable and rate-limit eligible.
+- Free-user reactivation messages attempt push/Telegram only; they do not send email.
+- Production snapshot 2026-05-08 15:51 UTC: 527 real users, 4 email-notification opt-ins, 4 deliverable email users, 38 APNs push users, 0 web-push users, 3 users with both notify+push, and 1 user ever marked with `last_notification_at`.
+- Return signal: matured proactive messages reply at 7/110 within 72h (6.4%); messages where the user had a push token at send time reply at 6/32 (18.8%), versus 1/78 (1.3%) without push-token availability. Treat as directional, not causal, because push send success is not logged and the cohort is small.
+- Reactivation: 16 rows in `reactivation_messages`, 0 responses so far; real-user proactive-slot view counted 10 reactivation messages, also 0 replies.
+- Verification: read-only aggregate production SQL only; no private transcript contents inspected; no runtime code changed.
+
+---
+
+## Email Notification Default-On Fix (2026-05-08) — IN PROGRESS
+
+Turn companion email notifications on by default and backfill existing users so email can actually become a return channel.
+
+- Add a DB migration that changes `user_preferences.notify_new_messages` default to `true`, creates missing preference rows for existing users, and forces existing non-deleted users to `notify_new_messages = true`.
+- Update API fallbacks and notification queries so missing preference rows default to enabled.
+- Keep hard deliverability safeguards: do not send companion emails to disabled email addresses, synthetic relay addresses, app relay domains, or marketing-unsubscribed users.
+- Add companion email delivery to free-user reactivation messages so dormant high-intent users get an email, not just push/Telegram.
+- Verify with the relevant API test bucket.
+
+---
+
 ## Chat Quality Fixes — level-aware recovery + memory extension (2026-04-22) — IN PROGRESS
 
 Plan approved. Two batches.

@@ -75,7 +75,13 @@ function fallbackMediaDescription(mediaType, content) {
   return 'a flirty selfie, looking at camera with a playful expression';
 }
 
+// Don't ask a free user to upgrade until they've actually engaged.
+// On the very first turn, even a media-intent message shouldn't surface
+// the upgrade card — first impression is too important.
+const MIN_USER_MESSAGES_FOR_VALUE_PROMPT = 3;
+
 function pickValuePromptReason(analysis, userMessageCount, mediaRequest) {
+  if (userMessageCount < MIN_USER_MESSAGES_FOR_VALUE_PROMPT) return null;
   if (analysis?.mediaIntent || mediaRequest) return 'media_request';
   if (analysis?.needsSceneState && userMessageCount >= 8) return 'long_scene';
   if (userMessageCount >= 20) return 'high_intent_20_messages';

@@ -250,20 +250,25 @@ router.get('/chat-insights', async (req, res) => {
     `, params);
 
     const { rows: mediaFailures } = await pool.query(`
-      SELECT COALESCE(media_error, 'unknown') AS reason, COUNT(*)::int AS count
-      FROM messages
-      WHERE media_error IS NOT NULL
-        AND created_at >= NOW() - ($1 || ' days')::INTERVAL
+      SELECT COALESCE(m.media_error, 'unknown') AS reason, COUNT(*)::int AS count
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      JOIN users u ON u.id = c.user_id
+      WHERE m.media_error IS NOT NULL
+        AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
       GROUP BY reason
       ORDER BY count DESC
       LIMIT 12
     `, params);
 
     const { rows: valuePrompts } = await pool.query(`
-      SELECT reason, COUNT(*)::int AS shown, COUNT(converted_at)::int AS converted
-      FROM value_prompt_events
-      WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL
-      GROUP BY reason
+      SELECT vpe.reason, COUNT(*)::int AS shown, COUNT(vpe.converted_at)::int AS converted
+      FROM value_prompt_events vpe
+      JOIN users u ON u.id = vpe.user_id
+      WHERE vpe.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+      GROUP BY vpe.reason
       ORDER BY shown DESC
     `, params);
 
