@@ -500,6 +500,10 @@
         <div class="section"><h3>Top girls picked (template / custom)</h3><div id="girls-template"></div></div>
         <div class="section"><h3>Top voices picked</h3><div id="girls-voice"></div></div>
       </div>
+      <div class="section" style="margin-top:24px;">
+        <h3>Top custom avatars</h3>
+        <div id="girls-custom-avatar"></div>
+      </div>
     </div>
 
     <!-- Reports Tab -->
@@ -1916,7 +1920,7 @@
         });
       }
 
-      ['template','voice'].forEach(function(id) {
+      ['template','voice','custom-avatar'].forEach(function(id) {
         document.getElementById('girls-' + id).innerHTML = '<p style="color:var(--muted);padding:16px;">Loading...</p>';
       });
 
@@ -1972,11 +1976,42 @@
         '</tr>';
       }
 
+      function customAvatarThumb(url) {
+        if (!url) return '<div style="width:64px;height:64px;border-radius:8px;background:var(--bg-secondary);"></div>';
+        return '<img src="' + esc(url) + '" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;display:block;" loading="lazy">';
+      }
+
+      function attrBadge(value) {
+        if (!value) return '';
+        return '<span style="display:inline-block;padding:1px 6px;margin:1px 2px 1px 0;border-radius:4px;font-size:0.65rem;background:rgba(214,51,108,0.10);color:var(--accent);">' + esc(value) + '</span>';
+      }
+
+      function customAvatarRow(r, total) {
+        var pct = total > 0 ? Math.round((r.picks / total) * 1000) / 10 : 0;
+        var inactive = r.is_active === false ? '<span style="display:inline-block;padding:1px 6px;margin-left:4px;border-radius:4px;font-size:0.65rem;background:rgba(255,77,106,0.15);color:var(--error);">retired</span>' : '';
+        var unknown = r.avatar_id == null ? '<span style="display:inline-block;padding:1px 6px;margin-left:4px;border-radius:4px;font-size:0.65rem;background:rgba(140,140,140,0.15);color:var(--muted);">user-uploaded</span>' : '';
+        return '<tr>' +
+          '<td>' + customAvatarThumb(r.avatar_url) + '</td>' +
+          '<td>' +
+            (r.style ? attrBadge(r.style) : '') +
+            (r.hair ? attrBadge('hair: ' + r.hair) : '') +
+            (r.skin ? attrBadge('skin: ' + r.skin) : '') +
+            (r.age ? attrBadge('age: ' + r.age) : '') +
+            inactive + unknown +
+          '</td>' +
+          '<td><strong>' + formatNumber(r.picks) + '</strong></td>' +
+          '<td>' + formatNumber(r.users) + '</td>' +
+          '<td>' + pct + '%</td>' +
+        '</tr>';
+      }
+
       apiFetch('/api/admin/companion-usage?days=' + girlsDays).then(function(data) {
         var templates = data.byTemplate || [];
         var voices = data.byVoice || [];
+        var customAvatars = data.byCustomAvatar || [];
         var templateTotal = templates.reduce(function(s, r) { return s + (r.picks || 0); }, 0);
         var voiceTotal = voices.reduce(function(s, r) { return s + (r.picks || 0); }, 0);
+        var customTotal = customAvatars.reduce(function(s, r) { return s + (r.picks || 0); }, 0);
 
         if (!templates.length) {
           document.getElementById('girls-template').innerHTML = '<p style="color:var(--muted);padding:16px;">No picks in this window.</p>';
@@ -1995,8 +2030,17 @@
           v += '</table>';
           document.getElementById('girls-voice').innerHTML = v;
         }
+
+        if (!customAvatars.length) {
+          document.getElementById('girls-custom-avatar').innerHTML = '<p style="color:var(--muted);padding:16px;">No custom-avatar picks in this window.</p>';
+        } else {
+          var ca = '<table style="font-size:0.85rem;"><tr><th>Avatar</th><th>Attributes</th><th>Picks</th><th>Users</th><th>Share of customs</th></tr>';
+          customAvatars.forEach(function(r) { ca += customAvatarRow(r, customTotal); });
+          ca += '</table>';
+          document.getElementById('girls-custom-avatar').innerHTML = ca;
+        }
       }).catch(function(err) {
-        ['template','voice'].forEach(function(id) {
+        ['template','voice','custom-avatar'].forEach(function(id) {
           document.getElementById('girls-' + id).innerHTML = '<p style="color:var(--error);padding:16px;">Failed: ' + esc(err.message || 'unknown') + '</p>';
         });
       });

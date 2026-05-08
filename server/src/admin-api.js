@@ -406,7 +406,33 @@ router.get('/companion-usage', async (req, res) => {
       };
     });
 
-    res.json({ days, byTemplate, byVoice });
+    // Top custom avatars — only rows where template_id IS NULL,
+    // grouped by avatar_url. JOIN custom_avatars to get hair/skin/style/age.
+    const { rows: byCustomAvatar } = await pool.query(`
+      SELECT
+        uc.avatar_url,
+        ca.id AS avatar_id,
+        ca.hair,
+        ca.skin,
+        ca.style,
+        ca.age,
+        ca.is_active,
+        COUNT(*)::int AS picks,
+        COUNT(DISTINCT uc.user_id)::int AS users
+      FROM user_companions uc
+      LEFT JOIN custom_avatars ca ON ca.image_url = uc.avatar_url
+      JOIN users u ON u.id = uc.user_id
+      WHERE u.deleted_at IS NULL
+        AND uc.template_id IS NULL
+        AND uc.avatar_url IS NOT NULL
+        AND uc.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+      GROUP BY uc.avatar_url, ca.id, ca.hair, ca.skin, ca.style, ca.age, ca.is_active
+      ORDER BY picks DESC
+      LIMIT 30
+    `, params);
+
+    res.json({ days, byTemplate, byVoice, byCustomAvatar });
   } catch (err) {
     console.error('[admin] companion-usage error:', err.message);
     res.status(500).json({ error: 'Failed to load companion usage' });
