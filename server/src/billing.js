@@ -28,6 +28,22 @@ const PLANS = {
 const TIP_AMOUNTS = [999, 1999, 4999, 9999]; // cents
 const IOS_TIP_INTENT_LIFETIME_MINUTES = 30;
 
+async function markRecentValuePromptsConverted(pool, userId) {
+  if (!pool || !userId) return;
+  try {
+    await pool.query(
+      `UPDATE value_prompt_events
+       SET converted_at = COALESCE(converted_at, NOW())
+       WHERE user_id = $1
+         AND converted_at IS NULL
+         AND created_at > NOW() - INTERVAL '14 days'`,
+      [userId]
+    );
+  } catch (err) {
+    console.warn('[billing] value prompt conversion update failed:', err.message);
+  }
+}
+
 // -- Checkout sessions ------------------------------------
 
 async function createSubscriptionCheckout(userId, plan, email) {
@@ -561,6 +577,7 @@ async function handleWebhook(rawBody, signature) {
              trial_ends_at = COALESCE($6, subscriptions.trial_ends_at), updated_at = NOW()`,
           [userId, plan, subId, customerId, periodEnd, trialEnd]
         );
+        await markRecentValuePromptsConverted(pool, userId);
         console.log(`[billing] Subscription created: user=${userId} plan=${plan}`);
         // Tracker event (non-blocking)
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
@@ -643,6 +660,7 @@ async function handleWebhook(rawBody, signature) {
            current_period_end = $5, trial_ends_at = $6, updated_at = NOW()`,
         [userId, plan, sub.id, sub.customer, periodEnd, trialEnd]
       );
+      await markRecentValuePromptsConverted(pool, userId);
       console.log(`[billing] Subscription created (sub event): user=${userId} plan=${plan}`);
       break;
     }
@@ -807,6 +825,7 @@ async function handleRevenueCatWebhook(body, authHeader) {
         subscriberId,
         expiresAt,
       });
+      await markRecentValuePromptsConverted(pool, userId);
       console.log(`[revenuecat] ${rcType}: user=${userId} plan=${plan}`);
 
       // Tracker event for initial iOS purchase (production only — sandbox renewals fire daily and pollute analytics)

@@ -27,6 +27,18 @@ test.describe('Admin API', () => {
     expect(data.settings.text_level_web).toBeDefined();
   });
 
+  test('GET /api/admin/chat-insights returns aggregate data', async ({ request }) => {
+    const res = await request.get(`${BASE}/api/admin/chat-insights?days=7`, {
+      headers: adminHeaders(),
+    });
+    expect(res.ok()).toBeTruthy();
+    const data = await res.json();
+    expect(data.summary).toBeDefined();
+    expect(Array.isArray(data.topics)).toBeTruthy();
+    expect(Array.isArray(data.languages)).toBeTruthy();
+    expect(data.summary.user_messages).toBeDefined();
+  });
+
   test('PUT /api/admin/settings updates a setting', async ({ request }) => {
     const res = await request.put(`${BASE}/api/admin/settings`, {
       headers: adminHeaders(),

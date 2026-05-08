@@ -1232,6 +1232,72 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_user_events_type ON user_events(event_type, created_at);
     `,
   },
+  {
+    name: 'v61_chat_research_improvements',
+    sql: `
+      CREATE TABLE IF NOT EXISTS conversation_scene_state (
+        conversation_id    UUID PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE,
+        language           TEXT,
+        active_roleplay    BOOLEAN DEFAULT FALSE,
+        scene_state        JSONB DEFAULT '{}'::jsonb,
+        last_user_intent   TEXT,
+        last_updated_at    TIMESTAMPTZ DEFAULT NOW(),
+        created_at         TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_scene_state_active ON conversation_scene_state(active_roleplay, last_updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_scene_state_json ON conversation_scene_state USING GIN(scene_state);
+
+      ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS preferred_language TEXT;
+      ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS preferred_media_type TEXT;
+      ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS response_depth TEXT;
+      ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS preferred_companion_style TEXT;
+      ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS last_style_observed_at TIMESTAMPTZ;
+
+      CREATE TABLE IF NOT EXISTS value_prompt_events (
+        id              BIGSERIAL PRIMARY KEY,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        companion_id    UUID REFERENCES user_companions(id) ON DELETE SET NULL,
+        conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+        prompt_type     TEXT NOT NULL,
+        reason          TEXT NOT NULL,
+        surface         TEXT DEFAULT 'chat',
+        metadata        JSONB DEFAULT '{}'::jsonb,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        converted_at    TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_value_prompt_user ON value_prompt_events(user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_value_prompt_reason ON value_prompt_events(reason, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS reactivation_messages (
+        id              BIGSERIAL PRIMARY KEY,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        companion_id    UUID REFERENCES user_companions(id) ON DELETE SET NULL,
+        conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+        message_id      UUID REFERENCES messages(id) ON DELETE SET NULL,
+        reason          TEXT NOT NULL,
+        status          TEXT DEFAULT 'sent',
+        metadata        JSONB DEFAULT '{}'::jsonb,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        responded_at    TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_reactivation_user ON reactivation_messages(user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_reactivation_conversation ON reactivation_messages(conversation_id, created_at DESC);
+
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS language TEXT;
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS intent_tags TEXT[] DEFAULT '{}'::TEXT[];
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS quality_flags TEXT[] DEFAULT '{}'::TEXT[];
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_intent TEXT;
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS monetization_prompt_reason TEXT;
+      CREATE INDEX IF NOT EXISTS idx_messages_language ON messages(language, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_messages_intent_tags ON messages USING GIN(intent_tags);
+
+      INSERT INTO app_settings (key, value) VALUES
+        ('value_prompt_enabled', 'true'::jsonb),
+        ('free_reactivation_enabled', 'true'::jsonb),
+        ('chat_insights_enabled', 'true'::jsonb)
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

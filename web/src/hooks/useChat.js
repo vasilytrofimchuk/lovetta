@@ -339,6 +339,16 @@ export default function useChat(companionId) {
           isTipPromo: true,
           created_at: new Date().toISOString(),
         });
+      } else if (event.valuePrompt) {
+        setTipPromoMessage({
+          id: 'value-prompt-' + Date.now(),
+          role: 'assistant',
+          content: event.valuePrompt.message,
+          context_text: null,
+          isValuePrompt: true,
+          valuePrompt: event.valuePrompt,
+          created_at: new Date().toISOString(),
+        });
       }
     }
 

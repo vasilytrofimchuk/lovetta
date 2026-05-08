@@ -306,6 +306,7 @@
       <button class="tab" data-tab="users" onclick="switchTab('users')">Users <span class="badge" id="users-badge" style="display:none;background:rgba(214,51,108,0.15);color:var(--accent);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="economics" onclick="switchTab('economics')">Economics</button>
       <button class="tab" data-tab="funnel" onclick="switchTab('funnel')">Funnel</button>
+      <button class="tab" data-tab="chat-insights" onclick="switchTab('chat-insights')">Chat Insights</button>
       <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
       <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="sentry" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
@@ -456,6 +457,30 @@
           <h3>Raw event counts (window)</h3>
           <div id="funnel-events"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Chat Insights Tab -->
+    <div id="tab-chat-insights" class="tab-content">
+      <div class="tab-header"><h2>Chat Insights</h2><button class="refresh-btn" onclick="loadChatInsights(chatInsightsDays||7)">↻ Refresh</button></div>
+      <div style="display:flex;gap:8px;margin-bottom:20px;">
+        <button class="econ-period" onclick="loadChatInsights(1, this)">1d</button>
+        <button class="econ-period active" onclick="loadChatInsights(7, this)">7d</button>
+        <button class="econ-period" onclick="loadChatInsights(30, this)">30d</button>
+        <button class="econ-period" onclick="loadChatInsights(90, this)">90d</button>
+      </div>
+      <div class="stat-cards" id="chat-insights-cards"></div>
+      <div class="breakdown-grid" style="margin-top:24px;">
+        <div class="section"><h3>User topics</h3><div id="chat-insights-topics"></div></div>
+        <div class="section"><h3>Languages</h3><div id="chat-insights-languages"></div></div>
+      </div>
+      <div class="breakdown-grid" style="margin-top:24px;">
+        <div class="section"><h3>Value prompts</h3><div id="chat-insights-value"></div></div>
+        <div class="section"><h3>Media failures</h3><div id="chat-insights-media"></div></div>
+      </div>
+      <div class="section" style="margin-top:24px;">
+        <h3>Free reactivation</h3>
+        <div id="chat-insights-reactivation"></div>
       </div>
     </div>
 
@@ -643,6 +668,7 @@
     var chatsFlaggedPage = 1;
     var chatsFlaggedCategory = '';
     var chatsFlaggedDays = 30;
+    var chatInsightsDays = 7;
     var supportPollInterval = null;
     var overviewPollInterval = null;
 
@@ -679,7 +705,7 @@
     function showDashboard() {
       document.getElementById('auth-gate').style.display = 'none';
       document.getElementById('dashboard').style.display = 'block';
-      var validTabs = ['overview','visitors','users','economics','settings','reports','sentry','email','companion-emails','cashouts','support','feedback','chats'];
+      var validTabs = ['overview','visitors','users','economics','funnel','chat-insights','settings','reports','sentry','email','companion-emails','cashouts','support','feedback','chats'];
       var hash = window.location.hash.slice(1);
       var initialTab = validTabs.indexOf(hash) !== -1 ? hash : 'overview';
       switchTab(initialTab);
@@ -708,6 +734,7 @@
       else if (name === 'sentry') loadSentry();
       else if (name === 'economics') loadEconomics(econPeriod || '7d');
       else if (name === 'funnel') loadFunnel(funnelDays || 7);
+      else if (name === 'chat-insights') loadChatInsights(chatInsightsDays || 7);
       else if (name === 'email') loadEmails();
       else if (name === 'companion-emails') loadCompanionEmails();
       else if (name === 'cashouts') loadCashouts();
@@ -1061,6 +1088,9 @@
       { key: 'enable_avatar_age_filter', label: 'Avatar Age Filter', desc: 'Show age filter in companion creation wizard' },
       { key: 'enable_avatar_skin_filter', label: 'Avatar Skin Filter', desc: 'Show skin tone filter in companion creation wizard' },
       { key: 'digest_enabled', label: 'Daily Admin Digest', desc: 'Send daily stats summary email to admin at 9:00 UTC' },
+      { key: 'value_prompt_enabled', label: 'Value Prompts', desc: 'Show subscription prompts after high-intent chat moments' },
+      { key: 'free_reactivation_enabled', label: 'Free Reactivation', desc: 'Send limited return prompts to dormant high-intent free users' },
+      { key: 'chat_insights_enabled', label: 'Chat Insights', desc: 'Enable aggregate chat insight instrumentation' },
     ];
 
     function loadSettings() {
@@ -1787,6 +1817,70 @@
         }
       }).catch(function(err) {
         stagesEl.innerHTML = '<p style="color:var(--error);padding:16px;">Failed to load funnel: ' + esc(err.message || 'unknown error') + '</p>';
+      });
+    }
+
+    function loadChatInsights(days, btn) {
+      chatInsightsDays = parseInt(days, 10) || 7;
+      document.querySelectorAll('#tab-chat-insights .econ-period').forEach(function(b) { b.classList.remove('active'); });
+      if (btn) btn.classList.add('active');
+      else {
+        document.querySelectorAll('#tab-chat-insights .econ-period').forEach(function(b) {
+          if (parseInt(b.textContent, 10) === chatInsightsDays) b.classList.add('active');
+        });
+      }
+
+      document.getElementById('chat-insights-cards').innerHTML = '<p style="color:var(--muted);padding:16px;">Loading...</p>';
+      ['topics','languages','value','media','reactivation'].forEach(function(id) {
+        document.getElementById('chat-insights-' + id).innerHTML = '';
+      });
+
+      function simpleTable(rows, cols, empty) {
+        if (!rows || !rows.length) return '<p style="color:var(--muted);padding:16px;">' + empty + '</p>';
+        var html = '<table style="font-size:0.85rem;"><tr>' + cols.map(function(c) { return '<th>' + esc(c.label) + '</th>'; }).join('') + '</tr>';
+        rows.forEach(function(r) {
+          html += '<tr>' + cols.map(function(c) {
+            var v = typeof c.value === 'function' ? c.value(r) : r[c.key];
+            return '<td>' + esc(v == null ? '—' : String(v)) + '</td>';
+          }).join('') + '</tr>';
+        });
+        return html + '</table>';
+      }
+
+      apiFetch('/api/admin/chat-insights?days=' + chatInsightsDays).then(function(data) {
+        var s = data.summary || {};
+        var re = data.reactivation || {};
+        document.getElementById('chat-insights-cards').innerHTML =
+          '<div class="card"><div class="label">Users</div><div class="value">' + formatNumber(s.users || 0) + '</div></div>' +
+          '<div class="card"><div class="label">User messages</div><div class="value">' + formatNumber(s.user_messages || 0) + '</div></div>' +
+          '<div class="card"><div class="label">Avg user chars</div><div class="value">' + Number(s.avg_user_chars || 0).toFixed(1) + '</div></div>' +
+          '<div class="card"><div class="label">Avg assistant chars</div><div class="value">' + Number(s.avg_assistant_chars || 0).toFixed(1) + '</div></div>' +
+          '<div class="card"><div class="label">Delivered media</div><div class="value">' + formatNumber(s.delivered_media || 0) + '</div></div>' +
+          '<div class="card"><div class="label">Media failures</div><div class="value">' + formatNumber(s.media_failures || 0) + '</div></div>';
+
+        document.getElementById('chat-insights-topics').innerHTML = simpleTable(data.topics || [], [
+          { key: 'topic', label: 'Topic' },
+          { key: 'count', label: 'Messages' }
+        ], 'No topic data');
+        document.getElementById('chat-insights-languages').innerHTML = simpleTable(data.languages || [], [
+          { key: 'language', label: 'Language' },
+          { key: 'count', label: 'Messages' }
+        ], 'No language data');
+        document.getElementById('chat-insights-value').innerHTML = simpleTable(data.valuePrompts || [], [
+          { key: 'reason', label: 'Reason' },
+          { key: 'shown', label: 'Shown' },
+          { key: 'converted', label: 'Converted' }
+        ], 'No value prompts');
+        document.getElementById('chat-insights-media').innerHTML = simpleTable(data.mediaFailures || [], [
+          { key: 'reason', label: 'Reason' },
+          { key: 'count', label: 'Messages' }
+        ], 'No media failures');
+        var rate = re.sent ? ((100 * (re.returned || 0) / re.sent).toFixed(1) + '%') : '—';
+        document.getElementById('chat-insights-reactivation').innerHTML =
+          '<table style="font-size:0.85rem;"><tr><th>Sent</th><th>Returned</th><th>Return rate</th></tr>' +
+          '<tr><td>' + formatNumber(re.sent || 0) + '</td><td>' + formatNumber(re.returned || 0) + '</td><td>' + rate + '</td></tr></table>';
+      }).catch(function(err) {
+        document.getElementById('chat-insights-cards').innerHTML = '<p style="color:var(--error);padding:16px;">Failed to load chat insights: ' + esc(err.message || 'unknown error') + '</p>';
       });
     }
 

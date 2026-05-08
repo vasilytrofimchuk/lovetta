@@ -2,6 +2,55 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Execute Chat Research Improvements P0-P2 (2026-05-08)
+
+- [x] Update `plan.md` and `PROGRESS.md` with full implementation scope before code changes
+- [x] Add DB migration for scene state, profile/style, value prompts, reactivation tracking, and insights metadata
+- [x] Implement adaptive reply pacing and anti-repetition guard
+- [x] Implement scene-state extraction/injection for active roleplay conversations
+- [x] Implement platform-aware taboo policy and aggregate counters
+- [x] Tighten media intent/reliability handling and media failure reason analytics
+- [x] Implement value-moment monetization prompts and outcome instrumentation
+- [x] Implement ethical free-user reactivation for high-intent dormant sessions
+- [x] Implement custom companion preference/flywheel data in APIs/UI
+- [x] Add language/slang detection and multilingual intent coverage
+- [x] Add privacy-preserving Chat Insights admin endpoint and UI tab
+- [x] Add/update relevant API/AI/UI tests
+- [x] Run `npm run test:e2e:ai`
+- [x] Run `npm run test:e2e:api`
+- [x] Run `npm run test:e2e:ui`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and verification notes
+- Notes: Added `v61_chat_research_improvements`, deterministic chat-intelligence helpers, adaptive chat/media/policy wiring, value prompts, free-user reactivation, companion-list flywheel signals, Chat Insights admin aggregates/UI, and bounded companion first-message fallback.
+- Verification: `npm run test:e2e:ai` passed; `npm run test:e2e:api` passed; `npm run test:e2e:ui` passed after adding the bounded companion-creation fallback for slow first-message generation.
+
+## User Chat Research + Logic Improvement Audit (2026-05-08)
+
+- [x] Update `plan.md` and `PROGRESS.md` with research scope before analysis
+- [x] Review existing chat-analysis report/script and relevant chat AI code paths
+- [x] Run read-only local/prod-safe queries only if needed, keeping findings aggregate/anonymized
+- [x] Research current public signals about AI girlfriend / AI companion user behavior
+- [x] Write prioritized product and chat-logic recommendations in `docs/USER_CHAT_RESEARCH_2026-05-08.md`
+- [x] Update `plan.md` and `PROGRESS.md` with final status and verification notes
+- Findings: explicit sexual chat (21.4% of user msgs), romance/affection (14.5%), family/taboo markers (10.8%), roleplay/scene control (8.0%), media requests (7.3%), emotional-support language (0.6%).
+- Logic priorities: adaptive reply pacing, scene-state memory, media reliability, platform-aware taboo policy, value-moment monetization, ethical free-user reactivation, custom-companion flywheel, localization/slang coverage.
+- Verification: no runtime code changed; tests skipped intentionally.
+
+## Chat Usage Analysis — in-conversation drop-off + top users (2026-05-07)
+
+Plan: `/Users/vasily/.claude/plans/analize-usess-chats-where-bubbly-naur.md`.
+
+One-off prod analysis: where users ghost inside conversations (Funnel tab only covers pre-chat),
+who the top active users are, and how they actually use the app (avg msg length, hours, companions, transcripts).
+
+- [x] Add `scripts/chat-analysis.js` — Node + `pg`, 8 read-only queries, writes Markdown
+- [x] Run against prod via `DATABASE_URL=$(heroku config:get DATABASE_URL -a lovetta) node scripts/chat-analysis.js`
+- [x] Generate `docs/CHAT_ANALYSIS_2026-05-07.md` — 521 real users, 318 with msgs, 32k messages, 15.7k user msgs
+- [x] Verify TEST_FILTER excludes test users; transcripts render readably
+- [x] Follow-up (2026-05-08): `scripts/chat-analysis-followup.js` + `docs/CHAT_ANALYSIS_FOLLOWUP_2026-05-08.md` answering "is proactive reaching dormant users?" and "why doesn't paywall fire?"
+  - Proactive: only **3 of 527 users** are eligible (gated on active subscription via `proactive.js:117-119`). Reach to dormant cohort: 12 of 268 dormant users got *any* proactive. Reply-rate from proactive→dormant: 2/102 (2%). Effectively no revival.
+  - Paywall: **`tip_request_threshold_free_usd` was raised 10× from $0.10/week to $1/week on 2026-05-04** (4 days before this analysis). Funnel events instrumented 2026-04-29, so the window where paywall could fire AND be logged was only 5 days. Total `paywall_blocked` events ever: 8, from 3 users. Lifetime spend on never-payers = $73.66 of $87.03 total (**85%**).
+- [ ] (Phase 2 — separate PR) Promote 2-3 most useful queries into a "Chat Analysis" admin tab
+
 ## Funnel instrumentation: events, device_type, paywall logging (2026-04-29)
 
 Triggered by 7-day funnel analysis (`/Users/vasily/.claude/plans/analize-hwy-user-ignup-serialized-alpaca.md`):

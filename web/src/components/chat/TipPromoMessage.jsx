@@ -6,11 +6,12 @@ import { TIP_AMOUNTS, getTipAmountsWithPrices, startTipCheckout } from '../../li
 import { isAppStore } from '../../lib/platform';
 import { getErrorMessage } from '../../lib/api';
 
-export default function TipPromoMessage({ message, companionId, onDismiss, onTipSuccess }) {
+export default function TipPromoMessage({ message, companionId, onDismiss, onTipSuccess, onUpgrade }) {
   const { user } = useAuth();
   const toast = useToast();
   const [tipLoading, setTipLoading] = useState(null);
   const [tipAmounts, setTipAmounts] = useState(TIP_AMOUNTS);
+  const isValuePrompt = !!message?.isValuePrompt;
 
   useEffect(() => {
     if (isAppStore()) {
@@ -48,9 +49,17 @@ export default function TipPromoMessage({ message, companionId, onDismiss, onTip
           {formatActions(message.content)}
         </div>
 
-        {/* Tip buttons */}
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {tipAmounts.map(({ amount, priceString }) => (
+        {/* Action buttons */}
+        {isValuePrompt ? (
+          <button
+            onClick={onUpgrade}
+            className="mt-2 w-full py-2 px-3 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors"
+          >
+            {message.valuePrompt?.cta || 'Unlock Premium'}
+          </button>
+        ) : (
+          <div className="mt-2 grid grid-cols-4 gap-1.5">
+            {tipAmounts.map(({ amount, priceString }) => (
             <button
               key={amount}
               onClick={() => handleTip(amount)}
@@ -59,8 +68,9 @@ export default function TipPromoMessage({ message, companionId, onDismiss, onTip
             >
               <span className="block text-sm">{tipLoading === amount ? '...' : (priceString || `$${amount}`)}</span>
             </button>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Dismiss */}
         <button

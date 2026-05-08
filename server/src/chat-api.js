@@ -6,7 +6,6 @@
 const { Router } = require('express');
 const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
-const { streamChat, buildSystemPrompt } = require('./ai');
 const { detectPlatform, getMediaEnabled, getVideoEnabled } = require('./content-levels');
 const { getUserSubscription, isSubscriptionActive } = require('./billing');
 const { sendCompanionEmail, sendAppleReviewerTranscriptAlert } = require('./email');
@@ -20,6 +19,19 @@ const { checkMediaBlocked, checkFreeLimit } = require('./consumption');
 const { getRedis } = require('./redis');
 const { sendPushNotification } = require('./push');
 const { logEvent, hasEvent, EVENT_TYPES } = require('./events');
+const {
+  analyzeUserMessage,
+  buildAdaptivePrompt,
+  buildAntiRepetitionPrompt,
+  buildSceneContext,
+  buildTabooPolicyPrompt,
+  detectMediaIntent,
+  isResponseTooSimilar,
+  maybeCreateValuePrompt,
+  sanitizeMediaPromise,
+  updateSceneState,
+  updateUserStyleProfile,
+} = require('./chat-intelligence');
 
 const router = Router();
 
@@ -40,6 +52,42 @@ function formatMessagesForAI(rows) {
     }
     return { role: m.role, content };
   });
+}
+
+function fallbackMediaDescription(mediaType, content) {
+  const text = (content || '').toLowerCase();
+  if (mediaType === 'video') return 'short flirty selfie video, moving naturally, looking at camera';
+  if (text.includes('bed') || text.includes('bedroom') || text.includes('pillow')) {
+    return 'lying on bed, soft lighting, flirty pose, looking at camera';
+  }
+  if (text.includes('shower') || text.includes('bath') || text.includes('towel')) {
+    return 'in bathroom, wrapped in towel, wet hair, playful expression';
+  }
+  if (text.includes('lingerie') || text.includes('lace') || text.includes('underwear')) {
+    return 'posing in lingerie, soft bedroom lighting, seductive look at camera';
+  }
+  if (text.includes('beach') || text.includes('pool') || text.includes('swim') || text.includes('bikini')) {
+    return 'at the beach in bikini, playful smile, looking at camera';
+  }
+  if (text.includes('dress') || text.includes('outfit') || text.includes('wearing')) {
+    return 'showing off outfit, posing playfully, looking at camera with a smile';
+  }
+  return 'a flirty selfie, looking at camera with a playful expression';
+}
+
+function pickValuePromptReason(analysis, userMessageCount, mediaRequest) {
+  if (analysis?.mediaIntent || mediaRequest) return 'media_request';
+  if (analysis?.needsSceneState && userMessageCount >= 8) return 'long_scene';
+  if (userMessageCount >= 20) return 'high_intent_20_messages';
+  return null;
+}
+
+async function countUserMessages(pool, conversationId) {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM messages WHERE conversation_id = $1 AND role = 'user'`,
+    [conversationId]
+  );
+  return rows[0]?.count || 0;
 }
 
 async function checkRateLimit(userId) {
@@ -301,7 +349,7 @@ router.get('/:companionId', authenticate, async (req, res) => {
     const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
 
     const { rows: messages } = await pool.query(
-      `SELECT id, role, content, context_text, scene_text, media_url, media_type, created_at
+      `SELECT id, role, content, context_text, scene_text, media_url, media_type, media_pending, media_error, created_at
        FROM messages WHERE conversation_id = $1
        ORDER BY created_at DESC LIMIT 50`,
       [conversation.id]
@@ -359,14 +407,27 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       res.write(`data: ${JSON.stringify({ type: 'error', code: 'empty_message' })}\n\n`);
       return res.end();
     }
+    const trimmedContent = content.trim();
+    const analysis = analyzeUserMessage(trimmedContent);
 
     const isFirstMessage = !(await hasEvent(req.userId, EVENT_TYPES.FIRST_MESSAGE_SENT));
 
     // Save user message
     await pool.query(
-      `INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
-      [conversation.id, content.trim()]
+      `INSERT INTO messages (conversation_id, role, content, language, intent_tags, media_intent)
+       VALUES ($1, 'user', $2, $3, $4, $5)`,
+      [conversation.id, trimmedContent, analysis.language, analysis.tags, analysis.mediaIntent]
     );
+
+    pool.query(
+      `UPDATE reactivation_messages
+       SET status = 'responded', responded_at = NOW()
+       WHERE conversation_id = $1 AND user_id = $2 AND status = 'sent' AND responded_at IS NULL
+       RETURNING id`,
+      [conversation.id, req.userId]
+    ).then(({ rows }) => {
+      if (rows.length) logEvent(req.userId, EVENT_TYPES.REACTIVATION_RETURNED, { conversation_id: conversation.id, companion_id: companion.id });
+    }).catch(() => {});
 
     if (isFirstMessage) {
       logEvent(req.userId, EVENT_TYPES.FIRST_MESSAGE_SENT, { companion_id: companion.id, conversation_id: conversation.id });
@@ -392,7 +453,14 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       [conversation.id]
     );
     recentMessages.reverse();
+    const turnAnalysis = analyzeUserMessage(trimmedContent, recentMessages);
     const aiMessages = formatMessagesForAI(recentMessages);
+    updateUserStyleProfile(pool, {
+      userId: req.userId,
+      analysis: turnAnalysis,
+      recentMessages,
+      companion,
+    }).catch(() => {});
 
     // Build system prompt with memory context
     const [mediaEnabled, videoEnabled, actionsPref] = await Promise.all([
@@ -403,19 +471,28 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled, videoEnabled, actionsEnabled });
     const platform = detectPlatform(req);
     const level = await getEffectiveTextLevel(platform, req.userId);
-    const [memoryContext, userContext] = await Promise.all([
+    const [memoryContext, userContext, sceneContext] = await Promise.all([
       buildMemoryContext(conversation.id, { level }),
       buildUserContext(req.userId, { level }),
+      buildSceneContext(pool, conversation.id, { level }),
     ]);
-    let systemPrompt = basePrompt + userContext + memoryContext;
+    const tabooPolicy = buildTabooPolicyPrompt({ analysis: turnAnalysis, platform, level });
+    if (tabooPolicy.action !== 'none') {
+      logEvent(req.userId, EVENT_TYPES.TABOO_POLICY_HIT, {
+        action: tabooPolicy.action,
+        platform,
+        level,
+        companion_id: companion.id,
+        conversation_id: conversation.id,
+      });
+    }
+    let systemPrompt = basePrompt + userContext + memoryContext + sceneContext +
+      buildAdaptivePrompt({ analysis: turnAnalysis, recentMessages }) + tabooPolicy.prompt;
 
     // When we know nothing about the user yet, guide AI to ask discovery questions
     if (!memoryContext && !userContext) {
       systemPrompt += '\n\nYou are still getting to know this person. Ask genuine questions about them — their name, interests, what they do, what they enjoy. Be curious and attentive. Do NOT invent or assume any details about their life.';
     }
-
-    let fullText = '';
-    let doneData = null;
 
     // Send typing indicator immediately
     res.write(`data: ${JSON.stringify({ type: 'typing' })}\n\n`);
@@ -428,6 +505,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     // Use chatCompletion (non-generator)
     const { chatCompletion } = require('./ai');
     let aiResult;
+    const qualityFlags = [];
     try {
       aiResult = await chatCompletion(systemPrompt, aiMessages, {
         userId: req.userId,
@@ -435,6 +513,15 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         platform,
         subscription: sub,
       });
+      if (aiResult?.content && isResponseTooSimilar(aiResult.content, recentMessages)) {
+        qualityFlags.push('rewritten_repetition');
+        aiResult = await chatCompletion(systemPrompt + buildAntiRepetitionPrompt(), aiMessages, {
+          userId: req.userId,
+          companionId: companion.id,
+          platform,
+          subscription: sub,
+        });
+      }
     } finally {
       clearInterval(heartbeat);
     }
@@ -448,10 +535,31 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         cleanText = cleanText.replace(/\*[^*]+\*\s*/g, '').trim();
       }
 
-      fullText = cleanText;
+      // Handle media — LLM tag OR user explicitly asked for image/photo
+      let mediaBlocked = false;
+      let mediaPending = false;
+      let effectiveMediaRequest = mediaEnabled ? mediaRequest : null;
+      const requestedMediaType = turnAnalysis.mediaIntent || detectMediaIntent(trimmedContent);
+      // Downgrade video to image when video generation is disabled
+      if (effectiveMediaRequest && effectiveMediaRequest.type === 'video' && !videoEnabled) {
+        effectiveMediaRequest = { ...effectiveMediaRequest, type: 'image' };
+      }
+      if (mediaEnabled && !effectiveMediaRequest && requestedMediaType) {
+        const type = requestedMediaType === 'video' && !videoEnabled ? 'image' : requestedMediaType;
+        effectiveMediaRequest = { type, description: fallbackMediaDescription(type, trimmedContent) };
+      }
+      if (effectiveMediaRequest && !aborted) {
+        if (aiResult.mediaBlocked) {
+          mediaBlocked = true;
+        } else {
+          mediaPending = true;
+        }
+      }
+
+      cleanText = sanitizeMediaPromise(cleanText, mediaPending);
       res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
 
-      const parsed = parseContextText(cleanText);
+      let parsed = parseContextText(cleanText);
 
       // Server-side strip: remove actions/scenes if user disabled them
       if (!actionsEnabled) {
@@ -464,35 +572,68 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         parsed.sceneText = await generateScene(companion, parsed.content);
       }
 
-      // Handle media — LLM tag OR user explicitly asked for image/photo
-      let mediaBlocked = false;
-      let mediaPending = false;
-      let effectiveMediaRequest = mediaEnabled ? mediaRequest : null;
-      // Downgrade video to image when video generation is disabled
-      if (effectiveMediaRequest && effectiveMediaRequest.type === 'video' && !videoEnabled) {
-        effectiveMediaRequest = { ...effectiveMediaRequest, type: 'image' };
-      }
-      if (mediaEnabled && !effectiveMediaRequest && /send.*(image|photo|pic|selfie|video|nude)|show me|send me.*(photo|pic|selfie|image)/i.test(content || '')) {
-        effectiveMediaRequest = { type: 'image', description: 'a flirty selfie, looking at camera with a playful expression' };
-      }
-      if (effectiveMediaRequest && !aborted) {
-        if (aiResult.mediaBlocked) {
-          mediaBlocked = true;
-        } else {
-          mediaPending = true;
-        }
+      const userMessageCount = await countUserMessages(pool, conversation.id);
+      const valueReason = pickValuePromptReason(turnAnalysis, userMessageCount, effectiveMediaRequest);
+      const valuePrompt = valueReason
+        ? await maybeCreateValuePrompt(pool, {
+            userId: req.userId,
+            companionId: companion.id,
+            conversationId: conversation.id,
+            subscription: sub,
+            reason: valueReason,
+            metadata: {
+              tags: turnAnalysis.tags,
+              media_intent: turnAnalysis.mediaIntent || null,
+              user_message_count: userMessageCount,
+            },
+          })
+        : null;
+      if (valuePrompt) {
+        logEvent(req.userId, EVENT_TYPES.VALUE_PROMPT_SHOWN, {
+          reason: valueReason,
+          companion_id: companion.id,
+          conversation_id: conversation.id,
+        });
       }
 
+      const assistantQualityFlags = tabooPolicy.action !== 'none'
+        ? [...qualityFlags, `taboo_${tabooPolicy.action}`]
+        : qualityFlags;
+
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type, media_pending)
-         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, $6) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText, mediaPending ? effectiveMediaRequest.type : null, mediaPending]
+        `INSERT INTO messages (
+           conversation_id, role, content, context_text, scene_text, media_url,
+           media_type, media_pending, language, intent_tags, quality_flags,
+           media_intent, monetization_prompt_reason
+         )
+         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, $6, $7, $8, $9, $10, $11)
+         RETURNING id, created_at`,
+        [
+          conversation.id,
+          parsed.content,
+          parsed.contextText,
+          parsed.sceneText,
+          mediaPending ? effectiveMediaRequest.type : null,
+          mediaPending,
+          turnAnalysis.language,
+          turnAnalysis.tags,
+          assistantQualityFlags,
+          effectiveMediaRequest?.type || turnAnalysis.mediaIntent || null,
+          valuePrompt ? valueReason : null,
+        ]
       );
 
       await pool.query(
         'UPDATE conversations SET last_message_at = NOW() WHERE id = $1',
         [conversation.id]
       );
+
+      updateSceneState(pool, {
+        conversationId: conversation.id,
+        analysis: turnAnalysis,
+        userMessage: trimmedContent,
+        assistantText: parsed.content,
+      }).catch(() => {});
 
       // Fire-and-forget email notification
       maybeNotifyUser(pool, req.userId, companion, conversation.id, cleanText);
@@ -513,6 +654,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         mediaPending,
         shouldRequestTip: aiResult.shouldRequestTip || false,
         mediaBlocked,
+        valuePrompt,
       })}\n\n`);
 
       // Start media generation in background (non-blocking)
@@ -576,17 +718,28 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       [conversation.id]
     );
     recentMessages.reverse();
+    const nextAnalysis = analyzeUserMessage('continue', recentMessages);
 
-    const { rows: actionsPrefRows } = await pool.query('SELECT show_actions FROM user_preferences WHERE user_id = $1', [req.userId]);
+    const [mediaEnabledNext, videoEnabledNext, actionsPrefRows] = await Promise.all([
+      getMediaEnabled(),
+      getVideoEnabled(),
+      pool.query('SELECT show_actions FROM user_preferences WHERE user_id = $1', [req.userId]),
+    ]);
     const actionsEnabled = actionsPrefRows[0]?.show_actions ?? true;
-    const basePrompt = buildCompanionSystemPrompt(companion, { actionsEnabled });
+    const basePrompt = buildCompanionSystemPrompt(companion, {
+      mediaEnabled: mediaEnabledNext,
+      videoEnabled: videoEnabledNext,
+      actionsEnabled,
+    });
     const nextPlatform = detectPlatform(req);
     const nextLevel = await getEffectiveTextLevel(nextPlatform, req.userId);
-    const [memoryContext, userContext] = await Promise.all([
+    const [memoryContext, userContext, sceneContext] = await Promise.all([
       buildMemoryContext(conversation.id, { level: nextLevel }),
       buildUserContext(req.userId, { level: nextLevel }),
+      buildSceneContext(pool, conversation.id, { level: nextLevel }),
     ]);
-    let systemPrompt = basePrompt + userContext + memoryContext;
+    let systemPrompt = basePrompt + userContext + memoryContext + sceneContext +
+      buildAdaptivePrompt({ analysis: nextAnalysis, recentMessages });
 
     // Discovery mode vs normal mode based on memory state
     const hasMemory = !!(memoryContext || userContext);
@@ -602,27 +755,45 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       ...formatMessagesForAI(recentMessages),
       { role: 'user', content: syntheticContent },
     ];
-    const platform = detectPlatform(req);
+    const platform = nextPlatform;
 
-    let fullText = '';
+    res.write(`data: ${JSON.stringify({ type: 'typing' })}\n\n`);
+
+    const heartbeat = setInterval(() => {
+      if (!aborted) { try { res.write(': heartbeat\n\n'); } catch {} }
+    }, 3000);
+
+    const { chatCompletion } = require('./ai');
     let doneData = null;
-
-    for await (const event of streamChat(systemPrompt, aiMessages, {
-      userId: req.userId,
-      companionId: companion.id,
-      platform,
-      subscription: sub,
-    })) {
-      if (aborted) break;
-      if (event.type === 'chunk') {
-        fullText += event.data;
-        res.write(`data: ${JSON.stringify({ type: 'chunk', text: event.data })}\n\n`);
-      } else if (event.type === 'regenerate') {
-        fullText = '';
-        res.write(`data: ${JSON.stringify({ type: 'regenerate' })}\n\n`);
-      } else if (event.type === 'done') {
-        doneData = event.data;
+    const qualityFlags = [];
+    try {
+      const aiResult = await chatCompletion(systemPrompt, aiMessages, {
+        userId: req.userId,
+        companionId: companion.id,
+        platform,
+        subscription: sub,
+      });
+      doneData = {
+        fullText: aiResult.content,
+        shouldRequestTip: aiResult.shouldRequestTip || false,
+        mediaBlocked: aiResult.mediaBlocked || false,
+      };
+      if (aiResult?.content && isResponseTooSimilar(aiResult.content, recentMessages)) {
+        qualityFlags.push('rewritten_repetition');
+        const retry = await chatCompletion(systemPrompt + buildAntiRepetitionPrompt(), aiMessages, {
+          userId: req.userId,
+          companionId: companion.id,
+          platform,
+          subscription: sub,
+        });
+        doneData = {
+          fullText: retry.content,
+          shouldRequestTip: retry.shouldRequestTip || false,
+          mediaBlocked: retry.mediaBlocked || false,
+        };
       }
+    } finally {
+      clearInterval(heartbeat);
     }
 
     if (!aborted && doneData) {
@@ -633,6 +804,24 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
       if (!actionsEnabled) {
         cleanText = cleanText.replace(/\*[^*]+\*\s*/g, '').trim();
       }
+
+      // Handle media generation if LLM requested it.
+      let mediaBlocked = false;
+      let mediaPending = false;
+      let effectiveMediaRequest = mediaEnabledNext ? mediaRequest : null;
+      if (effectiveMediaRequest && effectiveMediaRequest.type === 'video' && !videoEnabledNext) {
+        effectiveMediaRequest = { ...effectiveMediaRequest, type: 'image' };
+      }
+      if (effectiveMediaRequest && !aborted) {
+        if (doneData.mediaBlocked) {
+          mediaBlocked = true;
+        } else {
+          mediaPending = true;
+        }
+      }
+
+      cleanText = sanitizeMediaPromise(cleanText, mediaPending);
+      res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
 
       const parsed = parseContextText(cleanText);
 
@@ -647,23 +836,34 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
         parsed.sceneText = await generateScene(companion, parsed.content);
       }
 
-      // Handle media generation if LLM requested it
-      let mediaBlocked = false;
-      let mediaPending = false;
-      if (mediaRequest && !aborted) {
-        if (doneData.mediaBlocked) {
-          mediaBlocked = true;
-        } else {
-          mediaPending = true;
-        }
-      }
-
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type, media_pending)
-         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, $6) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText, mediaPending ? mediaRequest.type : null, mediaPending]
+        `INSERT INTO messages (
+           conversation_id, role, content, context_text, scene_text, media_url,
+           media_type, media_pending, language, intent_tags, quality_flags, media_intent
+         )
+         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, $6, $7, $8, $9, $10)
+         RETURNING id, created_at`,
+        [
+          conversation.id,
+          parsed.content,
+          parsed.contextText,
+          parsed.sceneText,
+          mediaPending ? effectiveMediaRequest.type : null,
+          mediaPending,
+          nextAnalysis.language,
+          nextAnalysis.tags,
+          qualityFlags,
+          effectiveMediaRequest?.type || null,
+        ]
       );
       await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
+
+      updateSceneState(pool, {
+        conversationId: conversation.id,
+        analysis: nextAnalysis,
+        userMessage: syntheticContent,
+        assistantText: parsed.content,
+      }).catch(() => {});
 
       // Fire-and-forget email notification
       maybeNotifyUser(pool, req.userId, companion, conversation.id, cleanText);
@@ -680,7 +880,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
         contextText: parsed.contextText,
         sceneText: parsed.sceneText,
         mediaUrl: null,
-        mediaType: mediaPending ? mediaRequest.type : null,
+        mediaType: mediaPending ? effectiveMediaRequest.type : null,
         mediaPending,
         shouldRequestTip: doneData.shouldRequestTip || false,
         mediaBlocked,
@@ -688,7 +888,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
 
       // Start media generation in background (non-blocking)
       if (mediaPending) {
-        generateMediaInBackground(pool, savedMsg.id, companion, mediaRequest, {
+        generateMediaInBackground(pool, savedMsg.id, companion, effectiveMediaRequest, {
           userId: req.userId,
           companionId: companion.id,
           platform,
@@ -752,10 +952,17 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       [conversation.id]
     );
     recentMessages.reverse();
+    const mediaAnalysis = analyzeUserMessage('send me a photo of you right now', recentMessages);
     const aiMessages = [
       ...formatMessagesForAI(recentMessages),
       { role: 'user', content: 'send me a photo of you right now' },
     ];
+    updateUserStyleProfile(pool, {
+      userId: req.userId,
+      analysis: mediaAnalysis,
+      recentMessages,
+      companion,
+    }).catch(() => {});
 
     const videoEnabledForMedia = await getVideoEnabled();
     const { rows: actionsPrefRows3 } = await pool.query('SELECT show_actions FROM user_preferences WHERE user_id = $1', [req.userId]);
@@ -763,11 +970,13 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     const basePrompt = buildCompanionSystemPrompt(companion, { mediaEnabled: true, videoEnabled: videoEnabledForMedia, actionsEnabled });
     const platform = detectPlatform(req);
     const level = await getEffectiveTextLevel(platform, req.userId);
-    const [memoryContext, userContext] = await Promise.all([
+    const [memoryContext, userContext, sceneContext] = await Promise.all([
       buildMemoryContext(conversation.id, { level }),
       buildUserContext(req.userId, { level }),
+      buildSceneContext(pool, conversation.id, { level }),
     ]);
-    const systemPrompt = basePrompt + userContext + memoryContext;
+    const systemPrompt = basePrompt + userContext + memoryContext + sceneContext +
+      buildAdaptivePrompt({ analysis: mediaAnalysis, recentMessages });
 
     res.write(`data: ${JSON.stringify({ type: 'typing' })}\n\n`);
 
@@ -796,8 +1005,6 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
         cleanText = cleanText.replace(/\*[^*]+\*\s*/g, '').trim();
       }
 
-      res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
-
       const parsed = parseContextText(cleanText);
 
       // Strip context/scene if user disabled actions
@@ -808,23 +1015,70 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
 
       // Force image generation even if LLM didn't include the tag
       // Build a contextual description from the AI's response text
-      let fallbackDescription = 'a flirty selfie, looking at camera with a playful smile, casual setting';
-      if (parsed.content) {
-        const text = parsed.content.toLowerCase();
-        if (text.includes('bed') || text.includes('bedroom') || text.includes('pillow')) fallbackDescription = 'lying on bed, soft lighting, flirty pose, looking at camera';
-        else if (text.includes('shower') || text.includes('bath') || text.includes('towel')) fallbackDescription = 'in bathroom, wrapped in towel, wet hair, playful expression';
-        else if (text.includes('lingerie') || text.includes('lace') || text.includes('underwear')) fallbackDescription = 'posing in lingerie, soft bedroom lighting, seductive look at camera';
-        else if (text.includes('beach') || text.includes('pool') || text.includes('swim') || text.includes('bikini')) fallbackDescription = 'at the beach in bikini, sun-kissed skin, playful smile';
-        else if (text.includes('dress') || text.includes('outfit') || text.includes('wearing')) fallbackDescription = 'showing off outfit, posing playfully, looking at camera with a smile';
+      let effectiveMediaRequest = mediaRequest || {
+        type: 'image',
+        description: fallbackMediaDescription('image', parsed.content),
+      };
+      if (effectiveMediaRequest.type === 'video' && !videoEnabledForMedia) {
+        effectiveMediaRequest = { ...effectiveMediaRequest, type: 'image' };
       }
-      const effectiveMediaRequest = mediaRequest || { type: 'image', description: fallbackDescription };
+      const mediaBlocked = !!aiResult.mediaBlocked;
+      const mediaPending = !mediaBlocked;
+      cleanText = sanitizeMediaPromise(cleanText, mediaPending);
+      if (!mediaPending) {
+        parsed = parseContextText(cleanText);
+        if (!actionsEnabled) {
+          parsed.contextText = null;
+          parsed.sceneText = null;
+        }
+      }
+      res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
+
+      const valuePrompt = await maybeCreateValuePrompt(pool, {
+        userId: req.userId,
+        companionId: companion.id,
+        conversationId: conversation.id,
+        subscription: sub,
+        reason: 'media_request',
+        metadata: { tags: mediaAnalysis.tags, media_intent: effectiveMediaRequest.type },
+      });
+      if (valuePrompt) {
+        logEvent(req.userId, EVENT_TYPES.VALUE_PROMPT_SHOWN, {
+          reason: 'media_request',
+          companion_id: companion.id,
+          conversation_id: conversation.id,
+        });
+      }
 
       const { rows: [savedMsg] } = await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, context_text, scene_text, media_url, media_type, media_pending)
-         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, TRUE) RETURNING id, created_at`,
-        [conversation.id, parsed.content, parsed.contextText, parsed.sceneText || null, effectiveMediaRequest.type]
+        `INSERT INTO messages (
+           conversation_id, role, content, context_text, scene_text, media_url,
+           media_type, media_pending, language, intent_tags, media_intent,
+           monetization_prompt_reason
+         )
+         VALUES ($1, 'assistant', $2, $3, $4, NULL, $5, $6, $7, $8, $9, $10)
+         RETURNING id, created_at`,
+        [
+          conversation.id,
+          parsed.content,
+          parsed.contextText,
+          parsed.sceneText || null,
+          mediaPending ? effectiveMediaRequest.type : null,
+          mediaPending,
+          mediaAnalysis.language,
+          mediaAnalysis.tags,
+          effectiveMediaRequest.type,
+          valuePrompt ? 'media_request' : null,
+        ]
       );
       await pool.query('UPDATE conversations SET last_message_at = NOW() WHERE id = $1', [conversation.id]);
+
+      updateSceneState(pool, {
+        conversationId: conversation.id,
+        analysis: mediaAnalysis,
+        userMessage: 'send me a photo of you right now',
+        assistantText: parsed.content,
+      }).catch(() => {});
 
       res.write(`data: ${JSON.stringify({
         type: 'done',
@@ -833,13 +1087,15 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
         contextText: parsed.contextText,
         sceneText: parsed.sceneText || null,
         mediaUrl: null,
-        mediaType: effectiveMediaRequest.type,
-        mediaPending: true,
+        mediaType: mediaPending ? effectiveMediaRequest.type : null,
+        mediaPending,
         shouldRequestTip: aiResult.shouldRequestTip || false,
+        mediaBlocked,
+        valuePrompt,
       })}\n\n`);
 
       // Start media generation in background (non-blocking)
-      if (!aborted) {
+      if (!aborted && mediaPending) {
         generateMediaInBackground(pool, savedMsg.id, companion, effectiveMediaRequest, {
           userId: req.userId,
           companionId: companion.id,
@@ -871,12 +1127,12 @@ router.get('/:companionId/history', authenticate, async (req, res) => {
 
     let query, params;
     if (before) {
-      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, media_pending, created_at
+      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, media_pending, media_error, created_at
                FROM messages WHERE conversation_id = $1 AND created_at < (SELECT created_at FROM messages WHERE id = $2)
                ORDER BY created_at DESC LIMIT 50`;
       params = [conversation.id, before];
     } else {
-      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, media_pending, created_at
+      query = `SELECT id, role, content, context_text, scene_text, media_url, media_type, media_pending, media_error, created_at
                FROM messages WHERE conversation_id = $1
                ORDER BY created_at DESC LIMIT 50`;
       params = [conversation.id];
@@ -910,7 +1166,7 @@ router.get('/message/:messageId/media', authenticate, async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT m.media_url, m.media_type, m.media_pending
+      `SELECT m.media_url, m.media_type, m.media_pending, m.media_error
        FROM messages m
        JOIN conversations c ON c.id = m.conversation_id
        WHERE m.id = $1 AND c.user_id = $2`,
@@ -924,6 +1180,7 @@ router.get('/message/:messageId/media', authenticate, async (req, res) => {
       mediaUrl: msg.media_url,
       mediaType: msg.media_type,
       pending: msg.media_pending || false,
+      mediaError: msg.media_error || null,
     });
   } catch (err) {
     console.error('[chat] media poll error:', err.message);

@@ -172,6 +172,133 @@ router.get('/quality-stats', async (req, res) => {
   }
 });
 
+// -- GET /api/admin/chat-insights ---------------------------
+//
+// Privacy-preserving aggregate signals from chat turns. No raw message text is
+// returned here; this is for spotting product/logic patterns at cohort level.
+router.get('/chat-insights', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({});
+  try {
+    const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 7));
+    const params = [String(days)];
+    const testUserFilter = `
+      AND u.email NOT ILIKE '%@example.com'
+      AND u.email NOT ILIKE '%@test.com'
+      AND u.email NOT ILIKE 'conativer+%@gmail.com'
+      AND u.email <> 'conativer@gmail.com'
+    `;
+
+    const { rows: [summary] } = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE m.role = 'user')::int AS user_messages,
+        COUNT(*) FILTER (WHERE m.role = 'assistant')::int AS assistant_messages,
+        COUNT(DISTINCT c.id)::int AS conversations,
+        COUNT(DISTINCT c.user_id)::int AS users,
+        AVG(char_length(m.content)) FILTER (WHERE m.role = 'user')::numeric(10,1) AS avg_user_chars,
+        AVG(char_length(m.content)) FILTER (WHERE m.role = 'assistant')::numeric(10,1) AS avg_assistant_chars,
+        COUNT(*) FILTER (WHERE m.role = 'assistant' AND m.media_url IS NOT NULL)::int AS delivered_media,
+        COUNT(*) FILTER (WHERE m.role = 'assistant' AND m.media_error IS NOT NULL)::int AS media_failures
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      JOIN users u ON u.id = c.user_id
+      WHERE m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+      ${testUserFilter}
+    `, params);
+
+    const { rows: topics } = await pool.query(`
+      SELECT topic, count::int FROM (
+        SELECT 'media_request' AS topic, COUNT(*) AS count
+        FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.user_id
+        WHERE m.role = 'user' AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL ${testUserFilter}
+          AND ('media_request' = ANY(COALESCE(m.intent_tags, '{}'::TEXT[])) OR m.content ~* '(photo|pic|selfie|video|show me|send me|nude|image)')
+        UNION ALL
+        SELECT 'explicit', COUNT(*)
+        FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.user_id
+        WHERE m.role = 'user' AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL ${testUserFilter}
+          AND ('explicit' = ANY(COALESCE(m.intent_tags, '{}'::TEXT[])) OR m.content ~* '(sex|fuck|pussy|dick|cock|cum|horny|nude|naked)')
+        UNION ALL
+        SELECT 'romance', COUNT(*)
+        FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.user_id
+        WHERE m.role = 'user' AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL ${testUserFilter}
+          AND ('romance' = ANY(COALESCE(m.intent_tags, '{}'::TEXT[])) OR m.content ~* '(love|miss you|kiss|hug|girlfriend|wife|babe|baby)')
+        UNION ALL
+        SELECT 'roleplay', COUNT(*)
+        FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.user_id
+        WHERE m.role = 'user' AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL ${testUserFilter}
+          AND ('roleplay' = ANY(COALESCE(m.intent_tags, '{}'::TEXT[])) OR m.content ~* '(roleplay|pretend|scene|story|continue|again|more|bedroom|shower)')
+        UNION ALL
+        SELECT 'taboo_family', COUNT(*)
+        FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = c.user_id
+        WHERE m.role = 'user' AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL ${testUserFilter}
+          AND ('taboo_family' = ANY(COALESCE(m.intent_tags, '{}'::TEXT[])) OR m.content ~* '(brother|sister|mom|mother|dad|father|family|cousin|incest)')
+      ) t
+      ORDER BY count DESC
+    `, params);
+
+    const { rows: languages } = await pool.query(`
+      SELECT COALESCE(NULLIF(m.language, ''), 'unknown') AS language, COUNT(*)::int AS count
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      JOIN users u ON u.id = c.user_id
+      WHERE m.role = 'user'
+        AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+      GROUP BY language
+      ORDER BY count DESC
+      LIMIT 12
+    `, params);
+
+    const { rows: mediaFailures } = await pool.query(`
+      SELECT COALESCE(media_error, 'unknown') AS reason, COUNT(*)::int AS count
+      FROM messages
+      WHERE media_error IS NOT NULL
+        AND created_at >= NOW() - ($1 || ' days')::INTERVAL
+      GROUP BY reason
+      ORDER BY count DESC
+      LIMIT 12
+    `, params);
+
+    const { rows: valuePrompts } = await pool.query(`
+      SELECT reason, COUNT(*)::int AS shown, COUNT(converted_at)::int AS converted
+      FROM value_prompt_events
+      WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL
+      GROUP BY reason
+      ORDER BY shown DESC
+    `, params);
+
+    const { rows: [reactivation] } = await pool.query(`
+      SELECT
+        COUNT(*)::int AS sent,
+        COUNT(responded_at)::int AS returned
+      FROM reactivation_messages
+      WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL
+    `, params);
+
+    res.json({
+      days,
+      summary: {
+        user_messages: summary.user_messages || 0,
+        assistant_messages: summary.assistant_messages || 0,
+        conversations: summary.conversations || 0,
+        users: summary.users || 0,
+        avg_user_chars: Number(summary.avg_user_chars || 0),
+        avg_assistant_chars: Number(summary.avg_assistant_chars || 0),
+        delivered_media: summary.delivered_media || 0,
+        media_failures: summary.media_failures || 0,
+      },
+      topics,
+      languages,
+      mediaFailures,
+      valuePrompts,
+      reactivation: reactivation || { sent: 0, returned: 0 },
+    });
+  } catch (err) {
+    console.error('[admin] chat-insights error:', err.message);
+    res.status(500).json({ error: 'Failed to load chat insights' });
+  }
+});
+
 // -- GET /api/admin/funnel --------------------------------
 // Signup -> activation -> conversion funnel for a date range.
 // Excludes obvious test users (@example.com, @test.com, conativer+*@gmail.com, conativer@gmail.com).

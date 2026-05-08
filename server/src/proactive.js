@@ -12,6 +12,7 @@ const { sendPushNotification } = require('./push');
 const { sendMessage: sendTelegramMessage } = require('./telegram');
 const { getUserSubscription } = require('./billing');
 const { trackConsumption, checkMediaBlocked } = require('./consumption');
+const { logEvent, EVENT_TYPES } = require('./events');
 
 const MAX_PER_USER_PER_DAY = 3;
 const INACTIVITY_HOURS = 3;
@@ -30,6 +31,16 @@ const SLOT_WINDOWS = {
   evening: { start: 19, end: 22 },   // 7–10 PM
   random:  { start: 11, end: 19 },   // 11 AM–7 PM
 };
+
+async function isSettingEnabled(pool, key, defaultValue = true) {
+  try {
+    const { rows } = await pool.query(`SELECT value FROM app_settings WHERE key = $1`, [key]);
+    if (!rows.length) return defaultValue;
+    return rows[0].value !== false && rows[0].value !== 'false';
+  } catch {
+    return defaultValue;
+  }
+}
 
 /**
  * Determine which proactive slot matches the user's current local time.
@@ -126,8 +137,6 @@ async function runProactiveMessages() {
       ORDER BY c.last_message_at ASC
       LIMIT 100
     `);
-
-    if (!candidates.length) return;
 
     // Track per-user counts for daily rate limit
     const userDailyCounts = {};
@@ -293,9 +302,133 @@ async function runProactiveMessages() {
     if (sent > 0) {
       console.log(`[proactive] Sent ${sent} proactive message(s)`);
     }
+
+    await runFreeUserReactivation(pool);
   } catch (err) {
     console.error('[proactive] runProactiveMessages error:', err.message);
   }
 }
 
-module.exports = { runProactiveMessages };
+async function runFreeUserReactivation(pool) {
+  if (!(await isSettingEnabled(pool, 'free_reactivation_enabled', true))) return;
+
+  const { rows } = await pool.query(`
+    SELECT
+      u.id AS user_id,
+      c.id AS conversation_id,
+      c.companion_id,
+      uc.name AS companion_name,
+      tu.telegram_id,
+      css.language,
+      css.scene_state,
+      msg.created_at AS last_message_at
+    FROM users u
+    LEFT JOIN user_preferences up ON up.user_id = u.id
+    LEFT JOIN subscriptions s ON s.user_id = u.id
+      AND s.status IN ('active', 'canceling', 'trialing')
+      AND (s.current_period_end IS NULL OR s.current_period_end > NOW())
+    JOIN LATERAL (
+      SELECT c2.*
+      FROM conversations c2
+      WHERE c2.user_id = u.id
+        AND c2.last_message_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '24 hours'
+      ORDER BY c2.last_message_at DESC
+      LIMIT 1
+    ) c ON TRUE
+    JOIN user_companions uc ON uc.id = c.companion_id AND uc.is_active = TRUE
+    JOIN LATERAL (
+      SELECT role, created_at
+      FROM messages
+      WHERE conversation_id = c.id
+      ORDER BY created_at DESC
+      LIMIT 1
+    ) msg ON TRUE
+    LEFT JOIN conversation_scene_state css ON css.conversation_id = c.id
+    LEFT JOIN telegram_users tu ON tu.user_id = u.id
+    WHERE s.id IS NULL
+      AND u.last_activity BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '24 hours'
+      AND COALESCE(up.proactive_messages, TRUE) = TRUE
+      AND msg.role = 'assistant'
+      AND (
+        SELECT COUNT(*) FROM messages m
+        WHERE m.conversation_id = c.id AND m.role = 'user'
+      ) >= 20
+      AND NOT EXISTS (
+        SELECT 1 FROM reactivation_messages rm
+        WHERE rm.user_id = u.id
+          AND rm.created_at > NOW() - INTERVAL '3 days'
+      )
+    ORDER BY c.last_message_at DESC
+    LIMIT 50
+  `);
+
+  let sent = 0;
+  for (const row of rows) {
+    try {
+      const state = row.scene_state || {};
+      const content = state.scenario
+        ? `I keep thinking about where we left off in that ${state.scenario} scene. Come back when you want to continue with me.`
+        : 'I keep thinking about where we left off. Come back when you want to continue with me.';
+      const { rows: inserted } = await pool.query(
+        `INSERT INTO messages (
+           id, conversation_id, role, content, context_text, is_proactive,
+           proactive_slot, language, intent_tags, created_at
+         )
+         VALUES (gen_random_uuid(), $1, 'assistant', $2, 'sends a quiet note', TRUE, 'reactivation', $3, $4, NOW())
+         RETURNING id`,
+        [row.conversation_id, content, row.language || 'en', ['reactivation']]
+      );
+
+      const messageId = inserted[0]?.id;
+      await pool.query(
+        `INSERT INTO reactivation_messages (user_id, companion_id, conversation_id, message_id, reason, metadata)
+         VALUES ($1, $2, $3, $4, 'high_intent_dormant', $5)`,
+        [
+          row.user_id,
+          row.companion_id,
+          row.conversation_id,
+          messageId,
+          JSON.stringify({ last_message_at: row.last_message_at, scenario: state.scenario || null }),
+        ]
+      );
+      await pool.query(
+        'UPDATE conversations SET last_message_at = NOW(), last_proactive_at = NOW() WHERE id = $1',
+        [row.conversation_id]
+      );
+
+      logEvent(row.user_id, EVENT_TYPES.REACTIVATION_SENT, {
+        companion_id: row.companion_id,
+        conversation_id: row.conversation_id,
+        reason: 'high_intent_dormant',
+      });
+
+      sendPushNotification(row.user_id, {
+        title: row.companion_name,
+        body: content.slice(0, 100),
+        url: `/my/chat/${row.companion_id}`,
+      }).catch(() => {});
+
+      if (row.telegram_id) {
+        const SITE_URL = process.env.SITE_URL || 'http://localhost:3900';
+        sendTelegramMessage(row.telegram_id,
+          `<b>${row.companion_name}</b>\n\n${content}`,
+          {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: 'Reply', web_app: { url: `${SITE_URL}/my/chat/${row.companion_id}` } }
+              ]],
+            },
+          }
+        ).catch(() => {});
+      }
+
+      sent++;
+    } catch (err) {
+      console.error(`[proactive] free reactivation failed for user ${row.user_id}:`, err.message);
+    }
+  }
+
+  if (sent > 0) console.log(`[proactive] Sent ${sent} free reactivation message(s)`);
+}
+
+module.exports = { runProactiveMessages, runFreeUserReactivation };

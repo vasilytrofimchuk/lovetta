@@ -1508,3 +1508,45 @@ test.describe('Media Reuse — cross-companion reuse with same avatar', () => {
     expect(totalGenCalls).toBe(generatedCount);
   });
 });
+
+// ============================================================
+// Chat Intelligence — research-driven logic helpers
+// ============================================================
+
+test.describe('Chat Intelligence — intent, pacing, and safety', () => {
+  const chatIntel = require('../server/src/chat-intelligence');
+
+  test('detects romanized Bengali and media intent', () => {
+    expect(chatIntel.detectLanguage('tumi ki ekta chobi pathabe jaan?')).toBe('bn-latn');
+    const analysis = chatIntel.analyzeUserMessage('send me a selfie jaan');
+    expect(analysis.mediaIntent).toBe('image');
+    expect(analysis.tags).toContain('media_request');
+  });
+
+  test('builds short-control pacing guidance', () => {
+    const analysis = chatIntel.analyzeUserMessage('continue');
+    const prompt = chatIntel.buildAdaptivePrompt({ analysis, recentMessages: [] });
+    expect(prompt).toContain('1-3 tight sentences');
+    expect(prompt).toContain('do not ask a generic question');
+  });
+
+  test('returns platform-aware taboo redirect on appstore', () => {
+    const analysis = chatIntel.analyzeUserMessage('pretend you are my sister');
+    const policy = chatIntel.buildTabooPolicyPrompt({ analysis, platform: 'appstore', level: 1 });
+    expect(policy.action).toBe('redirect');
+    expect(policy.prompt).toContain('non-family');
+  });
+
+  test('flags highly repeated assistant wording', () => {
+    const recent = [
+      { role: 'assistant', content: '*leans closer* I missed you so much, come closer and let me kiss you slowly tonight.' },
+    ];
+    expect(chatIntel.isResponseTooSimilar('I missed you so much, come closer and let me kiss you slowly tonight.', recent)).toBe(true);
+  });
+
+  test('sanitizes media promises when no job is queued', () => {
+    const text = chatIntel.sanitizeMediaPromise("Here's a photo for you, look at this", false);
+    expect(text).not.toMatch(/here'?s a photo/i);
+    expect(text).toContain('imagine');
+  });
+});

@@ -220,6 +220,7 @@ export default function ChatPage() {
         tipPromoMessage={tipPromoMessage}
         onDismissTip={dismissTip}
         onTipSuccess={handleTipSuccess}
+        onUpgrade={() => setShowPlanFromLimit(true)}
         companionId={companionId}
         tipSent={tipSent}
         companionName={companion?.name}

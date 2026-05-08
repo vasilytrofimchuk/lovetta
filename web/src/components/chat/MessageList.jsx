@@ -4,7 +4,7 @@ import StreamingMessage from './StreamingMessage';
 import TipPromoMessage from './TipPromoMessage';
 import TipSentCard from './TipSentCard';
 
-export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, onTipSuccess, companionId, mediaLoading, mediaLoadingType, showMediaButton, onRequestMedia, companionAvatarUrl, tipSent, companionName }) {
+export default function MessageList({ messages, streaming, streamingText, hasMore, onLoadMore, onTriggerNext, showNextButton, scrollTrigger, tipPromoMessage, onDismissTip, onTipSuccess, onUpgrade, companionId, mediaLoading, mediaLoadingType, showMediaButton, onRequestMedia, companionAvatarUrl, tipSent, companionName }) {
   const bottomRef = useRef(null);
   const containerRef = useRef(null);
   const sentinelRef = useRef(null);
@@ -67,7 +67,7 @@ export default function MessageList({ messages, streaming, streamingText, hasMor
 
         {/* Tip promo message */}
         {tipPromoMessage && (
-          <TipPromoMessage message={tipPromoMessage} companionId={companionId} onDismiss={onDismissTip} onTipSuccess={onTipSuccess} />
+          <TipPromoMessage message={tipPromoMessage} companionId={companionId} onDismiss={onDismissTip} onTipSuccess={onTipSuccess} onUpgrade={onUpgrade} />
         )}
 
         {/* Streaming indicator */}

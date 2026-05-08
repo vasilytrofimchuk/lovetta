@@ -748,7 +748,8 @@ async function buildUserContext(userId, opts = {}) {
   try {
     const { rows } = await pool.query(
       `SELECT display_name, preferred_style, kink_tags, narrative_voice,
-              typical_message_length, timezone, age_band
+              typical_message_length, timezone, age_band, preferred_language,
+              preferred_media_type, response_depth, preferred_companion_style
        FROM user_profile WHERE user_id = $1`,
       [userId]
     );
@@ -757,7 +758,11 @@ async function buildUserContext(userId, opts = {}) {
 
     const lines = [];
     if (p.display_name) lines.push(`- Name: ${p.display_name} (use this)`);
+    if (p.preferred_language) lines.push(`- Language: ${p.preferred_language} (mirror this unless the user switches)`);
     if (p.preferred_style) lines.push(`- Style: ${p.preferred_style}`);
+    if (p.response_depth) lines.push(`- Response depth: ${p.response_depth}`);
+    if (p.preferred_media_type) lines.push(`- Media preference: ${p.preferred_media_type}`);
+    if (p.preferred_companion_style) lines.push(`- Companion style: ${p.preferred_companion_style}`);
     if (p.narrative_voice) lines.push(`- Narrative voice: ${p.narrative_voice}`);
     if (p.typical_message_length) lines.push(`- Message length: ${p.typical_message_length}`);
     if (level > 0 && Array.isArray(p.kink_tags) && p.kink_tags.length > 0) {

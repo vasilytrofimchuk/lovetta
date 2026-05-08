@@ -45,6 +45,49 @@ AI companion app for entertaining and intimate chats with AI-generated women com
 
 ---
 
+## Chat Usage Analysis — in-conversation drop-off + top users (2026-05-07)
+
+One-off Markdown report from prod data answering questions the existing Funnel tab can't:
+
+1. Where users ghost *inside* a conversation (after N msgs, was it after paywall/tip/refusal, was last msg user or assistant?)
+2. Most active users (top spenders of messages + money) with usage patterns
+3. Sample transcripts so we can see how power users actually chat
+
+Phase 1 (this pass): one-off Node script `scripts/chat-analysis.js` producing `docs/CHAT_ANALYSIS_2026-05-07.md`. Read-only against prod.
+Phase 2 (later, separate PR): turn the most useful 2-3 queries into a "Chat Analysis" admin tab.
+
+Plan file: `/Users/vasily/.claude/plans/analize-usess-chats-where-bubbly-naur.md`.
+
+---
+
+## User Chat Research + Logic Improvement Audit (2026-05-08) — DONE
+
+Research-only pass to answer what users discuss with AI girlfriends and what should improve in the chat logic.
+
+- Reviewed existing prod chat analysis artifacts and current AI/chat/memory/media logic.
+- Used aggregate production SQL only; no user identifiers or private transcript excerpts in the deliverable.
+- Cross-checked against current public research and market behavior around AI companion/girlfriend usage.
+- Delivered `docs/USER_CHAT_RESEARCH_2026-05-08.md`.
+- Key result: Lovetta usage is primarily erotic roleplay, romantic possession/affection, scene continuation, and media requests; emotional-support language is minimal.
+- Priority logic improvements: adaptive reply pacing, scene-state memory, media reliability, platform-aware taboo policy, value-moment monetization, free-user reactivation, custom-companion flywheel, localization/slang coverage.
+- Verification: no runtime code changed; tests skipped intentionally.
+
+---
+
+## Execute Chat Research Improvements P0-P2 (2026-05-08) — DONE
+
+Implement the research recommendations across chat quality, memory, media, monetization, reactivation, companion recommendations, localization, and admin analytics.
+
+- Added migration `v61_chat_research_improvements` for scene state, user style/language fields, value prompts, reactivation tracking, message intent metadata, and feature toggles.
+- Added `server/src/chat-intelligence.js` and wired adaptive pacing, anti-repetition retry, scene-state injection/update, platform-aware taboo guidance, media-promise sanitization, and multilingual/slang intent classification into chat endpoints.
+- Added value-moment subscription prompts, free-user reactivation for high-intent dormant chats, and return attribution when a reactivated user replies.
+- Added companion-list recommendation/flywheel data and chat-native premium CTA rendering.
+- Added privacy-preserving `/api/admin/chat-insights` and Chat Insights admin tab with topic, language, media failure, value prompt, and reactivation aggregates.
+- Added bounded first-message generation fallback for companion creation so slow AI calls do not leave users stuck on the creation screen.
+- Verification: `npm run test:e2e:ai`, `npm run test:e2e:api`, and `npm run test:e2e:ui` passed.
+
+---
+
 ## Chat Quality Fixes — level-aware recovery + memory extension (2026-04-22) — IN PROGRESS
 
 Plan approved. Two batches.

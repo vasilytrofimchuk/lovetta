@@ -22,6 +22,17 @@ function truncateNatural(text, maxWords) {
 
 const router = Router();
 
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+  });
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    timeout,
+  ]);
+}
+
 // -- GET /api/companions/avatars — custom avatars with filters --
 router.get('/avatars', authenticate, async (req, res) => {
   const pool = getPool();
@@ -186,10 +197,16 @@ router.post('/', authenticate, async (req, res) => {
     // Generate first message
     let firstMessage = null;
     try {
-      const result = await chatCompletion(
-        `You are ${companion.name}, a ${companion.age}-year-old woman. ${companion.personality}\n\nYou have just been brought to life by someone special. Generate your very first words — express gratitude for being given life, and show excitement about meeting the person who created you. Start with an action in *asterisks*, then your message. Keep it to 2-3 sentences. Be deeply in character and emotionally genuine.`,
-        [{ role: 'user', content: 'I just brought you to life.' }],
-        { userId: req.userId, companionId: companion.id, platform: 'web' }
+      const firstMessageTimeoutMs = process.env.NODE_ENV === 'test' ? 6000 : 12000;
+      const sceneTimeoutMs = process.env.NODE_ENV === 'test' ? 1800 : 3500;
+      const result = await withTimeout(
+        chatCompletion(
+          `You are ${companion.name}, a ${companion.age}-year-old woman. ${companion.personality}\n\nYou have just been brought to life by someone special. Generate your very first words — express gratitude for being given life, and show excitement about meeting the person who created you. Start with an action in *asterisks*, then your message. Keep it to 2-3 sentences. Be deeply in character and emotionally genuine.`,
+          [{ role: 'user', content: 'I just brought you to life.' }],
+          { userId: req.userId, companionId: companion.id, platform: 'web' }
+        ),
+        firstMessageTimeoutMs,
+        'first companion message'
       );
 
       // Parse context text from *asterisks*
@@ -201,16 +218,20 @@ router.post('/', authenticate, async (req, res) => {
       // Always generate scene for first message
       let sceneText = null;
       try {
-        const sceneResult = await plainChatCompletion(
-          `Reply with ONLY a scene description in 5-8 words. Setting and mood only. No names, no dialogue, no actions, no labels, no continuation.
+        const sceneResult = await withTimeout(
+          plainChatCompletion(
+            `Reply with ONLY a scene description in 5-8 words. Setting and mood only. No names, no dialogue, no actions, no labels, no continuation.
 
 Examples:
 - Warm golden light across tangled sheets
 - Rain on the window, tea in hand
 - Kitchen counter, barefoot on cool tiles
 - Dim bedroom, phone glow on her face`,
-          [{ role: 'user', content: `Her first words: ${content}` }],
-          { model: 'thedrummer/rocinante-12b', max_tokens: 25 }
+            [{ role: 'user', content: `Her first words: ${content}` }],
+            { model: 'thedrummer/rocinante-12b', max_tokens: 25 }
+          ),
+          sceneTimeoutMs,
+          'first companion scene'
         );
         let scene = sceneResult.content
           .split('\n')[0]
@@ -260,12 +281,15 @@ router.get('/', authenticate, async (req, res) => {
   if (!pool) return res.json({ companions: [] });
 
   try {
-    const [{ rows }, msgCount] = await Promise.all([
+    const [{ rows }, msgCount, profileResult] = await Promise.all([
       pool.query(`
         SELECT uc.*,
                m.content AS last_message,
                m.context_text AS last_context,
-               m.created_at AS last_message_at
+               m.created_at AS last_message_at,
+               stats.user_messages,
+               stats.media_messages,
+               stats.last_user_message_at
         FROM user_companions uc
         LEFT JOIN LATERAL (
           SELECT msg.content, msg.context_text, msg.created_at
@@ -275,6 +299,15 @@ router.get('/', authenticate, async (req, res) => {
           ORDER BY msg.created_at DESC
           LIMIT 1
         ) m ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*) FILTER (WHERE msg.role = 'user')::int AS user_messages,
+            COUNT(*) FILTER (WHERE msg.role = 'assistant' AND msg.media_url IS NOT NULL)::int AS media_messages,
+            MAX(msg.created_at) FILTER (WHERE msg.role = 'user') AS last_user_message_at
+          FROM messages msg
+          JOIN conversations c ON c.id = msg.conversation_id
+          WHERE c.companion_id = uc.id
+        ) stats ON TRUE
         WHERE uc.user_id = $1 AND uc.is_active = TRUE
         ORDER BY COALESCE(m.created_at, uc.created_at) DESC
       `, [req.userId]),
@@ -284,9 +317,39 @@ router.get('/', authenticate, async (req, res) => {
          WHERE c.user_id = $1 AND m.role = 'user'`,
         [req.userId]
       ),
+      pool.query(
+        `SELECT preferred_style, preferred_language, preferred_media_type, response_depth
+         FROM user_profile WHERE user_id = $1`,
+        [req.userId]
+      ),
     ]);
 
-    res.json({ companions: rows, totalUserMessages: msgCount.rows[0]?.total || 0 });
+    const profile = profileResult.rows[0] || {};
+    const topCompanion = rows
+      .filter(c => (c.user_messages || 0) >= 5)
+      .sort((a, b) => (b.user_messages || 0) - (a.user_messages || 0))[0];
+    const enriched = rows.map(c => ({
+      ...c,
+      usage_badge: c.user_messages >= 20 ? 'Deep chat' : c.media_messages >= 2 ? 'Media favorite' : null,
+      recommendation_reason: topCompanion?.id === c.id && c.user_messages >= 20
+        ? 'Most active girlfriend'
+        : null,
+    }));
+    const recommendations = {
+      preferredStyle: profile.preferred_style || null,
+      preferredLanguage: profile.preferred_language || null,
+      preferredMediaType: profile.preferred_media_type || null,
+      responseDepth: profile.response_depth || null,
+      topCompanionId: topCompanion?.id || null,
+      topCompanionName: topCompanion?.name || null,
+      nextAction: topCompanion
+        ? `Create another girlfriend with ${topCompanion.name}'s energy`
+        : profile.preferred_style
+          ? `Create a ${profile.preferred_style} girlfriend`
+          : null,
+    };
+
+    res.json({ companions: enriched, totalUserMessages: msgCount.rows[0]?.total || 0, recommendations });
   } catch (err) {
     console.error('[companions] list error:', err.message);
     res.status(500).json({ error: 'Failed to load companions' });

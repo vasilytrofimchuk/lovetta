@@ -63,13 +63,23 @@ export default function CompanionCard({ companion }) {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <span className="font-semibold text-lg text-brand-text truncate">{companion.name}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-lg text-brand-text truncate">{companion.name}</span>
+            {companion.usage_badge && (
+              <span className="px-2 py-0.5 rounded-md bg-brand-accent/12 text-brand-accent text-[11px] font-semibold flex-shrink-0">
+                {companion.usage_badge}
+              </span>
+            )}
+          </div>
           {companion.last_message_at && (
             <span className="text-xs text-brand-muted ml-2 flex-shrink-0">
               {timeAgo(companion.last_message_at)}
             </span>
           )}
         </div>
+        {companion.recommendation_reason && (
+          <p className="text-xs text-brand-accent mb-1">{companion.recommendation_reason}</p>
+        )}
         <p className="text-sm text-brand-text-secondary line-clamp-3">
           {companion.last_message || companion.tagline || 'Start a conversation...'}
         </p>

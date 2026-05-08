@@ -46,6 +46,10 @@ const EVENT_TYPES = {
   FIRST_MESSAGE_SENT: 'first_message_sent',
   PAYWALL_BLOCKED: 'paywall_blocked',
   TIP_REQUESTED: 'tip_requested',
+  VALUE_PROMPT_SHOWN: 'value_prompt_shown',
+  REACTIVATION_SENT: 'reactivation_sent',
+  REACTIVATION_RETURNED: 'reactivation_returned',
+  TABOO_POLICY_HIT: 'taboo_policy_hit',
 };
 
 module.exports = { logEvent, hasEvent, EVENT_TYPES };

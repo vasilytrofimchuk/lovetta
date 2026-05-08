@@ -23,6 +23,7 @@ export default function CompanionList() {
   const [supportUnread, setSupportUnread] = useState(0);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [totalUserMessages, setTotalUserMessages] = useState(0);
+  const [recommendations, setRecommendations] = useState(null);
   const [pushBannerVisible, setPushBannerVisible] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const unreadPollRef = useRef(null);
@@ -32,6 +33,7 @@ export default function CompanionList() {
       api.get('/api/companions').then(({ data }) => {
         setCompanions(data.companions || []);
         setTotalUserMessages(data.totalUserMessages || 0);
+        setRecommendations(data.recommendations || null);
       }),
       api.get('/api/billing/status').then(({ data }) => {
         setSubscription(data);
@@ -193,6 +195,23 @@ export default function CompanionList() {
         {/* Rate app banner */}
         {!loading && (
           <RateAppBanner companions={companions} totalUserMessages={totalUserMessages} />
+        )}
+
+        {!loading && companions.length > 0 && recommendations?.nextAction && (
+          <div className="mb-4 bg-brand-surface border border-brand-border rounded-lg p-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-brand-text truncate">{recommendations.nextAction}</p>
+              <p className="text-xs text-brand-text-secondary mt-0.5">
+                Based on your chats{recommendations.preferredLanguage ? ` · ${recommendations.preferredLanguage}` : ''}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/create')}
+              className="px-3 py-2 rounded-lg bg-brand-accent text-white text-sm font-semibold hover:bg-brand-accent-hover transition-colors flex-shrink-0"
+            >
+              Create
+            </button>
+          </div>
         )}
 
         {/* Loading */}
