@@ -304,6 +304,122 @@ router.get('/chat-insights', async (req, res) => {
   }
 });
 
+// -- GET /api/admin/companion-usage -----------------------
+//
+// Top companions (templates + custom) by image, voice (TTS), video, and
+// total user messages. Used by the admin "Girls" tab to spot which
+// companions actually pull engagement and where users spend voice/image
+// budget. Custom companions (no template) are aggregated under a single
+// "(Custom)" row.
+router.get('/companion-usage', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.json({});
+  try {
+    const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 30));
+    const params = [String(days)];
+
+    const testUserFilter = `
+      AND u.email NOT ILIKE '%@example.com'
+      AND u.email NOT ILIKE '%@test.com'
+      AND u.email NOT ILIKE 'conativer+%@gmail.com'
+      AND u.email <> 'conativer@gmail.com'
+    `;
+
+    // Top by image — count of assistant messages with media_type='image' and a real URL.
+    const { rows: byImage } = await pool.query(`
+      SELECT
+        COALESCE(ct.name, '(Custom)') AS companion,
+        COALESCE(ct.style, 'custom') AS style,
+        ct.avatar_url,
+        COUNT(*)::int AS images,
+        COUNT(DISTINCT c.user_id)::int AS users
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      JOIN user_companions uc ON uc.id = c.companion_id
+      LEFT JOIN companion_templates ct ON ct.id = uc.template_id
+      JOIN users u ON u.id = c.user_id
+      WHERE m.role = 'assistant'
+        AND m.media_type = 'image'
+        AND m.media_url IS NOT NULL
+        AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+      GROUP BY ct.name, ct.style, ct.avatar_url
+      ORDER BY images DESC
+      LIMIT 25
+    `, params);
+
+    // Top by video — same but media_type='video'.
+    const { rows: byVideo } = await pool.query(`
+      SELECT
+        COALESCE(ct.name, '(Custom)') AS companion,
+        COALESCE(ct.style, 'custom') AS style,
+        ct.avatar_url,
+        COUNT(*)::int AS videos,
+        COUNT(DISTINCT c.user_id)::int AS users
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      JOIN user_companions uc ON uc.id = c.companion_id
+      LEFT JOIN companion_templates ct ON ct.id = uc.template_id
+      JOIN users u ON u.id = c.user_id
+      WHERE m.role = 'assistant'
+        AND m.media_type = 'video'
+        AND m.media_url IS NOT NULL
+        AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+      GROUP BY ct.name, ct.style, ct.avatar_url
+      ORDER BY videos DESC
+      LIMIT 25
+    `, params);
+
+    // Top by voice (TTS) — api_consumption rows where call_type='tts'.
+    const { rows: byVoice } = await pool.query(`
+      SELECT
+        COALESCE(ct.name, '(Custom)') AS companion,
+        COALESCE(ct.style, 'custom') AS style,
+        ct.avatar_url,
+        COUNT(*)::int AS plays,
+        COUNT(DISTINCT a.user_id)::int AS users,
+        ROUND(COALESCE(SUM(a.cost_usd), 0)::numeric, 4) AS cost_usd
+      FROM api_consumption a
+      JOIN user_companions uc ON uc.id = a.companion_id
+      LEFT JOIN companion_templates ct ON ct.id = uc.template_id
+      JOIN users u ON u.id = a.user_id
+      WHERE a.call_type = 'tts'
+        AND a.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+      GROUP BY ct.name, ct.style, ct.avatar_url
+      ORDER BY plays DESC
+      LIMIT 25
+    `, params);
+
+    // Top by total messages — overall popularity (assistant + user).
+    const { rows: byMessages } = await pool.query(`
+      SELECT
+        COALESCE(ct.name, '(Custom)') AS companion,
+        COALESCE(ct.style, 'custom') AS style,
+        ct.avatar_url,
+        COUNT(*) FILTER (WHERE m.role = 'user')::int AS user_msgs,
+        COUNT(*) FILTER (WHERE m.role = 'assistant')::int AS ai_msgs,
+        COUNT(DISTINCT c.user_id)::int AS users
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      JOIN user_companions uc ON uc.id = c.companion_id
+      LEFT JOIN companion_templates ct ON ct.id = uc.template_id
+      JOIN users u ON u.id = c.user_id
+      WHERE m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+      GROUP BY ct.name, ct.style, ct.avatar_url
+      ORDER BY (COUNT(*) FILTER (WHERE m.role = 'user')) DESC
+      LIMIT 25
+    `, params);
+
+    res.json({ days, byImage, byVoice, byVideo, byMessages });
+  } catch (err) {
+    console.error('[admin] companion-usage error:', err.message);
+    res.status(500).json({ error: 'Failed to load companion usage' });
+  }
+});
+
 // -- GET /api/admin/funnel --------------------------------
 // Signup -> activation -> conversion funnel for a date range.
 // Excludes obvious test users (@example.com, @test.com, conativer+*@gmail.com, conativer@gmail.com).

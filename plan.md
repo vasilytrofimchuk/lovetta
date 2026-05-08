@@ -7,6 +7,35 @@ AI companion app for entertaining and intimate chats with AI-generated women com
 
 ---
 
+## Admin "Girls" tab — companion usage tops (2026-05-08)
+
+Add a new admin tab surfacing which companions (templates + custom) are used most. Top tables for:
+- Image generation (count of `media_type='image'` messages)
+- Voice / TTS (count of `api_consumption.call_type='tts'` rows)
+- Video generation (count of `media_type='video'` messages) — bonus
+- Total messages (overall popularity) — bonus
+
+Each table groups by `companion_templates.name` when `user_companions.template_id` is set; custom companions (no template) are aggregated under one "(Custom)" row.
+
+Files:
+- `server/src/admin-api.js` — `GET /api/admin/companion-usage?days=N` endpoint
+- `public/admin.html` — new "Girls" tab with period selector (1d/7d/30d/90d/1y) and 4 tables
+
+Test users filtered via existing `testUserFilter` SQL fragment.
+
+---
+
+## Value Prompt Daily Cap (2026-05-08)
+
+DONE: Changed monetization value prompts from a once-per-7-days-per-reason cap to a steadier rolling daily cap:
+- max one value prompt per user per day globally
+- same reason cannot repeat more than once per day
+- preserve existing minimum engagement gate and active-subscriber suppression
+- added focused tests for eligible, global-capped, and same-reason-capped prompt behavior
+- verification: `npm run test:e2e:ai` passed (149/149)
+
+---
+
 ## Phase 1: Landing + Admin + Lead Capture — DONE
 - [x] Landing page (lovetta.ai) with social cards, OG tags, visitor tracking
 - [x] Lead capture with email + 18+ age gate (month/year of birth)
@@ -102,7 +131,7 @@ Measure how Lovetta notification channels currently work and whether they bring 
 
 ---
 
-## Email Notification Default-On Fix (2026-05-08) — IN PROGRESS
+## Email Notification Default-On Fix (2026-05-08) — DONE
 
 Turn companion email notifications on by default and backfill existing users so email can actually become a return channel.
 
@@ -110,7 +139,16 @@ Turn companion email notifications on by default and backfill existing users so 
 - Update API fallbacks and notification queries so missing preference rows default to enabled.
 - Keep hard deliverability safeguards: do not send companion emails to disabled email addresses, synthetic relay addresses, app relay domains, or marketing-unsubscribed users.
 - Add companion email delivery to free-user reactivation messages so dormant high-intent users get an email, not just push/Telegram.
-- Verify with the relevant API test bucket.
+- Added unsubscribe footer support to companion notification emails and kept deliverability blocks for disabled, synthetic-only, relay, test, and marketing-unsubscribed addresses.
+- Verification: syntax checks passed for touched server files; `npm run test:e2e:api` passed (30/30).
+
+---
+
+## Test Email Send (2026-05-08) — DONE
+
+Send one internal test email through the existing email helper and record the result. No runtime code changes planned.
+
+- Result: accepted by email provider with id `d0b9c7ff-df1b-4ffa-864a-49526cc1eb45`.
 
 ---
 

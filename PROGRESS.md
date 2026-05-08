@@ -2,6 +2,21 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Admin "Girls" tab — companion usage tops (2026-05-08)
+
+- [x] Added `GET /api/admin/companion-usage?days=N` to `server/src/admin-api.js`. Returns 4 tops: by image, by voice (TTS via `api_consumption.call_type`), by video, by total user messages. Templates + custom (custom companions aggregated under "(Custom)"). Test users filtered via existing `testUserFilter`.
+- [x] Added "Girls" tab to `public/admin.html` with 1d/7d/30d/90d/1y period selector and 4 tables. Each row shows avatar, companion name, style badge, count, distinct users; voice table also shows cost $; messages table also shows AI msg count.
+- [x] `npm run test:e2e:api` 30/30 green.
+- [x] Browser-verified on local dev: tab loads under `/admin.html#girls`, period buttons work, mock-data render shows tables align cleanly. Prod sanity check via direct SQL: Top by image (90d) → (Custom)=761/77u, Luna=168/39u; Top by TTS → (Custom)=483/41u, Luna=158/7u, Sophia=139/3u.
+
+## Value Prompt Daily Cap (2026-05-08)
+
+- [x] Update `plan.md` and `PROGRESS.md` with scope before code changes
+- [x] Change value prompt cap from 7 days per reason to daily global + daily per-reason checks
+- [x] Add focused tests for daily global and reason caps
+- [x] Run the smallest relevant test bucket — `npm run test:e2e:ai` passed (149/149)
+- [x] Update tracking files with final status and verification
+
 ## QA fixes round 2: subscription label + deliverability tests (2026-05-08)
 
 QA report v2: `.mystack/qa-reports/qa-report-lovetta-local-2026-05-08-v2.md` (health 92/100). The one observation (Profile shows "Active" for free users in dev) is fixed plus the suggested unit-test gap is filled.

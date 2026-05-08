@@ -307,6 +307,7 @@
       <button class="tab" data-tab="economics" onclick="switchTab('economics')">Economics</button>
       <button class="tab" data-tab="funnel" onclick="switchTab('funnel')">Funnel</button>
       <button class="tab" data-tab="chat-insights" onclick="switchTab('chat-insights')">Chat Insights</button>
+      <button class="tab" data-tab="girls" onclick="switchTab('girls')">Girls</button>
       <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
       <button class="tab" data-tab="reports" onclick="switchTab('reports')">Reports <span class="badge" id="reports-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
       <button class="tab" data-tab="sentry" onclick="switchTab('sentry')">Sentry <span class="badge" id="sentry-badge" style="display:none;background:rgba(255,77,106,0.15);color:var(--error);font-size:0.6rem;padding:1px 4px;border-radius:6px;margin-left:2px;"></span></button>
@@ -481,6 +482,27 @@
       <div class="section" style="margin-top:24px;">
         <h3>Free reactivation</h3>
         <div id="chat-insights-reactivation"></div>
+      </div>
+    </div>
+
+    <!-- Girls Tab -->
+    <div id="tab-girls" class="tab-content">
+      <div class="tab-header"><h2>Girls — usage tops</h2><button class="refresh-btn" onclick="loadGirls(girlsDays||30)">↻ Refresh</button></div>
+      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px;">Which companions (templates + custom) get the most usage. Custom companions are aggregated as one row. Test users excluded.</p>
+      <div style="display:flex;gap:8px;margin-bottom:20px;">
+        <button class="econ-period" onclick="loadGirls(1, this)">1d</button>
+        <button class="econ-period" onclick="loadGirls(7, this)">7d</button>
+        <button class="econ-period active" onclick="loadGirls(30, this)">30d</button>
+        <button class="econ-period" onclick="loadGirls(90, this)">90d</button>
+        <button class="econ-period" onclick="loadGirls(365, this)">1y</button>
+      </div>
+      <div class="breakdown-grid">
+        <div class="section"><h3>Top by image</h3><div id="girls-image"></div></div>
+        <div class="section"><h3>Top by voice (TTS)</h3><div id="girls-voice"></div></div>
+      </div>
+      <div class="breakdown-grid" style="margin-top:24px;">
+        <div class="section"><h3>Top by video</h3><div id="girls-video"></div></div>
+        <div class="section"><h3>Top by total messages</h3><div id="girls-messages"></div></div>
       </div>
     </div>
 
@@ -669,6 +691,7 @@
     var chatsFlaggedCategory = '';
     var chatsFlaggedDays = 30;
     var chatInsightsDays = 7;
+    var girlsDays = 30;
     var supportPollInterval = null;
     var overviewPollInterval = null;
 
@@ -735,6 +758,7 @@
       else if (name === 'economics') loadEconomics(econPeriod || '7d');
       else if (name === 'funnel') loadFunnel(funnelDays || 7);
       else if (name === 'chat-insights') loadChatInsights(chatInsightsDays || 7);
+      else if (name === 'girls') loadGirls(girlsDays || 30);
       else if (name === 'email') loadEmails();
       else if (name === 'companion-emails') loadCompanionEmails();
       else if (name === 'cashouts') loadCashouts();
@@ -1881,6 +1905,76 @@
           '<tr><td>' + formatNumber(re.sent || 0) + '</td><td>' + formatNumber(re.returned || 0) + '</td><td>' + rate + '</td></tr></table>';
       }).catch(function(err) {
         document.getElementById('chat-insights-cards').innerHTML = '<p style="color:var(--error);padding:16px;">Failed to load chat insights: ' + esc(err.message || 'unknown error') + '</p>';
+      });
+    }
+
+    function loadGirls(days, btn) {
+      girlsDays = parseInt(days, 10) || 30;
+      document.querySelectorAll('#tab-girls .econ-period').forEach(function(b) { b.classList.remove('active'); });
+      if (btn) btn.classList.add('active');
+      else {
+        document.querySelectorAll('#tab-girls .econ-period').forEach(function(b) {
+          var t = (b.textContent || '').trim();
+          var n = t === '1y' ? 365 : parseInt(t, 10);
+          if (n === girlsDays) b.classList.add('active');
+        });
+      }
+
+      ['image','voice','video','messages'].forEach(function(id) {
+        document.getElementById('girls-' + id).innerHTML = '<p style="color:var(--muted);padding:16px;">Loading...</p>';
+      });
+
+      function avatarCell(row) {
+        var url = row.avatar_url || '';
+        if (!url) return '<div style="width:32px;height:32px;border-radius:50%;background:var(--bg-secondary);"></div>';
+        return '<img src="' + esc(url) + '" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" loading="lazy">';
+      }
+
+      function styleBadge(style) {
+        var label = style || 'custom';
+        var bg = label === 'anime' ? 'rgba(120, 80, 220, 0.15)' :
+                 label === 'realistic' ? 'rgba(214, 51, 108, 0.15)' :
+                 'rgba(140, 140, 140, 0.15)';
+        var color = label === 'anime' ? '#a78bfa' :
+                    label === 'realistic' ? 'var(--accent)' :
+                    'var(--muted)';
+        return '<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:600;background:' + bg + ';color:' + color + ';">' + esc(label) + '</span>';
+      }
+
+      function girlsTable(rows, valueKey, valueLabel, extraCols) {
+        if (!rows || !rows.length) return '<p style="color:var(--muted);padding:16px;">No data in this window.</p>';
+        var html = '<table style="font-size:0.85rem;"><tr><th></th><th>Companion</th><th>Style</th><th>' + valueLabel + '</th><th>Users</th>';
+        (extraCols || []).forEach(function(c) { html += '<th>' + esc(c.label) + '</th>'; });
+        html += '</tr>';
+        rows.forEach(function(r) {
+          html += '<tr>' +
+            '<td>' + avatarCell(r) + '</td>' +
+            '<td><strong>' + esc(r.companion) + '</strong></td>' +
+            '<td>' + styleBadge(r.style) + '</td>' +
+            '<td>' + formatNumber(r[valueKey] || 0) + '</td>' +
+            '<td>' + formatNumber(r.users || 0) + '</td>';
+          (extraCols || []).forEach(function(c) {
+            var v = typeof c.value === 'function' ? c.value(r) : r[c.key];
+            html += '<td>' + esc(v == null ? '—' : String(v)) + '</td>';
+          });
+          html += '</tr>';
+        });
+        return html + '</table>';
+      }
+
+      apiFetch('/api/admin/companion-usage?days=' + girlsDays).then(function(data) {
+        document.getElementById('girls-image').innerHTML = girlsTable(data.byImage || [], 'images', 'Images');
+        document.getElementById('girls-voice').innerHTML = girlsTable(data.byVoice || [], 'plays', 'TTS plays', [
+          { key: 'cost_usd', label: 'Cost $' }
+        ]);
+        document.getElementById('girls-video').innerHTML = girlsTable(data.byVideo || [], 'videos', 'Videos');
+        document.getElementById('girls-messages').innerHTML = girlsTable(data.byMessages || [], 'user_msgs', 'User msgs', [
+          { key: 'ai_msgs', label: 'AI msgs' }
+        ]);
+      }).catch(function(err) {
+        ['image','voice','video','messages'].forEach(function(id) {
+          document.getElementById('girls-' + id).innerHTML = '<p style="color:var(--error);padding:16px;">Failed: ' + esc(err.message || 'unknown') + '</p>';
+        });
       });
     }
 
