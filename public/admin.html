@@ -487,22 +487,18 @@
 
     <!-- Girls Tab -->
     <div id="tab-girls" class="tab-content">
-      <div class="tab-header"><h2>Girls — usage tops</h2><button class="refresh-btn" onclick="loadGirls(girlsDays||30)">↻ Refresh</button></div>
-      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px;">Which companions (templates + custom) get the most usage. Custom companions are aggregated as one row. Test users excluded.</p>
+      <div class="tab-header"><h2>Girls — top picks</h2><button class="refresh-btn" onclick="loadGirls(girlsDays||365)">↻ Refresh</button></div>
+      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:16px;">Which template <em>and</em> which voice users picked when creating a girlfriend. Counts rows in <code>user_companions</code> grouped by template and by voice. Custom companions (no template) are aggregated as one row. Test users excluded.</p>
       <div style="display:flex;gap:8px;margin-bottom:20px;">
-        <button class="econ-period" onclick="loadGirls(1, this)">1d</button>
         <button class="econ-period" onclick="loadGirls(7, this)">7d</button>
-        <button class="econ-period active" onclick="loadGirls(30, this)">30d</button>
+        <button class="econ-period" onclick="loadGirls(30, this)">30d</button>
         <button class="econ-period" onclick="loadGirls(90, this)">90d</button>
-        <button class="econ-period" onclick="loadGirls(365, this)">1y</button>
+        <button class="econ-period active" onclick="loadGirls(365, this)">1y</button>
+        <button class="econ-period" onclick="loadGirls(3650, this)">All</button>
       </div>
       <div class="breakdown-grid">
-        <div class="section"><h3>Top by image</h3><div id="girls-image"></div></div>
-        <div class="section"><h3>Top by voice (TTS)</h3><div id="girls-voice"></div></div>
-      </div>
-      <div class="breakdown-grid" style="margin-top:24px;">
-        <div class="section"><h3>Top by video</h3><div id="girls-video"></div></div>
-        <div class="section"><h3>Top by total messages</h3><div id="girls-messages"></div></div>
+        <div class="section"><h3>Top girls picked (template / custom)</h3><div id="girls-template"></div></div>
+        <div class="section"><h3>Top voices picked</h3><div id="girls-voice"></div></div>
       </div>
     </div>
 
@@ -691,7 +687,7 @@
     var chatsFlaggedCategory = '';
     var chatsFlaggedDays = 30;
     var chatInsightsDays = 7;
-    var girlsDays = 30;
+    var girlsDays = 365;
     var supportPollInterval = null;
     var overviewPollInterval = null;
 
@@ -758,7 +754,7 @@
       else if (name === 'economics') loadEconomics(econPeriod || '7d');
       else if (name === 'funnel') loadFunnel(funnelDays || 7);
       else if (name === 'chat-insights') loadChatInsights(chatInsightsDays || 7);
-      else if (name === 'girls') loadGirls(girlsDays || 30);
+      else if (name === 'girls') loadGirls(girlsDays || 365);
       else if (name === 'email') loadEmails();
       else if (name === 'companion-emails') loadCompanionEmails();
       else if (name === 'cashouts') loadCashouts();
@@ -1909,24 +1905,23 @@
     }
 
     function loadGirls(days, btn) {
-      girlsDays = parseInt(days, 10) || 30;
+      girlsDays = parseInt(days, 10) || 365;
       document.querySelectorAll('#tab-girls .econ-period').forEach(function(b) { b.classList.remove('active'); });
       if (btn) btn.classList.add('active');
       else {
         document.querySelectorAll('#tab-girls .econ-period').forEach(function(b) {
           var t = (b.textContent || '').trim();
-          var n = t === '1y' ? 365 : parseInt(t, 10);
+          var n = t === 'All' ? 3650 : t === '1y' ? 365 : parseInt(t, 10);
           if (n === girlsDays) b.classList.add('active');
         });
       }
 
-      ['image','voice','video','messages'].forEach(function(id) {
+      ['template','voice'].forEach(function(id) {
         document.getElementById('girls-' + id).innerHTML = '<p style="color:var(--muted);padding:16px;">Loading...</p>';
       });
 
-      function avatarCell(row) {
-        var url = row.avatar_url || '';
-        if (!url) return '<div style="width:32px;height:32px;border-radius:50%;background:var(--bg-secondary);"></div>';
+      function avatarCell(url) {
+        if (!url) return '<div style="width:32px;height:32px;border-radius:50%;background:var(--bg-secondary);display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem;color:var(--muted);">?</div>';
         return '<img src="' + esc(url) + '" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" loading="lazy">';
       }
 
@@ -1941,38 +1936,67 @@
         return '<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:600;background:' + bg + ';color:' + color + ';">' + esc(label) + '</span>';
       }
 
-      function girlsTable(rows, valueKey, valueLabel, extraCols) {
-        if (!rows || !rows.length) return '<p style="color:var(--muted);padding:16px;">No data in this window.</p>';
-        var html = '<table style="font-size:0.85rem;"><tr><th></th><th>Companion</th><th>Style</th><th>' + valueLabel + '</th><th>Users</th>';
-        (extraCols || []).forEach(function(c) { html += '<th>' + esc(c.label) + '</th>'; });
-        html += '</tr>';
-        rows.forEach(function(r) {
-          html += '<tr>' +
-            '<td>' + avatarCell(r) + '</td>' +
-            '<td><strong>' + esc(r.companion) + '</strong></td>' +
-            '<td>' + styleBadge(r.style) + '</td>' +
-            '<td>' + formatNumber(r[valueKey] || 0) + '</td>' +
-            '<td>' + formatNumber(r.users || 0) + '</td>';
-          (extraCols || []).forEach(function(c) {
-            var v = typeof c.value === 'function' ? c.value(r) : r[c.key];
-            html += '<td>' + esc(v == null ? '—' : String(v)) + '</td>';
-          });
-          html += '</tr>';
-        });
-        return html + '</table>';
+      function pctBar(value, total) {
+        var pct = total > 0 ? Math.round((value / total) * 1000) / 10 : 0;
+        var w = total > 0 ? Math.max(2, Math.round((value / total) * 100)) : 0;
+        return '<div style="position:relative;width:100%;background:rgba(214,51,108,0.08);height:18px;border-radius:4px;overflow:hidden;">' +
+                 '<div style="position:absolute;left:0;top:0;bottom:0;width:' + w + '%;background:rgba(214,51,108,0.35);"></div>' +
+                 '<span style="position:relative;display:inline-block;padding:0 6px;font-size:0.75rem;line-height:18px;">' + pct + '%</span>' +
+               '</div>';
+      }
+
+      function templateRow(r, total) {
+        return '<tr>' +
+          '<td>' + avatarCell(r.avatar_url) + '</td>' +
+          '<td><strong>' + esc(r.companion) + '</strong>' +
+            (r.tagline ? '<div style="color:var(--muted);font-size:0.7rem;margin-top:2px;">' + esc(r.tagline) + '</div>' : '') +
+          '</td>' +
+          '<td>' + styleBadge(r.style) + '</td>' +
+          '<td><strong>' + formatNumber(r.picks) + '</strong></td>' +
+          '<td>' + formatNumber(r.users) + '</td>' +
+          '<td style="min-width:160px;">' + pctBar(r.picks, total) + '</td>' +
+        '</tr>';
+      }
+
+      function voiceRow(r, total) {
+        var customPct = r.picks > 0 ? Math.round((r.picks_on_custom / r.picks) * 100) : 0;
+        return '<tr>' +
+          '<td><strong>' + esc(r.label) + '</strong>' +
+            (r.desc ? '<div style="color:var(--muted);font-size:0.7rem;margin-top:2px;">' + esc(r.desc) + '</div>' : '') +
+            '<div style="color:var(--muted);font-size:0.65rem;margin-top:2px;font-family:monospace;">' + esc(r.voice_id) + '</div>' +
+          '</td>' +
+          '<td><strong>' + formatNumber(r.picks) + '</strong></td>' +
+          '<td>' + formatNumber(r.users) + '</td>' +
+          '<td>' + customPct + '% custom</td>' +
+          '<td style="min-width:160px;">' + pctBar(r.picks, total) + '</td>' +
+        '</tr>';
       }
 
       apiFetch('/api/admin/companion-usage?days=' + girlsDays).then(function(data) {
-        document.getElementById('girls-image').innerHTML = girlsTable(data.byImage || [], 'images', 'Images');
-        document.getElementById('girls-voice').innerHTML = girlsTable(data.byVoice || [], 'plays', 'TTS plays', [
-          { key: 'cost_usd', label: 'Cost $' }
-        ]);
-        document.getElementById('girls-video').innerHTML = girlsTable(data.byVideo || [], 'videos', 'Videos');
-        document.getElementById('girls-messages').innerHTML = girlsTable(data.byMessages || [], 'user_msgs', 'User msgs', [
-          { key: 'ai_msgs', label: 'AI msgs' }
-        ]);
+        var templates = data.byTemplate || [];
+        var voices = data.byVoice || [];
+        var templateTotal = templates.reduce(function(s, r) { return s + (r.picks || 0); }, 0);
+        var voiceTotal = voices.reduce(function(s, r) { return s + (r.picks || 0); }, 0);
+
+        if (!templates.length) {
+          document.getElementById('girls-template').innerHTML = '<p style="color:var(--muted);padding:16px;">No picks in this window.</p>';
+        } else {
+          var t = '<table style="font-size:0.85rem;"><tr><th></th><th>Template</th><th>Style</th><th>Picks</th><th>Users</th><th style="min-width:160px;">Share</th></tr>';
+          templates.forEach(function(r) { t += templateRow(r, templateTotal); });
+          t += '</table>';
+          document.getElementById('girls-template').innerHTML = t;
+        }
+
+        if (!voices.length) {
+          document.getElementById('girls-voice').innerHTML = '<p style="color:var(--muted);padding:16px;">No voice picks in this window.</p>';
+        } else {
+          var v = '<table style="font-size:0.85rem;"><tr><th>Voice</th><th>Picks</th><th>Users</th><th>Custom share</th><th style="min-width:160px;">Share</th></tr>';
+          voices.forEach(function(r) { v += voiceRow(r, voiceTotal); });
+          v += '</table>';
+          document.getElementById('girls-voice').innerHTML = v;
+        }
       }).catch(function(err) {
-        ['image','voice','video','messages'].forEach(function(id) {
+        ['template','voice'].forEach(function(id) {
           document.getElementById('girls-' + id).innerHTML = '<p style="color:var(--error);padding:16px;">Failed: ' + esc(err.message || 'unknown') + '</p>';
         });
       });

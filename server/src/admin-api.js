@@ -306,16 +306,43 @@ router.get('/chat-insights', async (req, res) => {
 
 // -- GET /api/admin/companion-usage -----------------------
 //
-// Top companions (templates + custom) by image, voice (TTS), video, and
-// total user messages. Used by the admin "Girls" tab to spot which
-// companions actually pull engagement and where users spend voice/image
-// budget. Custom companions (no template) are aggregated under a single
-// "(Custom)" row.
+// Top companions and voices users PICK when creating a girlfriend.
+// Counts rows in `user_companions` grouped by template / voice — i.e.
+// "what did the user choose," not "how much did they chat after."
+//
+// Custom companions (template_id IS NULL) are aggregated under one
+// "(Custom)" row. Voice IDs are mapped to friendly labels via the same
+// catalog the create-companion UI uses (web/src/lib/voices.js).
+//
+// Period filter: `?days=N` defaults to 365 (all-time-ish) since picks
+// are rare events compared to messages.
+
+const VOICE_CATALOG = {
+  'b089032e45db460fb1934ece75a8c51d': { label: 'Ember',   desc: 'Calm & sultry' },
+  '933563129e564b19a115bedd57b7406a': { label: 'Aurora',  desc: 'Captivating & versatile' },
+  'c2623f0c075b4492ac367989aee1576f': { label: 'Flame',   desc: 'Engaging & sassy' },
+  '8126dcf7ccd949a2b4d83c328efb91a5': { label: 'Velour',  desc: 'Poetic & romantic' },
+  'b545c585f631496c914815291da4e893': { label: 'Spark',   desc: 'Quirky & enthusiastic' },
+  'e3cd384158934cc9a01029cd7d278634': { label: 'Crystal', desc: 'Clear & engaging' },
+  'b347db033a6549378b48d00acb0d06cd': { label: 'Silk',    desc: 'Velvety & expressive' },
+  'b1e436a2375f4cdfbefc432381e385f4': { label: 'Pearl',   desc: 'Bright & polished' },
+  '59e9dc1cb20c452584788a2690c80970': { label: 'Fizz',    desc: 'Energetic & bubbly' },
+  '13ea42e651954876a59109ba40c8cdb2': { label: 'Breeze',  desc: 'Vibrant & light' },
+  '42e70f5bc7b34a9e84abbbd6ec5572d0': { label: 'Dazzle',  desc: 'Spirited & daring' },
+  '8ef4a238714b45718ce04243307c57a7': { label: 'Honey',   desc: 'Fun & feminine' },
+  '37ab9e84be5b42a18681adb35ab988d1': { label: 'Moon',    desc: 'Soft & soothing' },
+  'd60c136243984ec78a3be125b2f38faf': { label: 'Mist',    desc: 'Whispery & intimate' },
+  'df5c6c19dca944918dcbd6f1368fd02f': { label: 'Fairy',   desc: 'Magical & bright' },
+  '584afa907518428fac9b04c92ec8a563': { label: 'Willow',  desc: 'Warm & storytelling' },
+  '08b50a4cac844cea91a4b396bd1d10c3': { label: 'Blossom', desc: 'Cute & cheerful' },
+  '22550e2d849b44e18c7df57f61e666f9': { label: 'Echo',    desc: 'Clear & emotive' },
+};
+
 router.get('/companion-usage', async (req, res) => {
   const pool = getPool();
   if (!pool) return res.json({});
   try {
-    const days = Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 30));
+    const days = Math.min(3650, Math.max(1, parseInt(req.query.days, 10) || 365));
     const params = [String(days)];
 
     const testUserFilter = `
@@ -325,95 +352,61 @@ router.get('/companion-usage', async (req, res) => {
       AND u.email <> 'conativer@gmail.com'
     `;
 
-    // Top by image — count of assistant messages with media_type='image' and a real URL.
-    const { rows: byImage } = await pool.query(`
+    // Top girls picked — group user_companions by template (custom = NULL).
+    const { rows: byTemplate } = await pool.query(`
       SELECT
         COALESCE(ct.name, '(Custom)') AS companion,
         COALESCE(ct.style, 'custom') AS style,
+        COALESCE(ct.tagline, '') AS tagline,
         ct.avatar_url,
-        COUNT(*)::int AS images,
-        COUNT(DISTINCT c.user_id)::int AS users
-      FROM messages m
-      JOIN conversations c ON c.id = m.conversation_id
-      JOIN user_companions uc ON uc.id = c.companion_id
+        ct.id AS template_id,
+        COUNT(*)::int AS picks,
+        COUNT(DISTINCT uc.user_id)::int AS users,
+        COUNT(*) FILTER (WHERE uc.is_active = false)::int AS deleted
+      FROM user_companions uc
       LEFT JOIN companion_templates ct ON ct.id = uc.template_id
-      JOIN users u ON u.id = c.user_id
-      WHERE m.role = 'assistant'
-        AND m.media_type = 'image'
-        AND m.media_url IS NOT NULL
-        AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+      JOIN users u ON u.id = uc.user_id
+      WHERE u.deleted_at IS NULL
+        AND uc.created_at >= NOW() - ($1 || ' days')::INTERVAL
         ${testUserFilter}
-      GROUP BY ct.name, ct.style, ct.avatar_url
-      ORDER BY images DESC
-      LIMIT 25
+      GROUP BY ct.id, ct.name, ct.style, ct.tagline, ct.avatar_url
+      ORDER BY picks DESC
+      LIMIT 50
     `, params);
 
-    // Top by video — same but media_type='video'.
-    const { rows: byVideo } = await pool.query(`
+    // Top voices picked — group user_companions by voice_id, mapped to label.
+    const { rows: byVoiceRaw } = await pool.query(`
       SELECT
-        COALESCE(ct.name, '(Custom)') AS companion,
-        COALESCE(ct.style, 'custom') AS style,
-        ct.avatar_url,
-        COUNT(*)::int AS videos,
-        COUNT(DISTINCT c.user_id)::int AS users
-      FROM messages m
-      JOIN conversations c ON c.id = m.conversation_id
-      JOIN user_companions uc ON uc.id = c.companion_id
-      LEFT JOIN companion_templates ct ON ct.id = uc.template_id
-      JOIN users u ON u.id = c.user_id
-      WHERE m.role = 'assistant'
-        AND m.media_type = 'video'
-        AND m.media_url IS NOT NULL
-        AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        uc.voice_id,
+        COUNT(*)::int AS picks,
+        COUNT(DISTINCT uc.user_id)::int AS users,
+        COUNT(*) FILTER (WHERE uc.template_id IS NULL)::int AS picks_on_custom,
+        COUNT(*) FILTER (WHERE uc.template_id IS NOT NULL)::int AS picks_on_template
+      FROM user_companions uc
+      JOIN users u ON u.id = uc.user_id
+      WHERE u.deleted_at IS NULL
+        AND uc.voice_id IS NOT NULL
+        AND uc.created_at >= NOW() - ($1 || ' days')::INTERVAL
         ${testUserFilter}
-      GROUP BY ct.name, ct.style, ct.avatar_url
-      ORDER BY videos DESC
-      LIMIT 25
+      GROUP BY uc.voice_id
+      ORDER BY picks DESC
+      LIMIT 50
     `, params);
 
-    // Top by voice (TTS) — api_consumption rows where call_type='tts'.
-    const { rows: byVoice } = await pool.query(`
-      SELECT
-        COALESCE(ct.name, '(Custom)') AS companion,
-        COALESCE(ct.style, 'custom') AS style,
-        ct.avatar_url,
-        COUNT(*)::int AS plays,
-        COUNT(DISTINCT a.user_id)::int AS users,
-        ROUND(COALESCE(SUM(a.cost_usd), 0)::numeric, 4) AS cost_usd
-      FROM api_consumption a
-      JOIN user_companions uc ON uc.id = a.companion_id
-      LEFT JOIN companion_templates ct ON ct.id = uc.template_id
-      JOIN users u ON u.id = a.user_id
-      WHERE a.call_type = 'tts'
-        AND a.created_at >= NOW() - ($1 || ' days')::INTERVAL
-        ${testUserFilter}
-      GROUP BY ct.name, ct.style, ct.avatar_url
-      ORDER BY plays DESC
-      LIMIT 25
-    `, params);
+    const byVoice = byVoiceRaw.map((r) => {
+      const meta = VOICE_CATALOG[r.voice_id];
+      return {
+        voice_id: r.voice_id,
+        label: meta?.label || '(legacy / unknown)',
+        desc: meta?.desc || '',
+        picks: r.picks,
+        users: r.users,
+        picks_on_custom: r.picks_on_custom,
+        picks_on_template: r.picks_on_template,
+      };
+    });
 
-    // Top by total messages — overall popularity (assistant + user).
-    const { rows: byMessages } = await pool.query(`
-      SELECT
-        COALESCE(ct.name, '(Custom)') AS companion,
-        COALESCE(ct.style, 'custom') AS style,
-        ct.avatar_url,
-        COUNT(*) FILTER (WHERE m.role = 'user')::int AS user_msgs,
-        COUNT(*) FILTER (WHERE m.role = 'assistant')::int AS ai_msgs,
-        COUNT(DISTINCT c.user_id)::int AS users
-      FROM messages m
-      JOIN conversations c ON c.id = m.conversation_id
-      JOIN user_companions uc ON uc.id = c.companion_id
-      LEFT JOIN companion_templates ct ON ct.id = uc.template_id
-      JOIN users u ON u.id = c.user_id
-      WHERE m.created_at >= NOW() - ($1 || ' days')::INTERVAL
-        ${testUserFilter}
-      GROUP BY ct.name, ct.style, ct.avatar_url
-      ORDER BY (COUNT(*) FILTER (WHERE m.role = 'user')) DESC
-      LIMIT 25
-    `, params);
-
-    res.json({ days, byImage, byVoice, byVideo, byMessages });
+    res.json({ days, byTemplate, byVoice });
   } catch (err) {
     console.error('[admin] companion-usage error:', err.message);
     res.status(500).json({ error: 'Failed to load companion usage' });
