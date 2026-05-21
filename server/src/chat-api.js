@@ -9,6 +9,7 @@ const { authenticate } = require('./auth-middleware');
 const { detectPlatform, getMediaEnabled, getVideoEnabled } = require('./content-levels');
 const { getUserSubscription, isSubscriptionActive } = require('./billing');
 const { sendCompanionEmail, sendAppleReviewerTranscriptAlert } = require('./email');
+const { isCompanionEmailDeliverable } = require('./email-deliverability');
 
 const APPLE_REVIEWER_ID = '00000000-0000-0000-0000-000000001234';
 let reviewerTranscriptTimer = null;
@@ -158,7 +159,15 @@ async function appendFailureLineAndClear(pool, messageId, companion, reason, err
 async function maybeNotifyUser(pool, userId, companion, conversationId, messageContent) {
   try {
     const { rows } = await pool.query(
-      `SELECT up.notify_new_messages, up.last_notification_at, u.email, u.last_activity,
+      `SELECT COALESCE(up.notify_new_messages, true) AS notify_new_messages,
+              up.last_notification_at,
+              COALESCE(u.real_email, u.email) AS email,
+              u.email AS account_email,
+              u.real_email,
+              u.last_activity,
+              u.email_disabled,
+              u.email_type,
+              u.marketing_unsubscribed,
               c.last_email_message_id
        FROM users u
        LEFT JOIN user_preferences up ON up.user_id = u.id
@@ -167,7 +176,7 @@ async function maybeNotifyUser(pool, userId, companion, conversationId, messageC
       [userId, conversationId]
     );
     const row = rows[0];
-    if (!row || !row.notify_new_messages || !row.email) return;
+    if (!row || !row.notify_new_messages || !isCompanionEmailDeliverable(row)) return;
 
     // Only notify if user inactive for 5+ minutes
     const inactiveMs = Date.now() - new Date(row.last_activity).getTime();
@@ -187,6 +196,7 @@ async function maybeNotifyUser(pool, userId, companion, conversationId, messageC
       messageContent,
       conversationId,
       inReplyTo: row.last_email_message_id || null,
+      userId,
     });
 
     // Store message ID for threading + update notification timestamp
@@ -195,7 +205,11 @@ async function maybeNotifyUser(pool, userId, companion, conversationId, messageC
       [conversationId, msgId]
     );
     await pool.query(
-      'UPDATE user_preferences SET last_notification_at = NOW() WHERE user_id = $1',
+      `INSERT INTO user_preferences (user_id, notify_new_messages, last_notification_at, updated_at)
+       VALUES ($1, true, NOW(), NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         last_notification_at = NOW(),
+         updated_at = NOW()`,
       [userId]
     );
 

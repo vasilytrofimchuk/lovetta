@@ -31,7 +31,7 @@ router.get('/preferences', authenticate, async (req, res) => {
     const defaultExplicit = false;
 
     res.json({
-      notify_new_messages: rows[0]?.notify_new_messages ?? false,
+      notify_new_messages: rows[0]?.notify_new_messages ?? true,
       explicit_content: rows[0]?.explicit_content ?? defaultExplicit,
       proactive_messages: rows[0]?.proactive_messages ?? true,
       proactive_frequency: rows[0]?.proactive_frequency ?? 'normal',

@@ -1516,6 +1516,29 @@ test.describe('Media Reuse — cross-companion reuse with same avatar', () => {
 test.describe('Chat Intelligence — intent, pacing, and safety', () => {
   const chatIntel = require('../server/src/chat-intelligence');
 
+  function valuePromptPool({ enabled = true, userMessages = 3, sameReasonToday = false, anyToday = false } = {}) {
+    const calls = [];
+    return {
+      calls,
+      async query(sql, params) {
+        calls.push({ sql, params });
+        if (sql.includes("key = 'value_prompt_enabled'")) {
+          return { rows: [{ value: enabled ? 'true' : 'false' }] };
+        }
+        if (sql.includes('COUNT(*)::int AS user_messages')) {
+          return { rows: [{ user_messages: userMessages }] };
+        }
+        if (sql.includes('same_reason_today')) {
+          return { rows: [{ same_reason_today: sameReasonToday, any_today: anyToday }] };
+        }
+        if (sql.includes('INSERT INTO value_prompt_events')) {
+          return { rows: [] };
+        }
+        throw new Error(`Unexpected query: ${sql}`);
+      },
+    };
+  }
+
   test('detects romanized Bengali and media intent', () => {
     expect(chatIntel.detectLanguage('tumi ki ekta chobi pathabe jaan?')).toBe('bn-latn');
     const analysis = chatIntel.analyzeUserMessage('send me a selfie jaan');
@@ -1548,6 +1571,52 @@ test.describe('Chat Intelligence — intent, pacing, and safety', () => {
     const text = chatIntel.sanitizeMediaPromise("Here's a photo for you, look at this", false);
     expect(text).not.toMatch(/here'?s a photo/i);
     expect(text).toContain('imagine');
+  });
+
+  test('creates value prompt when free user is engaged and uncapped', async () => {
+    const pool = valuePromptPool();
+    const result = await chatIntel.maybeCreateValuePrompt(pool, {
+      userId: 'user-1',
+      companionId: 'companion-1',
+      conversationId: 'conversation-1',
+      subscription: null,
+      reason: 'media_request',
+    });
+
+    expect(result).toMatchObject({
+      kind: 'subscription',
+      reason: 'media_request',
+      cta: 'Unlock Premium',
+    });
+    expect(pool.calls.some(call => call.sql.includes('INSERT INTO value_prompt_events'))).toBe(true);
+  });
+
+  test('caps value prompts globally to one per user per day', async () => {
+    const pool = valuePromptPool({ anyToday: true, sameReasonToday: false });
+    const result = await chatIntel.maybeCreateValuePrompt(pool, {
+      userId: 'user-1',
+      companionId: 'companion-2',
+      conversationId: 'conversation-2',
+      subscription: null,
+      reason: 'long_scene',
+    });
+
+    expect(result).toBeNull();
+    expect(pool.calls.some(call => call.sql.includes('INSERT INTO value_prompt_events'))).toBe(false);
+  });
+
+  test('caps same value prompt reason to once per day', async () => {
+    const pool = valuePromptPool({ anyToday: false, sameReasonToday: true });
+    const result = await chatIntel.maybeCreateValuePrompt(pool, {
+      userId: 'user-1',
+      companionId: 'companion-1',
+      conversationId: 'conversation-1',
+      subscription: null,
+      reason: 'media_request',
+    });
+
+    expect(result).toBeNull();
+    expect(pool.calls.some(call => call.sql.includes('INSERT INTO value_prompt_events'))).toBe(false);
   });
 });
 

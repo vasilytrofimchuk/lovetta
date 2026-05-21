@@ -171,11 +171,13 @@ function parseCompanionEmailId(address) {
  * Send a message from a companion to a user via email.
  * Returns the Message-ID for threading.
  */
-async function sendCompanionEmail({ companionName, companionId, toEmail, messageContent, conversationId, inReplyTo }) {
+async function sendCompanionEmail({ companionName, companionId, toEmail, messageContent, conversationId, inReplyTo, userId }) {
   // Strip all *scene/action text* from message
   const plainText = (messageContent || '').replace(/\*[^*]+\*\s*/g, '').trim();
   const fromAddr = companionEmailAddress(companionName, companionId);
   const msgId = `<conv-${conversationId}-${Date.now()}@${COMPANION_EMAIL_DOMAIN}>`;
+  const footerText = userId ? `\n\nUnsubscribe: ${unsubscribeLink(userId)}` : '';
+  const footerHtml = userId ? unsubscribeFooter(userId) : '';
 
   const emailHeaders = { 'Message-ID': msgId };
   if (inReplyTo) emailHeaders['In-Reply-To'] = inReplyTo;
@@ -188,8 +190,8 @@ async function sendCompanionEmail({ companionName, companionId, toEmail, message
     from: `${companionName} <${fromAddr}>`,
     to: toEmail,
     subject,
-    text: plainText,
-    html: `<p>${plainText.replace(/\n/g, '<br>')}</p>`,
+    text: `${plainText}${footerText}`,
+    html: `<p>${plainText.replace(/\n/g, '<br>')}</p>${footerHtml}`,
     headers: emailHeaders,
   });
 

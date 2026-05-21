@@ -304,14 +304,22 @@ async function maybeCreateValuePrompt(pool, { userId, companionId, conversationI
     );
     if ((counts?.user_messages || 0) < VALUE_PROMPT_MIN_USER_MESSAGES) return null;
 
-    const { rows: recent } = await pool.query(
-      `SELECT 1 FROM value_prompt_events
-       WHERE user_id = $1 AND companion_id = $2 AND reason = $3
-         AND created_at > NOW() - INTERVAL '7 days'
-       LIMIT 1`,
-      [userId, companionId, reason]
+    const { rows: [recent] } = await pool.query(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM value_prompt_events
+           WHERE user_id = $1
+             AND reason = $2
+             AND created_at > NOW() - INTERVAL '1 day'
+         ) AS same_reason_today,
+         EXISTS (
+           SELECT 1 FROM value_prompt_events
+           WHERE user_id = $1
+             AND created_at > NOW() - INTERVAL '1 day'
+         ) AS any_today`,
+      [userId, reason]
     );
-    if (recent.length) return null;
+    if (recent?.same_reason_today || recent?.any_today) return null;
 
     await pool.query(
       `INSERT INTO value_prompt_events (user_id, companion_id, conversation_id, prompt_type, reason, surface, metadata)

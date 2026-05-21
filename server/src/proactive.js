@@ -8,6 +8,7 @@ const { plainChatCompletion, getAISettings } = require('./ai');
 const { buildMemoryContext, buildUserContext } = require('./memory');
 const { getEffectiveTextLevel } = require('./content-levels');
 const { sendCompanionEmail } = require('./email');
+const { isCompanionEmailDeliverable } = require('./email-deliverability');
 const { sendPushNotification } = require('./push');
 const { sendMessage: sendTelegramMessage } = require('./telegram');
 const { getUserSubscription } = require('./billing');
@@ -116,7 +117,7 @@ async function runProactiveMessages() {
     const { rows: candidates } = await pool.query(`
       SELECT
         u.id AS user_id, COALESCE(u.real_email, u.email) AS email, u.display_name, u.timezone,
-        u.email_disabled, u.email_type,
+        u.email AS account_email, u.real_email, u.email_disabled, u.email_type, u.marketing_unsubscribed,
         c.id AS conversation_id, c.companion_id, c.last_proactive_at,
         uc.name AS companion_name, uc.personality, uc.backstory,
         uc.traits, uc.communication_style, uc.age,
@@ -124,7 +125,7 @@ async function runProactiveMessages() {
         up.proactive_frequency,
         up.show_actions
       FROM users u
-      JOIN user_preferences up ON up.user_id = u.id
+      LEFT JOIN user_preferences up ON up.user_id = u.id
       JOIN subscriptions s ON s.user_id = u.id
         AND s.status IN ('active', 'canceling', 'trialing')
         AND (s.current_period_end IS NULL OR s.current_period_end > NOW())
@@ -132,7 +133,7 @@ async function runProactiveMessages() {
       JOIN user_companions uc ON uc.id = c.companion_id AND uc.is_active = true
       LEFT JOIN telegram_users tu ON tu.user_id = u.id
       WHERE u.last_activity < NOW() - INTERVAL '${INACTIVITY_HOURS} hours'
-        AND up.proactive_messages = true
+        AND COALESCE(up.proactive_messages, true) = true
         AND c.last_message_at IS NOT NULL
       ORDER BY c.last_message_at ASC
       LIMIT 100
@@ -253,12 +254,13 @@ async function runProactiveMessages() {
 
         // Email (if user has notify_new_messages enabled)
         const { rows: prefRows } = await pool.query(
-          `SELECT notify_new_messages, last_notification_at FROM user_preferences WHERE user_id = $1`,
+          `SELECT COALESCE(notify_new_messages, true) AS notify_new_messages, last_notification_at
+           FROM user_preferences
+           WHERE user_id = $1`,
           [row.user_id]
         );
-        const pref = prefRows[0];
-        if (pref?.notify_new_messages && row.email && !row.email_disabled && row.email_type !== 'synthetic'
-            && !row.email.endsWith('@telegram.lovetta.ai') && !row.email.endsWith('@apple.lovetta.ai')) {
+        const pref = prefRows[0] || { notify_new_messages: true, last_notification_at: null };
+        if (pref.notify_new_messages && isCompanionEmailDeliverable(row)) {
           // Rate limit: at most once per 30 min
           const canEmail = !pref.last_notification_at ||
             (Date.now() - new Date(pref.last_notification_at).getTime() > 30 * 60 * 1000);
@@ -269,9 +271,14 @@ async function runProactiveMessages() {
               toEmail: row.email,
               messageContent: result.content,
               conversationId: row.conversation_id,
+              userId: row.user_id,
             }).catch(() => {});
             pool.query(
-              'UPDATE user_preferences SET last_notification_at = NOW() WHERE user_id = $1',
+              `INSERT INTO user_preferences (user_id, notify_new_messages, last_notification_at, updated_at)
+               VALUES ($1, true, NOW(), NOW())
+               ON CONFLICT (user_id) DO UPDATE SET
+                 last_notification_at = NOW(),
+                 updated_at = NOW()`,
               [row.user_id]
             ).catch(() => {});
           }
@@ -315,10 +322,18 @@ async function runFreeUserReactivation(pool) {
   const { rows } = await pool.query(`
     SELECT
       u.id AS user_id,
+      COALESCE(u.real_email, u.email) AS email,
+      u.email AS account_email,
+      u.real_email,
+      u.email_disabled,
+      u.email_type,
+      u.marketing_unsubscribed,
       c.id AS conversation_id,
       c.companion_id,
       uc.name AS companion_name,
       tu.telegram_id,
+      COALESCE(up.notify_new_messages, TRUE) AS notify_new_messages,
+      up.last_notification_at,
       css.language,
       css.scene_state,
       msg.created_at AS last_message_at
@@ -407,6 +422,29 @@ async function runFreeUserReactivation(pool) {
         body: content.slice(0, 100),
         url: `/my/chat/${row.companion_id}`,
       }).catch(() => {});
+
+      if (row.notify_new_messages && isCompanionEmailDeliverable(row)) {
+        const canEmail = !row.last_notification_at ||
+          (Date.now() - new Date(row.last_notification_at).getTime() > 30 * 60 * 1000);
+        if (canEmail) {
+          sendCompanionEmail({
+            companionName: row.companion_name,
+            companionId: row.companion_id,
+            toEmail: row.email,
+            messageContent: content,
+            conversationId: row.conversation_id,
+            userId: row.user_id,
+          }).catch(() => {});
+          pool.query(
+            `INSERT INTO user_preferences (user_id, notify_new_messages, last_notification_at, updated_at)
+             VALUES ($1, true, NOW(), NOW())
+             ON CONFLICT (user_id) DO UPDATE SET
+               last_notification_at = NOW(),
+               updated_at = NOW()`,
+            [row.user_id]
+          ).catch(() => {});
+        }
+      }
 
       if (row.telegram_id) {
         const SITE_URL = process.env.SITE_URL || 'http://localhost:3900';

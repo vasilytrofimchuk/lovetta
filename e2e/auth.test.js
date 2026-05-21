@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { BASE } = require('./helpers');
+const { BASE, createTestUser } = require('./helpers');
 
 test.describe('Auth API', () => {
   const testEmail = `conativer+test_${Date.now()}@gmail.com`;
@@ -105,6 +105,16 @@ test.describe('Auth API', () => {
   test('GET /api/auth/me without token returns 401', async ({ request }) => {
     const res = await request.get(`${BASE}/api/auth/me`);
     expect(res.status()).toBe(401);
+  });
+
+  test('GET /api/user/preferences defaults email notifications on', async ({ request }) => {
+    const user = await createTestUser(request);
+    const res = await request.get(`${BASE}/api/user/preferences`, {
+      headers: user.authHeaders,
+    });
+    expect(res.ok()).toBeTruthy();
+    const data = await res.json();
+    expect(data.notify_new_messages).toBe(true);
   });
 
   test('POST /api/auth/refresh rotates tokens', async ({ request }) => {

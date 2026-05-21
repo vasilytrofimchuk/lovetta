@@ -1298,6 +1298,20 @@ const MIGRATIONS = [
       ON CONFLICT (key) DO NOTHING;
     `,
   },
+  {
+    name: 'v62_email_notifications_default_on',
+    sql: `
+      ALTER TABLE user_preferences ALTER COLUMN notify_new_messages SET DEFAULT true;
+
+      INSERT INTO user_preferences (user_id, notify_new_messages, proactive_messages, updated_at)
+      SELECT id, true, true, NOW()
+      FROM users
+      WHERE deleted_at IS NULL
+      ON CONFLICT (user_id) DO UPDATE SET
+        notify_new_messages = true,
+        updated_at = NOW();
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
