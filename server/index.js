@@ -376,6 +376,28 @@ if (SENTRY_ENABLED) {
 }
 
 // Start
+// Retry-on-transient-error wrapper for migrate(). Heroku Postgres essential
+// plans occasionally drop the first connection; that should never be fatal.
+async function migrateWithRetry(maxAttempts = 5) {
+  let lastErr;
+  for (let i = 1; i <= maxAttempts; i++) {
+    try {
+      await migrateWithRetry();
+      return;
+    } catch (err) {
+      lastErr = err;
+      const msg = err?.message || String(err);
+      const transient = /timeout|ECONNRESET|terminated|ETIMEDOUT|ENETUNREACH|connection|reset/i.test(msg);
+      console.error(`[lovetta] migrate attempt ${i}/${maxAttempts} failed: ${msg}`);
+      if (!transient || i === maxAttempts) break;
+      await new Promise(r => setTimeout(r, 1500 * i)); // 1.5s, 3s, 4.5s, 6s
+    }
+  }
+  // Migration is idempotent and has likely already run on a previous deploy.
+  // Don't block the web server from coming up — log and continue.
+  console.error('[lovetta] migrate failed after retries — booting anyway. Last error:', lastErr?.message);
+}
+
 async function start() {
   await migrate();
 
