@@ -59,8 +59,12 @@ export default function useChat(companionId) {
         count++;
       }
       setMessagesSinceLastMedia(count);
-      // Auto-send a photo right after the intro message
-      if (msgs.length === 1 && !msgs[0].media_url && !msgs[0].media_pending) {
+      // Auto-send a photo right after the intro message.
+      // Welcome flow B: SKIP when ?firstSession=1 — the auto-provisioned chat
+      // already has the template video on the opener, and an auto-photo burns
+      // free budget on first turn (audit 2026-05-30, finding #5).
+      const isFirstSession = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('firstSession') === '1';
+      if (!isFirstSession && msgs.length === 1 && !msgs[0].media_url && !msgs[0].media_pending) {
         setTimeout(() => {
           processSSE(`/api/chat/${companionId}/request-media`, {});
         }, 1500);

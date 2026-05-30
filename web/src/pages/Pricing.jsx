@@ -24,6 +24,17 @@ export default function Pricing() {
     }).catch(() => {}).finally(() => setSubLoading(false))
   }, [])
 
+  // Welcome flow B graft: silent-skip persistence. The user landing here is
+  // already a "saw the paywall" event — flip lovetta-plan-skipped so the
+  // CompanionList doesn't immediately re-pop the same modal next time. The
+  // explicit Skip button still works the same way; this is a no-op for users
+  // who already have the flag.
+  useEffect(() => {
+    if (onboarding) {
+      try { localStorage.setItem('lovetta-plan-skipped', '1') } catch {}
+    }
+  }, [onboarding])
+
   // Web-only subscribe handler (web plan selection buttons)
   const handleSubscribe = async (plan) => {
     setLoading(plan)

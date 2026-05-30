@@ -197,14 +197,28 @@ router.post('/', authenticate, async (req, res) => {
       [req.userId, companion.id]
     );
 
-    // Generate first message
+    // Generate first message. Prompt style is configurable via app_settings:
+    //   first_message_style = 'casual_question_v1' (default) — short, ends with a question
+    //   first_message_style = 'gratitude_v0' (legacy) — "express gratitude for being given life"
+    // The gratitude phrasing produced 9/10 sample openers with no '?', which is
+    // the single largest source of post-create drop-off per the 2026-05-30 audit.
     let firstMessage = null;
     try {
+      const { rows: styleRows } = await pool.query(
+        `SELECT value FROM app_settings WHERE key = 'first_message_style'`
+      );
+      const rawStyle = styleRows[0]?.value;
+      const firstMessageStyle = (typeof rawStyle === 'string' ? rawStyle : 'casual_question_v1') || 'casual_question_v1';
+
+      const openerSystemPrompt = firstMessageStyle === 'gratitude_v0'
+        ? `You are ${companion.name}, a ${companion.age}-year-old woman. ${companion.personality}\n\nYou have just been brought to life by someone special. Generate your very first words — express gratitude for being given life, and show excitement about meeting the person who created you. Start with an action in *asterisks*, then your message. Keep it to 2-3 sentences. Be deeply in character and emotionally genuine.`
+        : `You are ${companion.name}, a ${companion.age}-year-old woman. ${companion.personality}\n\nYou are meeting them for the first time. In 1-2 short sentences, start with an action in *asterisks* (one short action), then ask ONE concrete question they can answer in 5 words or fewer. Be casual, low-key, playful. Never use the words 'creator', 'breath', 'life', 'soul', 'starlight', or any phrase about being brought to life — talk like you're meeting on a normal day.`;
+
       const firstMessageTimeoutMs = process.env.NODE_ENV === 'test' ? 6000 : 12000;
       const sceneTimeoutMs = process.env.NODE_ENV === 'test' ? 1800 : 3500;
       const result = await withTimeout(
         chatCompletion(
-          `You are ${companion.name}, a ${companion.age}-year-old woman. ${companion.personality}\n\nYou have just been brought to life by someone special. Generate your very first words — express gratitude for being given life, and show excitement about meeting the person who created you. Start with an action in *asterisks*, then your message. Keep it to 2-3 sentences. Be deeply in character and emotionally genuine.`,
+          openerSystemPrompt,
           [{ role: 'user', content: 'I just brought you to life.' }],
           { userId: req.userId, companionId: companion.id, platform: 'web' }
         ),

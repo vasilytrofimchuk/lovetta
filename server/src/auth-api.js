@@ -18,6 +18,7 @@ const { sendVerificationEmail, sendResetEmail, sendNewRegistrationNotification, 
 const { fireSignupPostback } = require('./trafficstars');
 const { classifyDevice } = require('./device');
 const { logEvent, EVENT_TYPES } = require('./events');
+const { autoProvisionFirstCompanion } = require('./onboarding');
 
 const APPLE_REVIEWER_ID = '00000000-0000-0000-0000-000000001234';
 
@@ -170,7 +171,13 @@ router.post('/signup', authLimiter, async (req, res) => {
 
     logEvent(user.id, EVENT_TYPES.SIGNUP, { auth_provider: 'email', device_type: deviceType, utm_source: utmSource || null });
 
-    res.json({ user: sanitizeUser(user), accessToken, refreshToken });
+    // Welcome flow B: auto-provision first companion if flag is on and user falls into B cohort.
+    // Reviewer account is always control (App Store guideline 1.2 safety).
+    const onboarding = await autoProvisionFirstCompanion(user.id, pool, {
+      skip: user.id === APPLE_REVIEWER_ID,
+    });
+
+    res.json({ user: sanitizeUser(user), accessToken, refreshToken, onboarding });
   } catch (err) {
     console.error('[auth] signup error:', err.message);
     res.status(500).json({ error: 'Signup failed' });
@@ -466,6 +473,7 @@ router.get('/google/callback', async (req, res) => {
   const pool = getPool();
   if (!pool) return res.redirect('/my/login?error=service_unavailable');
 
+  let onboardingResult = null;
   try {
     const { code, error: oauthError, state: oauthState } = req.query;
     if (oauthError || !code) {
@@ -592,6 +600,10 @@ router.get('/google/callback', async (req, res) => {
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'google', device_type: deviceType, utm_source: stateUtmSource || null });
         if (stateTsClickId) fireSignupPostback(stateTsClickId, newUser.id);
+        // Welcome flow B: auto-provision first companion for new Google signups only.
+        onboardingResult = await autoProvisionFirstCompanion(newUser.id, pool, {
+          skip: newUser.id === APPLE_REVIEWER_ID,
+        });
       }
     }
 
@@ -605,6 +617,10 @@ router.get('/google/callback', async (req, res) => {
       refreshToken,
       oauth: 'success',
     });
+    if (onboardingResult && onboardingResult.variant === 'B_skip_create' && onboardingResult.companionId) {
+      params.set('onboardingVariant', onboardingResult.variant);
+      params.set('onboardingCompanionId', onboardingResult.companionId);
+    }
     if (oauthState) {
       try {
         const stateData = JSON.parse(Buffer.from(oauthState, 'base64').toString());
@@ -625,6 +641,7 @@ router.post('/google/token', async (req, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Service unavailable' });
 
+  let onboardingResult = null;
   try {
     const { idToken, birthMonth, birthYear, termsAccepted, privacyAccepted, aiConsentAccepted, referralCode, tsClickId,
             utmSource, utmMedium, utmCampaign } = req.body;
@@ -698,13 +715,17 @@ router.post('/google/token', async (req, res) => {
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'google', device_type: deviceType, utm_source: utmSource || null });
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
+        // Welcome flow B: auto-provision first companion for new Google-native signups only.
+        onboardingResult = await autoProvisionFirstCompanion(newUser.id, pool, {
+          skip: newUser.id === APPLE_REVIEWER_ID,
+        });
       }
     }
 
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id);
     await storeRefreshToken(pool, user.id, refreshToken);
-    res.json({ accessToken, refreshToken });
+    res.json({ accessToken, refreshToken, onboarding: onboardingResult });
   } catch (err) {
     console.error('[auth] google token error:', err.message);
     res.status(500).json({ error: 'Authentication failed' });
@@ -760,6 +781,7 @@ router.post('/apple', authLimiter, async (req, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Service unavailable' });
 
+  let onboardingResult = null;
   try {
     const { identityToken, fullName, email: clientEmail,
             birthMonth: bm, birthYear: by,
@@ -846,6 +868,10 @@ router.post('/apple', authLimiter, async (req, res) => {
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'apple', device_type: deviceType, utm_source: utmSource || null });
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
+        // Welcome flow B: auto-provision first companion for new Apple-email signups only.
+        onboardingResult = await autoProvisionFirstCompanion(newUser.id, pool, {
+          skip: newUser.id === APPLE_REVIEWER_ID,
+        });
       }
     } else {
       // No email available (user hid it from Apple) and no existing apple_id — need age/consent
@@ -884,6 +910,10 @@ router.post('/apple', authLimiter, async (req, res) => {
       fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
       logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'apple', device_type: deviceType, utm_source: utmSource || null });
       if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
+      // Welcome flow B: auto-provision first companion for new Apple-synthetic signups only.
+      onboardingResult = await autoProvisionFirstCompanion(newUser.id, pool, {
+        skip: newUser.id === APPLE_REVIEWER_ID,
+      });
     }
 
     const accessToken = generateAccessToken(user.id);
@@ -892,7 +922,7 @@ router.post('/apple', authLimiter, async (req, res) => {
 
     pool.query('UPDATE users SET last_activity = NOW() WHERE id = $1', [user.id]).catch(() => {});
 
-    res.json({ user: sanitizeUser(user), accessToken, refreshToken });
+    res.json({ user: sanitizeUser(user), accessToken, refreshToken, onboarding: onboardingResult });
   } catch (err) {
     console.error('[auth] apple error:', err.message);
     res.status(500).json({ error: 'Apple sign-in failed' });

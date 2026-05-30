@@ -33,6 +33,10 @@ export default function ChatPage() {
   const [scrollTrigger, setScrollTrigger] = useState(0);
   const [tipSent, setTipSent] = useState(null); // { amount }
 
+  // Welcome flow B: when ?firstSession=1, the user landed here directly from signup.
+  const isFirstSession = searchParams.get('firstSession') === '1';
+  const [showFirstSessionChip, setShowFirstSessionChip] = useState(isFirstSession);
+
   // Auto-audio: state + ref
   const [autoAudio, setAutoAudio] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -207,6 +211,26 @@ export default function ChatPage() {
       style={{ height: pageHeight }}
     >
       <ChatHeader companion={companion} onCompanionTap={() => setShowSheet(true)} autoAudio={autoAudio} onToggleAutoAudio={toggleAutoAudio} />
+
+      {/* Welcome flow B first-session chip — dismissible hint after auto-provisioning. */}
+      {showFirstSessionChip && (
+        <div className="app-page-gutter pt-2">
+          <div className="bg-brand-surface border border-brand-border rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+            <p className="text-xs text-brand-text-secondary">Tap her avatar to explore other girlfriends.</p>
+            <button
+              onClick={() => {
+                setShowFirstSessionChip(false);
+                // Strip the firstSession flag so a reload doesn't re-show the chip.
+                const next = new URLSearchParams(searchParams);
+                next.delete('firstSession');
+                setSearchParams(next, { replace: true });
+              }}
+              className="text-brand-muted text-xs px-2 py-1 hover:text-brand-text-secondary"
+              aria-label="Dismiss"
+            >Dismiss</button>
+          </div>
+        </div>
+      )}
 
       <MessageList
         messages={messages}

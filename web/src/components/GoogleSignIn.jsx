@@ -49,7 +49,7 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
       localStorage.removeItem('lovetta-utm-medium')
       localStorage.removeItem('lovetta-utm-campaign')
       await refreshUser()
-      onSuccess?.()
+      onSuccess?.(data)
     } catch (err) {
       if (err?.message?.includes('cancel') || err?.message?.includes('Cancel')) return
       const serverErr = err?.response?.data?.error || ''

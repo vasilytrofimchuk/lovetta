@@ -14,6 +14,9 @@ PODS:
   - CapacitorCommunityAppleSignIn (7.1.0):
     - Capacitor
   - CapacitorCordova (8.2.0)
+  - CapacitorFilesystem (8.1.2):
+    - Capacitor
+    - IONFilesystemLib (~> 1.1.1)
   - CapacitorKeyboard (8.0.1):
     - Capacitor
   - CapacitorPushNotifications (8.0.2):
@@ -33,6 +36,7 @@ PODS:
     - AppAuth/Core (~> 1.6)
     - GTMSessionFetcher/Core (< 3.0, >= 1.5)
   - GTMSessionFetcher/Core (2.3.0)
+  - IONFilesystemLib (1.1.2)
   - PurchasesHybridCommon (17.47.0):
     - RevenueCat (= 5.63.0)
   - RevenueCat (5.63.0)
@@ -46,6 +50,7 @@ DEPENDENCIES:
   - "CapacitorBrowser (from `../../../node_modules/@capacitor/browser`)"
   - "CapacitorCommunityAppleSignIn (from `../../../node_modules/@capacitor-community/apple-sign-in`)"
   - "CapacitorCordova (from `../../../node_modules/@capacitor/ios`)"
+  - "CapacitorFilesystem (from `../../../node_modules/@capacitor/filesystem`)"
   - "CapacitorKeyboard (from `../../../node_modules/@capacitor/keyboard`)"
   - "CapacitorPushNotifications (from `../../../node_modules/@capacitor/push-notifications`)"
   - "CapacitorSplashScreen (from `../../../node_modules/@capacitor/splash-screen`)"
@@ -59,6 +64,7 @@ SPEC REPOS:
     - GoogleSignIn
     - GTMAppAuth
     - GTMSessionFetcher
+    - IONFilesystemLib
     - PurchasesHybridCommon
     - RevenueCat
 
@@ -73,6 +79,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/@capacitor-community/apple-sign-in"
   CapacitorCordova:
     :path: "../../../node_modules/@capacitor/ios"
+  CapacitorFilesystem:
+    :path: "../../../node_modules/@capacitor/filesystem"
   CapacitorKeyboard:
     :path: "../../../node_modules/@capacitor/keyboard"
   CapacitorPushNotifications:
@@ -93,6 +101,7 @@ SPEC CHECKSUMS:
   CapacitorBrowser: 76847841b74c11ccac0a1afae18cf06e3bd59044
   CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
   CapacitorCordova: a9ac88d84a1f5280f33b349fe50fce1902683ac0
+  CapacitorFilesystem: 2db285a1ac6e475cc27cae2e1bea999000f9e2be
   CapacitorKeyboard: 867eb4b3c901d9bb5c3d0c93b546185d52484e19
   CapacitorPushNotifications: 5a1de4191a9fdbeacc84907313eede0bd59d2eb0
   CapacitorSplashScreen: 4b46c72298db552b3c57ce021ef028b6dc7f1fa7
@@ -101,10 +110,11 @@ SPEC CHECKSUMS:
   GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
   GTMAppAuth: 0ff230db599948a9ad7470ca667337803b3fc4dd
   GTMSessionFetcher: 3a63d75eecd6aa32c2fc79f578064e1214dfdec2
+  IONFilesystemLib: 21a63377696b2d8fab5632ecfb7d2ac67bddb68a
   PurchasesHybridCommon: 7794f8a04e50265d595b695d49b8fc212e138d1f
   RevenueCat: c7310bad19cb96a1551c68045303e1faaa1942a5
   RevenuecatPurchasesCapacitor: 6b652e6e001224841fbfb9a97322c46f14d32504
 
-PODFILE CHECKSUM: 7ee4d78d9c9d559f24570fc98a5cbcc158224413
+PODFILE CHECKSUM: c28fa8539ef4e3f2a44ab3e44a7e45dddc9a19f6
 
 COCOAPODS: 1.16.2

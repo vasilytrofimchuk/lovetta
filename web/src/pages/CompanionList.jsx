@@ -30,21 +30,28 @@ export default function CompanionList() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/api/companions').then(({ data }) => {
-        setCompanions(data.companions || []);
-        setTotalUserMessages(data.totalUserMessages || 0);
-        setRecommendations(data.recommendations || null);
-      }),
-      api.get('/api/billing/status').then(({ data }) => {
-        setSubscription(data);
-        const isNewUser = new URLSearchParams(window.location.search).get('newUser') === 'true';
-        const skipped = localStorage.getItem('lovetta-plan-skipped');
-        if (!data?.hasSubscription && (isNewUser || !skipped)) {
-          setShowPlanModal(true);
-          if (isNewUser) window.history.replaceState({}, '', window.location.pathname);
-        }
-      }),
-    ]).catch(() => {}).finally(() => setLoading(false));
+      api.get('/api/companions').then(({ data }) => data),
+      api.get('/api/billing/status').then(({ data }) => data),
+    ]).then(([companionsData, billingData]) => {
+      setCompanions(companionsData.companions || []);
+      setTotalUserMessages(companionsData.totalUserMessages || 0);
+      setRecommendations(companionsData.recommendations || null);
+      setSubscription(billingData);
+
+      const isNewUser = new URLSearchParams(window.location.search).get('newUser') === 'true';
+      const skipped = localStorage.getItem('lovetta-plan-skipped');
+      // Defer plan modal until the user has actually engaged (≥3 user
+      // messages across all conversations). The signup→Pricing-modal blast
+      // accounts for a meaningful chunk of the 5-min ghost cliff (audit
+      // 2026-05-30). isNewUser still forces show on the explicit
+      // ?newUser=true path so we don't lose the onboarding moment.
+      const totalMsgs = companionsData.totalUserMessages || 0;
+      const hasEnoughEngagement = totalMsgs >= 3;
+      if (!billingData?.hasSubscription && (isNewUser || (!skipped && hasEnoughEngagement))) {
+        setShowPlanModal(true);
+        if (isNewUser) window.history.replaceState({}, '', window.location.pathname);
+      }
+    }).catch(() => {}).finally(() => setLoading(false));
 
     // Check if push banner should show (Capacitor only, not dismissed, not yet granted)
     if (isCapacitor() && !localStorage.getItem('push_prompt_dismissed')) {

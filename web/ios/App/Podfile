@@ -14,6 +14,7 @@ def capacitor_pods
   pod 'CapacitorCommunityAppleSignIn', :path => '../../../node_modules/@capacitor-community/apple-sign-in'
   pod 'CapacitorApp', :path => '../../../node_modules/@capacitor/app'
   pod 'CapacitorBrowser', :path => '../../../node_modules/@capacitor/browser'
+  pod 'CapacitorFilesystem', :path => '../../../node_modules/@capacitor/filesystem'
   pod 'CapacitorKeyboard', :path => '../../../node_modules/@capacitor/keyboard'
   pod 'CapacitorPushNotifications', :path => '../../../node_modules/@capacitor/push-notifications'
   pod 'CapacitorSplashScreen', :path => '../../../node_modules/@capacitor/splash-screen'

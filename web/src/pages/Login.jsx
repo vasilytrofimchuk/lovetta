@@ -62,6 +62,14 @@ export default function Login() {
           window.location.replace(`/my${nextPath}`)
           return
         }
+        // Welcome flow B: server may have auto-provisioned a companion during the OAuth signup.
+        // The callback appends ?onboardingVariant=...&onboardingCompanionId=... when so.
+        const onboardingVariant = searchParams.get('onboardingVariant')
+        const onboardingCompanionId = searchParams.get('onboardingCompanionId')
+        if (onboardingVariant === 'B_skip_create' && onboardingCompanionId) {
+          window.location.replace(`/my/chat/${onboardingCompanionId}?firstSession=1`)
+          return
+        }
         await refreshUser()
       })()
     }

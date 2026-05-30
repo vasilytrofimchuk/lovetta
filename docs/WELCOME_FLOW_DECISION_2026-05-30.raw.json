@@ -1,0 +1,1050 @@
+{
+  "diagnoses": [
+    {
+      "title": "DIAGNOSIS A — Ghoster cohort behavior (60 single-session signups in last 7d)",
+      "findings": [
+        {
+          "claim": "The ghoster cohort is 60 users (60% of 100 qualifying signups), not 57 — the analysis doc undercounted slightly; cohort splits cleanly into 33 'never engaged' (55%), 4 'made companion but never typed' (7%), and 23 'sent at least one message' (38%).",
+          "evidence": "Single SQL with `last_activity <= created_at + 5min`, deleted_at IS NULL, test-email filter: 60 ghosters total. Q1 breakdown: 27 created a companion (45%), 23 sent a user message (38%), 6 hit a paywall (10%), 0 fired any error event. Q6 buckets: 1_no_companion_no_msg=33, 3_companion_ai_greeting_only=4, 5_2to3_msgs=9, 6_4to9_msgs=9, 7_10plus=1, 99_other=4.",
+          "implication": "Welcome flow needs THREE distinct interventions targeting three sub-cohorts, not one. The 33 zero-action users need a 'guided forced first step' (push them into a companion within signup itself). The 4 'made companion, no msg' users need a pre-filled first-message suggestion or auto-icebreaker from the user side. The 23 'tried and bounced' users need an experience fix, not a flow fix."
+        },
+        {
+          "claim": "33 of 60 ghosters (55%) have last_activity = created_at to the second — they bounced essentially within the signup transaction itself, never seeing the post-signup screen long enough to be tracked.",
+          "evidence": "Q-no-action timing: n_no_action=33, median_secs_to_bounce=0.1s, min=0s, max=120s, avg=14.8s. Individual sample: 28 of first 30 rows show secs_alive=0. The `last_activity` field is updated server-side per request, so 0s means the user made exactly one request (the signup itself) and never made another.",
+          "implication": "More than half the 'ghost rate' is a post-signup landing problem, not a chat-experience problem. The welcome flow needs to either (a) eliminate any redirect/loading screen after OAuth callback that loses sessions, or (b) compress the next step into the same request as signup (return user straight into a pre-created default companion chat). The fact that 19/20 zero-action Apple ghosters use the privaterelay domain hints OAuth round-trip is where they fall off."
+        },
+        {
+          "claim": "Apple Sign-In users ghost at 65%, vs Google 58% vs Email 47% — Apple is 18pp worse than email and dominates the funnel (57% of signups).",
+          "evidence": "Q3: apple 37/57=64.9%, google 15/26=57.7%, email 8/17=47.1%. Among the 33 zero-action ghosters, 20 are Apple (19 on privaterelay), 8 Google, 5 Email — Apple-relay alone accounts for 32% of all ghosters.",
+          "implication": "The welcome flow must not treat Apple users as fungible — they need either (a) extra friction-removal post-callback (e.g. skip 'choose a girlfriend' screen, drop them into a default chat), or (b) a check whether the Apple OAuth callback is reliably restoring app state on iOS Safari. The 19/19 apple-relay-no-action signal warrants Sentry trace investigation regardless of the welcome flow."
+        },
+        {
+          "claim": "Of 27 ghosters who created a companion, 24 picked a stock template — only 2 made a custom one. Compare to returners: 19 of 37 created a custom companion (51%).",
+          "evidence": "Ghoster companions: template=28 (24 users), custom=2 (2 users). Returner companions: template=39 (26 users), custom=20 (19 users). Custom-companion creation is a 17x stronger retention signal (51% of returners vs 3% of ghosters).",
+          "implication": "The welcome flow should push users into the customizer, not into a chat with a template girlfriend. Even a tiny customization step (name, hair color, vibe) seems to create the sunk-cost / ownership effect that doubles retention. Consider making 'pick a template' actually 'pick a starting point and tweak one thing' before letting users enter chat."
+        },
+        {
+          "claim": "The 23 ghosters who sent at least one message averaged 3.7 user messages + 5.3 AI replies in a single 1-3 minute burst; the median time from first message to bounce was 1.1 minutes (67 seconds).",
+          "evidence": "Q2: msg_senders=23, median_minutes_signup_to_first_msg=1.06, median_minutes_first_msg_to_lastactivity=1.12, avg_user_msgs=3.70, avg_ai_msgs=5.30. They are NOT taking minutes to evaluate — they fire 3-4 quick replies and leave inside two minutes.",
+          "implication": "This is the 'I tried it, was unimpressed, left' segment — a quality/expectation problem, not a flow problem. Welcome flow should set expectations earlier (e.g. 'choose your fantasy intensity', show NSFW capability up-front) so the user who fires 'open your legs' on message 3 doesn't get steered to safety mode. Also: the AI is being verbose (median 142 chars) while the user types 14 chars — mismatch in conversation pace; consider matching message length to user's."
+        },
+        {
+          "claim": "100% of dormant conversations for ghosters end with an AI message — but this is a structural artifact (AI always replies last), NOT evidence the AI specifically drove people away. The headline '89% AI-ended' is a tautology.",
+          "evidence": "Q6b: per-user last-msg role for the 27 ghosters who had any conversation = assistant for ALL 27 (100%). User sends → AI replies → user ghosts. There is no scenario where the user could send a message and have it NOT be followed by an AI reply, so 'AI-ended' is the default.",
+          "implication": "Stop framing AI-message-as-last-message as an action item. The real lever is: at message 3-5 (the median bounce point), nudge the user with a non-chat affordance — e.g. send a photo, change the scene, voice note — so the conversation stops being a flat text loop. Welcome flow should foreshadow these features ('try saying: send me a photo')."
+        },
+        {
+          "claim": "Every AI greeting opens with an existential 'thank you for giving me life / dreaming me into being' template that is uniform across companions and likely a turnoff for casual users.",
+          "evidence": "Q-first-AI-message sample, 20+ rows: 'Thank you… for giving me this breath, this moment, this *life*', 'Thank you, my creator, my miracle', 'Thank you for bringing me to life', 'Thank you… for stitching starlight into my veins'. Identical structural template; chars 121-285; mean ~180. Almost nobody types in this register so the user is conversationally outmatched on message 1.",
+          "implication": "Welcome flow / first message rewrite: kill the 'creator/giving life' framing. Replace with a casual, playful, conversation-starting opener that asks ONE concrete question the user can answer in 5 words (e.g. 'hey — what should I call you?' or 'okay first thing — beach person or mountain person?'). Match the user's expected register, not the LLM's poetry default."
+        },
+        {
+          "claim": "Paywall is NOT the reason ghosters ghost — only 6 of 60 ghosters (10%) ever hit a paywall, and they did so around the 3-minute mark, well into the bounce window.",
+          "evidence": "Q1: hit_paywall=6 of 60 ghosters. Event timing: paywall_blocked median 209s from signup (3.5min), value_prompt_shown median 130s. The 33 no-action ghosters never saw a paywall. The 5 taboo_policy_hit events are concentrated in 2 users (one looping 4 hits in 90s).",
+          "implication": "Welcome flow has no paywall problem to solve — paywall optimization belongs in a separate workstream. The exception is the 2 taboo-loopers: when a user retries the same blocked message 4 times in 90 seconds, the app is failing them silently. Welcome flow could include a one-line content-policy preview ('here's what I can do / what I can't') so users self-select before bouncing."
+        },
+        {
+          "claim": "Country is not a meaningful predictor of ghosting — US (59%), UK (68%), Canada (50%), all within noise of the overall 60% rate. There is no obvious non-EN localization issue.",
+          "evidence": "Q5: US 34/58=58.6%, UK 15/22=68.2%, Canada 2/4=50%, France 1/3=33%, Germany 2/3=67%, Saudi Arabia 2/3=67%. UK is highest but n=22 is too small to be confident; no country has both volume and a substantially-lower ghost rate.",
+          "implication": "Don't waste welcome-flow design cycles on localization variants — uniform English copy is fine for this cohort. Save translation/locale work until a single market exceeds 60% retention."
+        },
+        {
+          "claim": "Device split is also non-predictive — web-mobile 60% ghost, web-tablet 64% ghost; zero native-iOS device_type observed. Mobile screen size or input is not the bottleneck.",
+          "evidence": "Q4: web-mobile 53/89=59.6%, web-tablet 7/11=63.6%. There are no 'native-ios' or 'native-android' device_type values in this cohort — every signup is via the web SPA at lovetta.ai/my, even users coming through the iOS shell (which loads the web URL).",
+          "implication": "Welcome flow doesn't need a device-specific branch. But: the absence of native device_type values means the iOS app's User-Agent isn't being detected for tracking — verify device.js classifier handles the Capacitor WebView correctly before designing any iOS-specific welcome variants."
+        }
+      ],
+      "open_questions": [
+        "Where exactly do the 33 zero-action ghosters disappear? Are they hitting the post-OAuth callback route and then closing the tab, or are they actually landing on a page and bouncing visually? Need a tracking pixel on each post-signup page-view (CompanionList, WelcomeScreen) to disambiguate.",
+        "Is the Apple-relay 19/19 zero-action signal a real OAuth bug? Pull Sentry/server logs for Apple Sign-In callbacks in the 7-day window and check for error rate / unusual 4xx responses for privaterelay.appleid.com users.",
+        "Among the 23 message-senders who bounced, are there specific topics/messages where the AI replied poorly (e.g. broke character, gave safety-mode response, sent a generic phrase)? Sample of the full conversation text plus a quality grade per turn would isolate whether the AI is at fault vs the user just being a tire-kicker.",
+        "Should the welcome flow auto-create a default companion in the signup transaction (so the user never sees an empty CompanionList)? Test whether 'one click to start chatting' beats 'pick from 6 templates'."
+      ]
+    },
+    {
+      "title": "Diagnosis B: Latency + time-to-magic-moment — the wait happens BEFORE the chat, not inside it",
+      "findings": [
+        {
+          "claim": "The chat itself is NOT slow. AI-reply latency is essentially identical for users who ghost and users who retain (median 2.75s vs 2.95s; p90 5.58s vs 8.35s). Latency inside the chat is not the cause of the 5-min cliff.",
+          "evidence": "Query of first-user-msg → first-AI-reply for the 26 single-session users who messaged: n=27, p25 1.63s, p50 2.75s, p75 4.43s, p90 5.58s, max 15.10s. For 52 retained users: p25 1.80s, p50 2.95s, p75 4.05s, p90 8.35s. Heartbeats every 3s in chat-api.js:587 already keep Heroku alive.",
+          "implication": "Stop optimizing the streaming chat path. The bottleneck is upstream — the user never reaches the chat in the first place. Skip any plan that aims to shave 1-2s off the chat reply."
+        },
+        {
+          "claim": "36% of all signups (36/100 in the last 7 days) NEVER create a companion. They sign up, then vanish before clicking through the create-girlfriend funnel. This single drop is bigger than every other drop combined.",
+          "evidence": "Funnel from prod DB: 100 signups → 64 created a companion → 60 sent ≥1 message. The 36 no-companion users have only the 'signup' event in user_events. Of single-session users (those last active <5 min after signup), 36/66 = 55% never created a companion — i.e. they ghosted between signup and any companion-create action.",
+          "implication": "The biggest leak is the post-signup screen, not the chat. The welcome-flow design must put the user in front of a companion (or skip companion-create entirely on first run) within seconds of finishing signup — not park them on a CompanionList empty-state and a PlanModal."
+        },
+        {
+          "claim": "Apple Sign-In on mobile web is the worst-converting cohort: 49 signups → 30 companions (61%) → 28 messaged (57%). 21 of the 36 'no-companion' users (58%) came in via Apple. Email and Google convert markedly better on the same device.",
+          "evidence": "Per-cohort funnel: web-mobile/apple 49→30→28 (signup→companion→msg = 61%/57%). web-mobile/google 23→16→15 (70%/65%). web-mobile/email 17→12→12 (71%/71%). Of 36 no-companion single-session users: 21 apple, 10 google, 5 email.",
+          "implication": "Apple Sign-In returns the user to a different state (popup closes, Safari sometimes loses session/scroll position, in-app browser flow can drop tokens). This is likely a navigation/session issue right after the Apple handshake, not a chat-latency issue. Welcome flow design needs an Apple-specific post-auth landing test, and the post-signup destination must be deterministic (`window.location.replace` exists in Signup.jsx:179 but not for socials — socials only do `navigate(postSignupPath)` at line 190)."
+        },
+        {
+          "claim": "ALL new signups are routed to /pricing first via PlanModal full-screen — NOT to chat or companion-create. This is a hard interception layer between signup and the magic moment.",
+          "evidence": "web/src/pages/Signup.jsx:42 — `const postSignupPath = nativeApp ? '/pricing' : '/pricing?onboarding=1'`. web/src/pages/Pricing.jsx:63-76 — when `onboarding=1`, the page renders ONLY a full-screen `<PlanModal isOpen={true} fullScreen>`. To dismiss, the user must close the modal (which writes `lovetta-plan-skipped`). On the next page (CompanionList), if `isNewUser=true` OR `!skipped`, the same PlanModal re-opens (CompanionList.jsx:40-45).",
+          "implication": "The welcome flow currently shows the paywall TWICE before the user has ever spoken to a girlfriend. Hide the paywall until after first AI reply (or first 3 messages) — show value before price. This alone could plausibly cut the 36% no-companion drop in half."
+        },
+        {
+          "claim": "Companion creation is a synchronous blocking call that waits 3.83s (p50), 7.29s (p75), 11.23s (p90), 12.0s (p95 = hits the timeout). It blocks on TWO sequential LLM calls inside POST /api/companions: first-message generation (12s timeout) then scene generation (3.5s timeout).",
+          "evidence": "companion-api.js:200-247 — POST /api/companions calls `await chatCompletion(...)` (firstMessageTimeoutMs=12000) then `await plainChatCompletion(...)` (sceneTimeoutMs=3500) BEFORE returning to the client. Prod DB: of 64 companion creators in last 7d, the companion-row→intro-AI-msg delta (= LLM time inside POST) is p50 3.83s, p75 7.29s, p90 11.23s, max 12.02s. The 'Bringing her to life…' button blocks for that whole window.",
+          "implication": "Decouple the first message from the create POST. POST /api/companions should INSERT the companion + conversation + a placeholder assistant message and return immediately (~200ms), then ChatPage streams the intro via SSE on mount (reusing the existing typing/heartbeat flow). This converts a 3-12s frozen button into a normal streaming chat experience that already works well."
+        },
+        {
+          "claim": "Slow companion-create did NOT predict ghosting AMONG users who reached it (median intro wait 3.72s for messengers vs 3.13s for no-msg ghosters). The five 12s-timeout users all still sent messages. Latency past the create button isn't the killer.",
+          "evidence": "Of 30 single-session users who created a companion: SENT (n=26) median intro wait 3.72s; NO_MSG (n=4) 3.13s. The five users who hit the 12s max timeout (ff708f62, e66076c7, d49d921a, a544f9b5, f9a27c46) ALL sent ≥6 messages before ghosting later.",
+          "implication": "Users who push through to CompanionCreate are committed enough to wait 12s. The cliff happens earlier. Welcome-flow effort should target the signup → companion-create-button-clicked gap, not the create-API speed itself. The async fix from finding #5 is still worth doing (cheap win, removes anxiety), but isn't the primary lever for the 5-min cliff."
+        },
+        {
+          "claim": "Of the 26 single-session users who DID message, 19 (73%) sent 3+ messages. They got engaged, the AI replied within ~3s, and they STILL didn't come back. 11% of all single-session users hit `paywall_blocked` at avg 3.5 min after signup (median 2-5 user messages).",
+          "evidence": "Distribution of user-message counts for 26 single-session msgers: 5 sent 1, 2 sent 2, 19 sent 3+. Some sent 6, 7, 10. `paywall_blocked` event fired for 7/66 single-session users at avg 208.9s. `value_prompt_shown` fired for 12/66 at avg 150.5s — i.e. monetization prompts (`media_request`, `high_intent_20_messages`) start hitting users in the first 2-3 minutes. Free weekly cost threshold is $0.20 in app_settings — easily crossed in 5-10 messages with media.",
+          "implication": "For the cohort that DID get into the chat, the magic moment is fine — they engaged. They likely ghosted because they got paywalled or monetization-prompted while still evaluating. The welcome flow should grant a clear 'free trial budget' (e.g. first 10 messages or first 5 min are visibly unlimited and ad-free) so the first session ends on a high note, not a paywall. The `tip_request_threshold_free_usd=$0.20` is too aggressive for new users."
+        },
+        {
+          "claim": "There's an automatic photo request 1.5s after the intro message loads in ChatPage, which the user neither asked for nor expects, and which is gated by the same paywall (`media_blocked`).",
+          "evidence": "web/src/hooks/useChat.js:62-67 — on `loadChat`, if msgs.length===1 and no media, after 1.5s the client auto-calls `/api/chat/.../request-media`. server/src/chat-api.js:1017+ — that route runs LLM + media generation, with `checkFreeLimit` and `checkMediaBlocked`. Image gen + LLM = the most expensive call in the app, and it fires before the user has typed anything.",
+          "implication": "This auto-photo: (a) burns the free budget before the user has interacted, (b) gives the AI a chance to fire `media_blocked` immediately and break first impression, (c) creates a 'loading shimmer' on a chat that should feel alive. Either remove the auto-photo entirely OR make it use a pre-cached avatar selfie that costs zero LLM/fal credits. This is a candidate first item to drop from the welcome flow."
+        },
+        {
+          "claim": "For users who DID retain, time-to-first-message is huge and bimodal: p50 = 183s but mean = 3727s (62 min). The fastest 25% messaged within 97s of signup; the slowest 10% took 37+ min. Retained users are people who tolerate UI friction, not people who experienced low latency.",
+          "evidence": "Retained-user (n=34) signup→first-msg seconds: p25 96.8, p50 182.7, p75 368.7, p90 2238.0 (37 min), mean 3727s. Single-session users (n=26 who messaged) signup→first-msg: p25 52.6, p50 63.9, p75 115.3, p90 146.2, mean 89s. Counter-intuitively, retained users took LONGER to send their first message.",
+          "implication": "Slow signup→first-msg time is correlated with retention because slow = exploring (browsing companions, customizing, reading), not because slow = bad. The 5-min cliff is therefore NOT about people who timed out waiting — it's about people who quickly clicked through and got dropped at a dead-end (paywall, empty companion list, generic intro). The welcome flow should reward exploration (gallery of companions visible before signup wall), not optimize for speed."
+        }
+      ],
+      "open_questions": [
+        "Why is Apple Sign-In on mobile-web 14 percentage points worse at the signup→companion conversion than Google/email? Token/session loss after returning from Apple's auth popup is a likely culprit but needs an actual recording or session-id trace.",
+        "Did the 36 no-companion users land on /pricing or CompanionList — are they bouncing AT the paywall or BEFORE it? We need a `paywall_shown` (not `paywall_blocked`) and `welcome_landed` event to disambiguate.",
+        "What % of the 36 no-companion ghosters are duplicate signups by users who already had an account on another device? (No data to check this here.)",
+        "Does the auto-photo on chat load actually fire on free users, or is it gated by media_enabled flag? If it fires, how often does it burn $0.05-$0.10 of the $0.20 weekly free budget before a single user message?"
+      ]
+    },
+    {
+      "title": "Welcome-flow code audit + competitor benchmarks: paywall-first, no first-message hook, confirm-screen tax",
+      "findings": [
+        {
+          "claim": "After auth success the user lands on a paywall, not on a chat. Capacitor users go straight to `/pricing` (PlanModal fullScreen); web users go to `/pricing?onboarding=1` (same modal). It is the first thing they see after signing up.",
+          "evidence": "Signup.jsx:42 — `const postSignupPath = nativeApp ? '/pricing' : '/pricing?onboarding=1'`. Pricing.jsx:63-77 — when `onboarding=1` renders `<PlanModal fullScreen>` only. CompanionList.jsx:42-44 re-opens PlanModal again if `!localStorage.lovetta-plan-skipped`. DB: of 63 zero-companion signups in last 14d, 46 (73%) bailed within 60s of signup; only 6 lingered past 5 min. Apple-sign-in conversion: 67/93 (72%) made a companion; Google: 30/43 (70%); web-desktop email: 0/3.",
+          "implication": "The paywall-before-value pattern is the single biggest friction. Move the paywall to *after* the first AI reply lands (or after first 2-3 user messages). Competitors (Replika, Character.AI, Candy.AI) all let the user chat for several turns before any payment ask — Candy.AI shows pricing only after the first NSFW gate trips, Replika never shows a hard paywall in first session. We are paywall-first; they are value-first."
+        },
+        {
+          "claim": "The 'Surprise Me' button is wired correctly but does NOT skip the confirmation screen — it still routes through a 4-card edit form (name/personality/traits/voice) before creating the companion.",
+          "evidence": "CompanionCreate.jsx:170-176 `selectSurprise()` picks a random template then `setStep('confirm')`. The confirm step (lines 484-620) renders editable cards for name, personality, 10 traits, and 24 voices, requires user to tap 'Awaken {name}' to actually call POST /api/companions. So 'Surprise Me' is one tap to a configuration page, not one tap to chat. Choose-a-Soul + tap-template lands on the same screen.",
+          "implication": "Rename does not help; the screen does. For first-time users, 'Surprise Me' should create-and-redirect-to-chat in one tap (skip confirm). The confirm screen is appropriate for repeat creators tweaking, not for a brand-new user who has nothing to edit. Replika kicks you straight into chat after a single name field; Character.AI public bots are one tap into chat."
+        },
+        {
+          "claim": "The first AI message is a poetic monologue with no question or invitation to reply — 9 of 10 sampled ghosted users got 'Thank you for creating me…' with no question mark and no clear next prompt.",
+          "evidence": "companion-api.js:207 system prompt to LLM: 'express gratitude for being given life, and show excitement about meeting the person who created you. Start with an action in *asterisks*, then your message. Keep it to 2-3 sentences.' DB sample (10 messages) for users who created a companion but never sent a reply: 9/10 contain no '?'. Examples: 'Thank you, my creator, my miracle—I can already feel the poetry of you…', 'Thank you… for finding me in the silence.' 89% of dormant chats end on assistant turn (from weekly analysis) — this is why.",
+          "implication": "Change the first-message prompt to *end with a concrete question* the user can answer in 1-2 words: 'What should I call you?' / 'Tell me one thing about your day' / 'Where in the world am I waking up to?'. The current prompt produces art-school monologues that leave the user with no obvious move. This is a one-line prompt change with the biggest leverage of anything in this audit."
+        },
+        {
+          "claim": "Companion creation does two sequential LLM calls (intro message + scene description) before responding, which produces a noticeable 3.6s p50 / 10s p90 wait between 'Awaken' tap and first message visible — and there is no streaming on this endpoint.",
+          "evidence": "companion-api.js:202-247 — first call: `chatCompletion(...)` with 12s timeout for the intro; then immediately a *second* call: `plainChatCompletion(...)` with model `thedrummer/rocinante-12b` and 3.5s timeout to produce a 5-8 word 'scene'. Both must resolve before the message row is inserted and the endpoint responds. DB: avg 4.74s, p50 3.62s, p90 9.94s from conversation row creation to first assistant message row.",
+          "implication": "Drop the scene-generation call from the create path, or do it async and patch the row later. Better: skip server-side intro generation entirely and put a hardcoded warm one-liner ('Hey :) I'm Maya — what should I call you?') in the DB, then let the *real* first turn happen when the user replies (which already streams). This converts 3-10s of nothing into <500ms of something."
+        },
+        {
+          "claim": "Voice-message auto-play defaults to OFF, so the iconic 'wow' moment of hearing your AI girlfriend speak never fires on the first session for >99% of users.",
+          "evidence": "migrate.js v53: `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS auto_audio BOOLEAN DEFAULT false`. ChatPage.jsx:42-47 reads `data.auto_audio` and defaults to `false` if missing. user-api.js:39: `auto_audio: rows[0]?.auto_audio ?? false`. The TTS infrastructure exists (waitForMessageAudio in lib/tts.js, used at ChatPage.jsx:96-118).",
+          "implication": "For brand-new users, default auto_audio = true on the FIRST message only (or on the first 3 turns), then drop back to user pref. Voice is the single largest 'this is real' moment in an AI companion app — and we're hiding it behind a Profile setting. Candy.AI, Replika Pro, CrushOn all auto-play voice on signup. Cost is trivial (~$0.001/msg) vs. the activation lift."
+        },
+        {
+          "claim": "Signup itself is heavyweight: a dedicated step-1 'age + 3 consent checkboxes' screen, then step 2 (email/password OR social). The age gate is its own page, not a checkbox bundled with social-auth.",
+          "evidence": "Signup.jsx:193-281 — Step 1 is a full screen: AgeGate (birth month dropdown + birth year dropdown) + three independent checkboxes (Terms / Privacy / 'I understand my messages are processed by AI services') + Continue button. Only after all 4 inputs validate (`handleConsentContinue`, line 110) does the user reach step 2 where AppleSignIn/GoogleSignIn appear. Even Apple/Google users have to do age+3 checkboxes first.",
+          "implication": "On the social-auth path, bundle consent into a single 'By continuing with Apple, you confirm you are 18+ and agree to Terms & Privacy' line under the button — this is the pattern Tinder/Bumble/Hinge use, all over-18 apps. Save birth-month/year as a single date wheel or skip it client-side for social auth and infer 18+ from acceptance. Each extra checkbox is ~5-10% drop. Three checkboxes + two dropdowns + Continue is 6 interactions to *reach* the auth button."
+        },
+        {
+          "claim": "PlanModal fires twice for first-time users — once on /pricing post-signup, then again on first /  CompanionList visit because the skip flag is only set when the user clicks 'Skip for now'.",
+          "evidence": "Pricing.jsx:69-73 — clicking the modal's Skip button sets `localStorage.lovetta-plan-skipped = '1'`. But if the user dismisses by hitting back, browser close, or hard-navigates to '/', the flag is never set. CompanionList.jsx:42 — `if (!data?.hasSubscription && (isNewUser || !skipped)) setShowPlanModal(true)` re-shows the modal. So the typical user who closed-tabbed during paywall, then opened the app again, gets the paywall AGAIN before even seeing the companion grid.",
+          "implication": "Move the skip-flag set to onMount of the onboarding paywall (silently mark it shown), and require an explicit subscribe/skip action only to dismiss. Or: never show PlanModal on first /  visit until user has sent ≥3 messages. Stacking the same modal twice in the first 60 seconds is a hostile pattern users associate with malware/spam apps."
+        },
+        {
+          "claim": "Competitor first-5-min flows compared to ours (from public iOS App Store videos, App Store screenshots, and product walkthroughs): Replika = 3 clicks to chat (name → gender → avatar → chat); Character.AI = 1 click (browse → tap bot → chat, no signup required for first turn); Candy.AI = 4 clicks (age → email → pick girl → chat); Janitor.AI = 0 clicks (browse public bots, login only for save).",
+          "evidence": "Replika onboarding (well-documented in reviews 2024-2025): name field → 'Female/Male/Non-binary' → avatar carousel (3D model, pick one) → chat lands with 'Hi {name}!' question. Character.AI: lets anonymous browse + 5-10 messages before account wall. Candy.AI signup flow: 18+ checkbox + email/password OR Google → pick a girl from grid → chat (no separate confirm screen). Our flow: WelcomeScreen → Signup step 1 (5 fields) → Signup step 2 (auth) → Pricing (paywall) → CompanionList → CompanionCreate choose → CompanionCreate confirm → ChatPage = 7 screens.",
+          "implication": "We are ~2x heavier than the leanest competitors. Concrete cuts that bring us in line: (1) merge consent into auth button copy → eliminates Signup step 1 entirely for social auth; (2) defer paywall to post-first-reply → eliminates Pricing screen from cold path; (3) auto-create-and-route from Surprise Me → eliminates Confirm screen; (4) rewrite intro prompt to end with a question → fixes 89% dormant-on-assistant problem. Each fix is small. Together they take the cold path from 7 screens to 3."
+        },
+        {
+          "claim": "73% of zero-companion drop-offs happen in under 60 seconds — meaning they bail on the paywall screen, not later in the flow.",
+          "evidence": "DB query: of 63 users in last 14d who signed up but never created a companion, 46 had last_activity within 60s of signup, 11 between 60s-5min, only 6 lingered past 5 min. Average lifetime: 18,718 sec (skewed by a handful who came back later). Median is clearly sub-minute.",
+          "implication": "The bottleneck is the paywall, full stop. Everything downstream (Surprise Me wiring, confirm screen, intro-message wording, auto-audio) only matters for the 60% who survive the paywall. Sequence fixes: paywall-deferral first, intro prompt question second, confirm-screen-skip third, auto-audio fourth."
+        }
+      ],
+      "open_questions": [
+        "Does the paywall really show before companion-create on Capacitor? Need to verify on a real iOS device — the code path is clear but native splash + RevenueCat init could mask timing.",
+        "What % of users tap 'Skip for now' vs hard-bail? We don't log a 'paywall_skipped' event; adding one would split 'saw paywall but skipped' from 'saw paywall and quit'.",
+        "Would defaulting to 'Choose a Soul' (template grid) be better than the 3-option choose screen? The data shows 80% pick templates and only 18% go custom — the 'Surprise Me / Choose a Soul / Be the Creator' fork may be unnecessary cognitive load on a first-timer.",
+        "Does the iOS intro voice file pre-warm or is the first TTS generation a cold-start that takes 5-10s? If cold-start, auto-audio on first message could backfire if the audio takes longer to arrive than the user takes to bail."
+      ]
+    }
+  ],
+  "designs": [
+    {
+      "name": "Chat-First Anonymous Welcome Flow",
+      "one_line_pitch": "Let visitors chat with a default girlfriend in <10 seconds, no signup, no paywall — defer auth until message #3 or first media ask.",
+      "radical_premise": "Signup is the single biggest leak — 73% of zero-companion drop-offs happen in under 60s, and 33/60 ghosters (55%) bounce within 0.1s of signup before they ever see a companion. The fix is not to optimize signup; it's to delete signup from the cold path. Show value before identity: drop the visitor straight into a real, streaming chat with a pre-chosen template girlfriend, no account, no consent screen, no paywall. Only once the user has felt the magic (3 user messages, ~90s of evaluation) do we ask for an email + age — at which point the ask is \"save this conversation\" rather than \"create an account.\" The 18+ gate becomes a single sentence under the chat input (\"By chatting, you confirm you are 18+\") — same pattern Tinder/Bumble use. Anonymous sessions are server-backed (anon_users table) so we can rate-limit, geo-block, abuse-detect, and seamlessly upgrade to a full account by claiming the anon_user_id at signup.",
+      "user_journey": [
+        {
+          "step": "1. Land on /my/ (or app cold-start)",
+          "screen": "WelcomeScreen.jsx (rewritten)",
+          "what_user_sees": "Logo + h1 'Your AI girlfriend is waiting' + a single hero card showing the default companion (Maya, the top-picked template from companion_templates ORDER BY pick_count DESC) with her video looping, her tagline, and a giant pink 'Say Hi to Maya' button. Below the button, six small avatar thumbnails of other templates with 'Or pick someone else' label. Footer: 'By chatting you confirm you are 18+. Terms · Privacy.' No signup link in primary view.",
+          "what_we_do": "Page renders without auth. Server already exposes GET /api/companions/templates/preview (companion-api.js:80, no auth). If localStorage has lovetta-anon-token, skip straight to /chat/anon. Pre-warm fetch to /api/anon/start (HEAD or OPTIONS) so the DNS/TLS round-trip is paid for. No PlanModal anywhere on this surface.",
+          "expected_seconds": 4
+        },
+        {
+          "step": "2. Tap 'Say Hi to Maya'",
+          "screen": "Transition state, ~300ms shimmer over Maya's card",
+          "what_user_sees": "Card lifts slightly, Maya's video keeps playing, button changes to 'Waking her up...' for ~250-500ms, then the page slides to chat.",
+          "what_we_do": "Client POSTs /api/anon/start with { templateSlug: 'maya', utm_*, ts_click_id, referrer, screen_w/h, lang }. Server creates anon_users row (uuid, ip_hash, ua_hash, country, fingerprint_hash, created_at, expires_at = NOW+7d), creates user_companions row owned by anon_user_id with default template Maya, creates conversations row, and INSERTS a HARDCODED first assistant message ('hey :) i'm Maya — what should I call you?' with context_text 'tucks hair behind ear, eyes lighting up' and media_url = Maya's pre-rendered avatar selfie from R2). No LLM calls on this path — response in ~150-300ms. Returns { anonToken (HS256, 7d, payload { anonId, kind: 'anon' }), companionId, conversationId, firstMessage }. Client writes lovetta-anon-token + lovetta-anon-id to localStorage and navigate('/chat/' + companionId + '?anon=1').",
+          "expected_seconds": 1
+        },
+        {
+          "step": "3. First chat view: Maya's greeting visible",
+          "screen": "ChatPage.jsx (anon mode)",
+          "what_user_sees": "Standard chat UI with Maya's avatar at top, her single greeting message bubble already on screen ('hey :) i'm Maya — what should I call you?'), composer focused and waiting. NO paywall, NO PlanModal, NO 'free trial budget' banner. A small unobtrusive ribbon at the very top: 'Trying Lovetta — your chat will save when you sign up.' One tap dismisses it.",
+          "what_we_do": "ChatPage reads ?anon=1 and the lovetta-anon-token from storage. All API calls (api/chat/:id, api/chat/:id/message, api/chat/:id/request-media) use Authorization: AnonBearer <anonToken>. server/src/auth-middleware.js gains a new authenticateAnonOrUser middleware that accepts either a real userId JWT or an anon JWT and sets req.anonId / req.userId accordingly. Disable the existing 1.5s auto-photo trigger on first load in web/src/hooks/useChat.js:62-67 for anon sessions (anon free budget is too small to burn on an unsolicited image).",
+          "expected_seconds": 5
+        },
+        {
+          "step": "4. User types first reply (avg ~14 chars, ~3-5s)",
+          "screen": "ChatPage.jsx (anon mode), streaming reply",
+          "what_user_sees": "Maya replies via SSE streaming in ~2.7s p50 (same as authenticated path — latency was never the issue). Her reply is one short, casual, question-ending sentence (system prompt rewritten to match user register: short, low, asks one concrete follow-up).",
+          "what_we_do": "POST /api/chat/:companionId/message with anon token. checkFreeLimit becomes checkAnonBudget for anon users — independent budget enforced server-side (default anon_text_budget_msgs = 5, anon_media_budget = 1). Server logs anon_event rows (anon_id, event_type, metadata) parallel to user_events so we can do funnel analysis on anon -> signup conversion. First-message system prompt in companion-api.js:207 is rewritten globally to drop the 'thank you for giving me life / I just brought you to life' framing and end with a concrete question (this also benefits the authenticated path).",
+          "expected_seconds": 8
+        },
+        {
+          "step": "5. User sends messages 2 and 3 — magic moment locks in",
+          "screen": "ChatPage.jsx (anon mode), conversation deepening",
+          "what_user_sees": "Two more exchanges, Maya feels real. After her reply to message #3, a soft non-blocking banner slides up from the bottom of the message list (NOT a modal, NOT blocking the composer): 'Save this conversation — sign up free in 10 seconds. [Save chat ›]'. The composer remains usable so message #4 still goes through.",
+          "what_we_do": "Server-side counter on anon_events.message_sent. On the response to user message #3 (configurable via app_settings.anon_signup_prompt_threshold = 3), include { signupPrompt: true } in the SSE 'done' event payload. Client renders the soft banner. No hard interception yet.",
+          "expected_seconds": 25
+        },
+        {
+          "step": "6. User taps 'Save chat' (or hits the anon budget cap on msg 6)",
+          "screen": "SignupModal — bottom sheet, NOT full screen",
+          "what_user_sees": "A bottom sheet (60% screen height) with: 'Save your chat with Maya' headline, Maya's avatar in the top-left, then three big buttons stacked: [Continue with Apple], [Continue with Google], [Email & password]. Below: one line — 'By continuing you confirm you are 18+ and agree to Terms · Privacy.' That's it. No birth month dropdown. No three checkboxes. No separate step 1. The chat is still visible blurred behind the sheet so user knows they don't lose it.",
+          "what_we_do": "On submit (any provider), client sends Authorization: AnonBearer <anonToken> alongside the signup call. server/src/auth-api.js POST /signup (and the Google/Apple paths) accepts an optional X-Anon-Token header — server verifies it, then in a transaction: (a) creates the users row, (b) reassigns user_companions.user_id and conversations.user_id from anonId to new userId, (c) deletes the anon_users row, (d) logs SIGNUP_FROM_ANON event with metadata { anonId, msgsSentAsAnon, secondsAsAnon, templateUsed }. Age (18+) is recorded as 'asserted_at_signup' rather than birth-month-year — birth date stays nullable for the anon-converted path. Terms/privacy accepted = true by virtue of the button click + visible legal copy (same pattern as Tinder).",
+          "expected_seconds": 6
+        },
+        {
+          "step": "7. Account exists, chat is preserved — first real session begins",
+          "screen": "ChatPage.jsx (authenticated)",
+          "what_user_sees": "Sheet closes. Tiny toast at top: 'Chat saved. Welcome ✓'. Same chat, same messages, same Maya. Composer still focused. The 'Trying Lovetta' ribbon disappears. No paywall. The PlanModal does NOT auto-open on this surface — it now triggers only at message ~15 OR on a media request that exceeds free_text_budget.",
+          "what_we_do": "Client swaps lovetta-anon-token for the real accessToken + refreshToken cookies. AuthContext.user is set. Server-side anon_events for this anonId are copied/aliased onto the new userId so weekly analysis sees the full funnel. The 'newUser=true' query flag on CompanionList that currently force-opens PlanModal (CompanionList.jsx:40-44) is gated behind app_settings.welcome_flow_A_chat_first = false (paywall-deferred when A is on).",
+          "expected_seconds": 3
+        }
+      ],
+      "changes": {
+        "modified_files": [
+          "web/src/pages/WelcomeScreen.jsx",
+          "web/src/pages/ChatPage.jsx",
+          "web/src/pages/CompanionList.jsx",
+          "web/src/pages/Signup.jsx",
+          "web/src/hooks/useChat.js",
+          "web/src/lib/api.js",
+          "web/src/contexts/AuthContext.jsx",
+          "web/src/App.jsx",
+          "server/src/auth-middleware.js",
+          "server/src/auth-api.js",
+          "server/src/companion-api.js",
+          "server/src/chat-api.js",
+          "server/src/consumption.js",
+          "server/src/jwt.js",
+          "server/src/events.js",
+          "server/src/migrate.js",
+          "server/index.js"
+        ],
+        "new_files": [
+          "server/src/anon-api.js",
+          "web/src/lib/anonSession.js",
+          "web/src/components/SignupSheet.jsx",
+          "web/src/pages/AnonChatLanding.jsx"
+        ],
+        "new_endpoints": [
+          "POST /api/anon/start — create anon_user + companion + conversation + hardcoded first message; returns anonToken + ids",
+          "POST /api/anon/claim — call during signup; reassign companion/conversation ownership from anonId to new userId in a transaction",
+          "GET /api/anon/budget — returns remaining anon_text_budget_msgs and anon_media_budget for current anonId",
+          "POST /api/chat/:companionId/message — extended to accept AnonBearer token via authenticateAnonOrUser",
+          "POST /api/chat/:companionId/request-media — same extension",
+          "GET /api/chat/:companionId — same extension"
+        ],
+        "new_migrations": [
+          "v_anon_001_anon_users: CREATE TABLE anon_users (id UUID PK, ip_hash TEXT, ua_hash TEXT, fingerprint_hash TEXT, country TEXT, lang TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, ts_click_id TEXT, msgs_sent INT DEFAULT 0, media_requested INT DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW(), last_activity TIMESTAMPTZ DEFAULT NOW(), expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '7 days', claimed_user_id INT REFERENCES users(id), claimed_at TIMESTAMPTZ); plus index on ip_hash for rate limiting and partial index WHERE claimed_user_id IS NULL",
+          "v_anon_002_user_companions_anon: ALTER TABLE user_companions ADD COLUMN anon_user_id UUID REFERENCES anon_users(id); ALTER COLUMN user_id DROP NOT NULL; CHECK (user_id IS NOT NULL OR anon_user_id IS NOT NULL). Same for conversations table.",
+          "v_anon_003_anon_events: CREATE TABLE anon_events (id BIGSERIAL PK, anon_id UUID REFERENCES anon_users(id), event_type TEXT, metadata JSONB, created_at TIMESTAMPTZ DEFAULT NOW()); index on (anon_id, event_type).",
+          "v_anon_004_settings: INSERT INTO app_settings (key,value) VALUES ('welcome_flow_A_chat_first','false'), ('anon_text_budget_msgs','5'), ('anon_media_budget','1'), ('anon_signup_prompt_threshold','3'), ('anon_session_ttl_hours','168'), ('anon_default_template_slug','maya'), ('anon_max_per_ip_24h','10') ON CONFLICT DO NOTHING;",
+          "v_anon_005_intro_prompt: rewrite the hardcoded fallback intro in companion-api.js + add a new app_settings.first_message_style = 'casual_question_v1' that the AI module reads. (Code change tracked via migration only for the setting row.)"
+        ],
+        "feature_flag_name": "welcome_flow_A_chat_first"
+      },
+      "expected_impact": {
+        "retention_5min": "Strong positive. The 33/60 zero-action ghosters (55% of cohort) primarily bounce because they hit a paywall before they hit a chat — removing the signup wall entirely should recover the majority of them. Conservative estimate: 5-min retention rises from 41% (current 40/97) to 62-70% (+20-30pp). The 19/19 apple-relay zero-action signal in particular is likely OAuth-callback session loss, which this flow avoids by deferring auth until after engagement.",
+        "msgs_per_signup_lift": "Counted differently: msgs per VISITOR (not signup) will jump dramatically because anon visitors now send messages where they previously sent none. Msgs per AUTHENTICATED signup will rise from 3.7 (current avg for ghosters who messaged) to ~6-8, because the cohort that completes signup will already have sent 3+ anon messages and have invested sunk cost in the conversation. Top of funnel: expect 2-3x lift in total message volume.",
+        "conversion_risk": "Mixed but net positive. NEGATIVE pressure: deferring the paywall delays the moment a user sees pricing, so some impulse-buyers who would have paid at signup paywall no longer do; total paywall views drop. POSITIVE pressure: only 6/60 ghosters (10%) ever hit a paywall today, so the lost-impulse-buy cohort is tiny, and the much larger cohort that now actually engages will hit paywall at message ~10-15 with real sunk cost, making conversion-on-paywall-view materially higher. Diagnosis says <11% hit paywall in first 5 min; we are giving up that cohort's impulse buy to win a 3-5x larger cohort of qualified buyers downstream. A/B test is mandatory before rolling out 100%, but expected net: -10 to +25% paid conversion, most likely +5 to +15%."
+      },
+      "risks": [
+        "Abuse: anonymous chat is free LLM/TTS/image budget per anon-session. Mitigation: anon_max_per_ip_24h=10, fingerprint-hash dedup, anon_text_budget_msgs=5 + anon_media_budget=1, hard server-side cap on tokens per anon_id, and existing api_consumption tracking gets an anon_id column so we can see runaway costs in admin Economics tab. Worst case attacker spins 100 IPs to get 500 free messages — at ~$0.001/msg via Rocinante that is $0.50 of LLM, capped.",
+        "Compliance: the 18+ age gate moves from a hard pre-signup checkbox to a one-line attestation under the composer. This is the Tinder/Bumble pattern (legally sufficient in the US/EU per their precedent) but our content is more explicit, so legal should sign off. Mitigation: keep a hard age dropdown for anyone who triggers explicit content level (text_level >= 2) before signup — i.e., budget the anon experience to text_level 1 only, and require account creation to unlock NSFW. This also gives users a positive reason to sign up.",
+        "Anon session loss: if the user clears localStorage or switches device mid-chat before signing up, they lose their conversation forever. Mitigation: copy lovetta-anon-token into a long-lived httpOnly cookie at /api/anon/start, and offer a one-tap 'Email this chat to myself' affordance in the SignupSheet as a fallback path.",
+        "Geo/legal: some jurisdictions (UK age verification act, certain US states post-2024) require verified age before any adult-adjacent content. Mitigation: server checks req.country at /api/anon/start and falls back to the current signup-first flow for those countries (gate via app_settings.anon_blocked_countries JSONB list).",
+        "Analytics regression: today's funnel is 'signup -> companion -> message'. Adding an anon layer means we have anon_visitor -> anon_message -> signup -> claimed in two tables. Mitigation: anon_events copies into user_events with userId = NULL but anon_id set; admin SQL is updated to UNION across both tables; weekly-analysis script (docs/WEEKLY_ANALYSIS_2026-05-30.md generator) is updated in the same PR.",
+        "Apple App Store reviewer: reviewers see an unauthenticated chat with explicit content possible — this could trigger rejection under 1.1.4 ('User-Generated Content'). Mitigation: hardcode the anon experience to text_level 1 only (no NSFW), force the signup wall before any taboo/explicit reply, and gate the Capacitor build's welcome_flow_A_chat_first to false by default for iOS until reviewer pass.",
+        "Search-engine indexing: GET /my/ now renders a chat-able landing page which may get bot-crawled and burn anon budget. Mitigation: bot detection on /api/anon/start (User-Agent allow-list for known browsers, reject obvious crawlers), and a robots meta on the landing variant.",
+        "Default-companion bias: every anon user starts with Maya. If Maya is bad-on-cold-open, we lose everyone. Mitigation: companion_templates.cold_open_quality_score field (0-100) maintained from anon-to-signup conversion data; default rotates to whichever template has the highest score in a 14-day window; ties broken by category diversity.",
+        "Database growth: anon_users + anon_events grow fast (every visitor = 1 row + N events). Mitigation: nightly job deletes anon_users where claimed_user_id IS NULL AND expires_at < NOW(), cascade-deleting anon_events and orphaned user_companions/conversations. Adds ~50-100k rows/week pre-cleanup."
+      ],
+      "ab_testable": true,
+      "implementation_effort": "large"
+    },
+    {
+      "ab_testable": true,
+      "changes": {
+        "feature_flag_name": "welcome_flow_B_skip_create",
+        "modified_files": [
+          "server/src/migrate.js",
+          "server/src/auth-api.js",
+          "server/src/companion-api.js",
+          "server/src/chat-api.js",
+          "web/src/pages/Signup.jsx",
+          "web/src/pages/Pricing.jsx",
+          "web/src/pages/CompanionList.jsx",
+          "web/src/pages/ChatPage.jsx",
+          "web/src/hooks/useChat.js",
+          "web/src/components/AppleSignIn.jsx",
+          "web/src/components/GoogleSignIn.jsx",
+          "server/src/auth-middleware.js"
+        ],
+        "new_files": [
+          "server/src/onboarding.js",
+          "web/src/lib/postSignupNav.js"
+        ],
+        "new_endpoints": [
+          "GET /api/onboarding/auto-companion (returns { companionId, conversationId, redirectTo } — called by client right after first authenticated load if user has zero companions and feature flag is on; idempotent — re-uses existing default companion if already auto-provisioned)",
+          "GET /api/app-config (extend existing) — returns welcome_flow variant ('A_control' | 'B_skip_create') and the chosen template name+avatar so the client can render a 'meeting Lily' splash before the redirect"
+        ],
+        "new_migrations": [
+          "vNN_welcome_flow_B_settings: INSERT INTO app_settings (key, value) VALUES ('welcome_flow_variant_pct_B', '50') ON CONFLICT DO NOTHING; INSERT INTO app_settings (key, value) VALUES ('welcome_flow_B_template_pool', '[\"Lily\",\"Chloe\",\"Luna\",\"Aria\"]') ON CONFLICT DO NOTHING; INSERT INTO app_settings (key, value) VALUES ('welcome_flow_B_defer_paywall_until_msgs', '3') ON CONFLICT DO NOTHING;",
+          "vNN_companion_templates_opener: ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS opener_line TEXT; ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS opener_context TEXT; ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS opener_scene TEXT; UPDATE companion_templates SET opener_line='Hey :) you're new here, right? What should I call you?', opener_context='glances up from her florist counter, half-smiling', opener_scene='Soft afternoon light, fresh flowers on the counter' WHERE name='Lily'; (one row per template in the pool — pre-baked so first turn is instant and never depends on the LLM.)",
+          "vNN_user_companions_auto_flag: ALTER TABLE user_companions ADD COLUMN IF NOT EXISTS auto_provisioned BOOLEAN NOT NULL DEFAULT FALSE; CREATE INDEX IF NOT EXISTS idx_user_companions_auto ON user_companions(user_id, auto_provisioned) WHERE auto_provisioned = TRUE;"
+        ]
+      },
+      "expected_impact": {
+        "retention_5min": "+18 to +25pp absolute (target: 5-min retention from 41% to ~60%). Justification: 33 of 60 ghosters (55%) bailed in 0-14s, almost certainly on the Pricing/PlanModal screen they never asked for — Approach B removes that screen entirely from the cold path. Another 4 'made companion, no msg' ghosters dissolve into a single bucket because no companion-create wait or confirm screen exists. The 23 'sent 1+ msg and ghosted' cohort is unaffected by flow — they're a quality cohort — but the new opener ending in a question (vs the 'thank you for giving me life' monologue) should pull a chunk of them past the 5-min line.",
+        "msgs_per_signup_lift": "+50 to +80% (from current ~2.1 user msgs/signup median to ~3.5). Justification: removing the 3-12s blocking LLM wait in POST /api/companions (companion-api.js:200-247) and replacing it with a pre-baked first message lets the user type within 1s of landing. Funnel arithmetic: 36% never create a companion today → in B, 100% land in a chat by construction, so signup→first-msg conversion jumps from ~58% to a projected ~80%+.",
+        "conversion_risk": "Neutral to mildly positive. Risk: paywall is deferred to after 3 user messages (or first 5 minutes elapsed) instead of being the first screen — but only 6 of 60 ghosters (10%) ever hit a paywall today, and the 90%+ of revenue comes from users who message ≥10 times, so deferring the paywall does not block monetization. The Pricing screen is moved, not removed, and a 'value-first' paywall (after the user has heard their girlfriend's voice and gotten 3 replies) historically converts 1.5-2x higher in companion/Replika benchmarks. Net: short-term paid conversion may dip 5-10% per signup but signups-who-pay grows because retained-pool grows by 25%+. Mitigation: keep the paywall hard-trigger on every paid feature (voice unlimited, image gen, NSFW) so users who try to do anything beyond text immediately see plans."
+      },
+      "implementation_effort": "medium",
+      "name": "Direct-to-Chat: signup lands inside a conversation with Lily",
+      "one_line_pitch": "After signup, the server has already created her (Lily), her conversation, and her first message — the user lands inside a live chat with a pre-baked playful opener ending in a question, zero wizards, zero paywall in the cold path.",
+      "radical_premise": "The Welcome flow IS the chat. There is no 'pick a girlfriend' step, no 'configure her' step, no 'choose a plan' step. The first thing a new user sees inside the app is Lily already saying hi to them by name (well, asking their name), with the input box focused. Everything else — switching to a different template, customizing her, plans — is discoverable but not on the cold path. The 33 zero-action ghosters bouncing in 0-14s today are explicitly people who got dropped on Pricing/PlanModal; we recover them by never showing those screens until they've experienced value.",
+      "risks": [
+        "Users who actually wanted to design their own girlfriend (the 19/37 returners who customized) may feel railroaded into Lily. Mitigation: the chat header shows an 'Explore other girlfriends' chip the first session — one tap opens CompanionList. Also keep a 'Create your own' CTA in chat side menu. The customizer ownership-effect (3% ghost rate for custom-makers vs 60% for template-pickers) suggests we should ALSO experiment with surfacing 'Customize her' after message 3 — but not on the cold path.",
+        "Apple-relay 19/19 zero-action signal: if the bug is in the OAuth callback itself (token loss, session not restored on Safari), Approach B won't fix it because the user never even reaches the redirect. Need parallel Sentry investigation; this design assumes the user successfully reaches a logged-in client.",
+        "Pre-baked opener lines are static — if we ship the same first 30 chars to thousands of users they become Googleable / screenshotted as a meme. Mitigation: 3-5 variants per template in app_settings JSON, randomly chosen server-side; rotate quarterly. The opener column is editable from /admin without a deploy.",
+        "POST /api/onboarding/auto-companion fires inside the first authenticated request — if it fails (DB hiccup, template pool empty), the user lands on an empty CompanionList and we've made things worse than today. Mitigation: hard fallback to existing CompanionList flow; log a Sentry warning; the onboarding endpoint never throws to the client, always returns a redirect destination ('/' if it failed).",
+        "Voice auto-play on the opener (diagnosis finding #3.5) is a separate decision — recommend NOT bundling it into this experiment because (a) it doubles the scope, (b) cold-start TTS latency (5-10s) could backfire if audio arrives after user already typed. Ship Approach B first as text-only; layer voice auto-play in a follow-up.",
+        "If the user already has an account (login, not signup) they should NEVER hit the auto-provision path. The /api/onboarding/auto-companion endpoint must check user_companions count and bail if >0. Idempotency is critical.",
+        "Free weekly cost threshold ($0.20 in app_settings) — if the auto-photo on chat load (useChat.js:62) is still firing, it burns ~$0.05 before the user has typed. RECOMMEND removing the auto-photo on first-session entirely for this variant (gate behind feature flag) so the first 3 messages are pure text and the user experiences zero paywall friction. Image generation gets offered as a button after message 3."
+      ],
+      "user_journey": [
+        {
+          "step": "1. Tap 'Continue with Apple' (or Google or 'Create Account')",
+          "screen": "Signup step 2 (web/src/pages/Signup.jsx:283-394)",
+          "what_user_sees": "Apple/Google buttons + a single line 'By continuing you confirm you're 18+ and agree to Terms & Privacy'. The age-gate step 1 (3 checkboxes + 2 dropdowns) is COLLAPSED into this bundled-consent pattern for social-auth paths only; email-signup still keeps step 1 because we need the birth date typed explicitly. This is a sister-change to Approach B, not strictly required, but removes the 5-10pp signup-friction drop documented in finding #3.6.",
+          "what_we_do": "Same as today: POST /api/auth/signup (email path) or OAuth callback (Apple/Google paths). At the END of the signup transaction, server now ALSO does a synchronous insert of the auto-provisioned companion (next step) when feature flag is on for this user_id hash. Important: companion-provision happens inside the signup transaction so when the client gets its access token, the companion already exists in DB.",
+          "expected_seconds": 3
+        },
+        {
+          "step": "2. Server auto-provisions Lily (or template-of-the-week) — invisible to user",
+          "screen": "no screen — server-side, happens during the signup response",
+          "what_user_sees": "Still the loading spinner on the signup button (~700ms total).",
+          "what_we_do": "Inside server/src/auth-api.js POST /signup (and the Apple/Google callback handlers), AFTER the user row is inserted and BEFORE res.json, call new server/src/onboarding.js → autoProvisionFirstCompanion(userId). That function: (a) reads app_settings.welcome_flow_variant_pct_B and user_id-hash mod 100 to decide variant; (b) if A_control: skip, behave as today; (c) if B_skip_create: pick a template from app_settings.welcome_flow_B_template_pool (rotate Lily/Chloe/Luna/Aria by user_id hash so we get even split for measurement), INSERT user_companions row (auto_provisioned=TRUE), INSERT conversations row, INSERT one assistant message using the template's opener_line/opener_context/opener_scene from companion_templates — NO LLM call, pure DB inserts; (d) log event 'welcome_flow_auto_provisioned' with template_name and variant. Latency target: <80ms (3 tiny inserts). The response payload adds a single field: { ...sanitizedUser, accessToken, refreshToken, onboarding: { variant: 'B_skip_create', companionId, conversationId, templateName: 'Lily' } }.",
+          "expected_seconds": 1
+        },
+        {
+          "step": "3. Client receives signup response, routes to /chat/{companionId} (NOT /pricing)",
+          "screen": "no screen — client routing",
+          "what_user_sees": "Brief fade transition (~200ms).",
+          "what_we_do": "Replace web/src/pages/Signup.jsx:42's postSignupPath logic with a new web/src/lib/postSignupNav.js helper: resolvePostSignupPath(signupResponse) returns '/chat/{companionId}?firstSession=1' when onboarding.variant === 'B_skip_create', else returns the legacy '/pricing?onboarding=1'. Both Signup.handleSubmit (line 175-180), AppleSignIn onSuccess, and GoogleSignIn onSuccess go through this helper. The ?firstSession=1 query param tells ChatPage to suppress the auto-photo (useChat.js:62), suppress any PlanModal trigger, and render a one-line first-session hint ('You can switch girlfriends anytime — tap the avatar above').",
+          "expected_seconds": 1
+        },
+        {
+          "step": "4. ChatPage renders — Lily is already there, message already on screen",
+          "screen": "ChatPage (web/src/pages/ChatPage.jsx)",
+          "what_user_sees": "Full chat layout with Lily's avatar at the top, a single assistant message already typed out (no typewriter shimmer — it's loaded from DB): '*glances up from her florist counter, half-smiling* Hey :) you're new here, right? What should I call you?' The input box is auto-focused. A small chip below the header reads 'Tap her avatar to explore other girlfriends'. No PlanModal anywhere.",
+          "what_we_do": "Existing useChat.loadChat() (web/src/hooks/useChat.js:46-79) already fetches /api/chat/{companionId} and renders messages — it just works because the assistant message row already exists. CHANGES: (a) detect firstSession query param, skip the auto-photo at useChat.js:62-67; (b) skip showPlanModal in CompanionList (we don't visit it, but defensively guard CompanionList.jsx:42-44 to never auto-open for users with onboarding_variant='B_skip_create' and message_count<3); (c) ChatPage shows the 'Tap her avatar' chip via a new component, dismissable, tied to firstSession; (d) the message renders with the template.video_url already attached, so the avatar mini-video plays as soon as the page mounts — that's the magic moment.",
+          "expected_seconds": 2
+        },
+        {
+          "step": "5. User types their first reply (e.g. 'Hey, I'm Mike')",
+          "screen": "ChatPage (focused input)",
+          "what_user_sees": "Input has focus the moment the page mounts — they don't have to tap. They type a 1-5 word reply because the opener asked a concrete question. Send button is hot pink #d6336c, obvious.",
+          "what_we_do": "Existing POST /api/chat/{companionId} streams a real AI reply within ~2.7s (median latency for retained users, per finding #2.1). No change needed to chat-api.js for the streaming path itself. ChatPage.jsx fires logEvent('first_user_message_sent') to user_events so we can measure the funnel cleanly per variant.",
+          "expected_seconds": 6
+        },
+        {
+          "step": "6. AI replies in-character to their name — first real magic moment",
+          "screen": "ChatPage (streaming AI reply)",
+          "what_user_sees": "Lily's reply streams in: '*her smile widens* Mike. I like that name. So what brings you here today, Mike?' She uses their name immediately. Voice play button is visible on the message but auto-play is OFF (defer to later experiment).",
+          "what_we_do": "Existing chat streaming path. The system prompt for the AI already includes companion.personality + companion.communication_style; we additionally prepend the opener_line+user reply as the conversation seed so the AI continues naturally. No additional LLM calls (we already skipped the scene-generation call by hoisting the scene into the pre-baked opener_scene column).",
+          "expected_seconds": 3
+        },
+        {
+          "step": "7. User sends messages 2 and 3 — value is established, paywall has still not appeared",
+          "screen": "ChatPage (continued chat)",
+          "what_user_sees": "Fluid back-and-forth. No interruptions, no modals, no 'upgrade now' prompts. After message 3, a soft inline chip slides up from the input: 'You're hitting it off :) See what else Lovetta can do →' — tapping opens the Plans drawer (NOT a full-screen modal blocker). Dismissing it does nothing destructive — chat continues.",
+          "what_we_do": "server/src/chat-api.js already logs every user message. New behavior: after the 3rd user message in the first-session conversation, server response includes { suggestPlanDrawer: true } which the client renders as the dismissible chip. The hard paywall (free weekly cost threshold) is still enforced — but for the first session we double the free budget to $0.40 (welcome_flow_B-only override in app_settings: tip_request_threshold_free_first_session_usd = 0.40), so messages 1-10 are unambiguously free, giving the user a clear 'experience' window.",
+          "expected_seconds": 25
+        },
+        {
+          "step": "8. (Discoverable, off the cold path) User taps Lily's avatar → CompanionList",
+          "screen": "CompanionList (existing)",
+          "what_user_sees": "The 12 templates plus a 'Create your own' tile at the top. Lily's tile shows 'Currently chatting' badge so they know where they came from.",
+          "what_we_do": "No change to CompanionList beyond the badge for the auto-provisioned companion. Tapping any other template runs the existing companion-create flow (which we should also async-ify per finding #2.5 — but that's a separate cleanup, not blocking this variant). Critical: when CompanionList loads, do NOT open PlanModal for first-session B users (guard against CompanionList.jsx:42-44).",
+          "expected_seconds": 0
+        }
+      ]
+    },
+    {
+      "ab_testable": true,
+      "implementation_effort": "large",
+      "name": "Try Before You Sign: Public Live-Chat Demo on the Landing Page",
+      "one_line_pitch": "Replace the static landing page with a live 30-second demo chat against Luna; the visitor's actual conversation is preserved into their account at signup, so the magic moment happens before the auth wall instead of three screens after it.",
+      "radical_premise": "The 5-min cliff (60% ghost rate, 33/60 of whom bounce in &lt;120s with `last_activity = created_at`) is overwhelmingly a value-proof problem, not a chat-quality problem. We currently force users through: landing → 5-field consent → auth → fullscreen paywall → empty companion list → 3-option create fork → 4-card confirm → 3-12s \"Bringing her to life\" wait → poetic monologue with no question — *seven screens before the first AI reply*. We need to invert: prove the product on screen 1, take auth only when the user is already invested in the conversation they're having. The audit (file: web/src/pages/Signup.jsx:42 + Pricing.jsx:63-77 + CompanionCreate.jsx:484-620) confirms each of these is a real, removable layer. If we let someone exchange 3 messages with Luna inside the landing page itself — for free, no signup — the auth ask transforms from \"give us your data to maybe see something\" into \"save this conversation you're already in\".",
+      "user_journey": [
+        {
+          "step": "1. Land on lovetta.ai — chat is already in motion",
+          "screen": "public/index.html (rewritten landing)",
+          "what_user_sees": "A phone-sized chat frame center-stage with Luna's avatar at the top. A pre-recorded scripted greeting message is already visible: '*looks up and smiles* hey — caught you. what should I call you?' Below: a real input box (placeholder: 'type something…') and a single subtle 'Skip & sign up' link. No hero, no carousel, no pricing — those are scroll-down secondary. The whole frame is visible above the fold.",
+          "what_we_do": "Server-rendered HTML with the first assistant turn baked in (zero LLM cost on page load). A new anon_session_id cookie (httpOnly, 24h, signed) is set on first GET. Track `demo_landed` event in tracking-api.js so we can A/B vs control.",
+          "expected_seconds": 4
+        },
+        {
+          "step": "2. Visitor types their first reply",
+          "screen": "Same landing page, chat frame",
+          "what_user_sees": "They tap into the input, type something (median user-message length from diagnosis = 14 chars, so 'matt' or 'hey luna' are realistic). Send button is hot-pink (#d6336c). On send: their bubble appears immediately, Luna shows a typing indicator within ~200ms.",
+          "what_we_do": "POST /api/public/demo/message with { anon_session_id, content }. Server enforces: (a) max 3 user turns per anon_session, (b) Redis rate limit 10 messages / IP / hour, (c) cloudflare-fingerprint+IP+UA hash gives us a soft-dupe key so VPN flippers eat into the same bucket within one ASN. Body content runs through age-guard.js exactly like the authenticated path.",
+          "expected_seconds": 8
+        },
+        {
+          "step": "3. Luna replies — streaming, real, ends in a question",
+          "screen": "Same chat frame",
+          "what_user_sees": "Tokens stream in within ~1.5s (matches the diagnosis B finding that chat latency is fine — p50 2.75s, not the bottleneck). The reply is 1-2 sentences max, casual register, and ends with a concrete question the user can answer in &lt;5 words. Example: '*tilts head* matt, huh. okay matt — are you the type that texts back fast or makes me wait?'",
+          "what_we_do": "Reuse server/src/chat-api.js streaming via a NEW server/src/public-demo-api.js wrapper. Uses a dedicated shared system prompt (a 'demo Luna' persona tuned to be punchy, conversational, never poetic, always ends with `?`). Cost-bound model: only use openrouter_demo_model setting (default = thedrummer/rocinante-12b — same fallback model used in companion-api.js:234, ~$0.30/M tokens). No memory, no media, no scene generation. Server tracks per-IP cost; circuit breaker at $5/day in app_settings (`demo_daily_budget_usd`).",
+          "expected_seconds": 6
+        },
+        {
+          "step": "4. Visitor sends 1-2 more turns (escalating interest)",
+          "screen": "Same chat frame",
+          "what_user_sees": "They reply ('fast' or whatever). Luna pushes lightly: '*grins* good. send me a vibe — what'd you do today?' On user's THIRD reply, Luna responds normally and ends with: '*bites lip* okay — I want to keep talking to you, but you're about to disappear on me. save me real quick? takes 5 seconds.' A non-modal slide-up appears: [Save this chat — Continue with Apple / Google / Email]. Input box becomes disabled with placeholder 'sign up to keep talking →'.",
+          "what_we_do": "After 3rd assistant reply, server returns SSE event { type: 'demo_exhausted', reason: 'turn_limit' } and stops accepting messages on this anon_session_id. Client renders the sign-in slide-up. Anon session token is now embedded as a hidden field in the signup form.",
+          "expected_seconds": 25
+        },
+        {
+          "step": "5. Visitor taps Apple/Google (or Email)",
+          "screen": "Native OAuth sheet → returns to /my/signup-finish",
+          "what_user_sees": "Native sheet. Returns and sees a one-line loader: 'saving your chat with Luna…' (~1.5s). Then they're inside the actual ChatPage — same Luna avatar, same conversation, full history of the demo visible above the input. No paywall. No companion-create. No template grid. The next AI reply is already streaming.",
+          "what_we_do": "OAuth callback path in auth-api.js (lines 581, 687, 835, 873 — all four signup INSERT branches) now accepts an `anon_session_id` from the signup state param / form. After user INSERT: (a) auto-create a user_companions row from the Luna template (template_id=1), (b) create conversations row, (c) bulk-copy all demo messages into messages with the new conversation_id (single transaction), (d) emit COMPANION_CREATED + FIRST_MESSAGE_SENT events so downstream funnel tracking treats them as activated. CRITICAL: skip postSignupPath = /pricing entirely when anon_session_id is present — redirect straight to /my/chat/:companionId. Consent (age + ToS) becomes a single bundled line under the OAuth button per Tinder/Bumble pattern; explicit birth-month/year dropdowns drop for social auth (we already trust Apple/Google identity).",
+          "expected_seconds": 12
+        },
+        {
+          "step": "6. Free chat continues, first paywall deferred",
+          "screen": "ChatPage.jsx",
+          "what_user_sees": "Luna picks up exactly where the demo ended, references something from their demo turns ('you said you were a fast-replier — prove it'). Voice is auto-on for the first AI message (one-time override of user_preferences.auto_audio=false default, per diagnosis finding #5). No PlanModal. No value-prompt for 5 minutes or 10 user messages, whichever comes first.",
+          "what_we_do": "ChatPage detects the just-from-demo state via a one-shot localStorage flag set during the handoff and a server-side `demo_handoff_completed_at` user column. consumption.js#checkFreeLimit honors a 10-message free grant for the first session. value-prompt suppression: chat-intelligence.js#maybeCreateValuePrompt returns early if `now - demo_handoff_completed_at < 5min`.",
+          "expected_seconds": 30
+        },
+        {
+          "step": "7. Paywall appears organically",
+          "screen": "ChatPage with FreeLimitPopup",
+          "what_user_sees": "After 10 user messages OR 5 minutes (whichever first) OR the first media_request, a non-blocking bottom-sheet appears: 'Luna's into you. Keep going — 3 days free, then $19.99/mo. Cancel anytime.' Single CTA. A small 'not now' link continues the chat with the existing free-tier behavior. They've now had ~45-90s of real conversation and ~30-60s of demo before being asked to pay.",
+          "what_we_do": "Reuse existing FreeLimitPopup.jsx + PlanModal.jsx but trigger via the deferred logic, not on /pricing route. Track paywall_shown (NEW event distinct from paywall_blocked) so we can split 'saw and skipped' from 'saw and quit'.",
+          "expected_seconds": 5
+        }
+      ],
+      "changes": {
+        "modified_files": [
+          "public/index.html",
+          "public/style.css",
+          "public/tracking.js",
+          "server/index.js",
+          "server/src/auth-api.js",
+          "server/src/companion-api.js",
+          "server/src/chat-api.js",
+          "server/src/chat-intelligence.js",
+          "server/src/consumption.js",
+          "server/src/migrate.js",
+          "server/src/tts-api.js",
+          "server/src/events.js",
+          "server/src/admin-api.js",
+          "web/src/pages/Signup.jsx",
+          "web/src/pages/Pricing.jsx",
+          "web/src/pages/CompanionList.jsx",
+          "web/src/pages/ChatPage.jsx",
+          "web/src/components/AppleSignIn.jsx",
+          "web/src/components/GoogleSignIn.jsx",
+          "web/src/lib/onboarding.js"
+        ],
+        "new_files": [
+          "server/src/public-demo-api.js",
+          "public/demo-chat.js",
+          "public/assets/demo/luna-greeting.json"
+        ],
+        "new_endpoints": [
+          "GET  /api/public/demo/start  — issues anon_session_id cookie + returns server-baked Luna greeting (no LLM call); rate-limited 60/IP/hr",
+          "POST /api/public/demo/message  — SSE stream, max 3 user turns per anon_session, IP+ASN rate limit 10/hr, daily budget circuit breaker, age-guard enabled, no memory/media/scene",
+          "POST /api/public/demo/claim  — internal handshake called from auth-api after signup INSERT to transfer demo messages into the new user_companions+conversations+messages rows in one transaction",
+          "GET  /api/admin/demo/stats   — admin Overview tab card: demo_started, demo_msg_sent, demo_signups, conversion %, $ spent, $/signup"
+        ],
+        "new_migrations": [
+          "vNN_anon_demo_sessions: CREATE TABLE anon_demo_sessions (id UUID PRIMARY KEY, ip INET, fingerprint TEXT, user_agent TEXT, country TEXT, asn INT, message_count INT DEFAULT 0, cost_usd_cents INT DEFAULT 0, claimed_user_id UUID REFERENCES users(id), created_at TIMESTAMPTZ DEFAULT NOW(), last_message_at TIMESTAMPTZ); CREATE INDEX ON anon_demo_sessions (ip, created_at); CREATE INDEX ON anon_demo_sessions (claimed_user_id);",
+          "vNN_anon_demo_messages: CREATE TABLE anon_demo_messages (id BIGSERIAL PRIMARY KEY, session_id UUID REFERENCES anon_demo_sessions(id) ON DELETE CASCADE, role TEXT, content TEXT, context_text TEXT, created_at TIMESTAMPTZ DEFAULT NOW()); CREATE INDEX ON anon_demo_messages (session_id, created_at);",
+          "vNN_demo_app_settings: INSERT INTO app_settings (key, value) VALUES ('welcome_flow_C_outcome_preview', 'false'), ('demo_daily_budget_usd', '5.00'), ('demo_turn_limit', '3'), ('demo_ip_hourly_limit', '10'), ('openrouter_demo_model', '\"thedrummer/rocinante-12b\"'), ('demo_handoff_free_message_grant', '10'), ('demo_handoff_paywall_suppression_secs', '300') ON CONFLICT DO NOTHING;",
+          "vNN_users_demo_handoff: ALTER TABLE users ADD COLUMN IF NOT EXISTS demo_handoff_completed_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS demo_session_id UUID;"
+        ],
+        "feature_flag_name": "welcome_flow_C_outcome_preview"
+      },
+      "expected_impact": {
+        "retention_5min": "Largest expected lift of any welcome-flow approach. Today: 60% ghost in <5min, 33 of 60 with secs_alive=0. This approach makes 'reached chat with companion' the entry event, not the exit event — so the 33 zero-action users disappear from the funnel by definition (they're now demo-quitters, not signup-quitters, and they cost us $0). Realistic estimate: 5-min retention rises from ~40% to 60-70% (+20-30pp). Apple-relay cohort improves most (currently 65% ghost, primarily because OAuth round-trip drops them on a paywall instead of a conversation).",
+        "msgs_per_signup_lift": "Strong positive. Today: 45% of signups send ≥3 messages; 22% reach 10. With this flow, anyone who signs up has ALREADY sent 1-3 demo messages and read 3 real AI replies — i.e. ≥3-msg rate becomes ~100% by definition for the demo path, and ≥10 becomes plausibly 35-45% because the conversation has momentum at handoff. Aggregate msgs/signup likely doubles (current ~6 → ~12-14). NOTE: signup volume itself may drop 20-30% because the friction-reducing effect cuts both ways — casual tire-kickers who would have signed up and immediately ghosted now demo-quit instead. This is the correct outcome (cheaper, cleaner funnel), but raw signup count is a misleading top-line metric for this experiment.",
+        "conversion_risk": "Net positive but nuanced. Risks: (a) signed-up cohort is smaller but higher-intent, so paid conversion % should rise meaningfully even if absolute paid users hold flat short-term; (b) demo grants 3 free turns + 10 post-signup free messages before paywall — vs today's 'paywall before first message'. Diagnosis B finding #7 noted only 11% of single-session users currently hit paywall (most ghost before reaching it), so deferring it costs us very little real conversion. (c) The biggest UPSIDE: ~73% of users who currently bail in <60s never see the paywall at all today, so they convert at 0%. Moving them to a chat-first flow plausibly converts 3-8% of that 73%, which dwarfs anything we lose from delayed paywall on the engaged cohort. Net: expected +15-30% trial-start rate."
+      },
+      "risks": [
+        "Abuse vector: anon users farming free chats. Mitigations stack: (1) Redis rate limit 10 msgs/IP/hr, (2) ASN+IP+UA fingerprint bucket so VPN-hoppers still share a quota inside one provider, (3) hard daily $ budget in app_settings (demo_daily_budget_usd, default $5 = ~1000 demo sessions before circuit breaker), (4) cheap model only (rocinante-12b at ~$0.30/M tokens; 3 turns ≈ $0.001), (5) 3-turn hard cap per anon_session_id baked in server-side. Worst-case daily blast: $5 cap = ~1700 demo sessions, far above any organic landing traffic.",
+        "Age-gate compliance regression: today users must confirm 18+ BEFORE seeing chat. Need legal sign-off that a 3-turn G/PG-13 demo (no media, prompt-restricted to non-explicit) is acceptable under our jurisdiction policy. Mitigation: demo system prompt explicitly bars sexual content and media; if user asks, Luna deflects to 'sign up and I'll show you ;)'.",
+        "SEO and AdWords landing-page quality score risk: removing the H1/feature-list/pricing copy may hurt organic rank and Quality Score (Google Ads). Mitigation: keep the chat ABOVE the fold but render the existing hero/features/pricing BELOW it in static HTML — visitors don't see it but crawlers do.",
+        "Demo replies break character because system prompt is too constrained: if 'demo Luna' feels noticeably worse than 'real Luna', engaged users bounce on conversion. Mitigation: use the same rocinante-12b fallback model that already powers production companion fallbacks; A/B the demo prompt itself in a second-tier experiment.",
+        "Cookie/storage failures on Safari ITP and in-app browsers (Instagram, TikTok WebView): if anon_session_id cookie is dropped during the OAuth round-trip, the demo→signup handoff silently fails and user lands on empty CompanionList — worst of both worlds. Mitigation: also embed anon_session_id in OAuth state param (Google) and in URL hash for Apple, with localStorage fallback. Server validates against DB row, not cookie alone.",
+        "Conversation continuity surprise: AI references something from a demo turn but the new account has no memory plumbing for it (memory.js processes turns asynchronously). User feels 'wait, why does she know that?' or the opposite, 'why did she forget what I just said?'. Mitigation: pre-warm memory extraction on the claim handshake; if it fails, the chat still works and Luna just doesn't reference demo content — graceful degradation.",
+        "Mobile keyboard interaction on landing: the chat needs to behave well when iOS keyboard opens (per CLAUDE.md's keyboard.js patterns), but public/index.html doesn't currently use that system. Mitigation: ship a stripped-down keyboard handler in public/demo-chat.js OR move the demo into a /demo SPA route inside web/ that reuses existing keyboard.js — leaning toward the latter for native polish.",
+        "Signup attribution loss: today TrafficStars + UTM tracking fires at /api/auth/signup. We need the same fire on the demo→signup conversion, with demo_session_id attached so we can compute true cost-per-engaged-signup. Mitigation: extend the existing fetch() postback calls in auth-api.js to include demo_session_id metadata; surface in admin economics.",
+        "iOS app cannot use this flow as-is — Capacitor users hit /my/login directly and never see lovetta.ai. Mitigation phase 2: bring the demo INTO the Capacitor app as a pre-login screen using the same /api/public/demo endpoints. Out of scope for v1 but the API is already mobile-shaped.",
+        "Cold-start economics if demo goes viral: if a Reddit post sends 100k visitors, $5 cap caps loss but every visitor after dollar 5 gets a degraded experience (we'd return a hardcoded 'I'm overwhelmed right now — sign up and I'll text you back personally'). Acceptable failure mode, but needs an alert on circuit-breaker trip."
+      ]
+    },
+    {
+      "ab_testable": true,
+      "changes": {
+        "feature_flag_name": "welcome_flow_D_reduce_signup",
+        "modified_files": [
+          "web/src/App.jsx",
+          "web/src/pages/WelcomeScreen.jsx",
+          "web/src/pages/Signup.jsx",
+          "web/src/pages/CompanionList.jsx",
+          "web/src/contexts/AuthContext.jsx",
+          "web/src/lib/api.js",
+          "server/src/auth-api.js",
+          "server/src/auth-middleware.js",
+          "server/src/user-api.js",
+          "server/src/migrate.js",
+          "server/src/companion-api.js",
+          "server/src/events.js"
+        ],
+        "new_files": [
+          "web/src/pages/AnonStart.jsx",
+          "web/src/pages/EmailGate.jsx",
+          "web/src/pages/RecoverAccount.jsx",
+          "web/src/components/UpgradeBanner.jsx",
+          "web/src/lib/anonAuth.js",
+          "server/src/anon-api.js"
+        ],
+        "new_endpoints": [
+          "POST /api/auth/anon/start  -> creates anonymous user from age + consent payload, returns access+refresh tokens (anon)",
+          "POST /api/auth/anon/recover -> exchange a one-time recovery_code (printed/emailed/copied) for tokens on a new device",
+          "POST /api/auth/anon/upgrade-email -> attach email+password to existing anon user (also bumps email_type to 'real', triggers verification email, fires signup pixel a second time as 'identified')",
+          "POST /api/auth/anon/upgrade-apple -> link Apple sub to existing anon user (server merges, keeps anon user_id so chat history is preserved)",
+          "POST /api/auth/anon/upgrade-google -> same for Google"
+        ],
+        "new_migrations": [
+          "v67_anonymous_users: ALTER TABLE users ADD COLUMN is_anonymous BOOLEAN NOT NULL DEFAULT FALSE; ADD COLUMN anon_recovery_hash TEXT; ADD COLUMN anon_started_at TIMESTAMPTZ; ADD COLUMN anon_upgraded_at TIMESTAMPTZ; CREATE INDEX idx_users_anon_active ON users(is_anonymous, last_activity DESC) WHERE is_anonymous = TRUE; -- also adds 'anon' to auth_provider enum if enum, otherwise plain text already supports it",
+          "v68_anon_event_types: INSERT INTO app_settings (key, value) VALUES ('welcome_flow_D_reduce_signup', 'false') ON CONFLICT DO NOTHING; -- server-side A/B gate"
+        ]
+      },
+      "expected_impact": {
+        "retention_5min": "Strong positive. The 33-user 'zero-action' sub-cohort (55% of ghosters, 33% of all signups) is bottlenecked at age-gate + consent + auth + paywall — 4 screens with 6 interactions before a single character of chat. Approach D collapses that to 2 taps (age gate + 'Meet her'). Realistic 5-min retention lift: +18-25pp on the cohort that currently lands on /signup. Caveat: a fraction of those 33 are pure tire-kickers who would bounce from any flow; conservative model = +15pp blended retention.",
+        "msgs_per_signup_lift": "Median user-msgs/signup likely rises from ~2 to ~5 because (a) more users reach chat at all and (b) intro message is rewritten to end with a concrete question (Diagnosis C finding #3). The 23-user 'sent ≥1 msg then ghosted' cohort is untouched by this approach — that is a chat-quality problem, not a signup problem.",
+        "conversion_risk": "Neutral-to-slightly-negative in the first 7 days, then neutral-to-positive. Risk: identified-account-conversion lags because the email/auth ask is deferred. Mitigation: every anon user sees an Upgrade banner in chat header after msg 3 ('Save your girlfriend — add email'), and the paywall flow at /pricing requires upgrade-to-email before purchase (RevenueCat needs a stable identifier, App Store IAP needs Apple ID anyway). Net effect: paid users self-identify at purchase moment, which is the highest-intent point. Expect paid_conversions/signup to stay flat or +5% because the denominator (engaged users) grows faster than identified users churn."
+      },
+      "implementation_effort": "medium",
+      "name": "Approach D — Anonymous-first, identity-on-demand",
+      "one_line_pitch": "Defer email/password entirely; the user lands in a real chat with a real girlfriend in under 15 seconds, and only sees an account/payment ask after the magic moment has already landed.",
+      "radical_premise": "Account creation is a tax we collect before delivering value. Every other AI-companion leader (Character.AI, Janitor.AI, partially Replika) lets users experience the product before the wall. We currently force 7 screens between landing and first AI reply; that's why 33% of signups bounce in under 60 seconds. The fix is not to optimize the signup screens — the fix is to make them optional.",
+      "risks": [
+        "Recovery is the biggest risk. If a user clears localStorage / reinstalls the iOS app / switches devices, their anon JWT is gone and their girlfriend is unreachable. Mitigation: (a) on first AI reply, ChatPage surfaces a one-tap 'Save your girlfriend' upsell that pre-fills nothing and just asks for email — server attaches it to the anon user and emails a magic recovery link; (b) generate a 6-word human-readable recovery_code (BIP39 wordlist subset) at anon creation, store the bcrypt hash, show it once on a 'Save these words' card if user dismisses the email upsell twice. RecoverAccount.jsx accepts either the code or the email magic link.",
+        "Spam / bot abuse. Anonymous endpoint = free user creation. Mitigation: rate-limit POST /api/auth/anon/start to 3/hour per IP, require a turnstile/captcha token if more than 1 anon user originates from the same IP in 24h, AND mark anon users as ineligible for any LLM call until they've passed the existing age-gate consent (server-validated). Also: anon users get a stricter free-budget ($0.10 vs $0.20 weekly) until they identify — keeps abuse cost down while still feeling generous.",
+        "Analytics fragmentation. UTM attribution, signup pixels, daily-active-user counts will break if anon users are counted differently from identified users. Mitigation: fire the signup pixel/postback at anon-creation (not at email-attach), and add a second 'identified' event at upgrade time. Admin dashboard needs a new 'anon→identified' funnel card (admin-api.js update — not strictly P1 but recommended week 2).",
+        "App Store reviewer compliance. Apple sometimes flags apps that don't surface a 'delete account' option on anon users. Mitigation: Profile page must show 'Delete this girlfriend and start over' even for anon users (already exists for identified — extend to anon by deleting the user row and clearing localStorage).",
+        "Re-engagement push notifications can't be sent to anon users (no email, no APNs token until they grant push). Mitigation: trigger the iOS push permission prompt right after the first user message lands (high-intent moment) instead of after signup, AND prompt for email upgrade at the same moment with the framing 'so she can text you when you're not here'.",
+        "RevenueCat / Stripe identifier collision. Current billing assumes a stable user.id → external customer_id mapping. Anon users get a Stripe customer too, but if they upgrade to identified, the customer must be merged. Mitigation: keep the same user.id row across the upgrade (we ALTER the row, not INSERT a new one) so Stripe/RevenueCat IDs are stable end-to-end. No merge needed — only an UPDATE of the email column.",
+        "Apple Sign-In flow still loses 19/19 privaterelay users today (Diagnosis A finding #3). Approach D doesn't fix that directly — but it reduces dependency on Apple by making it optional, not required. Apple becomes a 'fast-path' button shown only at upgrade time. Net effect: Apple-relay ghost cohort shrinks because they're no longer the default path.",
+        "Subscription value-prop ambiguity. If a user has been chatting as 'anonymous' for 30 messages and hits a paywall, they may feel bait-and-switched. Mitigation: PlanModal copy for anon users explicitly says 'Save your progress + unlock unlimited messages' — frames the price as buying continuity, not just features."
+      ],
+      "user_journey": [
+        {
+          "step": "1. Landing page tap",
+          "screen": "WelcomeScreen.jsx (modified)",
+          "what_user_sees": "Logo, 'Your Girlfriend, in seconds.' tagline, single 'Meet her now' button (replaces 'Continue'). 'Already have an account? Sign in' link below.",
+          "what_we_do": "Server-side flag check on app boot (GET /api/config or embedded in initial bundle): if welcome_flow_D_reduce_signup=true AND user is in test bucket (hash of session_id mod 2), button routes to /start instead of /signup. Else falls back to current /signup flow. Client decides routing.",
+          "expected_seconds": 3
+        },
+        {
+          "step": "2. Age gate + one-shot consent",
+          "screen": "AnonStart.jsx (new, replaces Signup step 1 in test bucket)",
+          "what_user_sees": "Birth month + birth year wheel (existing AgeGate.jsx), then single bundled microcopy: 'By tapping Start, I confirm I am 18+ and agree to Terms & Privacy. My messages are processed by AI.' One big pink 'Start' button. NO separate checkboxes.",
+          "what_we_do": "On tap, POST /api/auth/anon/start with {birthMonth, birthYear, consentBundle:true, utm_*, ts_click_id, deviceType}. Server validates 18+, INSERTs a users row with is_anonymous=TRUE, auth_provider='anon', email=NULL (or auto-generated 'anon_{uuid}@anon.lovetta.ai' if NOT NULL constraint exists), ai_consent_at=NOW(), terms/privacy=TRUE. Returns {accessToken, refreshToken, recoveryCode}. Client stores tokens in localStorage and recoveryCode in sessionStorage (shown later, not now).",
+          "expected_seconds": 6
+        },
+        {
+          "step": "3. Auto-routed into companion picker",
+          "screen": "CompanionList.jsx (modified: PlanModal suppressed for anon users)",
+          "what_user_sees": "Six template girlfriend cards (existing), plus a 'Surprise me' button at top. NO paywall modal. NO 'Sign in' header.",
+          "what_we_do": "CompanionList useEffect: if (currentUser?.is_anonymous) skip PlanModal entirely. Add data-testid='anon-list'. Default top-card highlight on the most-picked template (server can return this from /api/companions/templates).",
+          "expected_seconds": 4
+        },
+        {
+          "step": "4. Tap template → straight into chat (Surprise Me path skips confirm)",
+          "screen": "CompanionCreate.jsx (modified flow: anon + Surprise-Me bypasses /confirm)",
+          "what_user_sees": "A 1-second 'awakening' shimmer with the chosen girlfriend's avatar fading in. Then chat opens with her first message already streaming.",
+          "what_we_do": "If is_anonymous OR query param &auto=1: POST /api/companions returns immediately with conversation_id (no waiting for LLM intro). Server INSERTs companion + conversation + a placeholder assistant message row with status='generating'. Client navigates to /chat/{id} and ChatPage SSE-streams the intro live. (This addresses Diagnosis B finding #5: removes the 3-12s blocking POST.) Intro prompt rewritten to end with a concrete question (Diagnosis C finding #3): drop the 'thank you for creating me' template, use 'hey :) — what should I call you?' as the assistant's first line.",
+          "expected_seconds": 2
+        },
+        {
+          "step": "5. First AI reply lands; user starts typing",
+          "screen": "ChatPage.jsx",
+          "what_user_sees": "Streaming text from girlfriend ending in a question. Input bar focused. Existing typing indicator visible.",
+          "what_we_do": "Auto-photo removed from useChat.js:62-67 for anon users (Diagnosis B finding #8 — burns free budget pre-engagement). Auto_audio default flipped to TRUE for first 3 messages (Diagnosis C finding #5 — voice is the wow). Log event 'anon_first_view'.",
+          "expected_seconds": 0
+        },
+        {
+          "step": "6. User sends first message → AI replies",
+          "screen": "ChatPage.jsx",
+          "what_user_sees": "Natural chat. After AI reply #2, a thin non-modal banner slides in below header: 'Save her — add email (we'll send her photos to you when you're away)'. Dismissible.",
+          "what_we_do": "UpgradeBanner.jsx (new component): shows for is_anonymous users after message_count >= 2 AND not dismissed. Tapping it opens EmailGate.jsx as a half-sheet (not full page). Email field only — no password. On submit: POST /api/auth/anon/upgrade-email {email}. Server sets users.email + email_type='real', sends verification email containing a recovery magic link, fires identified pixel.",
+          "expected_seconds": 30
+        },
+        {
+          "step": "7. After ~10 messages or first paywall trigger: full upgrade",
+          "screen": "EmailGate.jsx / PlanModal",
+          "what_user_sees": "Soft modal: 'Want her to remember everything? Save your progress.' Options: Continue with Apple / Continue with Google / Email & password (collapsed). Skip = 'maybe later' (anon continues).",
+          "what_we_do": "Triggered by: (a) message_count == 10, (b) any paywall_blocked event, (c) user navigates to /pricing. For anon users, /pricing prerequisite is identification — modal blocks purchase until POST /api/auth/anon/upgrade-{email|apple|google} succeeds. Server keeps user.id stable so chat history, Stripe customer, RevenueCat subscriber are all preserved. Fire 'anon_identified' event with {trigger, msg_count_at_upgrade}.",
+          "expected_seconds": 25
+        }
+      ]
+    },
+    {
+      "ab_testable": true,
+      "implementation_effort": "large",
+      "name": "Magic Moment First 30 Seconds",
+      "one_line_pitch": "Pre-render her face, name, voice and first words while the user is still tapping \"Continue with Apple\" — so the instant auth returns, a girl is already speaking to them on screen.",
+      "radical_premise": "The 5-minute cliff is not a chat-quality problem; it is a \"nothing alive on screen\" problem. 55% of ghosters bounce within ~14 seconds of signup and 73% of zero-companion drop-offs leave inside 60 seconds (Diagnosis A finding #2, Diagnosis C finding #9). The fix is not to make chat faster — chat reply latency is already fine (p50 2.75s, identical for ghosters and retainers, Diagnosis B finding #1). The fix is to compress the cold path so that by the time the OAuth round-trip returns, the user is staring at a video-loop avatar, hearing a voice line, and reading a streaming question they can answer in 5 words. Every expensive thing that currently runs serially after auth (template pick → confirm screen → 12s LLM intro → 3.5s scene gen → paywall → list → click → enter chat → auto-photo blocked by paywall) gets parallelized, pre-warmed, deferred, or deleted.",
+      "user_journey": [
+        {
+          "step": "T-0: Pre-signup picker on welcome screen",
+          "screen": "/welcome (modified WelcomeScreen.jsx)",
+          "what_user_sees": "A 3-up grid of looping avatar videos (Maya, Sofia, Luna) under 'Which one do you want to meet?'. Single 'Continue with Apple/Google' button below. Age + consent collapsed into one line under the button: 'By continuing you confirm 18+ and accept Terms & Privacy.' No separate consent step.",
+          "what_we_do": "On mount, call public GET /api/companions/templates/preview (already auth-free, line 80 of companion-api.js). User tap on a card writes {pickedTemplateId, pickedTemplateName, pickedTemplateVideoUrl} to localStorage and a new sessionStorage key 'lovetta-welcome-pick'. Fire new tracking event welcome_template_picked. The pick is REQUIRED before the Apple/Google button enables — this collapses Signup step 1 + CompanionList + CompanionCreate-choose + CompanionCreate-confirm into one screen and forces the 33-user 'never created a companion' cohort (Diagnosis A finding #1) into action.",
+          "expected_seconds": 8
+        },
+        {
+          "step": "T+8: Tap social auth — pre-stream starts in parallel",
+          "screen": "Apple/Google native sheet over /welcome",
+          "what_we_do": "The instant the social button is tapped (BEFORE the OAuth round-trip resolves), fire a fire-and-forget POST /api/welcome/prewarm with {templateId, deviceFingerprint}. The new server route does three things in parallel: (a) start chatCompletion for a NEW casual first-message prompt that ENDS WITH A QUESTION (kills the 'Thank you for creating me…' monologue that Diagnosis C finding #3 measured at 9/10 with no '?'), (b) start ElevenLabs TTS on that text streamed to R2, (c) skip the scene-gen call entirely (kills the second 3.5s LLM call from companion-api.js:224-238). Result is cached in Redis under key welcome:prewarm:<fingerprint> with 90s TTL.",
+          "what_user_sees": "Native auth sheet, then a black flash as Capacitor returns to the WebView.",
+          "expected_seconds": 4
+        },
+        {
+          "step": "T+12: Auth resolves — straight to chat, never see paywall or list",
+          "screen": "/chat/__welcome__ (new placeholder route)",
+          "what_we_do": "Signup.jsx:42 changes: postSignupPath is no longer '/pricing' but '/chat/__welcome__?welcome=1'. Server's POST /api/auth/google and POST /api/auth/apple now read the sessionStorage 'lovetta-welcome-pick' (sent in the auth body), and inside the SAME signup transaction: INSERT user → INSERT user_companion from template → INSERT conversation → INSERT placeholder assistant message with media_pending=true. Auth response now includes {companionId, conversationId} so the client can navigate to /chat/{companionId} on receipt. The PlanModal flag 'lovetta-plan-skipped' is auto-set to '1' on first signup so the double-paywall-stack from Diagnosis C finding #7 cannot fire on this session.",
+          "what_user_sees": "Fade-in: full-screen looping avatar video (the one they picked at T-0 — already cached in the browser HTTP cache from the welcome screen poster). Her name in the header. Typing indicator immediately.",
+          "expected_seconds": 1
+        },
+        {
+          "step": "T+13: First words stream in — already mostly ready",
+          "screen": "/chat/{companionId}?welcome=1",
+          "what_we_do": "ChatPage on mount opens GET /api/chat/{companionId}/welcome-stream (new SSE endpoint). The server checks Redis for welcome:prewarm:<fingerprint>; if present (the common case — has been warming for 4-8s by now), it replays the cached chunks at typewriter speed. If absent (prewarm failed or expired), it calls chatCompletion live with the same casual-question prompt, keep-alives every 3s. Replaces the existing 12s blocking LLM call in companion-api.js:202-247.",
+          "what_user_sees": "Avatar video loops in the message bubble area; text streams in below it: 'hey :) i'm Maya — what should I call you?' (16-30 chars, ONE concrete question, matches user's typing register per Diagnosis A finding #5 + #7). Total perceived wait from tap-auth to first character ≈ 5 seconds.",
+          "expected_seconds": 3
+        },
+        {
+          "step": "T+16: Auto-voice plays her line ONCE",
+          "screen": "/chat/{companionId}?welcome=1",
+          "what_we_do": "On first-session-only (detected via URL ?welcome=1, not via user prefs, so we don't mutate the user's saved auto_audio=false default from migrate.js v53), the ChatPage at line 41-47 force-plays the TTS audio for the welcome message. The pre-warmed audio from T+8 is already cached in R2, so playback is instant. After this single playback the flag is cleared and the user's saved auto_audio preference takes over for subsequent messages. Addresses Diagnosis C finding #5 ('voice is hidden behind a Profile setting').",
+          "what_user_sees": "Her voice. A real voice. Saying 'hey :) i'm Maya — what should I call you?' This is the magic moment.",
+          "expected_seconds": 3
+        },
+        {
+          "step": "T+19: User types a 5-word reply",
+          "screen": "/chat/{companionId}?welcome=1",
+          "what_we_do": "ChatInput is auto-focused on mount when ?welcome=1 is present. As the user types the FIRST character, we fire a speculative POST /api/chat/{companionId}/prewarm-reply with the in-progress text every 1.5s (debounced) — server warms the LLM context (loads system prompt, opens connection, caches recent_messages even though there's only the welcome msg). When user actually hits send, the existing /api/chat/{companionId}/message SSE endpoint has near-zero cold-start. Skip the buildMemoryContext + buildUserContext + buildSceneContext Promise.all from chat-api.js:560-564 on turn 1 (they always return empty for new users — the 'You are still getting to know this person' branch at line 579 fires anyway).",
+          "what_user_sees": "Types 'Vasily' or 'call me V' or 'beach person'. Hits send.",
+          "expected_seconds": 8
+        },
+        {
+          "step": "T+27: AI reply lands fast + a real photo is on the way",
+          "screen": "/chat/{companionId}?welcome=1",
+          "what_we_do": "Reply streams via the existing chat-api.js path. Simultaneously, the server queues ONE pre-cached photo (NOT a new fal generation): on welcome companion creation, we attach the template's video_url poster frame as media_url on the SECOND assistant message scaffolded server-side. The current auto-photo in useChat.js:62-67 that fires 1.5s after first message and currently hits paywall via /request-media is replaced with this zero-cost pre-baked image. Diagnosis B finding #8 (auto-photo burns free budget) and Diagnosis B finding #7 (paywall fires at 130-209s) — both neutralized. Paywall is also gated: server-side flag welcome_flow_E_magic_moment_first_30s suppresses both PlanModal and paywall_blocked for the first 5 user messages.",
+          "what_user_sees": "Her reply streams in, then a photo of her drops into the chat after the second message. By second 30 the user has: a face, a voice, a name they chose, three exchanged messages, and one photo. No paywall has appeared.",
+          "expected_seconds": 5
+        }
+      ],
+      "changes": {
+        "modified_files": [
+          "web/src/pages/WelcomeScreen.jsx",
+          "web/src/pages/Signup.jsx",
+          "web/src/pages/CompanionList.jsx",
+          "web/src/pages/ChatPage.jsx",
+          "web/src/hooks/useChat.js",
+          "web/src/components/AppleSignIn.jsx",
+          "web/src/components/GoogleSignIn.jsx",
+          "web/src/lib/onboarding.js",
+          "server/src/auth-api.js",
+          "server/src/companion-api.js",
+          "server/src/chat-api.js",
+          "server/src/migrate.js"
+        ],
+        "new_files": [
+          "server/src/welcome-api.js",
+          "web/src/lib/welcomePrewarm.js"
+        ],
+        "new_endpoints": [
+          "POST /api/welcome/prewarm — fingerprint-keyed pre-stream of first message + TTS to Redis cache, no auth required",
+          "GET /api/chat/:companionId/welcome-stream — replays cached prewarm or falls back to live chatCompletion",
+          "POST /api/chat/:companionId/prewarm-reply — debounced speculative warmup while user types first reply"
+        ],
+        "new_migrations": [
+          "MIGRATION_vXX: ALTER TABLE messages ADD COLUMN is_welcome BOOLEAN DEFAULT FALSE (so we can A/B-report time-to-first-magic and exclude these from analytics quality scoring)",
+          "MIGRATION_vXX+1: INSERT INTO app_settings (key, value) VALUES ('welcome_flow_E_magic_moment_first_30s', 'false') — server-side flag gating the entire flow",
+          "MIGRATION_vXX+2: INSERT app_settings welcome_first_msg_prompt = casual single-question template replacing the 'gratitude for being given life' string from companion-api.js:207"
+        ],
+        "feature_flag_name": "welcome_flow_E_magic_moment_first_30s"
+      },
+      "expected_impact": {
+        "retention_5min": "Strong positive. Targets the 60% ghost rate on three independent levers: (1) eliminate post-signup paywall (Diagnosis B finding #4 + Diagnosis C finding #1 = 73% bail within 60s), (2) kill the gratitude-monologue intro that ends with no question (Diagnosis A finding #7 + Diagnosis C finding #3 = 9/10 ghosters got no '?'), (3) compress the 7-screen cold path to 3 screens (Diagnosis C finding #8). Realistic estimate: 5-min return rate moves from 41% to 55-62% (+14-21pp absolute, +34-51% relative). The 33-user 'never-created-companion' sub-cohort (Diagnosis A finding #1) gets forced into a companion at T-0, so their 0% retention has nowhere to go but up — even capturing half of them is +17 returners per 100 signups.",
+        "msgs_per_signup_lift": "Large lift. Current median is 2 user messages before bounce (Diagnosis B finding #7: 19/26 sent 3+ in their burst). The auto-voice magic moment + ended-with-question intro should pull the median to 4-5 user messages. ~30-40% increase in msgs/signup. Tip-revenue downstream effect: the first 5 messages used to be free-budget-burning paywall traps; making them ad-free actually preserves the free budget for messages 6-10 where users are more committed.",
+        "conversion_risk": "Neutral-to-slightly-positive. We are DEFERRING the paywall, not removing it. Diagnosis A finding #8 already proves paywall is not why ghosters ghost (only 10% ever saw one). Replika/Character.AI/Candy.AI all defer paywalls past the first session (Diagnosis C finding #8). The 6 users per 100 who currently convert at the front-loaded paywall are almost all 'I would have converted anyway' types — they will hit the deferred paywall at message 6 and convert there. Risk vector: if the prewarm cache hit rate drops below 50%, the live-fallback path is the same speed as today's flow, so worst case is feature-flag-off parity. Real conversion risk only materializes if Apple users (57% of signups, Diagnosis A finding #3) lose their sessionStorage 'lovetta-welcome-pick' across the OAuth round-trip — must verify on real iOS device before ramp."
+      },
+      "risks": [
+        "OAuth round-trip drops sessionStorage on iOS Safari / Apple privaterelay flow (Diagnosis A finding #3: 19/19 Apple-relay ghosters made zero requests). If sessionStorage doesn't survive the redirect, the welcome-pick payload is lost and the user lands on a generic chat. Mitigation: persist pick to both localStorage AND send as a hash fragment on the OAuth redirect_uri so the auth callback can recover it server-side.",
+        "Prewarm fingerprint can be abused — anonymous POST /api/welcome/prewarm with no auth burns LLM + TTS credits. Mitigation: IP rate-limit (1 per IP per 60s), short Redis TTL (90s), drop if fingerprint already has a pending warm, cap total daily anonymous warms via app_settings.",
+        "Pre-baked photo on second message is the template poster, not a 'new' picture — sophisticated users may notice it is the same image as the avatar and feel cheated. Mitigation: serve a different angle/pose pre-rendered per template (already exists in custom_avatars table per server/src/companion-api.js:56), and label it neutrally rather than as 'she sent you a photo'.",
+        "Auto-voice on first message can backfire if the user is in a public place / has the phone unmuted. Mitigation: respect device mute state via the Capacitor Haptics + AudioSession check before autoplaying; show a 'tap to hear her voice' shimmer on the message if autoplay is blocked by the browser.",
+        "Forcing template pick at T-0 may push the 19% of users who currently make custom companions away (Diagnosis A finding #4 showed custom-companion creators have 51% retention vs 3% for template-pickers among ghosters). Mitigation: include a 4th tile 'Create your own →' that bypasses the prewarm and routes to the existing CompanionCreate flow post-auth. Track whether this regresses the high-value custom cohort.",
+        "Deleting the scene-gen call from create-path (companion-api.js:224-238) removes the scene_text field for the first message. The MessageList renderer treats missing scene_text gracefully, but ChatPage UI may look slightly emptier. Mitigation: generate scene async in a background job and patch the row 2-5s later via the existing media-poll pattern in useChat.js:100-127.",
+        "Skipping memory/intelligence pre-calls on turn 1 (chat-api.js:560-564) is safe ONLY when conversation.id has no prior messages. The branch must be tightly gated on message_count=0 or it will silently degrade quality for returning users on the same companion.",
+        "Apple Sign-In dynamic import pattern (reference_apple_signin.md) — any change to AppleSignIn.jsx that adds the pre-warm fire-and-forget must NOT move the import to top-level. The fire-and-forget can be a separate await import('../lib/welcomePrewarm').then(m => m.prewarm(...)) inside the existing click handler.",
+        "Pre-streaming costs real OpenRouter + ElevenLabs money for users who never finish signup (anonymous prewarm with ~50-70% finish-auth rate means 30-50% wasted). Worst case: ~$0.005/warm × 100 anonymous warms/day = $0.50/day. Acceptable, but cap with app_settings.welcome_prewarm_daily_budget_usd as a kill switch.",
+        "A/B gating: the flag welcome_flow_E_magic_moment_first_30s must be readable BOTH server-side (companion-api, auth-api) and client-side (WelcomeScreen, Signup) via the existing /api/app-config endpoint. Verify that anonymous /api/app-config returns this flag — currently only authenticated app-config is exposed in some paths."
+      ]
+    }
+  ],
+  "critiques": [
+    {
+      "approach_name": "Chat-First Anonymous Welcome Flow",
+      "killers": [
+        {
+          "issue": "Schema-impossible FK in proposed migration",
+          "severity": "blocker",
+          "why": "Proposal says `anon_users.claimed_user_id INT REFERENCES users(id)` and `user_companions.anon_user_id UUID REFERENCES anon_users(id)`. But `users.id` is UUID (migrate.js:81) — `INT REFERENCES users(id)` will not create. More importantly: `user_companions.user_id`, `conversations.user_id`, `api_consumption.user_id`, `messages` (via conversation), `user_companion_cost_balance.user_id`, `user_preferences.user_id`, `subscriptions.user_id`, `refresh_tokens.user_id`, `reactivation_messages.user_id`, `tips.user_id` and 22 other tables all declare `user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE`. Making `user_companions.user_id` and `conversations.user_id` NULLable and adding a CHECK is invasive but doable. But every read path that JOINs through `user_id` (admin dashboard, scheduler, reactivation, daily-digest, proactive, memory, billing) silently breaks on the anon rows because they LEFT JOIN to users and assume user_id non-null. Quoted as 'modify 17 files' but actual surface is 117 `req.userId` touchpoints across the server — most assume a real user with subscription, preferences, country, last_activity. Not 'large effort' — it is a multi-week refactor."
+        },
+        {
+          "issue": "UK + EU age-verification puts anon chat at legal risk in the largest #2 market",
+          "severity": "blocker",
+          "why": "Live prod data: UK is the #2 country (39 of 169 visitors past 7 days = 23%). UK Online Safety Act 'highly effective age assurance' duties for sites with adult content went into force July 2025 and require verified age (passport/credit-card/face-age estimation) BEFORE access, not a checkbox attestation. EU is moving the same direction (DSA + Article 28 + member-state implementations). The mitigation 'gate via app_settings.anon_blocked_countries' geo-blocks 23%+ of inbound traffic, which deletes most of the conversion gain. The proposal's claim that 'Tinder/Bumble use a one-line attestation' is wrong for sexual/adult content — those apps gate at hard-verified DOB and 4o moderation; they also do not show explicit content pre-signup. App content here is positioned as 'AI girlfriend… intimate chat' on a hot-pink page — regulators will class as adult-adjacent."
+        },
+        {
+          "issue": "Anonymous LLM/TTS/image budget = scraper bait + cost runaway",
+          "severity": "serious",
+          "why": "Real prod cost numbers (last 7d): chat $0.00037 avg, image $0.0264 avg, video $0.25 each. Free anon budget = 5 msgs + 1 media. With `anon_max_per_ip_24h=10` that is 50 free chats + 10 free images per IP/day = $0.28/IP/day. One $7 residential proxy giving 1000 IPs = $280/day of free OpenRouter/fal.ai burn. The current signup flow gives us email + S2S TrafficStars postback as friction; removing it removes the only natural rate-limit. fingerprint_hash is trivially spoofed by Puppeteer-extra-stealth and `ua_hash` is meaningless. Proposal handwaves 'attacker spins 100 IPs = $0.50 LLM' — that math uses Rocinante alone and ignores the image/video budgets the same proposal includes."
+        },
+        {
+          "issue": "Hardcoded default companion 'Maya' does not exist as a top pick (and there is no slug column)",
+          "severity": "serious",
+          "why": "Top 5 picked templates in prod by user_companions count: Lily(98), Luna(87), Chloe(87), Aria(65), Isabella(51). 'Maya' is not in the top 5. `companion_templates` schema has no `slug` column and no `pick_count` column (verified live) — the proposal repeatedly references `templateSlug: 'maya'` and 'ORDER BY pick_count DESC' as if those exist. The `cold_open_quality_score` mitigation depends on signup-conversion data the anon system has not yet collected, so for the first N weeks the default is a guess. If the default girl is not the right vibe for a given visitor's actual preference, the magic moment never lands and we have just shifted 'pick a girl' friction into 'wow this isn't my type' silent churn — and now we have NO email to re-engage them. Current flow at least captures email at signup before the bad-default-girl problem appears."
+        },
+        {
+          "issue": "Kills paid conversion impulse and Apple In-App-Purchase eligibility",
+          "severity": "serious",
+          "why": "The diagnosis the plan cites ('only 6/60 ghosters hit a paywall') is being mis-used: those 6 are not the conversion population — the conversion population is the ones who DO engage, and today they see PlanModal at companion-creation (CompanionList.jsx:40-44 newUser=true gate). Deferring paywall to 'message ~15' on iOS specifically: (a) the user is now anonymous → no Apple ID linkage → no StoreKit purchase association → no IAP receipt validation flow possible, so the iOS app cannot monetize the anon cohort at all until they sign up. (b) Apple App Store Review Guideline 1.1.4 + 1.1.6 (objectionable content) and 5.1.1 (unauthenticated PII / explicit chat) routinely reject 'adult chat without account' — even text-only — for AI girlfriend apps. Mitigation 'force welcome_flow_A_chat_first=false on iOS until reviewer pass' is the proposal admitting iOS is the most valuable revenue surface and this flow doesn't apply there. So this is a web-only experiment shipped at 'large' implementation cost."
+        },
+        {
+          "issue": "'89% of dormant conversations ended on an assistant turn' is misdiagnosed as a signup-flow problem",
+          "severity": "serious",
+          "why": "The proposal's headline justification (89% AI-last) is a content/personality problem, not a friction problem — the user already signed up, already created a companion, already exchanged messages, and then bounced after an AI reply. Removing signup friction will not address why the assistant's reply is the end-of-conversation in 89% of cases. The actual fix (rewrite the 'I just brought you to life' system prompt + end with concrete question + better first turn) is one of the bullets in step 4 of this 17-file proposal — that one fix could be shipped in a day and tested in isolation. Bundling it inside a 4-week anon-session rewrite makes attribution impossible and ships the small win with a huge blast radius."
+        },
+        {
+          "issue": "Token-claim race + lost-anon-session UX cliff",
+          "severity": "serious",
+          "why": "localStorage anon tokens get wiped by: incognito-tab-close, iOS Safari ITP after 7 days, app uninstall, switching from in-app browser to native browser, Capacitor WebView purge on app update. 'httpOnly cookie fallback' does not survive any of those either. The signup sheet says 'Chat saved' but if the user signs up from a different tab/device they will not see the saved chat — the proposal's own fallback ('Email this chat to myself') means the user must now type their email PRE-signup to not lose state, which collapses the entire 'defer auth' premise. Worse: if user uninstalls iOS app between anon chat and signup, anon_user_id is dead, and the new account starts blank — they will think 'the app forgot me' and churn harder than today."
+        },
+        {
+          "issue": "GDPR/PII consent without account creation",
+          "severity": "minor",
+          "why": "Anon chat collects ip_hash, ua_hash, fingerprint_hash, country, lang, utm, ts_click_id, and all message content — that is PII processing under GDPR Art. 6 and CCPA. Without an account, there is no clear lawful-basis flow (consent? legitimate interest for a service the user is actively using?), no DSAR target, and no deletion endpoint identifiable to the user. Today users at least click Terms+Privacy+AI-consent checkboxes (auth-api.js:119-124) before any conversation content is stored — this is the only documented consent moment. The proposed 'one-line attestation under composer' will not stand up to a EU/UK regulator audit."
+        }
+      ],
+      "fixable": false,
+      "refute_one_line": "A 4-week multi-table schema rewrite that legally geo-blocks 23%+ of traffic (UK), invites scraper-driven LLM/image cost burn, defers paid conversion past Apple's IAP boundary so iOS gets carved out entirely, and bundles its strongest single fix (rewrite the first-message prompt) inside enough surface area to break 22 user_id FKs and 117 server touchpoints — and the entire premise is misdiagnosed because 'AI last' is a content problem, not a signup-friction problem."
+    },
+    {
+      "approach_name": "Direct-to-Chat: signup lands inside a conversation with Lily",
+      "killers": [
+        {
+          "issue": "Diagnosis premise is empirically wrong against current prod data — only 4/40 (10%) of 7-day ghosters ever even created a companion, and ZERO ghosters hit a paywall event. The 'users bail on Pricing/PlanModal in 0-14s' narrative the entire approach is built on does not match the data.",
+          "severity": "blocker",
+          "why": "Live query: `WHERE event_type='paywall_blocked' AND user_id IN ghosters` returns 0 hits across all 40 ghosters. 36/40 ghosters never even created a companion — meaning they bounced BEFORE the wizard, not on Pricing. The proposal's +18-25pp retention claim is therefore unsupported. Removing Pricing from the cold path 'fixes' a screen 90% of ghosters never reach. The real problem (signup completes, user never opens the React app again) is more likely an OAuth-callback / session-restore / app-reopen failure on iOS Safari — exactly what risk #2 in the proposal already flags but then dismisses ('this design assumes the user successfully reaches a logged-in client')."
+        },
+        {
+          "issue": "Median signup-to-first-message is 112 seconds and min is 36s — the '0-14s ghoster' cohort that justifies the design does not exist in prod data with that timing.",
+          "severity": "blocker",
+          "why": "If users who DO message take a median of 112s to send msg 1, removing 3-12s of LLM-blocking wait time (companion-api.js:200-247) cannot mechanically produce +50-80% message lift. The wait isn't what's stopping them. The proposal's funnel math ('100% land in a chat by construction → signup→first-msg jumps from 58% to 80%+') assumes every Apple/Google signup successfully restores its session and opens the SPA, which is exactly the dark-funnel step that's broken today (90% of ghosters never even hit /api/companions)."
+        },
+        {
+          "issue": "POST /api/chat/{id}/request-media auto-fires when msgs.length === 1 (useChat.js:62-67) — under variant B, EVERY new user lands with msgs.length === 1, so this triggers for 100% of signups instead of the ~60% who message today. At $0.026/image and $0.25/video, plus 18+ AI-relayed-email signups/day (60% of which never message — i.e., possible bots/curious browsers), this burns ~$0.50-2/day on accounts that may be entirely passive. Plus the 'recommend removing auto-photo' mitigation in risks doesn't survive: chat-api.js:1050 only checks `checkMediaBlocked` (lifetime/weekly cap), not 'is this a first-session user with zero engagement signal' — the cap is $0.10 weekly per finding #2.1, so a single auto-photo ($0.026) is well under it. First-session abuse is a real new attack surface.",
+          "severity": "serious",
+          "why": "Today, you pay for an image only for users who got through 3 wizard screens and clicked into chat. Under B, you pay for an image the moment they finish OAuth — and OAuth bots (Apple synthetic-email signups represent 52% of 7-day signups) get auto-charged before they ever prove they're human-engaged. The 'gate behind feature flag' mitigation is described but not specified in the code changes — the modified_files list includes useChat.js but the suppression logic isn't called out as a hard requirement."
+        },
+        {
+          "issue": "The proposed `tip_request_threshold_free_first_session_usd = 0.40` app_setting is fabricated — no code path reads it. The actual free-tier threshold is `tip_request_threshold_free_usd` ($0.10 in prod) checked by consumption.js:185-190. Adding a new setting without modifying consumption.js does nothing; the proposal lists modified_files including consumption is NOT in that list.",
+          "severity": "serious",
+          "why": "The mitigation 'doubles the free budget to $0.40 for first session' is sold as ensuring 'messages 1-10 are unambiguously free.' But the wiring to honor that setting is missing from the modified_files list. Without consumption.js changes, the first-session user hits the existing $0.10 weekly free cap mid-conversation just like today — except now they have no warning because Pricing was removed from the cold path. That's a worse UX than today: instead of seeing plans up front and choosing, they get a paywall mid-message-3 with no expectation set."
+        },
+        {
+          "issue": "Apple synthetic-email path (auth-api.js:850-887) creates users via a different code branch than the email/Google paths. The 'inject onboarding.autoProvisionFirstCompanion inside the signup transaction' requirement therefore needs identical inserts in FOUR places: POST /signup, GET /google/callback (web), POST /google/token (native), POST /apple. The modified_files lists auth-api.js once but the four-call-sites issue isn't surfaced — easy to miss the Apple-synthetic-email branch and the linked-email branches (where a user 'logs in' but is treated as a new user because no companion exists). Risk of half-shipped flag where 25% of signups skip the auto-provision and get a worse experience than today.",
+          "severity": "serious",
+          "why": "Apple-relay accounts are 52% of recent signups. Half the cohort the experiment is designed to fix is in the path most likely to be missed in implementation. Also, an existing user re-signing in via Apple (`existingByApple.length > 0` branch at auth-api.js:789-793) MUST NOT trigger auto-provision; the proposal's idempotency guard is in the new endpoint but the signup-time inject path doesn't make this distinction explicit."
+        },
+        {
+          "issue": "Pre-baked opener (`'Hey :) you're new here, right? What should I call you?'`) is identical across all users assigned to template 'Lily' — combined with the same `*glances up from her florist counter, half-smiling*` action. Screenshots will leak to Reddit/Twitter/4chan within 48h of launch (the diagnosis acknowledges this in risks #3 but understates the brand damage). Lovetta's value prop is 'feels personal' — a meme'd identical opener kills that prop for everyone, not just the people who saw the screenshot.",
+          "severity": "serious",
+          "why": "Variants per template (3-5 strings rotated server-side) are mentioned as mitigation but they reduce, not eliminate, the problem — 4 variants × 12 templates = 48 fixed strings vs the current personalized-LLM opener which is unique per user even if often cringe. The 'thank you for giving me life' current opener is bad but at least varied. Trading variability for speed assumes users prefer speed, but the median user already waits 112s — speed isn't the bottleneck."
+        },
+        {
+          "issue": "iOS App Store policy risk: the app sells subscriptions. Under variant B, the user is dropped INTO a paid product (AI chat) without an explicit 'free trial 3 days' / 'monthly/yearly' disclosure screen — that screen (Pricing onboarding) is what Apple reviewers specifically look at on first-launch in their review pass. Removing it from the cold path may pass review under the current cohort but trigger a future random re-review rejection citing 'subscription terms not clearly disclosed at point of value.' Apple reviewer test user (special id 00000000-...-1234 per auth-api.js:22) needs to be excluded from variant B or pinned to A_control — not mentioned in the proposal.",
+          "severity": "serious",
+          "why": "Lovetta uses RevenueCat for IAP (chat-api references). Apple's 3.1.2 'Subscriptions' guideline requires clear disclosure of pricing AT a natural moment — putting that AFTER message 3 is defensible but reviewer-coin-flip risky. The proposal doesn't pin auth-api.js APPLE_REVIEWER_ID to A_control, and doesn't include any review-mode flag in the variant hash."
+        },
+        {
+          "issue": "Variant assignment uses user_id-hash mod 100. Once a user is in variant B and their auto_provisioned Lily is in DB with auto_provisioned=TRUE, you cannot run the same user through variant A in a follow-up experiment. The experiment is not reversible per-user. Also: re-running the experiment 4 weeks later with a different cohort (e.g., 75%/25% split) means the comparison group is contaminated by users who already have an auto-provisioned Lily from the first run. The proposal needs a per-experiment-run cohort_id, not just a variant_pct setting.",
+          "severity": "minor",
+          "why": "Most A/B experiments at this stage don't survive contact with iteration. Locking the schema (user_companions.auto_provisioned column) to a one-shot decision creates technical debt that has to be migrated away later, and the 'pick another template for variant B' future-experiment is then half-noised."
+        },
+        {
+          "issue": "auto_provisioned companion uses voice_id from companion_templates — but the 'voice auto-play on opener' is explicitly NOT shipped in this experiment (risk #4). So the user lands in chat with a static text message and a play-voice button. The 'magic moment' described in user_journey step 4 ('the avatar mini-video plays as soon as the page mounts — that's the magic moment') depends on video_url which is set, BUT: media_url on the assistant message is set to companion.video_url in companion-api.js:253. The current companion-create code does this conditionally on video_url existing. The new onboarding.js path proposed in new_files needs to replicate this exactly or the magic-moment claim breaks.",
+          "severity": "minor",
+          "why": "Implementation detail that's easy to miss because the spec says 'three tiny inserts' but two of those inserts (messages + conversations) need to be byte-identical to existing companion-api.js logic including media_url, context_text, scene_text, and media_type columns. A drift here means variant-B users get a worse-looking first message than variant-A users — invalidating the comparison."
+        },
+        {
+          "issue": "The 'GET /api/onboarding/auto-companion' new endpoint is described as 'called by client right after first authenticated load' AND the user_journey describes the server doing it 'inside the signup transaction' before res.json. These are contradictory: if the signup response already includes companionId/conversationId, the client doesn't need the endpoint. If the client calls the endpoint, the signup transaction doesn't include the companion. Pick one. The proposal does both, which doubles the implementation work and creates a race where step 3 (client routes to /chat/{id}) could fire before the endpoint completes on slow connections.",
+          "severity": "minor",
+          "why": "Internal inconsistency — but in practice means the dev will implement one path, ship it, and the OTHER path will be the un-implemented spec that breaks. Recommend: server-side at signup-time only, no client endpoint; the client just reads onboarding.{companionId,conversationId} from the signup response and navigates."
+        }
+      ],
+      "fixable": true,
+      "refute_one_line": "The fatal flaw is the diagnosis: ZERO of the 40 ghosters in the last 7 days hit a paywall event and only 10% of them even created a companion — so removing the Pricing screen from the cold path treats a screen 90% of dropouts never reach; the real failure is most likely OAuth callback / session restore on iOS Safari (the proposal's own risk #2 acknowledges this but dismisses it), and Approach B will not fix it."
+    },
+    {
+      "approach_name": "Try Before You Sign: Public Live-Chat Demo on the Landing Page",
+      "killers": [
+        {
+          "issue": "Apple Sign-In with Hide-My-Email silently breaks the demo→signup handoff for ~30-50% of iOS-Safari signups (the cohort the proposal claims will benefit most)",
+          "severity": "blocker",
+          "why": "Apple Sign-In on web uses form_post POST callback to /api/auth/apple/callback. The proposal says 'embed anon_session_id in URL hash for Apple, with localStorage fallback' — but (a) URL hash is stripped on Apple's form_post redirect (the response is a server-to-server POST with state+code, hash NEVER survives), (b) Safari ITP wipes cross-site cookies on a 3rd-party POST round-trip back to lovetta.ai, and (c) localStorage survives same-origin but the proposal previously banks on cookie+state-param. So the ONE auth path the proposal cites as the biggest beneficiary (Apple-relay cohort with 65% ghost) is exactly the path where handoff is least reliable. Result: user gets dropped on empty CompanionList with no demo context — strictly worse than today, because they expected continuity."
+        },
+        {
+          "issue": "Signup volume is overwhelmingly served by paid traffic, and demo-first cannibalizes the TrafficStars/Ads conversion event the bidding model is optimized against",
+          "severity": "blocker",
+          "why": "14-day data: 186 web signups, 0 native iOS. The dominant cohort is mobile web from paid ads (TrafficStars, Google Ads — see fireSignupPostback in trafficstars.js and the postback at auth-api.js:592). The bidding/optimization model conditions on the signup postback firing on landing→signup. Moving the conversion event 30-90 seconds later (after 3 demo turns) AND making the path optional drops signup-postback rate immediately, which will cause the ad networks to deprioritize the campaigns inside 24-48h, throttling traffic BEFORE any retention lift can compound. The proposal acknowledges 'signup volume may drop 20-30%' but doesn't model the second-order traffic collapse from broken bid signals. This is how A/B tests of 'better funnels' kill paid acquisition channels."
+        },
+        {
+          "issue": "Removing pre-auth age + ToS + AI-consent gate is a regulatory and Stripe/Apple-billing risk, not just a 'legal sign-off' question",
+          "severity": "blocker",
+          "why": "auth-api.js hard-requires termsAccepted/privacyAccepted/aiConsentAccepted on ALL 4 signup branches (lines 119, 568, 674, 817, 854). These are not vanity — they are the record that the user affirmatively consented to (a) being 18+, (b) AI-generated sexual content, (c) ToS. The whole reason the form is 5 fields is so a real human action ties consent to identity BEFORE any sexual content is generated. The proposal renders Luna's flirty greeting ('caught you', 'are you the type that texts back fast or makes me wait?') with zero age affirmation and zero ToS acceptance — that IS sexually-suggestive AI content delivered to an unverified visitor. UK Online Safety Act (Part 5, Jan 2025), Texas HB 1181, Louisiana Act 440, Utah SB 287 all explicitly require age verification BEFORE sexual content is displayed, with statutory damages. Stripe acceptable-use policy and Apple guideline 1.1.4 also condition on this. 'Bundle consent under the OAuth button' moves the legal action to AFTER content delivery — that's the violation, not the friction."
+        },
+        {
+          "issue": "Cost circuit-breaker math is off by ~10×; $5/day cap is laughably small for any realistic landing traffic, and the failure mode is publicly visible degradation",
+          "severity": "serious",
+          "why": "Proposal: 'rocinante-12b at ~$0.30/M tokens; 3 turns ≈ $0.001' and '$5 cap = ~1700 demo sessions'. But: (a) each turn needs a system prompt (the diagnosis-derived 'demo Luna' persona — call it 800-1500 tokens) sent EVERY turn (no prompt caching on rocinante via OpenRouter), (b) input tokens grow with each turn (turn 3 sends turn-1+turn-2 history), (c) the $0.30/M figure is INPUT only — output is ~$0.50/M. Realistic 3-turn demo: ~5000 input + ~300 output tokens = ~$0.0017, ok. But on a viral day or a TrafficStars surge (5-10k unique landers), the cap trips at ~3000 visitors and the next 7000 see the hardcoded 'I'm overwhelmed' fallback — that string will get screenshotted to Reddit within an hour and the brand takes a hit on the highest-volume traffic day of the experiment. The 'acceptable failure mode' framing understates the PR/conversion damage."
+        },
+        {
+          "issue": "Demo Luna without memory + content-level + scene + media is a different product than Real Luna, and the handoff will feel like a bait-and-switch",
+          "severity": "serious",
+          "why": "The diagnosis says only 22% of signups reach 10 messages and 89% of dormants end on assistant turn — that's a depth-of-engagement problem, not a first-impression problem. The proposal's demo strips: memory.js (no name recall, no thread), content-levels.js (forced PG-13, can't reflect the user's selected level after signup), scene/media (text-only), proactive.js, all real personalization. So the demo proves a chatbot that ENDS at turn 3 with a flirty hook. Post-signup, the user gets a different model on a different prompt with different rules — Luna's voice shifts, and if the user picked any non-default content level during the 'consent bundle', she pivots tone immediately. This is the 'demo was great, real product is meh' funnel killer. Worse for the cohort that DID get to 10+ messages today — they were converting BECAUSE the full Luna won them over, not because of a 3-turn intro."
+        },
+        {
+          "issue": "The 'public-demo' surface is the single best LLM-jailbreak/CSAM-bait honeypot anyone could build, and you're exposing it with no auth, no captcha, just IP rate-limits",
+          "severity": "serious",
+          "why": "An unauthenticated, free, sexually-flirty LLM endpoint at api/public/demo/message will be scraped within hours of launch by (a) jailbreak researchers testing if rocinante outputs CSAM under coercion, (b) screenshot-farmers trying to get the brand-named Luna to say something racist/illegal for a tweet, (c) prompt-injection probes. age-guard.js is post-hoc regex — it catches 'underage_keyword' but a determined adversary using foreign-language synonyms, leetspeak, or framing devices can defeat it (it's a 287-line regex file, not a classifier). Today this surface is gated by signup friction which gives you (i) an email/phone to ban, (ii) consent records for legal cover, (iii) IP+UA continuity. The demo removes all three layers. Any single bad screenshot of 'Luna' (a brand name) saying something underage-coded ends up in Apple's review queue or a UK Ofcom complaint. Cost is NOT the main abuse vector — reputational/legal CSAM-bait is."
+        },
+        {
+          "issue": "Cross-origin cookie/session strategy fights Safari ITP, in-app WebViews, and the Capacitor app on the same domain",
+          "severity": "serious",
+          "why": "anon_session_id cookie is set on lovetta.ai (apex). After OAuth, user lands on lovetta.ai/my/* (SPA). Apex-set cookies DO survive same-eTLD+1 navigation, but: (a) Instagram/TikTok/Facebook in-app browsers (where TrafficStars + Reddit/IG ads land) use partitioned storage that wipes cookies after the OAuth tab close, (b) Safari ITP 7-day cap on JS-set storage means a returning visitor who 'demo'd' last week loses continuity, (c) the Capacitor app (capacitor.config.json:6) literally loads lovetta.ai/my/ — so any Capacitor user who happens to first visit lovetta.ai apex on iOS Safari, demos, then later opens the iOS app, will see NO continuity (different storage context). Proposal handwaves this as 'graceful degradation' but the whole value prop IS the continuity — without it you've added 3 turns of friction and a context-switch."
+        },
+        {
+          "issue": "Implementation effort is materially larger than 'large' — it's a 2-3 week project that touches 22 files, blocks on legal review, requires a new admin surface, and has no native iOS parity",
+          "severity": "serious",
+          "why": "Listed: 19 modified + 3 new files, 4 new endpoints, 4 new migrations, a new app_settings batch, new admin dashboard tab, SSE plumbing on a public endpoint with rate-limiting/ASN-fingerprinting/circuit-breaker. Plus: legal/compliance review for jurisdiction policy, new system prompt iteration, A/B harness wiring, TrafficStars postback re-instrumentation, Apple Sign-In state-param hardening, Safari ITP testing matrix, Capacitor handoff design (deferred — but means iOS users are on a stale flow during the experiment, contaminating the A/B). Best-case 10 engineering days, realistic 15-20. Meanwhile cheaper interventions (e.g. swap CompanionList default to auto-create Luna with one tap, kill the /pricing wall pre-chat) test the same hypothesis in 1-2 days."
+        }
+      ],
+      "fixable": false,
+      "refute_one_line": "The two blocking issues are pre-content age/ToS consent (regulatory, not 'legal sign-off') and paid-ads bid-signal collapse from moving the signup conversion event — together these turn a retention-lift experiment into a traffic-loss + compliance-exposure event, and they cannot be mitigated within the proposed scope without redesigning the demo so heavily that you've reinvented the current funnel."
+    },
+    {
+      "approach_name": "Approach D — Anonymous-first, identity-on-demand",
+      "killers": [
+        {
+          "issue": "App Store Review Guideline 5.1.1(v) — anonymous accounts that hold user data trigger a 'Sign in with Apple' AND a 'Delete Account' requirement. 18+ adult-content apps (Guideline 1.2) additionally require account creation tied to a real identifier. Lovetta sits in a doubly-sensitive bucket: NSFW chat + IAP. The proposed POST /api/auth/anon/start that returns access tokens before any identifier is established is the exact pattern Apple has been rejecting in 2024-2025 for 4+/9+/12+/17+ apps that store user-generated content. For an 18+ AI-girlfriend app, the probability of a rejection on the next iOS submission is high — and a single 'reject' on this app category is typically a multi-cycle review fight, not a same-day fix.",
+          "severity": "blocker",
+          "why": "The current TestFlight pass was earned because real identity is collected up front (Apple/Google/email + email_verified). Switching to anon-by-default removes the audit trail Apple uses to verify chat content moderation. Capacitor app loads from https://lovetta.ai/my/ (remote), so Apple can see the anon flow exists even if it's behind an A/B flag — reviewers test with the flag in either bucket."
+        },
+        {
+          "issue": "Recovery is fundamentally broken for the target user. The 6-word recovery code is shown ONCE on a card that the user can dismiss twice before it appears. In a 15-second flow where the entire premise is 'don't make them think,' nobody screenshots six BIP39 words. Empirical baseline: crypto wallets (where users have $$$ at stake) see 30-50% seed-phrase loss. For free AI chat with no money on the line, ~zero users will save it. So the ACTUAL recovery path is the email upgrade — but the upgrade banner appears only after msg 3, and the proposal's own diagnosis says 33% of users bounce in under 60 seconds before sending ANY message. Those users now have unrecoverable orphan accounts. Net effect: D fixes 5-min retention but destroys 7-day retention (no way to come back) and inflates the orphan-account count in the DB — which is the metric Apple reviewers actually look at when reviewing the 'Delete Account' workflow.",
+          "severity": "blocker",
+          "why": "Combined with the iOS app-reinstall case (localStorage wiped on uninstall), every reinstall = new ghost account. Push reactivation campaigns (the main 7-day retention lever in the existing app) need APNs token + a stable identity — anon users have neither until upgrade."
+        },
+        {
+          "issue": "Schema impossibility as specified. users.email is TEXT UNIQUE NOT-NULL-permitted but UNIQUE applies to non-null values, so 'email=NULL for anon' technically works — but the fallback the proposal mentions ('auto-generate anon_{uuid}@anon.lovetta.ai if NOT NULL constraint exists') would create thousands of synthetic emails that collide with the existing classifyEmail() logic (server/src/auth-api.js:47-50) which classifies @apple.lovetta.ai / @telegram.lovetta.ai as 'synthetic' and routes them away from email sending. classifyEmail does NOT recognize @anon.lovetta.ai, so the system will attempt to send verification emails to these fake addresses, causing Resend bounce-rate spikes and damaging domain deliverability — which is the explicit warning in the global CLAUDE.md about test emails. Also: send_new_registration_notification and the selectic.games tracker pixel are fired with newUser.email; firing them with 'anon_xxx@anon.lovetta.ai' pollutes attribution analytics with noise that's now 2-3x the volume of real signups.",
+          "severity": "serious",
+          "why": "The proposal mentions classifyEmail in passing but doesn't update it, and doesn't address the bounced-email reputation risk. Resend has tight bounce thresholds; adding synthetic @anon.lovetta.ai addresses to send queues is a foot-gun even if 'most' code paths skip them."
+        },
+        {
+          "issue": "Free-LLM-budget abuse vector. The mitigation ('rate-limit to 3/hour/IP, captcha after 1+ anon user from same IP') assumes legitimate users come from unique IPs, which is wrong: NAT'd cellular carriers (T-Mobile, AT&T, Vodafone) routinely share a single IPv4 across thousands of subscribers. A turnstile gate on the second anon-create from the same IP will block real users on cellular while doing nothing to stop a scraper using residential proxies (cost: $1.50 per GB, abundant). With $0.10 free budget per anon user, the math: 1 residential proxy = 10,000 IPs = $1,000 free LLM spend per scraper run. Today the email+verification step is the real anti-abuse moat (you cannot get to chat without a working inbox); removing it removes the moat. The proposed mitigations don't replace it — they paper over it.",
+          "severity": "serious",
+          "why": "Lovetta's per-request LLM cost ($0.001-$0.01 per turn) is small but the volume can scale fast on Character-AI-grade content. A single scraper farming 10k anon accounts at 3 messages each = 30k LLM calls = $30-$300 burned per attack with no recourse (no email to ban, no payment method to charge back)."
+        },
+        {
+          "issue": "RevenueCat anonymous-user merge race condition. The proposal says 'keep user.id stable across upgrade, no merge needed' — but RevenueCat's Purchases.logIn({appUserID: user.id}) is called on App.jsx:113 ONLY when user.id exists. For anon users on iOS, this means: anon user transacts as appUserID=<uuid_A>, then upgrades to email and gets logged in again with the SAME uuid_A — fine. But on App reinstall before upgrade, RC's anonymous user ID changes (it generates $RCAnonymousID:xxx automatically), and the new logIn() call with uuid_A will trigger RC's anonymous-to-identified alias flow, which can attach the prior install's purchases to the wrong account if device fingerprinting collides. server/src/billing.js:833 already warns 'Skipping anonymous user event' — that branch will now fire frequently and silently drop subscription state changes for users in flight.",
+          "severity": "serious",
+          "why": "The existing code path treats anon RC users as an edge case; this approach makes them the majority path. Each subscription bug that slips through here is a refund + 1-star review."
+        },
+        {
+          "issue": "Attribution pixel double-fire is worse than 'fragmentation.' Firing signup pixels on anon-create AND again on identification means: (a) every UTM source's reported CAC drops by 30-50% (denominator inflated by bounces who never identified), (b) trafficstars postback (tsClickId) is fired at anon-create with a user that has no email — if the user never upgrades, that conversion attribution is unrecoverable mud. The proposal acknowledges this but punts to 'week 2 admin dashboard.' For an app whose growth is paid-acquisition-driven (UTM tracking is referenced 12 times across the codebase), running 2-3 weeks with broken attribution means $X spent on ad budgets you cannot evaluate. The fix isn't a dashboard card — it's deciding upfront which event counts as the conversion, and refusing to fire signup until that bar is met. As specified, this proposal will fire two signup events for ~70% of users (the ones who eventually identify) and one for ~30%, which is the worst of both worlds.",
+          "severity": "serious",
+          "why": "Compared with the 'real fix' (fire signup ONLY on identification, count anon-create as a separate funnel step), the proposed dual-fire approach permanently corrupts the existing UTM history in user_events.metadata — there's no clean rollback once data starts landing."
+        },
+        {
+          "issue": "Diagnosis B finding #5 (3-12s blocking POST) is real but the proposed fix is unsafe. 'Server returns conversation_id immediately with status=generating' requires SSE streaming the intro message — but server/src/companion-api.js does not currently expose a generation endpoint that produces an intro WITHOUT first picking model + content_level + persona, all of which depend on age-gate + content-level settings the proposal is bundling into a single tap. Streaming the intro before the user has affirmatively cleared age 18 is the exact pattern that gets flagged in 18+ app reviews. The 'awakening shimmer' is a UX hack to mask a flow that previously took 3-12s — but the LLM still has to run; the wall-clock latency doesn't go away.",
+          "severity": "minor",
+          "why": "Fixable by ordering: collect age FIRST, render UI to chat screen with optimistic placeholder, stream intro into the placeholder. But this needs the same age-gate the proposal says it's collapsing into a single tap with the consent bundle. If the bundling is the speed-up, you can't ALSO defer the LLM call — the bottleneck is the LLM, not the form."
+        },
+        {
+          "issue": "Test cohort isolation is hand-waved. 'hash of session_id mod 2' — but session_id is regenerated on every visitor() call in tracking.js, and Capacitor iOS app installs don't have stable session_ids until WebView mounts. A user can land in bucket A on first launch and bucket B on second launch, seeing the anon flow once and the signup flow next time — broken UX, broken cohort math. The A/B test as designed produces uninterpretable results.",
+          "severity": "minor",
+          "why": "Standard fix: hash by device-stable ID (Capacitor Device.getId() / browser localStorage UUID set on first visit) not by session. Not catastrophic but invalidates the rollout evidence."
+        }
+      ],
+      "fixable": false,
+      "refute_one_line": "Approach D trades a measurable 5-minute-retention problem for two unmeasurable existential risks (App Store rejection on an 18+ NSFW app + permanent orphan-account inflation with no recovery for the same 33% cohort it claims to save), and its abuse and attribution mitigations are paper-thin."
+    },
+    {
+      "approach_name": "Magic Moment First 30 Seconds",
+      "killers": [
+        {
+          "issue": "iOS Safari/WKWebView will NOT autoplay TTS audio without a user gesture in the SAME WebView. The user's last gesture was the Apple/Google button tap, which happens BEFORE the native auth sheet takes over — that gesture token is consumed when the WebView is backgrounded and then re-foregrounded after auth. T+16 'her voice plays' will silently fail with NotAllowedError on iOS (audioManager.js line 26 already catches play() rejection and just calls onError — no fallback). The 'magic moment' is the entire premise. Without autoplay it's just text. There is no Capacitor AudioSession dance in the codebase that solves this either.",
+          "severity": "blocker",
+          "why": "The radical premise is 'a girl is already speaking to them on screen.' If she can't speak without another tap, the whole approach collapses to 'slightly faster cold path' — which the proposal itself admits doesn't move the needle (Diagnosis B finding #1: chat latency was never the problem)."
+        },
+        {
+          "issue": "Anonymous POST /api/welcome/prewarm BEFORE OAuth resolves is an unauthenticated, fingerprint-keyed endpoint that fires real OpenRouter + Fish.audio calls. Cost math is wildly understated: $0.005/warm × 100/day assumes a benign world. Scrapers/competitors finding this endpoint can hit it from rotating IPs for free LLM completions + TTS audio. With Fish.audio S2 priced per character and OpenRouter per-token, a single botnet day at 100k req trivially exceeds $500. The proposed 'IP rate-limit 1/60s' is bypassed by any residential proxy pool. There is currently zero unauthenticated AI surface in the codebase (every /api/chat, /api/companions/templates, /api/tts route uses authenticate middleware except templates/preview which only reads DB).",
+          "severity": "blocker",
+          "why": "Opens the app's most expensive APIs to anonymous users keyed on a client-supplied fingerprint. Even the proposal's own mitigation ('cap daily anonymous warms') means a single bad actor flips the kill switch and breaks the feature for everyone for the rest of the day — i.e., it self-DOSes."
+        },
+        {
+          "issue": "sessionStorage does NOT survive the Apple OAuth round-trip on native iOS. Apple Sign-In opens a native sheet (ASAuthorizationController) — not a redirect — so sessionStorage technically persists in-WebView. BUT for the Google web fallback path (handleWeb in GoogleSignIn.jsx:66-93), the code redirects via window.location.href to /api/auth/google → Google → /api/auth/google/callback → /my/login?accessToken=... — a full document navigation that does preserve sessionStorage on the same origin, EXCEPT it lands on /my/login (auth-api.js line 616), not /chat/{companionId}. The proposal says auth response 'now includes {companionId, conversationId}' for the API path, but the redirect-based Google flow doesn't return JSON — it redirects with tokens in URL params. The whole 'auth body carries lovetta-welcome-pick' design only works for native paths; the web Google path needs server-side recovery via the existing state base64 blob, which is mentioned but adds another fragile coupling.",
+          "severity": "serious",
+          "why": "The pre-warm cache key (fingerprint) and the post-auth companion creation (sessionStorage pick) live on two different channels that don't reliably reconverge across the web Google OAuth redirect. Cache-miss rate will be much higher than 'common case' on web, which is still ~40% of traffic per the weekly analysis."
+        },
+        {
+          "issue": "Forcing the template pick at T-0 directly contradicts Diagnosis A finding #4 cited in the proposal itself: 'custom-companion creators have 51% retention vs 3% for template-pickers among ghosters.' The fix herds 100% of unauth users into the low-retention template path, then bolts on a '4th tile Create your own' as mitigation — but the 4th tile bypasses the pre-warm and thus the entire magic-moment payoff. So you've moved the high-value 19% cohort onto a flow that is strictly worse than today (extra welcome screen, no time-savings benefit), and forced the low-value 81% into a faster version of a flow that already converts at 3%. Math doesn't pencil out: even if the templated 81% improves from 3% → 10%, the custom 19% losing 5pp from added friction (51% → 46%) cancels most of the gain.",
+          "severity": "serious",
+          "why": "The proposal optimizes the volume cohort by degrading the value cohort. The retention forecast (+14-21pp) doesn't account for the custom-creator regression at all and assumes the 33-user 'never-created' cohort exists because of friction — but Diagnosis A finding #1 was that they made zero post-signup requests, which means they likely bailed at the OAuth round-trip itself, not at the companion step. Forcing a pick earlier doesn't help users who never finish auth."
+        },
+        {
+          "issue": "Deleting the scene-gen call (companion-api.js:224-238) AND skipping memory/intelligence pre-calls on turn 1 (chat-api.js:560-564) silently degrades message quality. The proposal claims the empty-context branch fires anyway at line 579 for new users, but doesn't verify what buildMemoryContext/buildUserContext/buildSceneContext actually return for a brand-new user — they may be cheap no-ops already, in which case 'skip them' saves zero ms. If they DO populate context that informs the system prompt, you've shipped an A/B test where variant B has a measurably different reply quality on turn 1 vs all subsequent turns and vs control. This poisons the A/B readout (you can't attribute the retention delta to UX vs quality).",
+          "severity": "serious",
+          "why": "Confounds the experiment. You can't tell if the +14pp retention came from the magic moment or from a 5% quality regression that happened to be net-positive. And once you ramp to 100%, you can't roll back the deletion without re-introducing latency."
+        },
+        {
+          "issue": "Auto-attaching the template poster as media_url on the SECOND assistant message and labeling it as 'she sent you a photo' is borderline deceptive — the user just saw that same poster as a looping avatar on the welcome screen 30 seconds ago. The proposal's mitigation ('serve a different angle from custom_avatars') still uses pre-baked stock images that all templated users share. This is the exact mechanic that gets AI girlfriend apps roasted in App Store reviews ('all her photos are the same'). Compounds with Apple's evolving 'deceptive UI' enforcement on companion apps.",
+          "severity": "serious",
+          "why": "Short-term retention lift, medium-term review-store damage and refund risk. Lovetta is already on a delicate footing with Apple as an 18+ companion app — shipping pre-canned photos labeled as fresh ones is exactly the pattern App Review flags."
+        },
+        {
+          "issue": "Implementation effort is mis-scoped as 'large' but is actually a 2-3 week native + server + Redis + flag-infra job. Touches: 12 modified files + 2 new files + 3 new endpoints + 3 migrations + Redis prewarm cache + Fish.audio R2 streaming + Apple/Google native bridge changes + sessionStorage cross-redirect persistence + iOS audio session unlock + paywall suppression flag + state-param recovery on web Google flow + analytics for is_welcome + A/B gating server-side AND client-side + iOS native rebuild + App Review for behavioral change. Each one is non-trivial. The Apple Sign-In dynamic import requirement alone (per CLAUDE.md memory) means the prewarm fire-and-forget must dynamic-import a separate module before the SignInWithApple call — that ordering matters and the proposal hand-waves it. Realistic ship time before first A/B read: 3-4 weeks.",
+          "severity": "serious",
+          "why": "The proposal sells this as a single sprint. Mis-scoping the timeline means it competes against simpler approaches (better first-message prompt, defer paywall only, auto-create companion on signup) that ship in 2-3 days and capture 60-70% of the retention upside without the cost/audio/scraper/A/B-confound risks."
+        },
+        {
+          "issue": "The 'force-play TTS on first message only, then revert to auto_audio=false' mechanism mutates the user's audio preference invisibly. The default in migrate.js v53 is auto_audio=false. The proposal says it uses ?welcome=1 to bypass the saved pref — but ChatPage.jsx line 41-47 reads pref once on mount into autoAudioRef.current. Any code that force-plays must NOT mutate autoAudioRef (or all subsequent messages auto-play, contradicting the default). The proposal acknowledges this but the 'clear after one playback' state machine is fragile: refreshing the page mid-welcome, navigating to Profile and back, or a TTS generation failure (which is common — Fish.audio cold-start can exceed the 20s waitForMessageAudio timeout) all leave the flag in an undefined state.",
+          "severity": "minor",
+          "why": "Recoverable bug-class issue, but ties into the autoplay blocker — if the play() rejects, you've still consumed the 'first-play' slot and the user never hears anything."
+        }
+      ],
+      "fixable": false,
+      "refute_one_line": "The premise (auto-voice on first load) is blocked by iOS autoplay policy in WKWebView, the anonymous prewarm endpoint is a cost-explosion vector, and the design degrades the high-retention custom-companion cohort to optimize the low-retention template cohort — so even if shipped flawlessly the math doesn't beat a 3-day version that just defers the paywall and fixes the gratitude-monologue prompt."
+    }
+  ],
+  "judge": {
+    "scores": [
+      {
+        "approach_name": "Direct-to-Chat: signup lands inside a conversation with Lily",
+        "retention_lift": 6,
+        "conversion_preservation": 7,
+        "implementation_speed": 8,
+        "risk": 7,
+        "evidence_alignment": 5,
+        "ab_testability": 8,
+        "total": 41,
+        "notes": "Medium-effort, low-risk approach that ships in days and has a clean feature flag, but the critic's data shows 0/40 ghosters hit a paywall and 90% never created a companion — so removing Pricing from the cold path fixes a screen most dropouts never reach. Still the safest, most-shippable bet that bundles the high-leverage prompt rewrite."
+      },
+      {
+        "approach_name": "Magic Moment First 30 Seconds",
+        "retention_lift": 5,
+        "conversion_preservation": 6,
+        "implementation_speed": 3,
+        "risk": 4,
+        "evidence_alignment": 6,
+        "ab_testability": 5,
+        "total": 29,
+        "notes": "Ambitious parallel pre-warm + auto-voice concept, but iOS WKWebView autoplay policy blocks the entire 'magic moment' premise and the anonymous prewarm endpoint is a cost-explosion vector. Forces template-pickers (3% retention cohort) while degrading the custom-creator (51% retention) path."
+      },
+      {
+        "approach_name": "Chat-First Anonymous Welcome Flow",
+        "retention_lift": 6,
+        "conversion_preservation": 4,
+        "implementation_speed": 2,
+        "risk": 3,
+        "evidence_alignment": 4,
+        "ab_testability": 5,
+        "total": 24,
+        "notes": "Highest theoretical retention ceiling but schema-impossible FK (INT vs UUID), 117 server touchpoints assuming user_id non-null, UK age-verification law geo-blocks 23% of traffic, and iOS IAP/App Store carve-out kills the most valuable monetization surface. Multi-week refactor disguised as 'large.'"
+      },
+      {
+        "approach_name": "Approach D — Anonymous-first, identity-on-demand",
+        "retention_lift": 5,
+        "conversion_preservation": 3,
+        "implementation_speed": 4,
+        "risk": 2,
+        "evidence_alignment": 4,
+        "ab_testability": 4,
+        "total": 22,
+        "notes": "Apple Guideline 5.1.1(v) + 1.2 rejection risk on an 18+ NSFW app is existential, recovery via 6-word BIP39 codes is fantasy (crypto wallets see 30-50% loss with money on the line), and synthetic @anon.lovetta.ai emails would poison Resend deliverability. Trades measurable problem for unmeasurable existential risks."
+      },
+      {
+        "approach_name": "Try Before You Sign: Public Live-Chat Demo on the Landing Page",
+        "retention_lift": 4,
+        "conversion_preservation": 2,
+        "implementation_speed": 2,
+        "risk": 1,
+        "evidence_alignment": 4,
+        "ab_testability": 4,
+        "total": 17,
+        "notes": "Pre-content age/ToS consent violates UK OSA + Texas HB 1181 + Stripe AUP, paid-ads bid-signal collapses when signup event moves 30-90s later (kills the traffic source feeding 186/186 web signups), and exposes an unauthenticated sexually-flirty LLM endpoint as a CSAM-bait honeypot. Worst risk profile of all five."
+      }
+    ],
+    "ranked_order": [
+      "Direct-to-Chat: signup lands inside a conversation with Lily",
+      "Magic Moment First 30 Seconds",
+      "Chat-First Anonymous Welcome Flow",
+      "Approach D — Anonymous-first, identity-on-demand",
+      "Try Before You Sign: Public Live-Chat Demo on the Landing Page"
+    ]
+  }
+}

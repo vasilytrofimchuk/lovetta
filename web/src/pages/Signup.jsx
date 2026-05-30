@@ -8,6 +8,7 @@ import GoogleSignIn from '../components/GoogleSignIn'
 import TelegramSignIn from '../components/TelegramSignIn'
 import AppleSignIn from '../components/AppleSignIn'
 import { hasCompleteConsent, readOnboardingData, writeOnboardingData } from '../lib/onboarding'
+import { resolvePostSignupPath } from '../lib/postSignupNav'
 import { isCapacitor } from '../lib/platform'
 import { trackSignup } from '../lib/pixels'
 import { getAppPageHeight } from '../lib/layout'
@@ -162,7 +163,7 @@ export default function Signup() {
     setLoading(true)
     try {
       const referralCode = localStorage.getItem('lovetta-ref') || undefined
-      await signup({
+      const signupResponse = await signup({
         email,
         password,
         birthMonth: consentData.birthMonth,
@@ -173,10 +174,12 @@ export default function Signup() {
         referralCode,
       })
       trackSignup()
+      // Welcome flow B: if server auto-provisioned a companion, route straight to chat.
+      const dest = resolvePostSignupPath(signupResponse) || postSignupPath
       if (nativeApp) {
-        navigate(postSignupPath)
+        navigate(dest)
       } else {
-        window.location.replace(`/my${postSignupPath}`)
+        window.location.replace(`/my${dest}`)
       }
     } catch (err) {
       setError(getErrorMessage(err))
@@ -185,9 +188,10 @@ export default function Signup() {
     }
   }
 
-  const handleSocialSuccess = () => {
+  const handleSocialSuccess = (data) => {
     trackSignup()
-    navigate(postSignupPath)
+    // Welcome flow B: server may have auto-provisioned a companion — go straight to chat.
+    navigate(resolvePostSignupPath(data) || postSignupPath)
   }
 
   if (step === 1) {

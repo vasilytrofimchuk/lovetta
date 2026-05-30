@@ -428,6 +428,14 @@ test.describe('Companion Creation — real API', () => {
 
     await page.fill('input[placeholder*="name"]', 'Aurora');
     await page.fill('textarea', 'Aurora is a mysterious astronomer who loves stargazing.');
+
+    // Avatar is required for custom companions (server-side 400 enforced —
+    // see fix H in the 2026-05-30 audit batch). Pick the first catalog avatar
+    // before continuing.
+    const firstAvatar = page.locator('img[alt=""]').first();
+    await firstAvatar.waitFor({ state: 'visible', timeout: 10000 });
+    await firstAvatar.click();
+
     await page.click('text=Continue');
 
     await expect(page.locator('button:has-text("Awaken Aurora")')).toBeVisible();

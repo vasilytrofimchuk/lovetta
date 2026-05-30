@@ -2,6 +2,35 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Welcome flow B + 3 grafts — Direct-to-Chat A/B (2026-05-30)
+
+Implements the recommended approach from `docs/WELCOME_FLOW_DECISION_2026-05-30.md`. 12-agent diagnosis+design workflow chose B (auto-provision Lily + her conversation + a pre-baked opener at signup time) over 4 alternatives. Feature-flagged, default OFF; flip `welcome_flow_B_skip_create` in admin Settings to enable, `welcome_flow_B_variant_pct` to control the % in B.
+
+Tests: `npm run test:e2e:api` 30/30 + `:ai` 149/149 + `:ui` 48/48 green. `npm run build:ios` ran.
+
+**Server**
+- [x] Migration `v67_welcome_flow_b_skip_create` — adds `user_companions.auto_provisioned`, `companion_templates.opener_{line,context,scene}` columns, seeds Lily's opener, and inserts 6 app_settings (the flag, variant pct, template name, deferred-paywall msg count, first-message style, plan-modal defer msgs).
+- [x] New `server/src/onboarding.js` exporting `autoProvisionFirstCompanion(userId, client, opts)`. FNV-1a hash mod 100 for stable per-user variant assignment. Reads the flag + pct, looks up the template, inserts user_companion (auto_provisioned=TRUE) + conversation + opener message in one go. Defensive — never throws to caller; logs `welcome_flow_assigned` + `welcome_flow_auto_provisioned` events.
+- [x] `server/src/auth-api.js` — wired into all 4 signup branches (email POST, Google web callback, Google native POST, Apple POST with both email and synthetic-email sub-branches). Apple reviewer (`APPLE_REVIEWER_ID`) is hard-pinned to A_control. Google web callback appends `onboardingVariant` + `onboardingCompanionId` to the redirect URL since it can't return JSON; JSON-returning branches add an `onboarding` field to the response.
+- [x] `server/src/companion-api.js:207` — opener system prompt is now configurable via `first_message_style` setting. Default `casual_question_v1` requires ending with one concrete 5-word-or-fewer question; legacy `gratitude_v0` preserved as a fallback. Single-line win per the diagnosis: 9/10 sampled openers had no `?` before.
+- [x] `server/src/chat-api.js` — at message #3 for users with auto-provisioned companions, the SSE `done` event includes `suggestPlanDrawer: true` so the client knows when to surface the (deferred) paywall.
+
+**Client**
+- [x] New `web/src/lib/postSignupNav.js` — `resolvePostSignupPath(signupResponse)` returns `/chat/{id}?firstSession=1` when the server auto-provisioned, else legacy `/pricing?onboarding=1`.
+- [x] `web/src/pages/Signup.jsx` — email signup captures the signup response and routes via the helper. Apple/Google sign-in success callbacks now receive the API `data` so they can route the same way.
+- [x] `web/src/components/AppleSignIn.jsx`, `GoogleSignIn.jsx` — pass `data` through to `onSuccess(data)`.
+- [x] `web/src/pages/Login.jsx` — OAuth-callback handler reads `onboardingVariant` + `onboardingCompanionId` from URL query and redirects straight to chat when present.
+- [x] `web/src/hooks/useChat.js` — skips the 1.5s auto-photo on `?firstSession=1` (the opener already has the template video; auto-photo burns free budget).
+- [x] `web/src/pages/ChatPage.jsx` — `?firstSession=1` renders a dismissible "Tap her avatar to explore other girlfriends" chip above MessageList; Dismiss strips the flag from the URL so reload doesn't re-show it.
+- [x] `web/src/pages/CompanionList.jsx` — Promise.all restructured to combine companions + billing-status results; plan modal only shows when `totalUserMessages >= 3` (defers the signup-blast paywall).
+- [x] `web/src/pages/Pricing.jsx` — when entered with `?onboarding=1`, sets `lovetta-plan-skipped=1` on mount so a silent dismiss has the same persistence as the explicit Skip button (kills the double-paywall stack).
+- [x] `e2e/companion-chat.test.js` — `custom companion creation works` test now picks an avatar before clicking Continue (avatar is required server-side per fix H from the prior batch).
+
+**A/B**: Flag default OFF. To enable: `INSERT INTO app_settings ... SET value='true' WHERE key='welcome_flow_B_skip_create'`. Stable hash mod 100 → bucket < `welcome_flow_B_variant_pct` is variant B. Both variants log `welcome_flow_assigned`.
+
+**Out of scope (not addressed by B):**
+- The Apple-relay (`@privaterelay.appleid.com`) zero-action ghost signal (19/19) — looks like an OAuth callback / token-not-persisted bug on iOS Safari. Worth a separate investigation.
+
 ## Weekly-analysis fixes batch (2026-05-30)
 
 Driven by `docs/WEEKLY_ANALYSIS_2026-05-30.md`. 12-agent workflow planned each fix to file-line precision; applied in conflict-checker safe order. `npm run test:e2e:api` 30/30 + `npm run test:e2e:ai` 149/149 green.

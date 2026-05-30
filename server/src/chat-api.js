@@ -739,6 +739,15 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         console.warn('[memory] processing error:', err.message);
       });
 
+      // Welcome flow B: suggest the plan drawer once at message #3 for users
+      // who were auto-provisioned (they skipped Pricing entirely on signup).
+      let suggestPlanDrawer = false;
+      try {
+        if (userMessageCount === 3 && companion?.auto_provisioned) {
+          suggestPlanDrawer = true;
+        }
+      } catch {}
+
       res.write(`data: ${JSON.stringify({
         type: 'done',
         messageId: savedMsg.id,
@@ -751,6 +760,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         shouldRequestTip: aiResult.shouldRequestTip || false,
         mediaBlocked,
         valuePrompt,
+        suggestPlanDrawer,
       })}\n\n`);
 
       // Start media generation in background (non-blocking)

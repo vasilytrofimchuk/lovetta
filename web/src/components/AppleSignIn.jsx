@@ -65,7 +65,7 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
       localStorage.removeItem('lovetta-utm-medium')
       localStorage.removeItem('lovetta-utm-campaign')
       await refreshUser()
-      onSuccess?.()
+      onSuccess?.(data)
     } catch (err) {
       // The iOS native sheet can report back-out as AuthorizationError 1000/1001.
       if (isAppleUserCancel(err)) return

@@ -1359,6 +1359,42 @@ const MIGRATIONS = [
       ON CONFLICT (key) DO NOTHING;
     `,
   },
+  {
+    name: 'v67_welcome_flow_b_skip_create',
+    sql: `
+      -- Welcome flow B: auto-provision Lily + opener at signup time so the
+      -- first thing a new user sees is a chat already in progress (not a
+      -- pricing modal or companion picker). Diagnosed 2026-05-30: 55% of
+      -- 5-min ghosters never made it past the post-signup screens.
+
+      ALTER TABLE user_companions ADD COLUMN IF NOT EXISTS auto_provisioned BOOLEAN NOT NULL DEFAULT FALSE;
+      CREATE INDEX IF NOT EXISTS idx_user_companions_auto
+        ON user_companions(user_id, auto_provisioned)
+        WHERE auto_provisioned = TRUE;
+
+      -- Pre-baked opener per template — sidesteps the 3-12s LLM call that
+      -- currently blocks first-message render in companion-api.js.
+      ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS opener_line TEXT;
+      ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS opener_context TEXT;
+      ALTER TABLE companion_templates ADD COLUMN IF NOT EXISTS opener_scene TEXT;
+
+      UPDATE companion_templates
+      SET opener_line = 'Hey :) you''re new here, right? What should I call you?',
+          opener_context = 'glances up, half-smiling',
+          opener_scene = 'Soft afternoon light'
+      WHERE name = 'Lily';
+
+      -- Feature flag + A/B config. Default OFF until manually flipped in admin.
+      INSERT INTO app_settings (key, value) VALUES
+        ('welcome_flow_B_skip_create', 'false'),
+        ('welcome_flow_B_variant_pct', '50'),
+        ('welcome_flow_B_template_name', '"Lily"'),
+        ('welcome_flow_B_defer_paywall_until_msgs', '3'),
+        ('first_message_style', '"casual_question_v1"'),
+        ('plan_modal_defer_msgs', '3')
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [
