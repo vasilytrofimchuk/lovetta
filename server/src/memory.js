@@ -50,6 +50,7 @@ async function buildMemoryContext(conversationId, opts = {}) {
       `SELECT t.amount, t.created_at FROM tips t
        JOIN conversations c ON c.id = $1
        WHERE t.user_id = c.user_id AND t.companion_id = c.companion_id
+         AND t.status = 'succeeded'
        ORDER BY t.created_at DESC LIMIT 5`,
       [conversationId]
     ),

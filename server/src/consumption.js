@@ -8,6 +8,26 @@ const { getRedis } = require('./redis');
 const { logEvent, EVENT_TYPES } = require('./events');
 
 const THRESHOLD_CACHE_TTL = 60; // seconds
+const TIP_REQUEST_COOLDOWN_SECONDS = 6 * 60 * 60; // 6 hours per user+source
+
+/**
+ * Atomically claim a tip-request slot for (userId, source) using Redis SET NX EX.
+ * Returns true if the slot was acquired (no cooldown active — caller may prompt + log),
+ * false if the cooldown is still active (caller must skip both event log and UI prompt).
+ * Falls back to true if Redis is unavailable so the flow never silently dies.
+ */
+async function acquireTipRequestSlot(userId, source) {
+  if (!userId || !source) return true;
+  const redis = getRedis();
+  if (!redis) return true;
+  const key = `tip_request_cooldown:${userId}:${source}`;
+  try {
+    const set = await redis.set(key, '1', 'EX', TIP_REQUEST_COOLDOWN_SECONDS, 'NX');
+    return set === 'OK';
+  } catch {
+    return true;
+  }
+}
 
 /**
  * Record an API call and update running cost balance.
@@ -67,11 +87,13 @@ async function _checkThreshold(pool, userId, subscription) {
   );
   const monthlyCost = parseFloat(costRows[0].monthly_cost);
 
-  // Sum all tips this month (amount is in cents → divide by 100)
+  // Sum all tips this month (amount is in cents → divide by 100).
+  // Filter to status='succeeded' so pending/failed rows don't count as revenue.
   const { rows: tipRows } = await pool.query(
     `SELECT COALESCE(SUM(amount), 0) / 100.0 AS monthly_tips
      FROM tips
      WHERE user_id = $1
+       AND status = 'succeeded'
        AND created_at >= date_trunc('month', NOW())`,
     [userId]
   );
@@ -94,21 +116,30 @@ async function _checkThreshold(pool, userId, subscription) {
   const netCost = monthlyCost - monthlyTips;
   const exceeded = netCost >= threshold;
 
+  // Per-user+source cooldown: only emit the UI prompt and event log once per
+  // TIP_REQUEST_COOLDOWN_SECONDS so a single user can't loop the modal and
+  // generate runaway tip_requested events. mediaBlocked stays driven by real
+  // cost so the spend cap is still enforced even while the prompt is muted.
+  let promptAllowed = false;
+  if (exceeded) {
+    promptAllowed = await acquireTipRequestSlot(userId, 'monthly_threshold');
+  }
+
   const result = {
-    shouldRequestTip: exceeded,
+    shouldRequestTip: exceeded && promptAllowed,
     mediaBlocked: exceeded,
     monthlyCost,
     monthlyTips,
   };
 
-  // Cache in Redis
+  // Cache in Redis (already honors the cooldown — shouldRequestTip is gated above)
   if (redis) {
     try { await redis.setex(cacheKey, THRESHOLD_CACHE_TTL, JSON.stringify(result)); } catch {}
   }
 
-  // Log first tip-request crossing this month (Redis cache prevents spam — same
-  // user keeps hitting cached `exceeded=true` until they tip or month rolls).
-  if (exceeded) {
+  // Only log when the cooldown slot was acquired this call — prevents the
+  // modal-loop pattern (~2x/hour for days) from flooding tip_requested events.
+  if (exceeded && promptAllowed) {
     logEvent(userId, EVENT_TYPES.TIP_REQUESTED, {
       source: 'monthly_threshold',
       isTrial: !!isTrial,
@@ -121,28 +152,58 @@ async function _checkThreshold(pool, userId, subscription) {
 }
 
 /**
- * Check if a free (unsubscribed) user has exceeded the free weekly cost threshold.
- * Returns true if they should be blocked (show limit popup).
+ * Check if a free (unsubscribed) user has exceeded any free-tier cost cap.
+ * Returns { blocked, reason } where reason is one of:
+ *   - 'lifetime_cap'  — lifetime spend >= free_lifetime_cost_cap_usd (default $5.00)
+ *   - 'daily_cap'     — today's spend >= free_daily_cost_cap_usd (default $0.30)
+ *   - 'weekly_limit'  — week-to-date spend >= tip_request_threshold_free_usd
+ *   - null            — under all caps
+ * Lifetime > daily > weekly precedence so the frontend can show the
+ * strongest message ("trial exhausted, upgrade") instead of the recurring
+ * weekly tip modal once a user has clearly used up their free trial.
+ * A cap of 0 means "disabled" (matches existing free-threshold convention).
  */
 async function checkFreeLimit(userId) {
   const pool = getPool();
-  if (!pool) return false;
+  if (!pool) return { blocked: false, reason: null };
 
   const { rows: costRows } = await pool.query(
-    `SELECT COALESCE(SUM(cost_usd), 0) AS weekly_cost
+    `SELECT
+       COALESCE(SUM(CASE WHEN created_at >= date_trunc('week', NOW()) THEN cost_usd ELSE 0 END), 0) AS weekly_cost,
+       COALESCE(SUM(CASE WHEN created_at >= date_trunc('day',  NOW()) THEN cost_usd ELSE 0 END), 0) AS daily_cost,
+       COALESCE(SUM(cost_usd), 0) AS lifetime_cost
      FROM api_consumption
-     WHERE user_id = $1 AND created_at >= date_trunc('week', NOW())`,
+     WHERE user_id = $1`,
     [userId]
   );
   const weeklyCost = parseFloat(costRows[0].weekly_cost);
+  const dailyCost = parseFloat(costRows[0].daily_cost);
+  const lifetimeCost = parseFloat(costRows[0].lifetime_cost);
 
   const { rows: settings } = await pool.query(
-    `SELECT value FROM app_settings WHERE key = 'tip_request_threshold_free_usd'`
+    `SELECT key, value FROM app_settings
+     WHERE key IN ('tip_request_threshold_free_usd', 'free_daily_cost_cap_usd', 'free_lifetime_cost_cap_usd')`
   );
-  const threshold = parseFloat(settings[0]?.value || '0.10');
+  const settingsMap = {};
+  for (const s of settings) settingsMap[s.key] = s.value;
 
-  if (threshold === 0) return false; // 0 = no free tier, subscription required immediately
-  return weeklyCost >= threshold;
+  const weeklyThreshold = parseFloat(settingsMap['tip_request_threshold_free_usd'] || '0.10');
+  const dailyCap = parseFloat(settingsMap['free_daily_cost_cap_usd'] || '0.30');
+  const lifetimeCap = parseFloat(settingsMap['free_lifetime_cost_cap_usd'] || '5.00');
+
+  // Lifetime cap fires first — once burned, no further free use.
+  if (lifetimeCap > 0 && lifetimeCost >= lifetimeCap) {
+    return { blocked: true, reason: 'lifetime_cap' };
+  }
+  // Daily cap fires next — slows runaway burn within a single day.
+  if (dailyCap > 0 && dailyCost >= dailyCap) {
+    return { blocked: true, reason: 'daily_cap' };
+  }
+  // Weekly threshold last — the existing soft-paywall behaviour.
+  if (weeklyThreshold > 0 && weeklyCost >= weeklyThreshold) {
+    return { blocked: true, reason: 'weekly_limit' };
+  }
+  return { blocked: false, reason: null };
 }
 
 /**
@@ -181,8 +242,8 @@ async function getConsumptionSummary(period = '30d') {
     ? `WHERE ac.created_at >= NOW() - INTERVAL '${interval}'`
     : '';
   const tipDateFilter = interval
-    ? `WHERE t.created_at >= NOW() - INTERVAL '${interval}'`
-    : '';
+    ? `WHERE t.status = 'succeeded' AND t.created_at >= NOW() - INTERVAL '${interval}'`
+    : `WHERE t.status = 'succeeded'`;
 
   const { rows: [result] } = await pool.query(`
     WITH consumption AS (
@@ -250,8 +311,8 @@ async function getConsumptionSummary(period = '30d') {
     ? `WHERE created_at >= NOW() - INTERVAL '${interval}'`
     : '';
   const dailyTipFilter = interval
-    ? `WHERE created_at >= NOW() - INTERVAL '${interval}'`
-    : '';
+    ? `WHERE status = 'succeeded' AND created_at >= NOW() - INTERVAL '${interval}'`
+    : `WHERE status = 'succeeded'`;
 
   const { rows: daily } = await pool.query(`
     WITH daily_cost AS (
@@ -335,4 +396,5 @@ module.exports = {
   invalidateThresholdCache,
   getConsumptionSummary,
   getFishAudioUsage,
+  acquireTipRequestSlot,
 };

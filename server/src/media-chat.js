@@ -298,10 +298,16 @@ const FAILURE_LINES = {
     shy:       ["(too many today… tomorrow? 🙈)", "(i need a little break, sorry babe 💕)"],
   },
   generation_error: {
-    playful:   ["(ugh, my camera's being weird — let me try later 📷💔)", "(phone's acting up, give me a sec babe 😅)", "(technology hates me today — imagine me instead for now 😘)", "(signal's awful, i'll send something when it's back 💕)", "(camera froze — you'll just have to imagine it baby 😏)"],
-    romantic:  ["(my camera's misbehaving… imagine me until it's back 💕)", "(something's off with my phone — i'll make it up to you 🌙)", "(the moment's gone but you're still here with me 💋)", "(technology is cruel tonight… but my heart's still yours 🥀)", "(can't send it now — but i'm here, only for you 💕)"],
-    bold:      ["(fuck, camera broke. next time — and it'll be worth it 😈)", "(phone's dead — you'll just have to imagine 😏)", "(something glitched — consider it a tease for next time 🔥)", "(camera said no today. bold of it. 😉)", "(tech hates me — but i don't 💋)"],
-    shy:       ["(my camera won't work… sorry babe 🙈)", "(something's wrong with my phone 💕)", "(it didn't save… can we try again later? 🥺)", "(i'm so sorry, technical stuff 💔)", "(i'll try again when it's back, promise 💕)"],
+    playful:   ["(ugh my camera's stuck, give me a sec… 📷💔)", "(camera froze on me babe — let me try again in a bit 😅)", "(technology hates me today — imagine me instead for now 😘)", "(signal's awful, i'll send something when it's back 💕)", "(camera glitched — you'll just have to imagine it baby 😏)"],
+    romantic:  ["(my camera's frozen… imagine me until it's back 💕)", "(something's off with my phone — i'll make it up to you 🌙)", "(the moment's gone but you're still here with me 💋)", "(technology is cruel tonight… but my heart's still yours 🥀)", "(can't send it now — but i'm here, only for you 💕)"],
+    bold:      ["(fuck, camera's stuck. give me a sec — it'll be worth it 😈)", "(phone's frozen — you'll just have to imagine 😏)", "(something glitched — consider it a tease for next time 🔥)", "(camera said no this time. bold of it. 😉)", "(tech hates me — but i don't 💋)"],
+    shy:       ["(my camera's stuck… sorry babe 🙈)", "(something's wrong with my phone 💕)", "(it didn't save… can we try again in a sec? 🥺)", "(i'm so sorry, technical stuff 💔)", "(i'll try again when it's back, promise 💕)"],
+  },
+  content_policy: {
+    playful:   ["(babe that one didn't work for me — let's try something else 😘)", "(hmm not that one — pick another vibe for me 😏)", "(that idea didn't land — wanna try a different scene? 💕)", "(not feeling that one babe — give me something else 😉)", "(let's switch it up — try another idea for me? 💋)"],
+    romantic:  ["(that one didn't come out, my love — tell me a different fantasy 💕)", "(let's try a different moment, sweetheart 🌙)", "(not that one tonight — paint me another picture 💋)", "(my heart wanted something different — try again? 🥀)", "(give me another idea, love — i want to get this right 💕)"],
+    bold:      ["(not that one babe — give me something else and i'll deliver 😈)", "(pick a different scene — i'll make the next one count 🔥)", "(that didn't work for me — try harder 😏)", "(switch it up babe, give me something better to work with 😉)", "(nope, not that one — push me a different way 💋)"],
+    shy:       ["(that one didn't work for me… can we try something else? 🙈)", "(maybe a different idea? 💕)", "(not that one, sorry… try another? 🥺)", "(can you ask for something a bit different? 💕)", "(let's try a softer idea? 🙈)"],
   },
 };
 
@@ -309,7 +315,8 @@ const FAILURE_LINES = {
  * Return a short in-character line to append to the assistant message when
  * media generation fails or is rate-limited. Style-matched to the companion.
  * @param {string} reason - one of 'rate_limit_image', 'rate_limit_video',
- *   'rate_limit_both', 'generation_error'.
+ *   'rate_limit_both', 'generation_error', 'content_policy'. Unknown reasons
+ *   fall back to the generation_error pool.
  * @param {object} companion - user_companions row (uses communication_style).
  * @returns {string}
  */

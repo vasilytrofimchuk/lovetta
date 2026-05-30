@@ -609,10 +609,28 @@ async function handleWebhook(rawBody, signature) {
         const amount = parseInt(session.metadata?.amount || '0', 10);
         const tipCompanionId = session.metadata?.companionId || null;
         const paymentIntent = session.payment_intent;
-        await pool.query(
-          'INSERT INTO tips (user_id, amount, stripe_payment_id, companion_id) VALUES ($1, $2, $3, $4) ON CONFLICT (stripe_payment_id) DO NOTHING',
-          [userId, amount, paymentIntent, tipCompanionId]
+        // Two-step to dodge partial-unique-index limitations on ON CONFLICT:
+        // 1) Upgrade the pending row written at checkout creation, if any.
+        // 2) Fall back to a fresh succeeded INSERT (deduped via the pre-existing
+        //    stripe_payment_id unique constraint) for tips that bypassed the
+        //    pending-write path (older clients, or webhook-only test fixtures).
+        const { rowCount: upgraded } = await pool.query(
+          `UPDATE tips
+             SET status = 'succeeded',
+                 stripe_payment_id = $1,
+                 companion_id = COALESCE(companion_id, $2),
+                 amount = $3
+           WHERE stripe_session_id = $4 AND status = 'pending'`,
+          [paymentIntent, tipCompanionId, amount, session.id]
         );
+        if (!upgraded) {
+          await pool.query(
+            `INSERT INTO tips (user_id, amount, currency, stripe_payment_id, stripe_session_id, companion_id, status)
+             VALUES ($1, $2, 'usd', $3, $4, $5, 'succeeded')
+             ON CONFLICT (stripe_payment_id) DO NOTHING`,
+            [userId, amount, paymentIntent, session.id, tipCompanionId]
+          );
+        }
         // Reset tip cost counter so companion stops asking + invalidate Redis cache
         try { await resetTipCounter(userId, tipCompanionId); } catch (e) { console.warn('[billing] resetTipCounter error:', e.message); }
         try { await invalidateThresholdCache(userId); } catch (e) { console.warn('[billing] cache invalidation error:', e.message); }
@@ -738,6 +756,20 @@ async function handleWebhook(rawBody, signature) {
           [subId]
         );
         console.warn(`[billing] Payment failed: subscription=${subId}`);
+      }
+      break;
+    }
+
+    case 'checkout.session.expired':
+    case 'checkout.session.async_payment_failed': {
+      // Tip checkout abandoned or async payment declined — mark the pending row failed.
+      const session = event.data.object;
+      if (session.mode === 'payment' && session.metadata?.type === 'tip') {
+        const { rowCount } = await pool.query(
+          `UPDATE tips SET status = 'failed' WHERE stripe_session_id = $1 AND status = 'pending'`,
+          [session.id]
+        );
+        console.log(`[billing] Tip ${event.type}: session=${session.id} rows_updated=${rowCount}`);
       }
       break;
     }

@@ -75,6 +75,21 @@ router.post('/tip', authenticate, async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
     const session = await createTipCheckout(req.userId, amountCents, rows[0].email, companionId || null);
+
+    // Observability: write a pending tip row at checkout creation so we can see
+    // every initiation, not just succeeded ones. The webhook upgrades this row
+    // to 'succeeded' or 'failed' once Stripe confirms the outcome.
+    try {
+      await pool.query(
+        `INSERT INTO tips (user_id, amount, currency, stripe_session_id, companion_id, status)
+         VALUES ($1, $2, 'usd', $3, $4, 'pending')
+         ON CONFLICT (stripe_session_id) DO NOTHING`,
+        [req.userId, amountCents, session.id, companionId || null]
+      );
+    } catch (e) {
+      console.warn('[billing] pending tip insert failed:', e.message);
+    }
+
     res.json({ url: session.url });
   } catch (err) {
     console.error('[billing] tip error:', err.message);

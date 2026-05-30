@@ -2,6 +2,28 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Weekly-analysis fixes batch (2026-05-30)
+
+Driven by `docs/WEEKLY_ANALYSIS_2026-05-30.md`. 12-agent workflow planned each fix to file-line precision; applied in conflict-checker safe order. `npm run test:e2e:api` 30/30 + `npm run test:e2e:ai` 149/149 green.
+
+- [x] **A — Kontext null image_url guard** (`server/src/ai.js`). Validates `referenceImageUrl` non-null+non-empty before PuLID/Kontext call. Stops the 19/wk silent failures hitting 5 users.
+- [x] **B — Empty assistant message guard** (`server/src/chat-api.js` × 3 INSERT sites). Skip persisting + emit `error:empty_response` SSE when content is empty AND no media is pending.
+- [x] **C — Tip-flow observability** (`billing-api.js`, `billing.js`, `consumption.js` × 3, `memory.js`, new migration `v65_tips_stripe_session_id`). Writes a `status='pending'` row on Stripe Checkout creation; webhook upgrades to `succeeded` via UPDATE-then-INSERT-fallback (avoids partial-unique-index ON CONFLICT issue). `checkout.session.expired` / `async_payment_failed` mark the row `failed`. All revenue-counting queries now filter `status='succeeded'`.
+- [x] **D — Tip-request rate limit** (`consumption.js`, `chat-api.js`). 6h per-user-per-source Redis cooldown via `acquireTipRequestSlot(userId, source)`. Caps the runaway-modal-loop pattern (101 events/user/3d).
+- [x] **E — Proactive-messaging kill switch** (`proactive.js`, new migration `v64_proactive_messages_kill_switch`). App setting `proactive_messages_enabled` defaults to `false` (engagement was 0.67% reply); reactivation path still runs.
+- [x] **F — Hard free-tier caps** (`consumption.js`, `chat-api.js` × 2, new migration `v66_free_user_hard_caps`). `checkFreeLimit` now returns `{blocked, reason}` with daily ($0.30) + lifetime ($5.00) caps in addition to weekly. New error code `trial_exhausted` for the harder caps so the UI can switch from soft tip modal to firm upgrade prompt.
+- [x] **G — fal.ai video safety_checker disabled** (`ai.js`, `chat-api.js`). Pass `enable_safety_checker: false` on wan/v2.6 video calls (was defaulting to true → false-positives on mild romantic prompts). Background-media `.catch` now detects content-policy strings and switches the in-character failure line to `content_policy` instead of generic `generation_error`.
+- [x] **H — Custom companion avatar required** (`companion-api.js`). 400 reject when `templateId` is null AND `avatarUrl` is blank. Stops the 23% NULL avatar_url leak.
+- [x] **I — UTM persistence across OAuth** (`web/src/pages/Login.jsx`, `Signup.jsx`). Capture `utm_source/medium/campaign` from URL into existing localStorage keys on page mount. Apple/Google sign-in already reads them. Fixes the OAuth-redirect drop that wiped UTMs for 96/97 signups.
+- [x] **J — Quality-flags telemetry** (`chat-api.js` × 3). Helper `computeContentQualityFlags()` adds `content_too_short`, `long_reply`, `high_emoji_density`, `no_concrete_detail` to the flags stored on every assistant message. Make persona drift visible in Chat Insights.
+- [x] **K — Legacy voice ID remap** (new migration `v63_remap_orphan_voice_to_crystal`). Updates the 19 user_companions + any companion_templates using orphan voice `hA4zGnmTwX2NQiTRMt7o` to Crystal (the most popular catalog voice).
+- [x] **L — Differentiated media failure lines** (`media-chat.js`). New `content_policy` failure-line pool (playful/romantic/bold/shy variants) so users can self-correct on a rejected prompt instead of seeing the generic "phone's acting up" for every failure cause.
+
+Out of scope (UX/business decisions, not code):
+- Paywall conversion rebuild (0 of 14 paywall-exposed signups subscribed). Needs design A/B.
+- RevenueCat trial-to-paid collapse (2 of 88 lifetime subs active). Needs business call on trial length / removing trial on yearly.
+- Welcome-flow / first-5-min retention (59% never return). Needs UX work.
+
 ## Admin "Girls" tab — companion usage tops (2026-05-08)
 
 - [x] Added `GET /api/admin/companion-usage?days=N` to `server/src/admin-api.js`. Returns 4 tops: by image, by voice (TTS via `api_consumption.call_type`), by video, by total user messages. Templates + custom (custom companions aggregated under "(Custom)"). Test users filtered via existing `testUserFilter`.

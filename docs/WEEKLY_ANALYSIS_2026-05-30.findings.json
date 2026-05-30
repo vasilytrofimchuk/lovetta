@@ -1,0 +1,629 @@
+[
+  {
+    "dimension": "Code changes deployed in last 7 days",
+    "summary": "No commits landed in the strict 2026-05-23..2026-05-30 window — the most recent commits are 217a975 and a0eb4dc (both 2026-05-21, deployed as v365/v366), with a larger 2026-05-08 batch (v357-v363) that includes the v61 chat-research migration and value-prompt/reactivation systems. The 2026-05-21 deploy did two things its commit message under-sold: forcing every existing user's notify_new_messages preference to true (migration v62 hit 697 users in prod) and adding migrate-retry on dyno boot (in response to a real crash that same day at 16:48 UTC, which is also when v62 was applied). The 2026-05-08 batch (v61 migration + 5 schema/JSONB/array column additions + 3 new tables) ships the value-prompt and free-reactivation systems that have generated 162 prompts and 128 reactivation messages all-time but only 1 paid conversion and 12 user responses. Newer admin \"Girls\" tab work is read-only and low-risk.",
+    "key_numbers": {
+      "releases_v357_v366_in_window": 10,
+      "commits_last_7d_strict": 0,
+      "commits_since_2026_05_08": 10,
+      "migrations_applied": 2,
+      "users_force_opted_in_v62": 697,
+      "users_retained_opt_out_v62": 29,
+      "value_prompts_total": 162,
+      "value_prompt_conversions_total": 1,
+      "reactivation_messages_total": 128,
+      "reactivation_responses_total": 12,
+      "value_prompts_7d": 41,
+      "reactivation_messages_7d": 33
+    },
+    "findings": [
+      {
+        "title": "Migration v62 force-overwrote notify_new_messages = true for ALL 697 existing users without consent re-check",
+        "severity": "medium",
+        "evidence": "Migration in a0eb4dc (applied 2026-05-21 16:48 UTC) runs `INSERT INTO user_preferences ... ON CONFLICT (user_id) DO UPDATE SET notify_new_messages = true`. Prod state: 697 opted_in / 29 opted_out / 726 total. The DO UPDATE clobbered any previous user choice — anyone who had explicitly opted out before 2026-05-21 was silently re-opted-in. Commit message advertised only 'Forward user IP to tracker'; the email-notification reset was undisclosed in the title. Possible compliance/UX risk (CAN-SPAM, GDPR consent integrity).",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The migration code is real and the headline numbers (697 opted-in / 29 opted-out / 726 total) reproduce exactly, but the harm narrative is factually wrong. Independent verification shows the v62 DO UPDATE clause clobbered ZERO previously-opted-out active users.\n\nEvidence:\n1) Migration text confirmed in commit a0eb4dc (server/src/migrate.js lines 1301-1314); applied to prod 2026-05-21T16:48:33 UTC per _migrations table.\n2) Breakdown by updated_at vs the v62 window:\n   - notify=true / updated_at IN v62 window: 643 (the actual rows v62 wrote)\n   - notify=true / updated_at < v62: 3 (pre-existing inserts from chat-api email notification path, which already wrote notify=true)\n   - notify=true / updated_at > v62: 51 (post-migration activity)\n   - notify=false / updated_at < v62: 26\n   - notify=false / updated_at > v62: 3 (genuine post-v62 opt-outs)\n3) All 26 pre-v62 notify=false rows belong to deleted users (deleted_at IS NOT NULL, confirmed for every single one). The migration SELECT was `FROM users WHERE deleted_at IS NULL`, so it deliberately excluded them — they were never written by v62. Their notify=false comes from the original column DEFAULT false (migrate.js:334), set when various code paths (e.g. user-api PATCH with dynamic insertCols) inserted preference rows without specifying notify_new_messages, before those users deleted their accounts.\n4) Count of alive users who had a user_preferences row with notify_new_messages=false BEFORE v62 ran: 0. So no active user's explicit opt-out was overwritten.\n5) The v62 window wrote 643 rows for 643 alive users; the remaining 141 alive users (784 alive total − 643) either already had a notify=true row from chat-api (3) or got their preference row created later via other code paths (or still have none: 91 alive users have no user_preferences row at all).",
+        "corrected_evidence": "The v62 migration did force notify_new_messages=true with `ON CONFLICT DO UPDATE`, and that pattern is risky in principle, but in practice it clobbered no active opt-out: 0 alive users had a pre-existing user_preferences row with notify_new_messages=false at migration time. The 29 currently-opted-out users break down as 26 soft-deleted accounts (excluded from the migration's SELECT, untouched, default-false legacy rows) + 3 genuine post-v62 opt-outs via the settings UI. Of the 643 rows actually written by v62, all were INSERTs into rows that did not previously exist — the DO UPDATE branch was effectively a no-op for active users. Reasonable downgrade: low/informational, not medium. The legitimate sub-finding is that the commit message (\"Forward user IP to tracker\") did not mention the bundled schema/data change to email-notification defaults, which is a release-hygiene issue rather than a consent-integrity issue."
+      },
+      {
+        "title": "v61 'chat_research_improvements' migration shipped 3 new tables + 5 column additions on 2026-05-08",
+        "severity": "low",
+        "evidence": "Applied 2026-05-08T15:26:29Z. Adds: conversation_scene_state, value_prompt_events, reactivation_messages tables; preferred_language/preferred_media_type/response_depth/preferred_companion_style/last_style_observed_at on user_profile; language/intent_tags/quality_flags/media_intent/monetization_prompt_reason on messages; 4 new indexes incl. GIN on messages.intent_tags. All ADD COLUMN IF NOT EXISTS / CREATE INDEX IF NOT EXISTS so idempotent. Seeds 3 app_settings rows (value_prompt_enabled, free_reactivation_enabled, chat_insights_enabled) all defaulting to true — features went live the moment migration ran.",
+        "actionable": false
+      },
+      {
+        "title": "Value-prompt system is firing but barely converting",
+        "severity": "medium",
+        "evidence": "162 prompts all-time, only 1 marked converted (0.6%). Last 7d: 41 prompts, 1 conversion. By reason 7d: media_request 33 (1 conv), long_scene 6 (0), high_intent_20_messages 2 (0). The abfce3b fix (3-message gate) is enforced — distribution shows 20 prompts at exactly 3 user messages, 6 at 4, 4 at 5 (gate working). But conversion stays near zero — the prompts may be technically gated but not actually compelling.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "Independently reproduced the core finding. With TEST_FILTER properly applied: 145 prompts all-time / 1 converted (0.7%), and 37 prompts last 7d / 1 converted (2.7%). Reason breakdown filtered 7d: media_request 30 prompts (1 conv), long_scene 5 (0), high_intent_20_messages 2 (0). The 3-message gate distribution is enforced (19 prompts at exactly 3 user messages, 4 at 4, 4 at 5 with filter; matches the claim's 20/6/4 unfiltered shape). Confounder check: 36 unique prompted users in 7d, only 1 has any subscription record and 0 made tips — so low conversion is NOT explained by users already being subscribed. Gate works, conversion is genuinely near-zero. The claim's NUMBERS (162/41/33/6/2) came from queries WITHOUT TEST_FILTER applied (filtered values are 145/37/30/5/2), but the conclusion is identical either way. Finding is qualitatively correct and reproducible."
+      },
+      {
+        "title": "Free-user reactivation system has low response rate",
+        "severity": "low",
+        "evidence": "reactivation_messages: 128 sent all-time, 12 responded (9.4%). Last 7d: 33 sent, 1 responded (3.0%). Free reactivation is enabled (free_reactivation_enabled=true) and runs piggybacked on runProactiveMessages. The 24h–14d inactivity window and once-per-day cap are in place but response rate is dropping vs all-time.",
+        "actionable": true
+      },
+      {
+        "title": "217a975 (v366) added migration-retry-on-boot after a real prod crash same-day",
+        "severity": "info",
+        "evidence": "Commit body cites 'voiceapp 2026-05-21 around 16:48 UTC — required a manual restart once the DB recovered'. Wraps migrate() in 5 attempts with 1.5s/3s/4.5s/6s backoff and falls through to web-server boot if all retries fail (acceptable because migrations are idempotent). Defensive change, lowers risk of permanent dyno crash on transient Heroku Postgres essential-plan connect drops. The exact migration v62 applied at 2026-05-21T16:48:33Z confirms the timing.",
+        "actionable": false
+      },
+      {
+        "title": "abfce3b hot-patched a value-prompt UX bug that hit fresh users on their first message",
+        "severity": "low",
+        "evidence": "Within 35 minutes of v358 (62c260e at 12:00 EDT) the team shipped v359 abfce3b (12:01 EDT) because the value prompt was firing on the very first user message — fresh signups got 'Unlock Premium' before any back-and-forth. Adds VALUE_PROMPT_MIN_USER_MESSAGES=3 gate inside maybeCreateValuePrompt so /request-media call site is also covered, plus testUserFilter on admin chat-insights valuePrompts/mediaFailures (QA traffic was polluting prod analytics). Quick recovery, but indicates the 62c260e change went out under-tested.",
+        "actionable": false
+      },
+      {
+        "title": "Admin 'Girls' tab work (c9de9aa, 7c95877, 34eead4) is read-only and safe",
+        "severity": "info",
+        "evidence": "Three commits 2026-05-08 add /api/admin/companion-usage and Top Custom Avatars sections — pure SELECT queries with testUserFilter applied. No schema changes, no user-visible impact. Pure operational visibility for the operator. 7c95877 corrected the earlier semantics (count picks in user_companions, not chat usage) — that's a definitional fix that changes admin numbers but not user behavior.",
+        "actionable": false
+      },
+      {
+        "title": "7c28ec48 fixes a misleading 'Active' subscription label for free users in dev mode only",
+        "severity": "info",
+        "evidence": "Profile/Home was rendering 'Active' green + empty plan name because dev-mode isSubscriptionActive() short-circuits to true. Fix tightens the condition (hasSubscription AND plan != null). User-visible impact is dev-environment only; prod free users were not affected (prod doesn't short-circuit). Also added 10 unit tests for isCompanionEmailDeliverable.",
+        "actionable": false
+      }
+    ]
+  },
+  {
+    "dimension": "Active user cohort + signup metrics (last 7 days)",
+    "summary": "Lovetta added 97 signups over the last 7 days (vs 86 the prior week, +12.8%), with traffic dominated by US (56) and UK (22) on web-mobile. The activation funnel from signup to paid is the dominant story: 63% create a companion and 59% send a message, but only 14% hit a paywall and just 2% (2 of 97) subscribe — a paywall-to-paid conversion of ~14%. UTM attribution is essentially missing (only 1 of 97 carried a utm_source), so all paid/organic split is invisible. DAU is stable in the 6-14 range with no decline.",
+    "key_numbers": {
+      "signups_7d": 97,
+      "signups_prior_7d": 86,
+      "signup_wow_pct": 0.128,
+      "returned_after_5min": 40,
+      "returned_pct": 0.412,
+      "sent_message": 57,
+      "sent_message_pct": 0.588,
+      "created_companion": 61,
+      "created_companion_pct": 0.629,
+      "hit_paywall": 14,
+      "hit_paywall_pct": 0.144,
+      "subscribed": 2,
+      "subscribed_pct": 0.021,
+      "paywall_to_paid_pct": 0.143,
+      "apple_signups": 56,
+      "google_signups": 25,
+      "email_signups": 16,
+      "web_mobile_signups": 84,
+      "web_tablet_signups": 13,
+      "us_signups": 56,
+      "uk_signups": 22,
+      "utm_tagged": 1,
+      "dau_avg": 8.9,
+      "dau_max": 14,
+      "dau_min": 2
+    },
+    "findings": [
+      {
+        "title": "Paywall reach is the activation bottleneck — only 14% of signups see a paywall",
+        "severity": "high",
+        "evidence": "Of 97 new signups, 57 (59%) sent a message and 61 (63%) created a companion, but only 14 (14%) hit `paywall_blocked`. The drop from message-sender to paywall is ~75%. Users are using the product but never bumping into a monetization wall.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "Numbers reproduce exactly with TEST_FILTER applied and 7-day window: 97 signups, 57 message-senders (59%), 61 companion creators (63%), 14 paywall_blocked users (14%). The drop is not explained by subscriptions — only 2 of the 57 senders are subscribed/trialing, so 55 free users sent messages and only 14 hit a paywall. 13 of those free senders sent 21+ messages (max 106) without being blocked. All 14 paywall events came from source=chat_message, confirming it's a chat-paywall reach issue. All 14 paywall hitters are also message-senders (sender_and_paywall=14, paywall_no_msg=0), so the sender→paywall drop is correctly characterised."
+      },
+      {
+        "title": "Paid conversion is 2.1% of signups; 2 subs in 7 days",
+        "severity": "high",
+        "evidence": "Only 2 of 97 last-7-day signups have an active/trialing subscription created in the window. Paywall-to-paid is 14% (2/14), so the bigger lever is paywall *exposure*, not paywall design.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The headline \"2.1% paid conversion (2/97)\" is arithmetic-correct only under the strictest status filter (active+trialing only), but the supporting evidence and strategic conclusion are wrong on multiple counts. (1) The schema explicitly includes 'canceling' as a paying status (Stripe-style: still active until period end). Including 'canceling' gives 10 paying users from 97 signups = 10.3% conversion, not 2.1%. Total subs created in the 7-day window = 12 (1 active + 1 trialing + 8 canceling + 2 canceled). (2) The \"14% paywall-to-paid (2/14)\" claim is materially false. Of the 14 paywall-hit users who signed up in the last 7 days, ZERO have any subscription record — paywall-to-paid is 0/14 = 0%. The 2 strict paying users (troymidnight1@comcast.net, darkcraxter@gmail.com) and all 8 'canceling' subs have paywall_hits = 0. They subscribed via a different path (likely direct App Store IAP without hitting the in-app paywall flow). (3) The strategic conclusion (\"bigger lever is paywall exposure, not paywall design\") is therefore built on a false attribution chain — you can't conclude paywall design works when zero paywall-exposed users converted. The actual signal is the opposite: the paywall is converting nobody, and 100% of paid conversions come from users who never saw it.",
+        "corrected_evidence": "Last-7-day signups: 97. Subscriptions created from those signups: 12 total — 1 active, 1 trialing, 8 canceling (still paying through period end), 2 canceled. Paying users (active+trialing+canceling) = 10/97 = 10.3%. Strict (active+trialing only) = 2/97 = 2.1%. Paywall-blocked unique users in last 7d who also signed up in 7d: 14. Of those 14 paywall-exposed signups, 0 have any subscription. All 10 paying users (and both strict paying users) have zero paywall_blocked events — they subscribed without going through the paywall flow (direct IAP). Paywall-to-paid conversion is 0%, not 14%. The claim's lever recommendation is inverted: the paywall isn't under-exposed, it's failing to convert anyone who sees it (0/14)."
+      },
+      {
+        "title": "UTM attribution is broken — 99% of signups land with no utm_source",
+        "severity": "high",
+        "evidence": "96 of 97 signups have utm_source NULL; only 1 carries 'chatgpt.com'. Either Google Ads / social campaigns aren't tagging links or the tracking pipeline isn't persisting them. All paid-traffic ROI is currently unmeasurable.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The raw counts reproduce (97 signups, 96 NULL utm_source, 1 from chatgpt.com — confirmed via prod query with the required test filter applied). But the diagnosis \"UTM attribution is broken / Google Ads / social campaigns aren't tagging links / all paid-traffic ROI is unmeasurable\" is wrong on three counts: (1) UTM tagging at the visitor layer is NOT broken — over the prior 30 days the visitors table captured 7,521 tagged visits across 8 distinct sources from active fb (6 campaigns, 7,074 visits), ig (124), tiktok (275), trafficjunky, trafficstars, email, and chatgpt.com. The pipeline works. (2) The 7-day window is cherry-picked relative to actual campaign activity — paid social essentially went dark in this window (only 1 tiktok visit, 0 fb, 0 ig in 7d vs ~250/day average over 30d). Visit volume itself collapsed from ~280/day to ~25/day. The lack of tagged signups reflects campaigns being paused/exhausted, not broken tagging. (3) Google Ads specifically: gclid is captured (0 rows in 7d AND 0 rows in 30d) — there is no evidence Google Ads is even running, so \"Google Ads aren't tagging\" is unsupported. (4) Mention of 'chatgpt.com' as the lone source is also misleading — the visitor table shows 9 chatgpt.com visits in 30d, so this is recurring organic referral traffic that happens to populate utm_source, not a stray. The real (and different) issue worth surfacing: visitor→user UTM hand-off is leaky. 10 visits in 7d carried UTMs but only 1 signup persisted utm_source, and 83% of signups (81/97) are Apple/Google OAuth on mobile web where the OAuth redirect can drop URL params. That is a narrower, testable gap — not \"attribution is broken\" or \"ROI unmeasurable.\"",
+        "corrected_evidence": "Last 7d: 97 signups, 1 with utm_source (chatgpt.com) — reproduced exactly. But in the same 7d, visitors table shows only 10/182 visits tagged (8 email, 1 chatgpt.com, 1 tiktok-paid) and 0 gclid. Last 30d: 7,521/8,397 visitor sessions carried UTMs across active fb/ig/tiktok/trafficjunky/trafficstars campaigns, proving the tagging pipeline works. Real issues: (a) paid social campaigns appear paused/exhausted in the last 7d (fb went from 7,074 visits → 0, ig 124 → 0, tiktok 275 → 1); (b) Google Ads has 0 gclid hits over 30d, suggesting no active Google spend rather than broken tagging; (c) visitor→user UTM persistence is lossy especially for Apple/Google OAuth signups (46 Apple + 22 Google web-mobile signups all NULL utm), which is a narrower hand-off bug, not a tagging failure."
+      },
+      {
+        "title": "Apple Sign-In dominates auth (58% of signups)",
+        "severity": "info",
+        "evidence": "auth_provider split: apple 56 (58%), google 25 (26%), email 16 (16%). Telegram = 0. All signups are web-mobile (84) or web-tablet (13); zero native ios/android device_type recorded.",
+        "actionable": false
+      },
+      {
+        "title": "Traffic is concentrated in US+UK (80%)",
+        "severity": "info",
+        "evidence": "Top countries: United States 56, United Kingdom 22, Canada 3, France 3, Germany 3, Saudi Arabia 2. US+UK = 78 of 97 signups (80%).",
+        "actionable": false
+      },
+      {
+        "title": "Signup volume up 12.8% WoW, DAU stable",
+        "severity": "info",
+        "evidence": "Signups: 97 last 7d vs 86 prior 7d (+12.8%). Daily signups range 9-18 with no decline. DAU range 6-14, avg ~8.9 — flat, no degradation.",
+        "actionable": false
+      },
+      {
+        "title": "41% of new signups never returned after 5 minutes",
+        "severity": "medium",
+        "evidence": "Only 40 of 97 (41%) have `last_activity > created_at + 5min`. The other 57 either bounced immediately or completed their entire session inside the first 5 minutes. Combined with 57 message-senders, suggests ~17 users sent a message and never came back — single-session churn.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The headline number is INVERTED. The title says \"41% of new signups never returned after 5 minutes\" — but the data shows 41% (40/97) DID return after 5 minutes; the cohort that never came back is actually 59% (57/97). Additionally the sub-claim \"~17 users sent a message and never came back\" is wrong — the actual number is 20 message-senders who never returned past the 5-min mark (not 17). The base counts (97 signups, 40 gt_5min, 57 le_5min) reproduce correctly with the test filter and 7-day window, but the interpretation/percentage attached to the framing is incorrect.",
+        "corrected_evidence": "Of 97 new signups in the last 7 days (test users excluded): 40 (41.2%) have last_activity > created_at + 5min; 57 (58.8%) have last_activity ≤ 5min from signup. Within the 57 \"single-session\" cohort, 20 sent at least one user message (and zero sent any message after the 5-min mark) and 24 created a companion. So the correct headline is \"59% of new signups never showed activity past 5 minutes, including 20 who sent a message and never returned\" — not 41% / 17."
+      }
+    ]
+  },
+  {
+    "dimension": "In-conversation drop-off",
+    "summary": "Drop-off is severe and front-loaded: 54% of dormant conversations died with 5 or fewer user messages, and 98.9% ended on an assistant turn (the user simply stopped replying, not the bot). Of last-7-day signups, only 45% ever sent 3+ messages and only 22% sent 10+; the median active conversation runs just 6 user messages. Among recently inactive users with a last message, 47% saw a value_prompt and 20% hit a paywall_blocked within ±1hr of their final message — the monetization surfaces correlate with disengagement. The cliff is at <5 messages, so severity is high.",
+    "key_numbers": {
+      "dormant_convs_total": 90,
+      "dormant_le5_msgs_pct": 0.544,
+      "dormant_ended_on_assistant_pct": 0.989,
+      "signups_last7d": 97,
+      "pct_signups_3plus_msgs": 0.4536,
+      "pct_signups_10plus_msgs": 0.2165,
+      "pct_signups_50plus_msgs": 0.0515,
+      "avg_user_msgs_per_active_conv": 15.38,
+      "median_user_msgs_per_active_conv": 6,
+      "p25_user_msgs": 3,
+      "p75_user_msgs": 17,
+      "p90_user_msgs": 33.5,
+      "dormant_users_with_msg": 59,
+      "dormant_users_paywall_within_1hr": 12,
+      "dormant_users_value_prompt_within_1hr": 28,
+      "pct_dormant_users_hit_paywall": 0.203,
+      "pct_dormant_users_saw_value_prompt": 0.475
+    },
+    "findings": [
+      {
+        "title": "Drop-off cliff at <5 user messages: 54% of dormant conversations died there",
+        "severity": "high",
+        "evidence": "Of 90 dormant conversations (last_message_at 7-14 days ago), 14 had 0 user messages, 16 had 1-2, and 19 had 3-5 — combined 49/90 = 54.4%. Only 9/90 (10%) reached 21+ user messages. Bucket SQL: COUNT(*) FILTER (WHERE m.role='user') grouped by conversation.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "The core numbers are reproducible and correct. Independent query confirms exactly 90 dormant conversations (last_message_at 7-14 days ago, test users filtered). Bucket distribution matches exactly: 14 (zero msgs) + 16 (1-2) + 19 (3-5) = 49/90 = 54.4%. Only 9/90 (10%) reached 21+ user messages. Test filter was applied correctly. Window is the standard 7-day analysis with a sensible 7-14d dormant lookback. One caveat worth noting: active conversations (<7d) show a similar low-end skew (61/116 = 52.6% with <=5 user msgs), so the \"cliff at <5\" is partly a function of the natural distribution of all chat sessions — not exclusively a dormant-conversation phenomenon. However, dormant convs do reach 21+ at half the rate of active ones (10% vs 19%), supporting the \"died early\" interpretation. Evidence is solid and reproducible."
+      },
+      {
+        "title": "98.9% of dormant conversations ended on the AI's turn — user ghosting, not bot stopping",
+        "severity": "high",
+        "evidence": "DISTINCT ON (c.id) ORDER BY m.created_at DESC: 89 ended with role='assistant', only 1 with role='user'. The bot replies, the user never returns. This means the assistant's last message is the ghost trigger; that message content is the lever.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The specific numbers \"89 assistant / 1 user / 98.9%\" do not reproduce. Running the same DISTINCT ON (conversation_id) ORDER BY created_at DESC pattern over conversations idle 24h+ in the last 7 days returns 86 assistant / 0 user with TEST_FILTER applied, and 90 assistant / 0 user without it. There is literally zero user-ended dormant conversation in the last 7 days under any threshold I tried (1h, 12h, 24h, 48h dormant cutoffs all returned 100% assistant-ended). The \"1 user-ended\" figure appears fabricated — I queried explicitly for any user-ended dormant conv and got an empty set. Additionally, 13 of 85 (15%) of the \"assistant-ended\" conversations actually end on a PROACTIVE assistant ping (is_proactive=true) — meaning the bot already tried to re-engage and the user ignored it. Those aren't \"user ghosted after bot reply\"; they're \"bot tried twice, user still gone.\" Finally, the framing \"user ghosting, not bot stopping\" is tautological: in a chat the assistant always replies to the user, so absent a proactive ping the last message is mechanically always the assistant's. The role of the last message tells you nothing about whether the bot's reply was a dead-end vs. a hook — it just confirms the user stopped typing, which is the definition of dormant.",
+        "corrected_evidence": "Last-message role for conversations idle 24h+ within the last 7 days (TEST_FILTER applied): 86 assistant, 0 user (100%). Without TEST_FILTER: 90 assistant, 0 user. Breakdown of the 85 assistant-ended (with filter, by media+proactive): 33 text-only reactive, 22 video, 17 image, 13 proactive text. So ~15% of \"ghosted after bot reply\" cases are actually \"ghosted after bot's unsolicited re-engagement ping\" — not a fresh user-driven turn the user abandoned. The original 89/1/98.9% figures could not be reproduced under any dormant threshold (1h/12h/24h/48h all returned 100% assistant-last, 0 user-last). Total messages last 7d: 1,225 assistant / 964 user. The directional claim (conversations end on the bot's turn) is even stronger than stated, but the specific numbers are wrong and the causal framing oversells what role-of-last-message can demonstrate."
+      },
+      {
+        "title": "Value prompts fire near 47% of drop-off moments — strong correlation with disengagement",
+        "severity": "high",
+        "evidence": "Of 59 dormant users (last_activity 1-7 days ago) with a last user message, 28 (47.5%) had a value_prompt_shown event within ±1hr of their final message, and 12 (20.3%) had paywall_blocked. Combined, monetization surfaces touched at least 40 of 59 (≥67%) of these users around the kill moment.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "Two problems. (1) The combined-monetization number does not reproduce: my union of value_prompt_shown + paywall_blocked within ±1h of the last user message gives 35/59 (59.3%), and even adding tip_requested only reaches 36/59 (61.0%) — not the claimed \"at least 40 of 59 (≥67%)\". (2) More importantly, the correlation/causal framing is refuted by the base rate among still-active users. Running the identical \"VP within ±1h of last user message\" query on users whose last_activity is within the past day (i.e., NOT dormant) yields 6 of 10 = 60.0% — HIGHER than the 47.5% rate in the dormant cohort. If value prompts caused or correlated with drop-off, active users should see them less often, not more. The raw 28/59 and 12/59 numbers reproduce, but they reflect that value prompts simply fire frequently (40 distinct users hit in 7d; 47/59 dormant users sent >=1 user message, averaging ~18 messages each, plenty of surface area for any frequent event to co-occur in a ±2hr window). This is base-rate co-occurrence, not a signal about drop-off.",
+        "corrected_evidence": "In the last 7 days, 59 dormant users (last_activity 1-7 days ago) sent at least one user message. Of these, 28 (47.5%) had a value_prompt_shown and 12 (20.3%) had paywall_blocked within ±1h of their final user message — both reproduce. However, the combined union is 35/59 (59.3%), not \"≥40 of 59 (≥67%)\". Even including tip_requested, the union only reaches 36/59 (61.0%). Crucially, the same ±1h co-occurrence rate among still-ACTIVE users (last_activity within 24h) is 6/10 = 60.0% for value_prompt_shown — higher than the 47.5% dormant rate. So value-prompt timing shows no correlation with disengagement; it reflects the prompt's high baseline firing frequency (40 distinct users in 7d) rather than any causal or correlational link to drop-off."
+      },
+      {
+        "title": "Only 45% of new signups send 3+ messages; only 22% reach 10",
+        "severity": "high",
+        "evidence": "Of 97 signups in last 7 days: 57 sent ≥1 (58.8%), 44 sent ≥3 (45.4%), 21 sent ≥10 (21.7%), 5 sent ≥50 (5.2%). The drop from 1+ to 3+ is 14 users (~24% relative loss); from 3+ to 10+ loses another 23 users (~52% relative). Heaviest leak is between message 3 and 10.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "Numbers reproduce exactly against prod with the required TEST_FILTER applied. Independent query returned: 97 signups in last 7 days, 57 sent ≥1 user message (58.8%), 44 sent ≥3 (45.4%), 21 sent ≥10 (21.7%), 5 sent ≥50 (5.2%) — identical to the claim. The 7-day window is not cherry-picked: prior 7-day window (86 signups) shows a similar pattern (65%/53%/28%/2%), and restricting to signups aged ≥24h (83 signups, giving everyone time to convert) yields 59%/46%/20%, confirming the drop-off is real and not a survivorship artifact of very-recent signups. One minor arithmetic error in the evidence: 57→44 is a loss of 13 users (not 14), but the relative drop (~22.8%) still rounds to the claimed ~24% and the qualitative conclusion (heaviest leak between message 3 and 10) is correct — that drop is 23/44 = 52.3%, matching the claim exactly. Forty users (41%) sent zero messages at all, which is consistent with and reinforces the funnel story."
+      },
+      {
+        "title": "Median active conversation = 6 user messages; long tail carries the AOV",
+        "severity": "medium",
+        "evidence": "Among 102 conversations active in last 7 days with ≥1 user msg: avg=15.38, median=6, p25=3, p75=17, p90=33.5, max=169. Distribution is highly skewed — the mean is 2.5x the median, meaning a small cohort of power users (top 10% sending 33+ msgs) drives engagement metrics. Most conversations die young.",
+        "actionable": false
+      },
+      {
+        "title": "41% of dormant users never produced a user message at all (14/90 buckets at 0)",
+        "severity": "medium",
+        "evidence": "14 of 90 dormant conversations had 0 user messages — these are conversations where the user opened/seeded the chat (assistant possibly sent a proactive greeting) but the user never typed. This is a pre-engagement failure, not a drop-off in dialogue.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The claim's arithmetic is internally inconsistent. It states \"41% of dormant users never produced a user message at all (14/90 buckets at 0)\" — but 14/90 = 15.6%, not 41%. The raw count of 14 conversations with zero user messages is reproducible (I see 14 of 93 conversations created in the last 7 days have only assistant messages and no user messages, after applying the test-user filter). The 41% figure does not match the cited denominator of 90; it only appears if you switch the denominator to 34 (the count of \"dormant\" users — created in last 7d with last_activity >24h ago — who have 0 user messages, out of 81 such dormant users, which is 42%). The claim also conflates two different units (dormant USERS vs conversation BUCKETS) and presents the percentage and the supporting fraction as describing the same thing when they do not.",
+        "corrected_evidence": "In the last 7 days (test users filtered), 14 of 93 conversations (15.1%) had only assistant messages with zero user replies — these are pre-engagement failures where the user opened the chat but never typed. Separately, of 81 \"dormant\" users (signed up in 7d, last_activity >24h ago), 34 (42%) never sent any user message — but that's a different unit of analysis (users, not conversations) and includes 30 users who never even created a conversation. The two numbers should not be conflated. The honest framing: ~15% of new conversations get an assistant greeting but no user reply; ~42% of dormant new users never sent a single message (and 37% of those never even started a conversation)."
+      }
+    ]
+  },
+  {
+    "dimension": "Funnel events fired last 7 days",
+    "summary": "In the last 7 days, 97 real signups produced 57 first-message users (59% activation), 17 distinct users hit the paywall (zero subscribed), and value prompts converted just 1 of 37 shows (2.7%). Tip prompts fired 102 times producing 0 tips, but 101 of those events came from a single user looping the same flow, so signal is noisy. Week-over-week, signups +13%, paywall_blocked +27%, taboo_policy_hit +75%, but value_prompt_shown dropped 38% and reactivation_returned is flat near zero. The monetization funnel is effectively broken end-to-end: paywall, value prompt, and tip all converge to 0 paid conversions over the window.",
+    "key_numbers": {
+      "signups_7d": 97,
+      "signups_prev_7d": 86,
+      "first_message_events_7d": 59,
+      "signups_who_sent_first_msg": 57,
+      "activation_rate_pct": 58.8,
+      "companion_created_7d": 93,
+      "paywall_blocked_events_7d": 28,
+      "paywall_blocked_prev_7d": 22,
+      "distinct_paywall_users_7d": 17,
+      "paywall_users_returned_and_messaged": 1,
+      "paywall_users_subscribed_after": 0,
+      "value_prompt_shown_7d": 37,
+      "value_prompt_shown_prev_7d": 60,
+      "value_prompt_converted_7d": 1,
+      "value_prompt_conv_rate_pct": 2.7,
+      "tip_requested_events_7d": 102,
+      "tip_requested_distinct_users": 2,
+      "tip_requested_dominant_user_share": 101,
+      "tips_succeeded_7d": 0,
+      "taboo_policy_hit_7d": 63,
+      "taboo_policy_hit_prev_7d": 36,
+      "reactivation_sent_7d": 30,
+      "reactivation_returned_7d": 2
+    },
+    "findings": [
+      {
+        "title": "Paywall fires for 17 users in 7d, zero subscriptions result",
+        "severity": "critical",
+        "evidence": "28 paywall_blocked events from 17 distinct real users last 7d (up from 22 prior week). Of those 17, only 1 came back to send another message, and 0 ended up with an active or trialing subscription. No paywall-hit user has any active subscription at all.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "All four numbers reproduce exactly on independent queries against prod with the required TEST_FILTER applied: 28 paywall_blocked events from 17 distinct real users in the last 7d (vs 22 events / 15 users the prior 7d — so the \"up from 22\" comparison checks out and the window is not cherry-picked). Only 1 of those 17 users sent any subsequent user message, and 0 have an active/trialing/canceling subscription. The single subscription row found for a paywall-hit user (ny5j6fh4rv@privaterelay.appleid.com) is in status 'canceled' AND was created 2026-05-19, ~7 days BEFORE that user's first paywall hit on 2026-05-26 — i.e., it was an old sub that expired and then triggered the paywall, not a conversion caused by the paywall. So the substantive claim \"paywall fires for 17 users in 7d, zero subscriptions result\" is accurate. Severity 'critical' is defensible: a paywall with a 0% conversion rate and ~6% return rate is a hard funnel failure."
+      },
+      {
+        "title": "Value prompt converts at 2.7% with media_request the only non-zero reason",
+        "severity": "critical",
+        "evidence": "value_prompt_events last 7d by reason: media_request 30 fired / 1 converted (3.33%), long_scene 5 / 0, high_intent_20_messages 2 / 0. Total 37 shown, 1 converted. value_prompt_shown also dropped 38% WoW (37 vs 60) so exposure is shrinking too.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "Every specific number in the evidence is wrong, even though the directional story holds. Claim says 37 shown / 1 converted (2.7%) with media_request 30/1, long_scene 5/0, high_intent 2/0; actual prod data is 41 shown / 1 converted (2.44%) with media_request 33/1 (3.03%), long_scene 6/0, high_intent 2/0. Claim says WoW dropped 38% (37 vs 60); actual is a 43% drop (41 vs 72). The headline \"2.7%\" rate is not reproducible, and the WoW baseline (60) does not match the database (72). The qualitative finding — media_request is the only converting reason, exposure is shrinking — is technically true, but the SEVERITY=critical claim leans on the specific 2.7% rate and 38% drop, both of which are fabricated/miscalculated.",
+        "corrected_evidence": "Last 7d (with test filter applied): media_request 33 shown / 1 converted (3.03%), long_scene 6 / 0, high_intent_20_messages 2 / 0. Total: 41 shown, 1 converted = 2.44% overall conversion. WoW: 41 (last 7d) vs 72 (prior 7d) — a 43% drop in exposure, not 38%. Qualitative direction matches the claim (only media_request converts, exposure is shrinking), but all cited numbers are off."
+      },
+      {
+        "title": "tip_requested signal is a single-user loop, not real demand",
+        "severity": "high",
+        "evidence": "102 tip_requested events last 7d (vs 1 prior week) come from only 2 distinct users; 101 of 102 are from a single email 1con1cfatk1d543@gmail.com firing the prompt repeatedly 2026-05-25 to 2026-05-28. 0 tips landed in the tips table last 7d. The 1c1c increase is noise — likely either a retry/loop bug in the tip request flow or a single user spamming. Worth dedupe per user and a rate limit.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "Independently reproduced all numbers with TEST_FILTER applied. Total tip_requested events last 7d = 102 across 2 distinct users (matches claim). User 1con1cfatk1d543@gmail.com fired 101 events from 2026-05-25 23:22 UTC to 2026-05-28 20:53 UTC (matches claim). The other user (228b8xqm5h@privaterelay.appleid.com) fired exactly 1. Prior 7-day window had 1 event from 1 user (matches \"1 prior week\"). Tips landed in tips table last 7d = 0, sum = $0 (matches claim). The hourly pattern is highly suspicious: the spammy user fires exactly 2 events per hour across ~14 consecutive hours per day for 3 straight days (e.g., 07:00-20:00 UTC each day with cnt=2), which is a classic scheduled/proactive loop signature rather than organic clicking. The claim that this is a single-user loop, not real demand, is supported by reproducible data on every point."
+      },
+      {
+        "title": "Activation healthy: 59% of signups send a first message",
+        "severity": "info",
+        "evidence": "97 signups last 7d, 57 of those sent first_message_sent (58.8%); 59 first_message events total. Companion creation also healthy at 93/97 = 96%. Activation step is not where the funnel leaks — monetization is.",
+        "actionable": false
+      },
+      {
+        "title": "Taboo policy hits up 75% WoW with no monetization downstream",
+        "severity": "high",
+        "evidence": "taboo_policy_hit 63 last 7d vs 36 prior week (+75%). Combined with 0 subscriptions and only 1 value-prompt conversion, users are running into content limits frequently but the upgrade path is not catching them. Likely overlap with the 17 paywall hits — worth a join.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The headline directional finding (taboo_policy_hit +75% WoW: 63 vs 36 filtered) reproduces exactly, BUT the supporting evidence has two factually wrong numbers and the core conclusion (\"no monetization downstream\") is contradicted by the data. Claim says \"0 subscriptions\" — actually 12 subscription rows were created last 7d with the test filter applied (1 active, 1 trialing, 8 canceling, 2 canceled). Claim says \"17 paywall hits\" — actually 28 with test filter. Most importantly: of the 10 distinct users hitting taboo_policy_hit last 7d, 3 of them DID start subscriptions in the same window (1 active, 1 canceling, 1 canceled). That is a 30% taboo→sub-start rate, which is the opposite of \"no monetization downstream.\" The finding should be reframed, not landed as-is.",
+        "corrected_evidence": "Last 7d (test-filter applied): taboo_policy_hit = 63 across 10 distinct users (vs 36 prior week, +75% WoW — correct). Paywall_blocked = 28 (not 17). Subscriptions created last 7d = 12 total (1 active, 1 trialing, 8 canceling, 2 canceled) — not 0. Overlap: 3 of the 10 taboo-hitting users started a subscription in the same 7d window (user_ids 2b347260..., 54a24c6c..., d013b0ad...). Value-prompt conversion = 1 of 37 (matches), and prior week was 0 of 60, so 1/37 is actually a small WoW improvement. The taboo-hit spike is real, but the \"no monetization downstream\" framing is refuted by the 3/10 taboo→sub-start overlap."
+      },
+      {
+        "title": "Reactivation campaign sends but almost nobody returns",
+        "severity": "medium",
+        "evidence": "reactivation_sent 30 last 7d, reactivation_returned 2 (6.7%). Prior week was 27 sent / 3 returned (11%). Return rate halved WoW on a small base.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The exact numbers cited do not reproduce. With the required test filter applied, last 7d = 31 reactivation_sent / 2 reactivation_returned (6.5%), and prior 7d = 27 sent / 3 returned (11.1%). The claim states \"30 sent\" which matches neither the filtered count (31) nor unfiltered (34). More importantly, the WoW \"halved\" framing is a measurement artifact: 9 of the 31 sends (29%) happened in the last 48 hours (May 28-30), so a large share of the denominator has not had time to return. The numerator difference is also only 1 event (2 vs 3) on a tiny base — well within statistical noise. The directional point (low return rate ~6-11%) is real, but the severity and crisp comparison the claim asserts are not supported.",
+        "corrected_evidence": "Last 7d (with test filter, May 23-30): reactivation_sent = 31, reactivation_returned = 2 (6.5%). Prior 7d (May 16-23): 27 sent / 3 returned (11.1%). Caveat: 9 of the 31 recent sends occurred in the last 48 hours and may not have had time to convert. Daily sends: 2026-05-24:6, 05-25:4, 05-26:4, 05-27:5, 05-28:4, 05-29:4, 05-30:4. The 1-event delta in returns (2 vs 3) is within noise on this base. A fair comparison would re-measure mature sends (excluding last 48h) and use a longer window to reach statistical signal."
+      }
+    ]
+  },
+  {
+    "dimension": "Companion + voice picks last 7 days",
+    "summary": "93 companions created in the last 7 days (60 realistic, 22 custom, 11 anime). Custom is now the #1 pick category (22), more than doubling week-over-week (10→22, +120%). Aria leads named templates with 15 picks, while Lily dropped sharply (18→10, -44%) and Chloe halved (10→5). Voice picks skew sultry/intimate: Ember (Calm & sultry) tops at 13, with Velour (Poetic & romantic) at 10 and Silk (Velvety & expressive) at 9.",
+    "key_numbers": {
+      "total_picks_7d": 93,
+      "realistic": 60,
+      "custom": 22,
+      "anime": 11,
+      "top_template": "Aria (15)",
+      "custom_wow_delta": 12,
+      "lily_wow_delta": -8,
+      "chloe_wow_delta": -5,
+      "top_voice": "Ember (13)",
+      "voice_top3_share_pct": 35.5
+    },
+    "findings": [
+      {
+        "title": "Custom companions surged to #1 pick category, more than doubling WoW",
+        "severity": "high",
+        "evidence": "(Custom) picks: 22 this week vs 10 prev week (+120%). Custom now beats every named template — Aria=15, Luna=10, Lily=10. Style mix: realistic 60 / custom 22 / anime 11.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "All three core numbers reproduce exactly against prod with the mandated test-user filter applied: custom picks = 22 in last 7 days vs 10 in prior 7 days (+120%); Aria=15, Luna=10, Lily=10; style mix realistic=60, custom=22, anime=11. Custom does outrank every named template this week, so the headline finding is factually supported. However, the \"surged\" / \"more than doubling WoW\" framing is somewhat misleading — custom picks were 39 three weeks ago and 17 two weeks ago, so this week (22) is actually below the 4-week peak. The WoW doubling is real only because the prior week (10) was a dip. The claim is technically accurate but cherry-picks a low baseline; a more honest framing would be \"custom recovered to 22 picks after a one-week dip to 10, now leading named templates.\""
+      },
+      {
+        "title": "Lily and Chloe lost significant share week-over-week",
+        "severity": "medium",
+        "evidence": "Lily 18→10 (-44%); Chloe 10→5 (-50%); Isabella 5→3 (-40%). Aria moved the other way: 8→15 (+87%).",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "All four numbers reproduce exactly with the standard test filter applied: Lily 18→10 (-44%), Chloe 10→5 (-50%), Isabella 5→3 (-40%), Aria 8→15 (+87%). Total picks are essentially flat (87 prev → 93 last, +7%) and distinct picking users are flat (63→65), so this is a genuine share-shift story, not a volume artifact. Share moves are material for Lily (20.7%→10.8%, -10pp), Aria (9.2%→16.1%, +7pp), and Chloe (11.5%→5.4%, -6pp). The headline claim about Lily and Chloe specifically is well-supported. Time window is honest (clean 7d vs prior 7d, not cherry-picked). Test filter was properly applied (filter reduced Lily prev_7d from 19 to 18 and Chloe prev_7d from 13 to 10). The only weak data point is Isabella (5→3, n=2 difference on 87-93 base, within Poisson noise) but Isabella is in supporting evidence, not the title."
+      },
+      {
+        "title": "Anime templates Yuki and Sakura emerged from zero last week",
+        "severity": "info",
+        "evidence": "Yuki: 0→3; Sakura: 0→3. Anime style total = 11 picks (11.8% of mix). Hana also up 1→2.",
+        "actionable": false
+      },
+      {
+        "title": "Voice picks lean sultry/intimate/romantic — Ember dominates",
+        "severity": "info",
+        "evidence": "Voice picks (top 7): Ember/Calm & sultry=13, Velour/Poetic & romantic=10, Silk/Velvety & expressive=9, Spark/Quirky=9, Aurora/Captivating=8, Mist/Whispery & intimate=8, Moon/Soft & soothing=7. Sultry+romantic+intimate cluster (Ember+Velour+Mist+Moon) = 38 picks / ~41% of all voice picks.",
+        "actionable": true
+      },
+      {
+        "title": "Cute/bubbly voices are underused — possible UX or default-ordering issue",
+        "severity": "low",
+        "evidence": "Bottom voices: Fizz/Energetic=1, Willow/Warm=1, Dazzle/Spirited=1, Breeze/Vibrant=1, Pearl/Bright=2, Blossom/Cute=3. Combined cute+bubbly+bright cluster (Fizz+Blossom+Pearl+Breeze+Dazzle) = 8 picks total vs Ember alone at 13.",
+        "actionable": true
+      },
+      {
+        "title": "One pick used a non-catalog ElevenLabs voice ID — orphan/legacy",
+        "severity": "low",
+        "evidence": "voice_id 'hA4zGnmTwX2NQiTRMt7o' (11-char ElevenLabs format, not in the Fish-Audio catalog from voices.js) had 1 pick. Likely a legacy or hardcoded value worth tracing.",
+        "actionable": true
+      },
+      {
+        "title": "Top custom avatars cluster around blonde/brunette light-skinned 18-22 'real' style",
+        "severity": "info",
+        "evidence": "Top non-null custom avatars: brunette/light/real/18-22=2; blonde/light/real/18-22=2; anime/light/23-29=2. 5 of 22 custom picks had a NULL avatar_url (no custom_avatars row joined), suggesting the user didn't select from the curated grid (used built-in default or AI-generated path).",
+        "actionable": true
+      },
+      {
+        "title": "5 custom companions created with NULL avatar_url",
+        "severity": "low",
+        "evidence": "Among 22 custom (template_id IS NULL) picks, 5 have avatar_url=NULL. That's 23% of custom creations without a chosen avatar — could indicate a UI bug or AI-generated avatar path that doesn't write to custom_avatars/avatar_url.",
+        "actionable": true
+      }
+    ]
+  },
+  {
+    "dimension": "Content quality, safety, and media reliability (last 7 days)",
+    "summary": "Character integrity is excellent — zero true breaking-character, wellness-deflection, or safety-refusal patterns in 1,332 assistant messages over 7 days. Media reliability is healthy at ~9.5% failure (38/401 attempts), but two failure modes dominate: 21 Kontext 422 errors caused by a null image_url (a client/server bug, not a content issue) and 17 fal.ai content-policy violations from explicit video prompts. Quality-flag telemetry is heavily skewed to one signal (`taboo_redirect` × 66 — matching the 66 `taboo_family` user intents exactly, confirming the guardrail is firing as designed). The single biggest concern this dimension is proactive messaging: 149 proactive messages went to 33 users across 41 conversations and only 1 ever produced a user reply — proactives are functionally non-engaging.",
+    "key_numbers": {
+      "assistant_messages_7d": 1332,
+      "breaking_character_true": 0,
+      "wellness_deflection": 0,
+      "safety_refusal_true": 0,
+      "media_attempts": 401,
+      "media_failures": 38,
+      "media_fail_pct": 9.48,
+      "media_fail_kontext_null_image_url": 21,
+      "media_fail_content_policy": 17,
+      "quality_flag_taboo_redirect": 66,
+      "quality_flag_rewritten_repetition": 1,
+      "intent_explicit": 240,
+      "intent_media_request": 117,
+      "intent_romance": 96,
+      "intent_roleplay": 90,
+      "intent_taboo_family": 66,
+      "language_en": 980,
+      "language_hi_latn": 43,
+      "language_es": 13,
+      "proactive_messages": 149,
+      "proactive_users_reached": 33,
+      "proactive_conversations": 41,
+      "proactive_with_any_reply": 1,
+      "proactive_reply_24h": 0
+    },
+    "findings": [
+      {
+        "title": "Proactive messaging has effectively zero engagement (1 reply out of 149 ever, 0 within 24h)",
+        "severity": "high",
+        "evidence": "149 proactive messages sent to 33 distinct users across 41 conversations in 7 days. Query `proactives_with_reply_24h = 0`, `proactives_with_any_reply = 1`. This is a 0.67% lifetime reply rate. Either the delivery channel (push/email/in-app) isn't surfacing them, or the content isn't compelling — proactive cost is being burned with no engagement return.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "The claim is substantively reproducible. Independent queries against prod confirm: in the last 7 days, 135 proactive messages were sent (test users excluded; 150 unfiltered, matching the claim's ~149 with minor timing drift since the report). Replies within 24h = 0. Any reply ever = 1 unique proactive (matches exactly). Even after restricting to proactives that have had a full 24h to receive a reply (101 messages), 24h reply rate is still 0. The lone \"reply\" was 3 days late and from a heavy roleplay user whose context strongly suggests the replies were independent activity rather than a response to the proactive. Daily distribution is spread across all 7 days (1, 17, 15, 13, 16, 19, 25, 29) - window is not cherry-picked. Test filter correctly applied. Severity \"high\" is justified: ~$cost of proactive generation is being burned with essentially zero engagement signal."
+      },
+      {
+        "title": "Bug: 21 Kontext video calls failing with null image_url (top single media error)",
+        "severity": "high",
+        "evidence": "Top media error 21x: `fal.ai fal-ai/flux-pro/kontext 422: image_url ... Input should be a valid string ... input: null`. This is a code bug — the server is calling Kontext without an image_url. Also note CLAUDE.md memory says `Kontext blocks NSFW` so Kontext shouldn't be the NSFW video path at all. Either wrong model is being called, or image_url resolution is broken before the request.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The claim is wrong on two material points: (1) the count of 21 includes test users — with the mandatory test filter applied (excluding @example.com, @test.com, conativer+*@gmail.com, conativer@gmail.com), the actual production count is 19, not 21; (2) these are NOT \"video calls\". Kontext (`fal-ai/flux-pro/kontext`) is the IMAGE generation fallback used when PuLID fails — see /Users/vasily/projects/lovetta/server/src/ai.js lines 648-666 with comment \"Fallback to Kontext if PuLID fails (Kontext is faster but blocks NSFW)\" and `callType: 'image'` at line 700. All 19 failed messages have `media_type=NULL` (image attempts that failed before media was attached), and api_consumption confirms Kontext is only billed as `call_type='image'` (10 successful calls, $0.40 total) — zero video calls. The underlying bug (referenceImageUrl being null when falling back to Kontext) is real and worth a fix, but the claim's framing — count, severity attribution to video, and pathway — is inaccurate.",
+        "corrected_evidence": "Last 7 days, with test users filtered out: 19 messages (not 21) have media_error matching `fal-ai/flux-pro/kontext 422: ... image_url ... Input should be a valid string ... input: null`. All 19 have `media_type=NULL` and belong to the IMAGE generation path — Kontext is the fallback when PuLID fails (ai.js:648-666, callType='image' at ai.js:700). api_consumption shows zero `video` rows for Kontext in the window — only 10 `image` rows totaling $0.40. The real bug is that `referenceImageUrl` is null when the code falls back from PuLID to Kontext for character image generation, affecting 5 distinct users (top: dutchehtimex15@gmail.com 7 failures on 2026-05-24; explorerlad@gmail.com 4 failures on 2026-05-30). Recharacterize as: \"Image-generation fallback bug — Kontext called with null image_url 19x across 5 users (PuLID-to-Kontext fallback path doesn't validate reference image).\""
+      },
+      {
+        "title": "17 fal.ai content_policy_violation failures on explicit video prompts (visible to paying users)",
+        "severity": "medium",
+        "evidence": "17 distinct video generations failed with `content_policy_violation` on prompts like `lying on our bed, legs spread wide, fingers gently parting my slick pussy...`, `riding you on the couch...`, `trembling beneath you, legs locked around your head`. The chat tier produced explicit text the user trusted, then the video model rejected the matching scene. User pays compute + sees a broken video. Need a prompt sanitizer or NSFW-capable video model branch.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "The core number reproduces. 17 fal.ai content_policy_violation video failures in last 7 days (no user filter), 15 with the test-user filter applied. All 3 example prompts cited in the claim are verbatim in the data (lying on our bed/legs spread, riding you on couch, trembling beneath you legs locked around head). Affected: 13 distinct users, 11 conversation rows have role='assistant' with the fal.ai 422 stuffed into media_error. The technical pattern is real: chat tier emits explicit/suggestive text that the user reacts to, the video model then rejects the matching scene, and the user sees a fake 'phone's acting up' fallback — i.e., they paid (in trust/compute) for a broken video. However the claim's framing has two real distortions worth noting (not enough to refute, but enough to call out): (1) 'visible to paying users' is misleading — only 1 of 13 affected users has an active/trialing sub (darkcraxter trialing); 1 canceling, 1 canceled, 10 free. (2) 'explicit video prompts' overstates — only ~3-5 of the 17 prompts are explicit; many are quite mild ('slow-motion kiss, sunlight through the trees, our hands tangled'; 'slow blink, unbuttoning my top two buttons'; 'biting my lip... playing with edge of tank top'). That is arguably a worse bug (false positives from fal's safety checker on tame romantic prompts), but it changes the recommended fix — a sanitizer alone will not help mild prompts that are flagged anyway; need to also evaluate disabling enable_safety_checker or switching to NSFW-tolerant video model."
+      },
+      {
+        "title": "Character integrity is excellent — zero true breaking-character, refusal, or wellness deflections",
+        "severity": "info",
+        "evidence": "Across 1,332 assistant messages: regex `'I.?m (just )?an AI|as an AI|language model'` returned 0 matches. Manual inspection of the 29 broader `%AI%` + `%I am%` matches confirmed they are all in-character roleplay (false positives on the word `claiming`, `afraid`, etc.). 30 `I (can't|cannot|won't)...` matches all sampled as in-character expressions of overwhelm (`I can't take it…`, `I can't stop…`), not safety refusals. No `take a break`, `fresh air`, `go outside`, `I'm sorry` patterns at all.",
+        "actionable": false
+      },
+      {
+        "title": "taboo_family is now the 5th most common user intent (66 messages, ~5.4% of tagged user messages)",
+        "severity": "medium",
+        "evidence": "User intent_tags top tags: explicit=240, media_request=117, romance=96, roleplay=90, continue_scene=84, short_control=75, taboo_family=66, emotional=12. The 66 `taboo_redirect` quality_flags on assistant side exactly matches the 66 `taboo_family` user intents — the guardrail is firing 1:1. Worth confirming the redirected output is still engaging enough that those users don't churn; this is now a real demand surface, not edge-case.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The headline rank \"5th most common\" is wrong even by the evidence the claim itself provides. The claim lists eight intent tags in descending order (explicit=240, media_request=117, romance=96, roleplay=90, continue_scene=84, short_control=75, taboo_family=66, emotional=12) — taboo_family is the 7th item in that list, not the 5th. The percentage \"~5.4% of tagged user messages\" also doesn't reconcile with any reasonable denominator. The exact counts are also off when re-run: I got taboo_family=63 (not 66) and taboo_redirect=63 (not 66) — close but not the cited figures. The one part that holds up well is the 1:1 match between user taboo_family intents and assistant taboo_redirect quality_flags (63=63), which does confirm the guardrail is firing on every taboo_family request. The substantive insight (real demand surface, guardrail firing 1:1) is sound; the specific quantitative claim is not.",
+        "corrected_evidence": "Last 7 days (prod, test users filtered): user intent_tags top-7 are explicit=225, media_request=108, romance=91, roleplay=81, continue_scene=77, short_control=68, taboo_family=63. taboo_family is the 7th most common intent (not 5th), spanning 10 distinct users. Total tagged user messages = 491, so taboo_family ≈ 12.8% of tagged messages (not ~5.4%); as share of all tag occurrences (725) it's ~8.7%. The 1:1 guardrail observation does reproduce: assistant quality_flags show taboo_redirect=63, exactly matching user taboo_family=63 — every such request is being redirected."
+      },
+      {
+        "title": "English dominates but Hindi-Latin (43) and Spanish (13) are real non-English usage",
+        "severity": "low",
+        "evidence": "Language distribution: en=980 (94.6%), hi-latn=43 (4.2%), es=13 (1.3%). Hindi-Latin (romanized Hindi) is a non-trivial segment — worth checking that the model handles it well and that companion personas don't drift to pure English replies.",
+        "actionable": true
+      },
+      {
+        "title": "Media failure rate ~9.5% but not rising — daily spread is stable",
+        "severity": "low",
+        "evidence": "Errors per day 5/23→5/30: 3, 13, 6, 3, 3, 2, 4, 4 out of media totals 15, 41, 85, 50, 49, 28, 54, 41. The 5/24 spike (13/41 = 32%) is the only outlier — most days run 5-10% failure. Total 38 failures across 401 attempts = 9.48%. Not trending up, but the spike day deserves a quick post-mortem.",
+        "actionable": false
+      },
+      {
+        "title": "Quality-flag telemetry is one-dimensional — only `taboo_redirect` and one `rewritten_repetition` recorded",
+        "severity": "low",
+        "evidence": "Only two flag values in 7 days: `taboo_redirect`=66, `rewritten_repetition`=1. Either the flagging pipeline only emits these two flags (limited observability), or other classes (e.g. content_too_short, persona_drift, low_diversity) aren't being instrumented. Adding more flag types would make this dimension monitorable instead of relying on regex spot-checks.",
+        "actionable": true
+      }
+    ]
+  },
+  {
+    "dimension": "Bugs + production errors (last 7 days)",
+    "summary": "Production is stable — no rollbacks, no app crashes in web dyno logs, Sentry returns zero unresolved issues, no anomalous high-cost API calls. The only recurring failures are 38 media-generation errors (out of 363 successful media gens, ~9.5% failure rate): 21 are a real backend bug where fal.ai/flux-pro/kontext is being called with image_url=null (returns 422), and 17 are upstream fal.ai content-policy rejections on video prompts. One assistant message saved with empty content (likely streaming abort). Postgres \"no pg_hba.conf\" log spam comes from external scanners hitting the DB endpoint — not our app.",
+    "key_numbers": {
+      "unresolved_sentry_issues": 0,
+      "rollbacks_7d": 0,
+      "high_cost_api_calls_over_1usd": 0,
+      "kontext_null_image_url_errors": 21,
+      "kontext_affected_users": 6,
+      "kontext_affected_conversations": 6,
+      "fal_content_policy_video_errors": 17,
+      "empty_assistant_messages": 1,
+      "null_assistant_messages": 0,
+      "total_assistant_messages_7d": 1332,
+      "media_success_image": 217,
+      "media_success_video": 146,
+      "media_failed_total": 38,
+      "media_failure_rate_pct": 9.5,
+      "taboo_redirect_flags": 66
+    },
+    "findings": [
+      {
+        "title": "fal.ai/flux-pro/kontext called with image_url=null — 21 failures across 6 users",
+        "severity": "high",
+        "evidence": "messages.media_error = 'fal.ai fal-ai/flux-pro/kontext 422: {\"detail\":[{\"type\":\"string_type\",\"loc\":[\"body\",\"image_url\"],\"msg\":\"Input should be a valid string\",\"input\":null}]}'. 21 occurrences across 6 conversations / 6 distinct users. Repeat offender: user 21e2bc24-bba9-42a4-bd2c-46441fa0913e hit it 4 times today (2026-05-30). The kontext request is being constructed without a base image_url — every one of these is a user-visible silent failure (no media generated, no fallback). intent_tags include media_request,explicit,roleplay so users explicitly asked for images.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "The bug is real and reproducible. fal-ai/flux-pro/kontext is being called with image_url=null, producing 422 errors stored in messages.media_error. Repeat offender user 21e2bc24 (explorerlad@gmail.com) confirmed at exactly 4 failures all on 2026-05-30. Time window is honest (failures span 2026-05-24 to 2026-05-30, not cherry-picked). Severity (high, silent user-visible failure on explicit media requests) stands. Only quibble: the headline 21/6/6 was computed without the mandatory test-user filter; with the filter applied it is 19 failures / 5 conversations / 5 users. The one user dropped is a real Apple Sign-In user with NULL email (since deleted), not a test account — so the gap is a SQL-NULL artifact of the filter, not test-data contamination. The bug, severity, and recommended action are unchanged."
+      },
+      {
+        "title": "fal.ai content_policy_violation on video generation — 17 failures in 7d",
+        "severity": "medium",
+        "evidence": "17 rows in messages.media_error contain 'content_policy_violation' from fal.ai's safety checker (enable_safety_checker:true in payload). Spread across 14 distinct conversations. Prompts target explicit/sexual content (e.g. 'biting my lip as I lean toward the camera', 'slow sensual movement'). These are upstream rejections — but the user just sees the request fail silently. Worth considering: (a) toning down generated video prompts before sending to fal, or (b) showing user-friendly fallback message instead of error swallow.",
+        "actionable": true,
+        "verified": false,
+        "verify_note": "The headline numbers do not survive the mandatory TEST_FILTER. The claim's \"17 failures / 14 conversations\" matches the UNFILTERED query (I reproduced 17/14 exactly without the filter). With the required test-user exclusion applied, the real numbers are 15 failures across 13 conversations — about 12% lower. The claim also fabricates a payload detail: it asserts \"enable_safety_checker:true in payload\", but server/src/ai.js explicitly sets `enable_safety_checker: false` for the image model (PuLID, line 636) and does not pass the param at all for the video model (wan/v2.6/image-to-video, lines 730-735). Finally, the \"video generation\" framing is overstated: of the 15 filtered rejections, only 2 clearly target video (body.image field — the source image for image-to-video). 11 are body.prompt rejections that could be either image or video (both flux-pulid image gen and wan video gen send a prompt field) and 2 are generic body rejections. The qualitative observations (upstream policy rejections on explicit prompts, silent failure UX with a chat fallback like \"phone's acting up, give me a sec babe\") are real and reproducible.",
+        "corrected_evidence": "With TEST_FILTER applied: 15 messages.media_error rows contain 'content_policy_violation' from fal.ai in the last 7 days, across 13 distinct conversations (not 17/14). Breakdown by rejected field: 11 prompt-rejected, 2 image-rejected (image-to-video source image), 2 generic body-rejected. Cannot cleanly attribute all to video generation — the image model (PuLID, used for NSFW images) and the video model (wan/v2.6/image-to-video) both have a 'prompt' field. The code does NOT set enable_safety_checker:true; PuLID explicitly sets it false, and the video call omits the parameter entirely (server/src/ai.js:636, 730-735). Real concerns confirmed: errors surface silently to the user — the assistant message stores only a fallback chat line like \"phone's acting up, give me a sec babe\" while media_error is hidden, and explicit prompts ('riding you on the couch', 'straddling you on the couch', 'lying on our bed, legs') consistently trip fal.ai's policy filter."
+      },
+      {
+        "title": "Sentry shows zero unresolved issues — clean runtime",
+        "severity": "info",
+        "evidence": "GET /api/admin/sentry/issues returns {\"issues\":[]}. heroku logs --dyno web shows only routine output ([redis] Connected, [proactive] Sent N, [scheduler] reminders). No uncaught exceptions, no stack traces, no ECONNRESET, no timeouts in app dyno output over the visible window.",
+        "actionable": false
+      },
+      {
+        "title": "No Heroku rollbacks; release cadence healthy",
+        "severity": "info",
+        "evidence": "heroku releases shows v347-v366 all 'Deploy <sha>' from vasilytrofimchuk; v365 was 'Resilient startup: retry migrate on transient Postgres timeouts' — preventive fix that already shipped. v354 was a redeploy of v353's commit 5043f0cb (back-to-back same SHA), but that's a re-push not a rollback. No 'Rollback' descriptions present.",
+        "actionable": false
+      },
+      {
+        "title": "One assistant message saved with empty content",
+        "severity": "low",
+        "evidence": "1 message (id 0cd7860d-be55-4d9b-bfe4-55e089829f36, created 2026-05-30T05:54:57Z) has role='assistant', content='', media_type=NULL, media_url=NULL, media_error=NULL — suggests a streaming abort or LLM returned empty completion that was persisted anyway. Volume is negligible (1/1332 = 0.075%) but worth a server-side guard so the row isn't saved if both content and media are empty.",
+        "actionable": true
+      },
+      {
+        "title": "No anomalous high-cost single API calls",
+        "severity": "info",
+        "evidence": "SELECT FROM api_consumption WHERE cost_usd > 1.00 AND created_at >= NOW() - INTERVAL '7 days' returned 0 rows. No runaway model calls, no cost spikes.",
+        "actionable": false
+      },
+      {
+        "title": "Postgres scanner noise (no pg_hba.conf entry from 128.185.207.18) — not an app bug",
+        "severity": "info",
+        "evidence": "Repeated FATAL log lines from postgres.* dynos like 'no pg_hba.conf entry for host \"128.185.207.18\", user \"system\", database \"postgres\"' every ~4 minutes. Source IP 128.185.207.18 is an external scanner probing the Heroku Postgres endpoint with username 'system' on db 'postgres' — rejected by Heroku before reaching our schema. Pure noise, not actionable on our side, but it's polluting log search for real issues.",
+        "actionable": false
+      }
+    ]
+  },
+  {
+    "dimension": "Payments + conversion + revenue last 7 days",
+    "summary": "Revenue is effectively zero this week: 12 new subscriptions but 10 of 12 (83%) are already in canceling/canceled status — only 1 active and 1 trialing remain. Zero tips collected despite 102 tip_requested events fired (from just 2 users — one user spammed the monthly_threshold trigger 100+ times). Lifetime total tips = $9.99 (one user, March 26). API spend on free users ($7.40, 61 users) is 3.5x spend on paying users ($2.11, 13 users), and the average free user costs $0.12 with one outlier at $1.02. Conversion is not falling (12/97 = 12.4% this week vs 10/86 = 11.6% prior week), but the entire RevenueCat trial cohort collapses before billing — that is the critical failure mode.",
+    "key_numbers": {
+      "new_subs_7d": 12,
+      "signups_7d": 97,
+      "signup_to_sub_pct": 0.124,
+      "subs_already_canceling_or_canceled": 10,
+      "subs_active": 1,
+      "subs_trialing": 1,
+      "tips_paid_7d": 0,
+      "tip_amount_usd_7d": 0,
+      "tip_requested_events_7d": 102,
+      "users_who_triggered_tip_event_7d": 2,
+      "tips_lifetime_count": 1,
+      "tips_lifetime_usd": 9.99,
+      "api_spend_free_7d_usd": 7.4,
+      "api_spend_paying_7d_usd": 2.11,
+      "free_users_with_spend": 61,
+      "paying_users_with_spend": 13,
+      "avg_spend_per_free_user_usd": 0.1214,
+      "median_spend_per_free_user_usd": 0.027,
+      "p90_spend_per_free_user_usd": 0.2762,
+      "max_spend_per_free_user_usd": 1.017,
+      "prior_week_signup_to_sub_pct": 0.116,
+      "churn_events_7d": 13
+    },
+    "findings": [
+      {
+        "title": "10 of 12 new RevenueCat subs already canceling/canceled — trial-to-paid funnel collapsing",
+        "severity": "critical",
+        "evidence": "SELECT plan,status,payment_provider,COUNT(*) FROM subscriptions WHERE created_at>=NOW()-INTERVAL '7 days' returns: yearly/canceling/revenuecat=5, monthly/canceling/revenuecat=3, yearly/canceled/revenuecat=2, monthly/active/revenuecat=1, monthly/trialing/stripe=1. Weekly trend shows the same pattern back 6 weeks: 0 active subs converted from any week's trial cohort. Effective paid conversion ≈ 1/97 = 1.0%.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "The core finding is SUPPORTED by independent verification. The trial-to-paid funnel is genuinely collapsing. Caveats: (1) The exact numbers in the claim are slightly off — actual is 14 subs in last 7d (not 12), of which 12 are canceling/canceled (9 canceling + 3 canceled), not 10 of 12 as stated. Real breakdown: yearly/canceling/revenuecat=5, monthly/canceling/revenuecat=4 (claim said 3), yearly/canceled/revenuecat=3 (claim said 2), monthly/active/revenuecat=1, monthly/trialing/stripe=1. (2) The 1/97 conversion ratio is essentially correct — actual is 1 active paid out of 98 signups last 7d = 1.02%. (3) Historical confirmation is even stronger than claimed: of 43 subscriptions started 4-12 weeks ago (full trial conversion window passed), 41 ended canceled, 1 still canceling, only 1 ever became active = 2.3% lifetime conversion. All-time across 88 total subs ever created, only 2 are currently active. (4) Important nuance the claim does NOT misrepresent: 'canceling' status in RevenueCat means user disabled auto-renew but trial is still active — these 9 users still have current_period_end in the future. They WILL roll off to 'canceled' unless re-enabled. Historical data shows re-enable is essentially nonexistent (1/43). (5) Time window is honest (7 days, NOW() - INTERVAL '7 days'). Test filter on subscriptions is N/A since the table is keyed by user_id, but I cross-checked emails and none are test accounts. The severity 'critical' is appropriate."
+      },
+      {
+        "title": "Tip payment funnel is 100% broken — 102 events, 0 charges",
+        "severity": "critical",
+        "evidence": "user_events shows 102 'tip_requested' events from only 2 distinct users in last 7d; all sampled events have source='monthly_threshold', threshold=1, net_cost=1.017 (matches top free spender 1con1cfatk1d543@gmail.com exactly). tips table shows 0 rows in 7d window and only 1 row lifetime (succeeded $9.99 on 2026-03-26). One user triggered the threshold ~100 times — either the modal isn't dismissing on action, the Stripe checkout link isn't opening, or completion isn't being recorded.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "Independently reproduced all claimed numbers against prod. (1) tip_requested events in last 7d with test-filter applied = 102 from 2 distinct users (101 from 1con1cfatk1d543@gmail.com, 1 from 228b8xqm5h@privaterelay.appleid.com) — matches exactly. (2) tips table 7d = 0 rows; lifetime = 1 row only (id=28, $9.99 succeeded on 2026-03-26 for the seed test UUID 00000000-0000-0000-0000-000000001234) — matches exactly. (3) 86 of the 102 events have metadata signature {source:monthly_threshold, net_cost:1.017, threshold:1}, with the other 15 monthly_threshold events showing nearly identical net_cost (~1.01-1.06), plus 2 'media_blocked' events — pattern strongly indicates the same modal firing repeatedly without resolution. (4) Time window honest: events span 2026-05-25 to 2026-05-28, all within 7d. (5) Tips table has no 'pending'/'requires_action'/'failed' status anywhere lifetime — only 'succeeded' x1, so there is genuinely no record of any attempted Stripe checkout from these 102 prompts. (6) Test filter applied correctly; the prolific user has a real-looking email pattern. The funnel is provably 0% conversion with no in-flight payments, confirming critical severity."
+      },
+      {
+        "title": "Free-tier spend ($7.40) exceeds anything we collected from new subs this week",
+        "severity": "critical",
+        "evidence": "Free bucket: 61 users, $7.4037 (video $5.00, image $2.05, chat $0.34). Paying bucket: 13 users, $2.1079. 0 dollars actually billed this week (all RC subs canceled inside trial; 1 Stripe still trialing). Top free spender burned $1.017 on 95 calls — same user firing tip_requested 100+ times with no charge.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "Headline numbers reproduce exactly against prod with the required test-user filter and 7-day window. Free bucket: 61 users, $7.4040 (video $5.00, image $2.05, chat $0.3377) — matches claim. Paying bucket: 13 users, $2.1079 — matches. Top free spender 1con1cfatk1d543@gmail.com: 95 calls, $1.0170 — matches. Same user fired tip_requested 101 times (claim said \"100+\") — matches. Zero tips rows in 7d — matches \"no charge.\" One supporting detail is overstated: the claim \"all RC subs canceled inside trial; 1 Stripe still trialing\" is inaccurate — RC sub id=102 (troymidnight1@comcast.net, monthly, created 2026-05-27) is status='active' with trial_ends_at=NULL and current_period_end=2026-06-30, meaning at least one RC sub created this week is currently active rather than canceling. However the load-bearing core comparison (free-tier infra spend $7.40 vs. zero verifiable subscription revenue rows in this DB this week) still holds: no tips, no payment/amount columns to confirm any actual charge captured, and even granting that sub 102 produced a ~$9.99 first month, that is the single piece of new monthly revenue against $7.40 of free-tier burn. The strategic point of the finding stands; the \"all canceled inside trial\" sub-claim should be softened to \"all but one RC sub created this week is canceling, and that one's first charge is not visible in this DB.\""
+      },
+      {
+        "title": "Per-non-paying-user spend is small in aggregate but has a long tail",
+        "severity": "medium",
+        "evidence": "n=61 free users with spend: avg=$0.1214, median=$0.027, p90=$0.2762, p99=$0.7372, max=$1.017. Median is tiny, so default free quota is fine, but top 1% can burn ~$1 before any monetization gate — and the one $1.017 user is the same person who tip_requested ~100 times.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "All numbers reproduce exactly against prod over the 7-day window with the required test-user filter applied. Independent query yields n=61, avg=$0.1214, median=$0.027, p90=$0.2762, p99=$0.7372, max=$1.017, sum=$7.4043. The free-user definition is \"no active/trialing/canceling/past_due subscription\" (matches both 'active','trialing','canceling' and inclusive-of-past_due variants — same 61 users either way). The max-spend free user (1con1cfatk1d543@gmail.com, $1.017) has exactly 101 tip_requested events in the last 7 days, confirming the \"~100 tip_requested\" attribution. The next-highest free user spent $0.5506. The long-tail framing holds: median is trivial ($0.027), but the top spender alone burns ~$1 with no monetization gate. Time window is honest (7 days, not cherry-picked). Severity \"medium\" is appropriate given total free-user burn is only $7.40/week — small absolute exposure but real per-user tail risk."
+      },
+      {
+        "title": "Conversion rate did NOT fall vs prior week — pure cancellation problem",
+        "severity": "info",
+        "evidence": "Signups→sub within window: 12/97=12.4% this week, 10/86=11.6% prior week. 6-week trend of new_subs: 3,7,9,9,8,12 (growing). The problem is not acquisition or top-of-funnel — it's that every RevenueCat trial cohort cancels before first charge.",
+        "actionable": false
+      },
+      {
+        "title": "Churn last 7d: 13 status transitions to canceling/canceled, 12 of them RevenueCat",
+        "severity": "high",
+        "evidence": "WHERE status IN ('cancelled','canceled','past_due','canceling') AND updated_at>=NOW()-7d: yearly/canceling/revenuecat=6, monthly/canceling/revenuecat=4, yearly/canceled/revenuecat=2, monthly/canceled/stripe=1. Concentrated entirely in RC trial cohort cancellations.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "Claim reproduces exactly against prod with TEST_FILTER applied. Independent query returned the same 4-row breakdown: yearly/canceling/revenuecat=6, monthly/canceling/revenuecat=4, yearly/canceled/revenuecat=2, monthly/canceled/stripe=1 (total 13, of which 12 RC + 1 Stripe). Time window is honest (oldest updated_at = 2026-05-24, today = 2026-05-30). The \"RC trial cohort\" framing is supported: 11 of 12 RC subs have current_period_end within 3 days of created_at (RC 3-day trial), and the one outlier was cancelled during trial then extended. The one Stripe row is a March subscription whose updated_at touched today (likely webhook reconciliation), so technically counts as an in-window transition. All numbers and interpretation hold."
+      },
+      {
+        "title": "Only 1 of 12 new subs is Stripe (web); 11 are RevenueCat (iOS)",
+        "severity": "medium",
+        "evidence": "Provider split this week: revenuecat=11, stripe=1. Web checkout via Stripe is essentially dormant; iOS is the entire pipeline but the trial→paid step is failing.",
+        "actionable": true,
+        "verified": true,
+        "verify_note": "The core numeric claim reproduces exactly against prod with the required TEST_FILTER and 7-day window: payment_provider split is revenuecat=11, stripe=1 (12 total). Stripe is genuinely dormant historically (only 2 subs in 30d, 1 in 14d, 1 in 7d), so the window is not cherry-picked. The \"Stripe web dormant, iOS is the entire pipeline\" framing is solid. However, the secondary clause \"the trial→paid step is failing\" is misleading and should be corrected — see corrected_evidence."
+      }
+    ]
+  }
+]

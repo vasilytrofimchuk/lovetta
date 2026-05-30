@@ -613,6 +613,15 @@ async function generateImage(prompt, opts = {}) {
  */
 async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   if (!FAL_KEY) throw new Error('FAL_KEY not configured');
+  if (!referenceImageUrl || typeof referenceImageUrl !== 'string' || !referenceImageUrl.trim()) {
+    // Guard against null/empty avatar_url — both PuLID (reference_image_url) and
+    // the Kontext fallback (image_url) require a non-null URL. Without this guard
+    // we silently POST image_url=null to fal-ai/flux-pro/kontext and burn 19+
+    // failed calls/week. Throw so the caller can fall back to a non-image-conditioned
+    // path or surface a clear error to the user.
+    console.warn(`[ai] generateCharacterImage: missing referenceImageUrl (companionId=${opts.companionId || 'n/a'})`);
+    throw new Error('generateCharacterImage: referenceImageUrl is required (companion has no avatar_url)');
+  }
 
   const model = 'fal-ai/flux-pulid';
   const fullPrompt = `${prompt}, photorealistic, beautiful adult woman, 18+ years old`;
@@ -732,6 +741,10 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
       prompt,
       duration: opts.duration || '5',
       resolution: opts.resolution || '720p',
+      // Disable upstream safety_checker — it false-positives on mild romantic
+      // prompts ("slow-motion kiss", "biting my lip"). Age + content policy
+      // is enforced upstream of generateVideo() at the prompt-building layer.
+      enable_safety_checker: false,
     }),
   });
 

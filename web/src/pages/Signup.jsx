@@ -53,6 +53,20 @@ export default function Signup() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Capture UTM params from URL into localStorage so OAuth redirects (which
+  // strip query params) don't lose attribution. Existing keys are already read
+  // by GoogleSignIn, AppleSignIn, and AuthContext.signup.
+  useEffect(() => {
+    try {
+      const utmSource = searchParams.get('utm_source')
+      const utmMedium = searchParams.get('utm_medium')
+      const utmCampaign = searchParams.get('utm_campaign')
+      if (utmSource) localStorage.setItem('lovetta-utm-source', utmSource.trim())
+      if (utmMedium) localStorage.setItem('lovetta-utm-medium', utmMedium.trim())
+      if (utmCampaign) localStorage.setItem('lovetta-utm-campaign', utmCampaign.trim())
+    } catch {}
+  }, [searchParams])
+
   useEffect(() => {
     const onboardingData = readOnboardingData()
     const prefilledEmail = searchParams.get('email')

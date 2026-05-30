@@ -107,6 +107,11 @@ async function runProactiveMessages() {
   const pool = getPool();
   if (!pool) return;
 
+  if (!(await isSettingEnabled(pool, 'proactive_messages_enabled', false))) {
+    await runFreeUserReactivation(pool);
+    return;
+  }
+
   try {
     // Find eligible user+companion pairs:
     // - User inactive 3+ hours

@@ -1312,6 +1312,53 @@ const MIGRATIONS = [
         updated_at = NOW();
     `,
   },
+  {
+    name: 'v63_remap_orphan_voice_to_crystal',
+    sql: `
+      -- Orphan voice ID 'hA4zGnmTwX2NQiTRMt7o' is no longer in the catalog
+      -- (web/src/lib/voices.js) after the rebuild. Remap to Crystal — the
+      -- most popular catalog voice — so playback works for affected picks.
+      UPDATE user_companions SET voice_id = 'e3cd384158934cc9a01029cd7d278634' WHERE voice_id = 'hA4zGnmTwX2NQiTRMt7o';
+      UPDATE companion_templates SET voice_id = 'e3cd384158934cc9a01029cd7d278634' WHERE voice_id = 'hA4zGnmTwX2NQiTRMt7o';
+    `,
+  },
+  {
+    name: 'v64_proactive_messages_kill_switch',
+    sql: `
+      -- Kill switch for the proactive-messaging system. 149 proactives sent
+      -- last 30d → 1 reply ever (0.67% lifetime reply rate). Default OFF;
+      -- flip to "true" in admin Settings if/when the system is rebuilt.
+      INSERT INTO app_settings (key, value) VALUES
+        ('proactive_messages_enabled', 'false'::jsonb)
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
+  {
+    name: 'v65_tips_stripe_session_id',
+    sql: `
+      -- Tip-flow observability: track every checkout-session initiation, not
+      -- only Stripe-confirmed payment intents. Combined with status='pending'
+      -- rows written at checkout creation, this makes abandoned/failed tips
+      -- visible in the tips table.
+      ALTER TABLE tips ADD COLUMN IF NOT EXISTS stripe_session_id TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_tips_stripe_session_id
+        ON tips(stripe_session_id)
+        WHERE stripe_session_id IS NOT NULL;
+    `,
+  },
+  {
+    name: 'v66_free_user_hard_caps',
+    sql: `
+      -- Hard caps on free-tier spend beyond the existing weekly threshold.
+      -- Daily $0.30 slows runaway burn within a single day; lifetime $5.00
+      -- ends the free trial once a user has clearly used it up. Both can
+      -- be tuned in admin Settings; 0 disables the respective cap.
+      INSERT INTO app_settings (key, value) VALUES
+        ('free_daily_cost_cap_usd', '"0.30"'),
+        ('free_lifetime_cost_cap_usd', '"5.00"')
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

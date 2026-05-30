@@ -156,6 +156,9 @@ router.post('/', authenticate, async (req, res) => {
       if (!name || !personality) {
         return res.status(400).json({ error: 'Name and personality are required for custom companions' });
       }
+      if (!avatarUrl || !String(avatarUrl).trim()) {
+        return res.status(400).json({ error: 'Avatar is required for custom companions' });
+      }
       companionData = {
         template_id: null,
         name,

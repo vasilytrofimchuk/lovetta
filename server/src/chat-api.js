@@ -16,7 +16,7 @@ let reviewerTranscriptTimer = null;
 const { buildMemoryContext, buildUserContext, processMemory } = require('./memory');
 const { getEffectiveTextLevel } = require('./content-levels');
 const { parseMediaTags, generateOrReuseMedia, getMediaFailureLine } = require('./media-chat');
-const { checkMediaBlocked, checkFreeLimit } = require('./consumption');
+const { checkMediaBlocked, checkFreeLimit, acquireTipRequestSlot } = require('./consumption');
 const { getRedis } = require('./redis');
 const { sendPushNotification } = require('./push');
 const { logEvent, hasEvent, EVENT_TYPES } = require('./events');
@@ -76,6 +76,64 @@ function fallbackMediaDescription(mediaType, content) {
   return 'a flirty selfie, looking at camera with a playful expression';
 }
 
+// -- Content quality telemetry ---------------------------------
+// Pure helper: inspects the user-visible assistant text (excluding media)
+// and returns zero or more quality flags for monitoring in Chat Insights.
+// Never throws — wrapped defensively to protect the chat write path.
+const GENERIC_REPLY_PHRASES = [
+  'i love you babe',
+  'i love you so much',
+  'i love you too',
+  'miss you',
+  'miss you babe',
+  'thinking of you',
+  'thinking about you',
+  'hey babe',
+  'hi babe',
+  'whats up babe',
+  "what's up babe",
+  'love you babe',
+  'love you',
+];
+
+function computeContentQualityFlags(text) {
+  const flags = [];
+  try {
+    const raw = typeof text === 'string' ? text : '';
+    const trimmed = raw.trim();
+    const len = trimmed.length;
+    if (len > 0 && len < 10) flags.push('content_too_short');
+    if (len > 1500) flags.push('long_reply');
+    if (len > 0) {
+      let emojiCount = 0;
+      try {
+        const matches = trimmed.match(/\p{Extended_Pictographic}/gu);
+        emojiCount = matches ? matches.length : 0;
+      } catch {
+        emojiCount = 0;
+      }
+      // > 20% of chars are emoji glyphs
+      if (emojiCount > 0 && emojiCount / len > 0.2) flags.push('high_emoji_density');
+    }
+    // Generic / no-concrete-detail: only flag short replies whose normalized
+    // text equals (or is a trivial variant of) a generic phrase.
+    if (len > 0 && len <= 60) {
+      const normalized = trimmed
+        .toLowerCase()
+        .replace(/[\p{Extended_Pictographic}]/gu, '')
+        .replace(/[^a-z0-9'\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (GENERIC_REPLY_PHRASES.includes(normalized)) {
+        flags.push('no_concrete_detail');
+      }
+    }
+  } catch {
+    // never let telemetry break the chat path
+  }
+  return flags;
+}
+
 // Don't ask a free user to upgrade until they've actually engaged.
 // On the very first turn, even a media-intent message shouldn't surface
 // the upgrade card — first impression is too important.
@@ -132,8 +190,15 @@ function generateMediaInBackground(pool, messageId, companion, mediaRequest, opt
     })
     .catch(async (err) => {
       console.error(`[media-bg] generation failed for message ${messageId}:`, err.message);
+      // Detect fal.ai content policy / safety blocks and use a more honest
+      // in-character line that hints the prompt was the problem (instead of
+      // a generic "phone broke" message). The actual error text is still
+      // persisted in media_error for admin inspection.
+      const msg = String(err && err.message || '');
+      const isContentPolicy = /content[_\s-]?policy|nsfw|safety[_\s-]?check|inappropriate|forbidden|blocked|moderation|prohibited/i.test(msg);
+      const reason = isContentPolicy ? 'content_policy' : 'generation_error';
       try {
-        await appendFailureLineAndClear(pool, messageId, companion, 'generation_error', err.message);
+        await appendFailureLineAndClear(pool, messageId, companion, reason, err.message);
       } catch (e) {
         console.warn('[media-bg] cleanup failed:', e.message);
       }
@@ -406,10 +471,11 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
     // Check subscription
     const sub = await getUserSubscription(req.userId);
     if (!isSubscriptionActive(sub)) {
-      const blocked = await checkFreeLimit(req.userId);
+      const { blocked, reason } = await checkFreeLimit(req.userId);
       if (blocked) {
-        logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'chat_message', companion_id: req.params.companionId });
-        res.write(`data: ${JSON.stringify({ type: 'error', code: 'free_limit_reached' })}\n\n`);
+        logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'chat_message', companion_id: req.params.companionId, reason });
+        const code = (reason === 'daily_cap' || reason === 'lifetime_cap') ? 'trial_exhausted' : 'free_limit_reached';
+        res.write(`data: ${JSON.stringify({ type: 'error', code, reason })}\n\n`);
         return res.end();
       }
       // Under free limit — fall through and allow the message
@@ -616,9 +682,19 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         });
       }
 
+      const contentFlags = computeContentQualityFlags(parsed.content);
       const assistantQualityFlags = tabooPolicy.action !== 'none'
-        ? [...qualityFlags, `taboo_${tabooPolicy.action}`]
-        : qualityFlags;
+        ? [...qualityFlags, ...contentFlags, `taboo_${tabooPolicy.action}`]
+        : [...qualityFlags, ...contentFlags];
+
+      // Guard: don't persist an empty assistant message when no media is pending.
+      if ((parsed.content == null || !String(parsed.content).trim()) && !mediaPending) {
+        console.warn('[chat] skipping empty assistant message persist', { conversation_id: conversation.id, user_id: req.userId });
+        if (!aborted) {
+          res.write(`data: ${JSON.stringify({ type: 'error', code: 'empty_response' })}\n\n`);
+        }
+        return;
+      }
 
       const { rows: [savedMsg] } = await pool.query(
         `INSERT INTO messages (
@@ -715,10 +791,11 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
   try {
     const sub = await getUserSubscription(req.userId);
     if (!isSubscriptionActive(sub)) {
-      const blocked = await checkFreeLimit(req.userId);
+      const { blocked, reason } = await checkFreeLimit(req.userId);
       if (blocked) {
-        logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'chat_next', companion_id: req.params.companionId });
-        res.write(`data: ${JSON.stringify({ type: 'error', code: 'free_limit_reached' })}\n\n`);
+        logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'chat_next', companion_id: req.params.companionId, reason });
+        const code = (reason === 'daily_cap' || reason === 'lifetime_cap') ? 'trial_exhausted' : 'free_limit_reached';
+        res.write(`data: ${JSON.stringify({ type: 'error', code, reason })}\n\n`);
         return res.end();
       }
       // Under free limit — fall through and allow the message
@@ -856,6 +933,17 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
         parsed.sceneText = await generateScene(companion, parsed.content);
       }
 
+      // Guard: don't persist an empty assistant message when no media is pending.
+      if ((parsed.content == null || !String(parsed.content).trim()) && !mediaPending) {
+        console.warn('[chat] skipping empty assistant message persist (next)', { conversation_id: conversation.id, user_id: req.userId });
+        if (!aborted) {
+          res.write(`data: ${JSON.stringify({ type: 'error', code: 'empty_response' })}\n\n`);
+        }
+        return;
+      }
+
+      const nextContentFlags = computeContentQualityFlags(parsed.content);
+      const nextAssistantQualityFlags = [...qualityFlags, ...nextContentFlags];
       const { rows: [savedMsg] } = await pool.query(
         `INSERT INTO messages (
            conversation_id, role, content, context_text, scene_text, media_url,
@@ -872,7 +960,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
           mediaPending,
           nextAnalysis.language,
           nextAnalysis.tags,
-          qualityFlags,
+          nextAssistantQualityFlags,
           effectiveMediaRequest?.type || null,
         ]
       );
@@ -961,8 +1049,12 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     // Check media block BEFORE calling LLM — no point generating text if media will be blocked
     const blocked = await checkMediaBlocked(req.userId, sub);
     if (blocked) {
-      logEvent(req.userId, EVENT_TYPES.TIP_REQUESTED, { source: 'media_blocked', companion_id: req.params.companionId });
-      res.write(`data: ${JSON.stringify({ type: 'media_blocked', shouldRequestTip: true })}\n\n`);
+      // Per-user cooldown: cap tip_requested events + UI prompt to once per 6h per source.
+      const promptAllowed = await acquireTipRequestSlot(req.userId, 'media_blocked');
+      if (promptAllowed) {
+        logEvent(req.userId, EVENT_TYPES.TIP_REQUESTED, { source: 'media_blocked', companion_id: req.params.companionId });
+      }
+      res.write(`data: ${JSON.stringify({ type: 'media_blocked', shouldRequestTip: promptAllowed })}\n\n`);
       return res.end();
     }
 
@@ -1068,6 +1160,15 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
           companion_id: companion.id,
           conversation_id: conversation.id,
         });
+      }
+
+      // Guard: don't persist an empty assistant message when no media is pending.
+      if ((parsed.content == null || !String(parsed.content).trim()) && !mediaPending) {
+        console.warn('[chat] skipping empty assistant message persist (request-media)', { conversation_id: conversation.id, user_id: req.userId });
+        if (!aborted) {
+          res.write(`data: ${JSON.stringify({ type: 'error', code: 'empty_response' })}\n\n`);
+        }
+        return;
       }
 
       const { rows: [savedMsg] } = await pool.query(
