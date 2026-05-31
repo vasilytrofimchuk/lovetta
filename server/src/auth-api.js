@@ -141,7 +141,7 @@ router.post('/signup', authLimiter, async (req, res) => {
     const referredBy = await resolveReferrer(pool, referralCode);
 
     const userAgent = req.get('User-Agent') || null;
-    const deviceType = classifyDevice(userAgent, req.body?.deviceType);
+    const deviceType = classifyDevice(userAgent, req.body?.deviceType, req.get('X-Lovetta-Platform'));
 
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (email, password_hash, birth_month, birth_year, terms_accepted, privacy_accepted,
@@ -170,6 +170,7 @@ router.post('/signup', authLimiter, async (req, res) => {
     fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: user.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: user.utm_source, utm_medium: user.utm_medium, utm_campaign: user.utm_campaign, auth_provider: user.auth_provider, ts_click_id: user.ts_click_id } }) }).catch(() => {});
 
     logEvent(user.id, EVENT_TYPES.SIGNUP, { auth_provider: 'email', device_type: deviceType, utm_source: utmSource || null });
+    logEvent(user.id, EVENT_TYPES.SIGNUP_RESPONSE_SENT, { auth_provider: 'email', device_type: deviceType, user_agent: userAgent });
 
     // Welcome flow B: auto-provision first companion if flag is on and user falls into B cohort.
     // Reviewer account is always control (App Store guideline 1.2 safety).
@@ -583,7 +584,7 @@ router.get('/google/callback', async (req, res) => {
         const refCode = generateReferralCode();
         const referredBy = await resolveReferrer(pool, stateRefCode);
         const userAgent = req.get('User-Agent') || null;
-        const deviceType = classifyDevice(userAgent, null);
+        const deviceType = classifyDevice(userAgent, null, req.get('X-Lovetta-Platform'));
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
@@ -599,6 +600,7 @@ router.get('/google/callback', async (req, res) => {
         sendNewRegistrationNotification(newUser).catch(() => {});
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'google', device_type: deviceType, utm_source: stateUtmSource || null });
+        logEvent(newUser.id, EVENT_TYPES.SIGNUP_RESPONSE_SENT, { auth_provider: 'google', device_type: deviceType, user_agent: userAgent });
         if (stateTsClickId) fireSignupPostback(stateTsClickId, newUser.id);
         // Welcome flow B: auto-provision first companion for new Google signups only.
         onboardingResult = await autoProvisionFirstCompanion(newUser.id, pool, {
@@ -698,7 +700,7 @@ router.post('/google/token', async (req, res) => {
         const refCode = generateReferralCode();
         const referredBy = await resolveReferrer(pool, referralCode);
         const userAgent = req.get('User-Agent') || null;
-        const deviceType = classifyDevice(userAgent, req.body?.deviceType);
+        const deviceType = classifyDevice(userAgent, req.body?.deviceType, req.get('X-Lovetta-Platform'));
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, google_id, display_name, avatar_url, email_verified, birth_month, birth_year,
@@ -714,6 +716,7 @@ router.post('/google/token', async (req, res) => {
         sendNewRegistrationNotification(newUser).catch(() => {});
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'google', device_type: deviceType, utm_source: utmSource || null });
+        logEvent(newUser.id, EVENT_TYPES.SIGNUP_RESPONSE_SENT, { auth_provider: 'google', device_type: deviceType, user_agent: userAgent });
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
         // Welcome flow B: auto-provision first companion for new Google-native signups only.
         onboardingResult = await autoProvisionFirstCompanion(newUser.id, pool, {
@@ -851,7 +854,7 @@ router.post('/apple', authLimiter, async (req, res) => {
         const refCode = generateReferralCode();
         const referredBy = await resolveReferrer(pool, referralCode);
         const userAgent = req.get('User-Agent') || null;
-        const deviceType = classifyDevice(userAgent, req.body?.deviceType) || 'ios';
+        const deviceType = classifyDevice(userAgent, req.body?.deviceType, req.get('X-Lovetta-Platform')) || 'ios';
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
@@ -867,6 +870,7 @@ router.post('/apple', authLimiter, async (req, res) => {
         sendNewRegistrationNotification(newUser).catch(() => {});
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'apple', device_type: deviceType, utm_source: utmSource || null });
+        logEvent(newUser.id, EVENT_TYPES.SIGNUP_RESPONSE_SENT, { auth_provider: 'apple', device_type: deviceType, user_agent: userAgent, sub_branch: 'apple_email' });
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
         // Welcome flow B: auto-provision first companion for new Apple-email signups only.
         onboardingResult = await autoProvisionFirstCompanion(newUser.id, pool, {
@@ -893,7 +897,7 @@ router.post('/apple', authLimiter, async (req, res) => {
       const refCode = generateReferralCode();
       const referredBy = await resolveReferrer(pool, referralCode);
       const userAgent = req.get('User-Agent') || null;
-      const deviceType = classifyDevice(userAgent, req.body?.deviceType) || 'ios';
+      const deviceType = classifyDevice(userAgent, req.body?.deviceType, req.get('X-Lovetta-Platform')) || 'ios';
 
       const { rows: [newUser] } = await pool.query(
         `INSERT INTO users (email, apple_id, display_name, email_verified, birth_month, birth_year,
@@ -909,6 +913,7 @@ router.post('/apple', authLimiter, async (req, res) => {
       sendNewRegistrationNotification(newUser).catch(() => {});
       fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
       logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'apple', device_type: deviceType, utm_source: utmSource || null });
+      logEvent(newUser.id, EVENT_TYPES.SIGNUP_RESPONSE_SENT, { auth_provider: 'apple', device_type: deviceType, user_agent: userAgent, sub_branch: 'apple_synthetic' });
       if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
       // Welcome flow B: auto-provision first companion for new Apple-synthetic signups only.
       onboardingResult = await autoProvisionFirstCompanion(newUser.id, pool, {
@@ -1006,7 +1011,7 @@ router.post('/telegram', authLimiter, async (req, res) => {
         const refCode = generateReferralCode();
         const referredBy = await resolveReferrer(pool, tgRefCode);
         const userAgent = req.get('User-Agent') || null;
-        const deviceType = classifyDevice(userAgent, req.body?.deviceType);
+        const deviceType = classifyDevice(userAgent, req.body?.deviceType, req.get('X-Lovetta-Platform'));
 
         const { rows: [newUser] } = await pool.query(
           `INSERT INTO users (email, telegram_id, display_name, avatar_url, email_verified, birth_month, birth_year,
@@ -1022,6 +1027,7 @@ router.post('/telegram', authLimiter, async (req, res) => {
         sendNewRegistrationNotification(newUser).catch(() => {});
         fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'signup', userEmail: newUser.email, ipAddress: ((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim() || req.ip || null, meta: { utm_source: newUser.utm_source, utm_medium: newUser.utm_medium, utm_campaign: newUser.utm_campaign, auth_provider: newUser.auth_provider, ts_click_id: newUser.ts_click_id } }) }).catch(() => {});
         logEvent(newUser.id, EVENT_TYPES.SIGNUP, { auth_provider: 'telegram', device_type: deviceType, utm_source: utmSource || null });
+        logEvent(newUser.id, EVENT_TYPES.SIGNUP_RESPONSE_SENT, { auth_provider: 'telegram', device_type: deviceType, user_agent: userAgent });
         if (tsClickId) fireSignupPostback(tsClickId, newUser.id);
 
         // Create telegram_users record

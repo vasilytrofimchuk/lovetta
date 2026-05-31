@@ -289,7 +289,22 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
           )}
 
           {onClose && (
-            <button onClick={onClose} className="w-full py-3 text-brand-muted text-sm">
+            <button
+              onClick={() => {
+                // Instrument paywall abandonment so we can split "client never
+                // returned" from "client returned but bounced off Pricing" in
+                // the funnel. Fire-and-forget — never blocks the close action.
+                try {
+                  const firstSession = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('onboarding') === '1'
+                  api.post('/api/user/events', {
+                    type: 'paywall_closed_without_subscribe',
+                    metadata: { surface: 'plan_modal', first_session: firstSession, path: typeof window !== 'undefined' ? window.location.pathname : null },
+                  }).catch(() => {})
+                } catch {}
+                onClose()
+              }}
+              className="w-full py-3 text-brand-muted text-sm"
+            >
               Skip for now
             </button>
           )}

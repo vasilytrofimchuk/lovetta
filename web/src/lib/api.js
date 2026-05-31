@@ -61,11 +61,19 @@ const api = axios.create({
   withCredentials: true,
 })
 
-// Request interceptor — attach Bearer token
+// Request interceptor — attach Bearer token + native-platform hint
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('lovetta-token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  // Bulletproof platform signal — Capacitor's appendUserAgent doesn't reach
+  // the server reliably (0/862 users in 90d showed 'lovetta-ios' UA despite
+  // 83 RevenueCat subs). An explicit header is unambiguous and survives
+  // every webview/proxy in between.
+  if (isNative) {
+    const platform = (window.Capacitor?.getPlatform?.() || '').toLowerCase()
+    config.headers['X-Lovetta-Platform'] = platform === 'android' ? 'android-native' : 'ios-native'
   }
   return config
 })

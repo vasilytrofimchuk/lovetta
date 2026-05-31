@@ -469,7 +469,22 @@ router.get('/funnel', async (req, res) => {
        )
        SELECT
          (SELECT COUNT(*) FROM cohort) AS signups,
-         (SELECT COUNT(*) FROM cohort WHERE last_activity > created_at + INTERVAL '5 minutes') AS returned,
+         -- "returned" used to read last_activity > created_at + 5 min, but that
+         -- was corrupted by the 60s debounce on last_activity writes in
+         -- auth-middleware (histogram spikes at 60/120/180s multiples — a real
+         -- user with 6 authed calls in 7s showed last_activity=created_at+0.328s).
+         -- Use real signals instead: any user_event after the signup row OR any
+         -- user message. Includes the new first_authenticated_request sentinel.
+         (SELECT COUNT(DISTINCT c.id) FROM cohort c WHERE EXISTS (
+            SELECT 1 FROM user_events e
+            WHERE e.user_id = c.id
+              AND e.event_type <> 'signup'
+              AND e.created_at > c.created_at + INTERVAL '5 seconds'
+         ) OR EXISTS (
+            SELECT 1 FROM messages m
+            JOIN conversations cv ON cv.id = m.conversation_id
+            WHERE cv.user_id = c.id AND m.role = 'user'
+         )) AS returned,
          (SELECT COUNT(DISTINCT c.id) FROM cohort c
             WHERE EXISTS (SELECT 1 FROM user_companions uc WHERE uc.user_id = c.id)) AS companion_created,
          (SELECT COUNT(DISTINCT c.id) FROM cohort c

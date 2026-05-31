@@ -50,6 +50,13 @@ const EVENT_TYPES = {
   REACTIVATION_SENT: 'reactivation_sent',
   REACTIVATION_RETURNED: 'reactivation_returned',
   TABOO_POLICY_HIT: 'taboo_policy_hit',
+  // Sentinels added 2026-05-30 to make "did the client return after signup"
+  // observable independent of the 5s `last_activity` debounce. Combined,
+  // these decisively isolate "client never came back" from "client came
+  // back but bounced off Pricing."
+  SIGNUP_RESPONSE_SENT: 'signup_response_sent',
+  FIRST_AUTHENTICATED_REQUEST: 'first_authenticated_request',
+  PAYWALL_CLOSED_WITHOUT_SUBSCRIBE: 'paywall_closed_without_subscribe',
 };
 
 module.exports = { logEvent, hasEvent, EVENT_TYPES };

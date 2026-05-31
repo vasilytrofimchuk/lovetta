@@ -2,6 +2,37 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Funnel observability fixes + safety net (2026-05-30)
+
+Driven by `docs/APPLE_RELAY_INVESTIGATION_2026-05-30.md`. The 11-agent workflow proved the "19/19 Apple-relay ghost" narrative was a measurement artifact: 60s debounce on `last_activity` + `api_consumption` only tracking AI calls made engaged users look identical to true ghosters. One specific ghoster (`shhrdvsh72@privaterelay.appleid.com`) actually made 6 authed calls within 7s. Histogram of `last_activity − created_at` spikes at exact 60/120/180/240s multiples — dispositive proof.
+
+`npm run test:e2e:api` 30/30 + `:ai` 149/149 green. `npm run build:ios` ran.
+
+**Fix 1 — debounce + race on `last_activity`** (`server/src/auth-middleware.js`)
+- `ACTIVITY_DEBOUNCE` 60_000ms → 5_000ms. 5s still cuts 95%+ of redundant writes for chat streams.
+- `UPDATE users SET last_activity = GREATEST(last_activity, NOW())` — fire-and-forget UPDATEs can no longer rewind the timestamp.
+
+**Fix 2 — funnel "returned" metric** (`server/src/admin-api.js:472`)
+- Now reads real activity: any non-signup `user_events` row created >5s after the signup, OR any user message — instead of the artifact-corrupted `last_activity > created_at + 5 min`.
+
+**Fix 3 — `AuthContext.refreshUser` token-clearing** (`web/src/contexts/AuthContext.jsx`)
+- Only clear tokens on a 401. Network errors / 5xx / aborts keep tokens; `lib/api.js` handles 401-refresh on the next request. Eliminates a latent footgun that could strand returning users on transient outages.
+
+**Fix 5 — device classification** (`server/src/device.js`, `server/src/auth-api.js` × 6 callers, `web/src/lib/api.js`)
+- Client sends explicit `X-Lovetta-Platform: ios-native` (or `android-native`) header when `Capacitor.isNativePlatform()`. Bulletproof signal.
+- Server reads it as the highest-fidelity input in `classifyDevice(userAgent, hint, platformHeader)`.
+- New heuristic fallback: iPhone/iPad UA without `Safari/` / `CriOS/` / `FxiOS/` → `'ios'` (catches in-app WebKit). Fixes "0/862 users showed `lovetta-ios` UA despite 83 RevenueCat subs."
+
+**Safety net — 3 new sentinel event types** (`server/src/events.js`, `auth-middleware.js`, `auth-api.js` × 6 signup branches, new `POST /api/user/events`, `web/src/components/PlanModal.jsx`)
+- `signup_response_sent` — emitted immediately after every successful signup in all 6 branches (email POST, Google web callback, Google native POST, Apple email, Apple synthetic, Telegram).
+- `first_authenticated_request` — emitted exactly ONCE per user from `auth-middleware` on the first /me hit, regardless of debounce.
+- `paywall_closed_without_subscribe` — fired from PlanModal "Skip for now" via new `POST /api/user/events` endpoint (whitelisted event types only). Lets us split "client never returned" from "client returned and bounced off Pricing" in future analyses without ambiguity.
+
+**Why this matters**: the next weekly analysis won't be lying. We can now compute real retention directly from sentinels:
+- Signups missing `first_authenticated_request` within 5 min = true ghosters (client never came back)
+- Signups with both events but no `companion_created` within 5 min = engaged-but-bounced (UX problem)
+- Signups with `paywall_closed_without_subscribe` = paywall abandonment (the welcome-flow B target)
+
 ## Welcome flow B + 3 grafts — Direct-to-Chat A/B (2026-05-30)
 
 Implements the recommended approach from `docs/WELCOME_FLOW_DECISION_2026-05-30.md`. 12-agent diagnosis+design workflow chose B (auto-provision Lily + her conversation + a pre-baked opener at signup time) over 4 alternatives. Feature-flagged, default OFF; flip `welcome_flow_B_skip_create` in admin Settings to enable, `welcome_flow_B_variant_pct` to control the % in B.

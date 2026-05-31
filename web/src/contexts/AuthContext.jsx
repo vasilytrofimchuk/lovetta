@@ -34,10 +34,17 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.get('/api/auth/me')
       setUser(data.user)
-    } catch {
+    } catch (err) {
       setUser(null)
-      localStorage.removeItem('lovetta-token')
-      localStorage.removeItem('lovetta-refresh-token')
+      // Only clear tokens on a real 401. A network blip, 5xx, or aborted
+      // request shouldn't strand a logged-in user — `lib/api.js` already
+      // handles 401-refresh on the next request, and forcing the user back
+      // to login on every transient outage is a latent footgun (was the
+      // suspected cause of the Apple-relay ghost cohort until disproved).
+      if (err?.response?.status === 401) {
+        localStorage.removeItem('lovetta-token')
+        localStorage.removeItem('lovetta-refresh-token')
+      }
     } finally {
       setLoading(false)
     }

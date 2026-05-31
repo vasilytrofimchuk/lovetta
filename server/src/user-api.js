@@ -8,8 +8,37 @@ const { authenticate } = require('./auth-middleware');
 // content-levels import removed — explicit default is now false for all platforms
 const { getVapidPublicKey } = require('./push');
 const { sendEmail, ADMIN_EMAIL } = require('./email');
+const { logEvent, EVENT_TYPES } = require('./events');
 
 const router = Router();
+
+// Whitelist of client-emittable events. Anything else is rejected so
+// untrusted client code can't pollute the funnel.
+const CLIENT_EMITTABLE_EVENTS = new Set([
+  EVENT_TYPES.PAYWALL_CLOSED_WITHOUT_SUBSCRIBE,
+]);
+
+// -- POST /api/user/events --------------------------------
+// Client-side event hook (e.g. PlanModal "Skip for now"). Whitelisted types
+// only — the user has no business writing arbitrary funnel rows.
+router.post('/events', authenticate, async (req, res) => {
+  const { type, metadata } = req.body || {};
+  if (!type || !CLIENT_EMITTABLE_EVENTS.has(type)) {
+    return res.status(400).json({ error: 'event type not allowed' });
+  }
+  const safeMetadata = (metadata && typeof metadata === 'object') ? metadata : {};
+  // Trim metadata: cap each string field to 256 chars, max 20 keys.
+  const trimmed = {};
+  let kept = 0;
+  for (const [k, v] of Object.entries(safeMetadata)) {
+    if (kept >= 20) break;
+    if (typeof v === 'string') trimmed[k] = v.slice(0, 256);
+    else if (v === null || ['number', 'boolean'].includes(typeof v)) trimmed[k] = v;
+    kept++;
+  }
+  await logEvent(req.userId, type, trimmed);
+  res.json({ ok: true });
+});
 
 // -- GET /api/user/vapid-key (no auth — needed before login for SW) --
 router.get('/vapid-key', (_req, res) => {

@@ -4,10 +4,16 @@
 
 const { verifyAccessToken } = require('./jwt');
 const { getPool } = require('./db');
+const { logEvent, hasEvent } = require('./events');
 
-// Debounce activity updates (max 1 per minute per user)
+// Debounce activity updates per user. Was 60s but that corrupted the
+// "returned past 5 min" funnel metric — a fresh signup that makes 6
+// authed calls within 7s looked like a 0.328s ghost. 5s still cuts
+// 95%+ of redundant writes for chat streams while keeping the funnel
+// signal honest. Use GREATEST() to prevent fire-and-forget UPDATEs
+// from rewinding last_activity on concurrent races.
 const activityCache = new Map();
-const ACTIVITY_DEBOUNCE = 60_000;
+const ACTIVITY_DEBOUNCE = 5_000;
 
 function updateActivity(userId, req) {
   const now = Date.now();
@@ -21,9 +27,22 @@ function updateActivity(userId, req) {
   const ip = req.ip || '';
   const ua = req.get('User-Agent') || null;
   pool.query(
-    'UPDATE users SET last_activity = NOW(), ip_address = COALESCE($2, ip_address), user_agent = COALESCE($3, user_agent) WHERE id = $1',
+    'UPDATE users SET last_activity = GREATEST(last_activity, NOW()), ip_address = COALESCE($2, ip_address), user_agent = COALESCE($3, user_agent) WHERE id = $1',
     [userId, ip, ua]
   ).catch(() => {});
+
+  // One-shot sentinel: emit `first_authenticated_request` the very first
+  // time this user makes an authenticated request. Decisively separates
+  // "client never returned" from "client returned but bounced off Pricing"
+  // in future analyses. Fire-and-forget; hasEvent + insert race is fine.
+  hasEvent(userId, 'first_authenticated_request').then((seen) => {
+    if (!seen) {
+      logEvent(userId, 'first_authenticated_request', {
+        path: req.originalUrl || req.url || null,
+        user_agent: ua,
+      });
+    }
+  }).catch(() => {});
 }
 
 // Cleanup old entries every 10 minutes
