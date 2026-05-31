@@ -7,6 +7,21 @@ AI companion app for entertaining and intimate chats with AI-generated women com
 
 ---
 
+## Welcome-flow A/B controls in admin Settings (2026-05-30)
+
+**Scope:** Expose the welcome-flow-B feature flags in the admin Settings tab so the direct-to-chat A/B can be launched and ramped without manual SQL (QA ISSUE-001). Surface all 6 settings seeded by migration v67 under one "Onboarding & Welcome Flow (A/B)" section.
+
+**Settings exposed:** `welcome_flow_B_skip_create` (toggle), `welcome_flow_B_variant_pct` (0–100), `welcome_flow_B_template_name` (text), `welcome_flow_B_defer_paywall_until_msgs` (int), `plan_modal_defer_msgs` (int), `first_message_style` (select: casual_question_v1 / gratitude_v0).
+
+**Execution:**
+1. admin.html — add section + render 6 controls in `loadSettings()`, reuse existing savers. No admin-api change (PUT keyless, JSONB column).
+2. Wire the two previously-dead settings: `welcome_flow_B_defer_paywall_until_msgs` (chat-api `suggestPlanDrawer`) and `plan_modal_defer_msgs` (companion-api `/api/companions` response → CompanionList gate). Both default 3, preserving current behavior when unset.
+3. Test: api + ui buckets, web build. Adversarial review of the diff.
+
+**Notes:** `first_message_style` affects all openers (not just B). The two defer settings were hardcoded `3` before this change.
+
+---
+
 ## Admin "Girls" tab — companion usage tops (2026-05-08)
 
 Add a new admin tab surfacing which companions (templates + custom) are used most. Top tables for:

@@ -2,6 +2,20 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## Welcome-flow A/B controls in admin Settings (2026-05-30)
+
+Closes QA ISSUE-001 (2026-05-30 report): the `welcome_flow_B_*` flags existed in the DB (migration v67) but were not editable in the admin Settings UI, so launching/ramping the A/B required a manual `UPDATE app_settings`. PROGRESS claimed they were flippable "in admin Settings" — they weren't.
+
+While wiring the UI, found two of the six seeded settings were **dead** (read by nothing): `welcome_flow_B_defer_paywall_until_msgs` and `plan_modal_defer_msgs`. The paywall-defer threshold was hardcoded to `3` in two places. Exposing dead controls would be a fake-control bug, so wired them up too.
+
+- [x] `public/admin.html` — new "Onboarding & Welcome Flow (A/B)" section in the Settings tab; renders 6 controls (master toggle, traffic %, template name, B defer-paywall #, A plan-modal defer #, opener-style select). Reuses existing savers (`saveToggleSetting` / `saveSetting` / `saveEconSetting`); no API change needed (PUT has no key whitelist; `app_settings.value` is JSONB).
+- [x] `server/src/chat-api.js` — `suggestPlanDrawer` now reads `welcome_flow_B_defer_paywall_until_msgs` (default 3, query gated behind `auto_provisioned`) instead of hardcoded `=== 3`.
+- [x] `server/src/companion-api.js` — `/api/companions` response now includes `planModalDeferMsgs` (from `plan_modal_defer_msgs`, default 3).
+- [x] `web/src/pages/CompanionList.jsx` — plan-modal engagement gate uses `planModalDeferMsgs` from the response instead of hardcoded `>= 3`.
+- [x] Tests: `npm run test:e2e:api` 30/30 + `:ui` 48/48, web build green.
+- [x] Live smoke: all 6 controls render + each save type round-trips through JSONB (`true`/`25`/`"Aiko"`/`"gratitude_v0"`), 0 console errors.
+- [x] Adversarial review workflow (4 dimensions × independent skeptics): 0 findings — diff clean on data round-trip, regression, XSS/DOM, edge cases.
+
 ## Funnel observability fixes + safety net (2026-05-30)
 
 Driven by `docs/APPLE_RELAY_INVESTIGATION_2026-05-30.md`. The 11-agent workflow proved the "19/19 Apple-relay ghost" narrative was a measurement artifact: 60s debounce on `last_activity` + `api_consumption` only tracking AI calls made engaged users look identical to true ghosters. One specific ghoster (`shhrdvsh72@privaterelay.appleid.com`) actually made 6 authed calls within 7s. Histogram of `last_activity − created_at` spikes at exact 60/120/180/240s multiples — dispositive proof.

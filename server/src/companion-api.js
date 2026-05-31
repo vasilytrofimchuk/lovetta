@@ -298,7 +298,7 @@ router.get('/', authenticate, async (req, res) => {
   if (!pool) return res.json({ companions: [] });
 
   try {
-    const [{ rows }, msgCount, profileResult] = await Promise.all([
+    const [{ rows }, msgCount, profileResult, planDeferResult] = await Promise.all([
       pool.query(`
         SELECT uc.*,
                m.content AS last_message,
@@ -339,9 +339,16 @@ router.get('/', authenticate, async (req, res) => {
          FROM user_profile WHERE user_id = $1`,
         [req.userId]
       ),
+      pool.query(
+        `SELECT value FROM app_settings WHERE key = 'plan_modal_defer_msgs'`
+      ),
     ]);
 
     const profile = profileResult.rows[0] || {};
+    // Legacy-flow paywall timing: home plan modal only shows after this many
+    // sent messages. Configurable via app_settings.plan_modal_defer_msgs (default 3).
+    const planDeferRaw = parseInt(planDeferResult.rows[0]?.value, 10);
+    const planModalDeferMsgs = Number.isFinite(planDeferRaw) && planDeferRaw >= 0 ? planDeferRaw : 3;
     const topCompanion = rows
       .filter(c => (c.user_messages || 0) >= 5)
       .sort((a, b) => (b.user_messages || 0) - (a.user_messages || 0))[0];
@@ -366,7 +373,7 @@ router.get('/', authenticate, async (req, res) => {
           : null,
     };
 
-    res.json({ companions: enriched, totalUserMessages: msgCount.rows[0]?.total || 0, recommendations });
+    res.json({ companions: enriched, totalUserMessages: msgCount.rows[0]?.total || 0, planModalDeferMsgs, recommendations });
   } catch (err) {
     console.error('[companions] list error:', err.message);
     res.status(500).json({ error: 'Failed to load companions' });

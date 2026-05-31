@@ -40,13 +40,15 @@ export default function CompanionList() {
 
       const isNewUser = new URLSearchParams(window.location.search).get('newUser') === 'true';
       const skipped = localStorage.getItem('lovetta-plan-skipped');
-      // Defer plan modal until the user has actually engaged (≥3 user
+      // Defer plan modal until the user has actually engaged (≥N user
       // messages across all conversations). The signup→Pricing-modal blast
       // accounts for a meaningful chunk of the 5-min ghost cliff (audit
-      // 2026-05-30). isNewUser still forces show on the explicit
-      // ?newUser=true path so we don't lose the onboarding moment.
+      // 2026-05-30). The threshold N is configurable via app_settings
+      // (plan_modal_defer_msgs, default 3). isNewUser still forces show on
+      // the explicit ?newUser=true path so we don't lose the onboarding moment.
       const totalMsgs = companionsData.totalUserMessages || 0;
-      const hasEnoughEngagement = totalMsgs >= 3;
+      const deferMsgs = Number.isFinite(companionsData.planModalDeferMsgs) ? companionsData.planModalDeferMsgs : 3;
+      const hasEnoughEngagement = totalMsgs >= deferMsgs;
       if (!billingData?.hasSubscription && (isNewUser || (!skipped && hasEnoughEngagement))) {
         setShowPlanModal(true);
         if (isNewUser) window.history.replaceState({}, '', window.location.pathname);

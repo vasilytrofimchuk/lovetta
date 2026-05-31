@@ -739,12 +739,22 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         console.warn('[memory] processing error:', err.message);
       });
 
-      // Welcome flow B: suggest the plan drawer once at message #3 for users
+      // Welcome flow B: suggest the plan drawer once at message #N for users
       // who were auto-provisioned (they skipped Pricing entirely on signup).
+      // Threshold is configurable via app_settings.welcome_flow_B_defer_paywall_until_msgs
+      // (default 3). Query gated behind auto_provisioned so it's a no-op for everyone else.
       let suggestPlanDrawer = false;
       try {
-        if (userMessageCount === 3 && companion?.auto_provisioned) {
-          suggestPlanDrawer = true;
+        if (companion?.auto_provisioned) {
+          let deferAt = 3;
+          try {
+            const { rows: deferRows } = await pool.query(
+              `SELECT value FROM app_settings WHERE key = 'welcome_flow_B_defer_paywall_until_msgs'`
+            );
+            const n = parseInt(deferRows[0]?.value, 10);
+            if (Number.isFinite(n) && n >= 0) deferAt = n;
+          } catch {}
+          if (userMessageCount === deferAt) suggestPlanDrawer = true;
         }
       } catch {}
 

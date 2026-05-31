@@ -383,6 +383,13 @@
           <div id="ai-settings-list"></div>
         </div>
       </div>
+      <div class="settings-section" style="margin-top:28px;">
+        <div class="settings-section-title">Onboarding &amp; Welcome Flow (A/B)</div>
+        <p style="font-size:0.8rem;color:var(--muted);margin:0 0 14px;max-width:760px;line-height:1.5;">
+          Variant B auto-provisions a companion + a pre-baked opener at signup so new users land directly in a live chat instead of the create&nbsp;&rarr;&nbsp;pricing screens. Master switch OFF &rarr; everyone gets the legacy flow. Variant assignment is a stable per-user hash, so a given user always sees the same variant.
+        </p>
+        <div id="welcome-flow-list"></div>
+      </div>
     </div>
 
     <!-- Economics Tab -->
@@ -1212,6 +1219,61 @@
             '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
         });
         document.getElementById('ai-settings-list').innerHTML = aiHtml;
+
+        // Onboarding & Welcome Flow (A/B) — feature flags for the direct-to-chat experiment.
+        // app_settings.value is JSONB, so values arrive already-parsed (bool / number / string).
+        var WELCOME_FLOW_DEFS = [
+          { key: 'welcome_flow_B_skip_create', type: 'toggle', label: 'Welcome Flow B — master switch',
+            desc: 'When ON, a share of NEW signups skip the create &rarr; pricing screens and land directly in a chat with an auto-provisioned companion.' },
+          { key: 'welcome_flow_B_variant_pct', type: 'number', min: 0, max: 100, dflt: 50, label: 'Variant B traffic %',
+            desc: 'Percent of NEW signups assigned to Variant B (0&ndash;100). The rest stay on the legacy flow. Only applies while the master switch is ON.' },
+          { key: 'welcome_flow_B_template_name', type: 'text', dflt: 'Lily', label: 'Auto-provisioned companion',
+            desc: 'Template name to auto-create for Variant B users. Needs a seeded opener &mdash; "Lily" is the only template with one today.' },
+          { key: 'welcome_flow_B_defer_paywall_until_msgs', type: 'number', min: 0, max: 50, dflt: 3, label: 'Variant B — suggest plan at message #',
+            desc: 'For Variant B users, the in-chat plan drawer is suggested once when they hit this many sent messages.' },
+          { key: 'plan_modal_defer_msgs', type: 'number', min: 0, max: 50, dflt: 3, label: 'Legacy flow — plan modal after N messages',
+            desc: 'Legacy (Variant A) home plan modal only appears once the user has sent at least this many messages.' },
+          { key: 'first_message_style', type: 'select', dflt: 'casual_question_v1', label: 'Opener style',
+            desc: 'System-prompt style for every companion\'s first message (applies to all openers, not just Variant B).',
+            options: [['casual_question_v1', 'casual_question_v1 — ends with a short question'], ['gratitude_v0', 'gratitude_v0 — legacy']] },
+        ];
+        var stripQuotes = function(v) { return String(v == null ? '' : v).replace(/^"|"$/g, ''); };
+        var wfHtml = '';
+        WELCOME_FLOW_DEFS.forEach(function(def) {
+          var raw = settings[def.key];
+          var control = '';
+          if (def.type === 'toggle') {
+            var isOn = raw === true || raw === 'true';
+            control = '<label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">' +
+              '<input type="checkbox" id="toggle-' + def.key + '" ' + (isOn ? 'checked' : '') +
+              ' onchange="saveToggleSetting(\'' + def.key + '\', this.checked, this)" style="opacity:0;width:0;height:0;">' +
+              '<span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (isOn ? 'var(--accent)' : 'var(--bg2)') +
+              ';border:1px solid var(--border);border-radius:13px;transition:0.3s;">' +
+              '<span style="position:absolute;content:\'\';height:20px;width:20px;left:' + (isOn ? '24px' : '3px') +
+              ';bottom:2px;background:white;border-radius:50%;transition:0.3s;"></span></span></label>';
+          } else if (def.type === 'number') {
+            var n = parseInt(raw, 10); if (isNaN(n)) n = def.dflt;
+            control = '<input type="number" min="' + def.min + '" max="' + def.max + '" value="' + n + '" ' +
+              'style="width:80px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;text-align:center;" ' +
+              'onchange="saveSetting(\'' + def.key + '\', parseInt(this.value, 10), this)">';
+          } else if (def.type === 'text') {
+            var t = stripQuotes(raw) || (def.dflt || '');
+            control = '<input type="text" value="' + esc(t) + '" ' +
+              'style="width:160px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;font-family:monospace;" ' +
+              'onchange="saveEconSetting(\'' + def.key + '\', this.value.trim(), \'text\', this)">';
+          } else if (def.type === 'select') {
+            var sv = stripQuotes(raw) || def.dflt;
+            var optionsHtml = def.options.map(function(o) {
+              return '<option value="' + o[0] + '"' + (o[0] === sv ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+            }).join('');
+            control = '<select onchange="saveEconSetting(\'' + def.key + '\', this.value, \'text\', this)">' + optionsHtml + '</select>';
+          }
+          wfHtml += '<div class="setting-row"><div><div class="label">' + def.label + '</div><div class="desc">' + def.desc + '</div></div>' +
+            '<div style="display:flex;align-items:center;">' + control +
+            '<span class="save-msg" id="msg-' + def.key + '">Saved</span></div></div>';
+        });
+        var wfEl = document.getElementById('welcome-flow-list');
+        if (wfEl) wfEl.innerHTML = wfHtml;
       });
     }
 
