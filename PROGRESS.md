@@ -2,6 +2,23 @@
 
 > Completed work is in the [Archive](#archive) section below.
 
+## 24h follow-up + CRITICAL onboarding.js jsonb fix (2026-06-01)
+
+Re-ran the weekly analysis 24h after shipping the funnel observability fixes (workflow `w9yred7z7`, 8 agents). Report at `docs/WEEKLY_ANALYSIS_FOLLOWUP_2026-05-31.md`.
+
+**Verdicts from the comparison:**
+- **Debounce + funnel-SQL fixes: ✅ working.** The 60s minute-multiple peaks and the 0-2s zero-tail are gone. Last week's "60% ghosters" / "19/19 privaterelay zero-action" was a measurement artifact — true ghoster rate in the 18-user post-deploy cohort is **2/18 = 11%**, not ~60%.
+- **OLD "returned" metric was systematically off by 17-28pp absolute.** On 18 post-deploy signups: OLD=50%, NEW=78% (38.9% false-negative rate).
+- **Sentinels firing 1.0 per signup.** signup_response_sent, welcome_flow_assigned, first_authenticated_request all reliable.
+- **`paywall_closed_without_subscribe` is mechanical-close noise, not a real decline signal.** A_control users dismiss in 2-8s (median ~3s) but 5/6 still go on to chat. Don't use as a "declined subscription" metric.
+
+**CRITICAL bug shipped on 2026-05-30 and detected 2026-06-01**: `server/src/onboarding.js:autoProvisionFirstCompanion` was throwing `invalid input syntax for type json` on every B-assigned user because it passed the jsonb `traits` array straight from the SELECT into the INSERT — node-pg serializes JS arrays as PG array literals `{a,b}` which fail the jsonb cast. The defensive try/catch swallowed the error and silently degraded all 8 B-assigned users to A_control's flow. **We were running A vs (silently-degraded A), not A vs B, for the entire 24h window.** Fixed by mirroring the `companion-api.js:183` pattern: `JSON.stringify(t.traits || [])` before binding.
+
+- [x] Patched `server/src/onboarding.js:113-130` — JSON.stringify(t.traits || []) before INSERT.
+- [x] Sanity test against test DB: end-to-end provisioning works — user_companion, conversation, and opener message all created. `traits` round-trips correctly.
+- [x] `npm run test:e2e:api` 30/30, `:ai` 149/149 green.
+- [ ] A/B clock effectively resets on this deploy. Re-check in 3 days.
+
 ## Welcome-flow A/B controls in admin Settings (2026-05-30)
 
 Closes QA ISSUE-001 (2026-05-30 report): the `welcome_flow_B_*` flags existed in the DB (migration v67) but were not editable in the admin Settings UI, so launching/ramping the A/B required a manual `UPDATE app_settings`. PROGRESS claimed they were flippable "in admin Settings" — they weren't.

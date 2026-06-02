@@ -111,6 +111,12 @@ async function autoProvisionFirstCompanion(userId, client, opts = {}) {
     }
 
     // Insert the user_companions row (auto_provisioned = TRUE).
+    // `traits` is jsonb on both source and dest. node-pg returns jsonb as a
+    // JS value (array here) but then serializes JS arrays as PG array literals
+    // (`{a,b}`) which fail the jsonb cast — mirror companion-api.js:183 and
+    // JSON.stringify before binding. This silent failure was 100% breaking
+    // welcome flow B from 2026-05-30 ship through 2026-06-01 detection.
+    const traitsJson = JSON.stringify(t.traits || []);
     const { rows: ucRows } = await client.query(
       `INSERT INTO user_companions (
          user_id, template_id, name, personality, backstory, avatar_url,
@@ -120,7 +126,7 @@ async function autoProvisionFirstCompanion(userId, client, opts = {}) {
        RETURNING id`,
       [
         userId, t.id, t.name, t.personality, t.backstory, t.avatar_url,
-        t.traits, t.communication_style, t.age, t.video_url, t.voice_id,
+        traitsJson, t.communication_style, t.age, t.video_url, t.voice_id,
       ]
     );
     const companionId = ucRows[0].id;

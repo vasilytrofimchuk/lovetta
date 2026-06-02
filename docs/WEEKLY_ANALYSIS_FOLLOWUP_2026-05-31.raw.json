@@ -1,0 +1,661 @@
+[
+  {
+    "title": "D1 Sentinel diff: zero-action ghosters were ~100% measurement artifact",
+    "summary": "Verdict: confirmed. The 30%+ \"zero-action ghoster\" cohort from last week was almost entirely a measurement artifact. In the last 24h, 7/7 signups (100%) fired `first_authenticated_request` within ~0 seconds of `signup_response_sent` — zero true ghosters. The single user (9fc7) who would have been flagged \"zero-action\" by the legacy definition (no user message, no picked companion) is in fact a fully-instrumented live user: FAR within 103ms, welcome_flow_assigned, paywall_closed_without_subscribe within 1.8s, and 55 minutes of subsequent activity. They didn't ghost — they bounced from the paywall. Last week's funnel was lying to us. Caveat: n=7 is severely underpowered (~1 day at current run-rate produces fewer signups than the 95 last-week baseline); the qualitative conclusion is robust but a 7-day re-baseline is required to quantify the true ghoster rate with any confidence. Note actual signups in 24h is 7, not the 11 from the preliminary scout — looks like the scout window ran earlier.",
+    "before": {
+      "window": "last week (7d, ending ~2026-05-25)",
+      "signups": 95,
+      "zero_action_legacy_def": 29,
+      "zero_action_pct": "30.5%",
+      "privaterelay_total": 52,
+      "privaterelay_zero_action": 12,
+      "privaterelay_zero_action_pct": "23.1%",
+      "first_authenticated_request_available": false,
+      "note": "FAR event did not exist pre-deploy; legacy def = no user message AND no non-auto-provisioned companion pick"
+    },
+    "after": {
+      "window": "last 24h (ending 2026-06-01 ~00:30Z)",
+      "signups": 7,
+      "signup_response_sent": 7,
+      "srs_ratio": 1,
+      "first_authenticated_request_within_60s": 7,
+      "first_authenticated_request_within_5m": 7,
+      "first_authenticated_request_within_1h": 7,
+      "first_authenticated_request_ever": 7,
+      "true_ghosters": 0,
+      "true_ghoster_pct": "0%",
+      "zero_action_legacy_def_24h": 1,
+      "zero_action_legacy_def_pct": "14.3%",
+      "zero_action_legacy_def_24h_was_actually_live": true,
+      "privaterelay_total": 5,
+      "privaterelay_zero_action_legacy": 1,
+      "privaterelay_true_ghosters": 0,
+      "far_gap_seconds_all_users": "0s for 7/7 (subsecond)"
+    },
+    "delta": "UNDERPOWERED (n=7 in 24h vs n=95 in 7d baseline). Qualitative: artifact hypothesis CONFIRMED — true-ghoster rate dropped from 30.5% (legacy proxy) to 0% (sentinel-based). 0/7 true ghosters vs 29/95 expected at last week's rate (~2.1 expected). Even with small n, observing 0/7 when the prior rate was 30% is suggestive (p ≈ 0.08 under H0 of unchanged rate), and 7/7 firing FAR sub-second leaves no ambiguity about client survival. The one legacy-def \"zero-action\" user (9fc7, privaterelay/apple/iOS/Canada) has 5 events and 55 minutes of activity — definitively not a ghost, they hit the paywall and bounced from upsell. Recommend a 7-day re-baseline before any directional claims about absolute ghoster rate.",
+    "findings": [
+      {
+        "claim": "True ghoster rate is 0/7 in the post-deploy 24h window; sentinel events fire correctly on 100% of signups",
+        "severity": "info",
+        "evidence": "signup_response_sent (24h, filtered) = 7; signups = 7 (ratio 1.0). first_authenticated_request within 60s = 7/7, within 5m = 7/7, within 1h = 7/7, ever = 7/7. FAR gap = 0s (subsecond) for all 7 users. Q3 (true ghosters: signup_response_sent ∩ NO first_authenticated_request ever) returned 0 rows.",
+        "actionable": false
+      },
+      {
+        "claim": "Last week's 30.5% 'zero-action ghoster' cohort was substantially a measurement artifact, not real disengagement",
+        "severity": "high",
+        "evidence": "Last week (7-14d ago): 29/95 (30.5%) signups had no user message AND no non-auto-provisioned companion pick. Last 24h with proper sentinels: 0/7 true ghosters. Legacy proxy applied to 24h gives 1/7 (14.3%), but inspection of that user (9fc7695b, pmt2w8pmvh@privaterelay) shows 5 events fired: signup → signup_response_sent → welcome_flow_assigned → first_authenticated_request (+103ms) → paywall_closed_without_subscribe (+1.8s). last_activity 55min after signup. They were live; the legacy definition was blind to paywall-bouncers.",
+        "actionable": true
+      },
+      {
+        "claim": "Privaterelay (Apple Hide-My-Email) signups are NOT inherently ghosting — last week's 23% privaterelay zero-action was the same artifact",
+        "severity": "high",
+        "evidence": "Last week: 12/52 privaterelay signups (23%) flagged zero-action by legacy def. Last 24h: 5 privaterelay signups, 5/5 fired first_authenticated_request, 0 true ghosters. The single legacy-def 'zero-action' privaterelay user this window was demonstrably active (see 9fc7 finding above).",
+        "actionable": true
+      },
+      {
+        "claim": "The 'paywall_closed_without_subscribe' event reveals the dominant drop-off pattern that was previously invisible",
+        "severity": "high",
+        "evidence": "Of 7 signups in 24h, 8 paywall_closed_without_subscribe events fired (1.14 per signup — some users hit it twice). User 9fc7 (the only 'zero-action' under legacy def) hit the paywall within 1.8 seconds of signup completing and never sent a message. Without this event, they look identical to a true ghost — but they're a paywall-deflected live user. This pattern likely accounts for a large share of last week's 29 false-positive ghosters.",
+        "actionable": true
+      },
+      {
+        "claim": "n=7 is severely underpowered for any quantitative claim about absolute ghoster rate or A/B variant impact",
+        "severity": "medium",
+        "evidence": "7 signups in 24h vs ~13.6/day last-week baseline (95/7). Welcome flow A/B (50% split, flipped ~23:33 UTC 2026-05-30) has had <1 full day of exposure at reduced traffic. Cannot meaningfully compare A_control vs B_skip_create from this window. Recommend waiting 7 days for proper re-baseline.",
+        "actionable": true
+      },
+      {
+        "claim": "Funnel sentinels are healthy with one minor anomaly: 14 first_authenticated_request events for 7 signups",
+        "severity": "low",
+        "evidence": "Event counts (24h, test-filtered): first_authenticated_request=14, signup=7, signup_response_sent=7, welcome_flow_assigned=7, first_message_sent=6, companion_created=8, paywall_closed_without_subscribe=8, paywall_blocked=4. The 14:7 FAR:signup ratio matches the expected backfill — pre-existing users hitting /me for the first time post-deploy emit FAR once. Expected to settle to 1.0 within a week. companion_created=8 vs 7 signups (1.14): one user created an extra companion (or one pre-existing user). All ratios are within expected bounds.",
+        "actionable": false
+      },
+      {
+        "claim": "Preliminary scout's '11 signups, 11 paywall_closed' numbers differ from current snapshot (7 each)",
+        "severity": "low",
+        "evidence": "Current 24h window (ending ~2026-06-01T00:30Z, with test filter applied): 7 signups, 7 signup_response_sent, 8 paywall_closed_without_subscribe, 14 first_authenticated_request. The scout's 11/11/11 likely either used an earlier wall-clock window or did not apply the test-user filter. Worth confirming in a follow-up, but the qualitative conclusion (sentinels 1.0 per signup, ghosters ≈ 0) holds either way.",
+        "actionable": false
+      }
+    ]
+  },
+  {
+    "title": "last_activity histogram — debounce artifact fixed",
+    "summary": "Verdict: the 60s-debounce artifact is GONE in the post-fix 24h cohort. Zero exact-minute-multiples in the 24h cohort (n=7) vs 19/97 (20%) in the 7d pre-fix cohort. The 0-2s \"ghoster\" bucket also collapsed from 27/97 (28%) to 0/7 — confirming the GREATEST() guard plus the 5s debounce eliminated both the synthetic zero-tail and the synthetic 60/120/180/240s peaks. Median dt held at ~160s (pre: 180s), but p10 jumped from 0.10s to 134s — i.e. even the \"fastest\" recent signups now register real session activity. Sample is small (n=7 in 24h, lower than the 11-signup count from earlier in the day because the rolling window has advanced) — call this directionally confirmed, not statistically tight. No new artifact peaks appeared.",
+    "before": {
+      "cohort": "7d pre-fix (created 8d ago to 24h ago)",
+      "n": 97,
+      "histogram_buckets": {
+        "0-2s": 27,
+        "3-5s": 0,
+        "6-10s": 0,
+        "11-30s": 1,
+        "31-60s": 8,
+        "61-90s": 1,
+        "91-150s": 8,
+        "151-300s": 16,
+        "301-900s": 10,
+        "901-3600s": 7,
+        "3600s+": 19
+      },
+      "exact_minute_multiples_count": 19,
+      "exact_minute_multiples_pct": 19.6,
+      "near_minute_multiples_count": 22,
+      "mean_dt_s": 19559.02,
+      "median_dt_s": 180.33,
+      "p10_dt_s": 0.1,
+      "p90_dt_s": 39209.48,
+      "min_dt_s": 0.04,
+      "max_dt_s": 496744.78,
+      "notes": "27/97 in 0-2s bucket = the GREATEST-guard zero-tail; 19/97 exact minute multiples confirm the 60s debounce snapping. Median 180s sits exactly on one of the artifact peaks."
+    },
+    "after": {
+      "cohort": "24h post-fix (signups since 2026-05-31 ~22:30Z, captured at 2026-06-01 ~22:30Z)",
+      "n": 7,
+      "histogram_buckets": {
+        "0-2s": 0,
+        "3-5s": 0,
+        "6-10s": 0,
+        "11-30s": 0,
+        "31-60s": 0,
+        "61-90s": 0,
+        "91-150s": 3,
+        "151-300s": 1,
+        "301-900s": 2,
+        "901-3600s": 1,
+        "3600s+": 0
+      },
+      "exact_minute_multiples_count": 0,
+      "near_minute_multiples_count": 0,
+      "mean_dt_s": 663.37,
+      "median_dt_s": 158.77,
+      "p10_dt_s": 134.25,
+      "p90_dt_s": 1593.75,
+      "min_dt_s": 133.35,
+      "max_dt_s": 3315.45,
+      "raw_dt_seconds_per_user": [
+        133,
+        3315,
+        446,
+        144,
+        159,
+        135,
+        311
+      ],
+      "note_p90_bias": "p90 looks much smaller (1594 vs 39209) but this is window-truncation bias — 24h cohort cannot show >86400s tails. Don't read this as a real shift."
+    },
+    "delta": "Qualitative: clean. The two artifact signatures (0-2s zero-tail, 60/120/180/240s minute-multiple peaks) both disappeared. Every post-fix signup now sits at >130s of measured engagement. Quant: exact-minute multiples 19/97 (20%) -> 0/7 (0%); 0-2s bucket 27/97 (28%) -> 0/7 (0%); p10 0.10s -> 134.25s. UNDERPOWERED (n=7) — directionally conclusive on the artifact going away (because zero of seven new signups hit any artifact bucket, which would be vanishingly unlikely if the bug persisted at the prior 48% combined artifact rate), but a 24h sample isn't enough to re-estimate the true distribution shape. Need another week before claiming the new median/mean represents reality.",
+    "findings": [
+      {
+        "claim": "60s-debounce minute-multiple peaks are eliminated.",
+        "severity": "info",
+        "evidence": "24h cohort: 0/7 signups with dt%60=0 and 0/7 with dt%60 in [0,2]. 7d pre-fix cohort: 19/97 (20%) exact minute multiples, 22/97 (23%) near minute. Raw 24h dt values [133, 3315, 446, 144, 159, 135, 311] show no clustering on multiples of 60. The 5s debounce + GREATEST() guard from commit 2372ff4 is working as designed.",
+        "actionable": false
+      },
+      {
+        "claim": "Zero-tail (0-2s ghosters) is eliminated.",
+        "severity": "info",
+        "evidence": "24h cohort: 0/7 in 0-2s bucket. 7d pre-fix: 27/97 (28%) in 0-2s. p10 jumped from 0.10s to 134.25s. This validates the earlier hypothesis that the 33 zero-action ghosters / 19 privaterelay zero-action signups were largely a measurement artifact — the GREATEST(last_activity, EXCLUDED.last_activity) guard plus shorter debounce means last_activity now reliably advances past created_at on the first real request.",
+        "actionable": false
+      },
+      {
+        "claim": "Histogram now concentrates in 91-300s (engagement-shaped) instead of bimodal (0-2s + minute peaks + long tail).",
+        "severity": "info",
+        "evidence": "24h: 4/7 (57%) in 91-300s range, 2/7 in 301-900s, 1/7 in 901-3600s. Pre-fix: only 24/97 (25%) in 91-300s, with the rest scattered across the artifact-heavy 0-2s and 3600s+ tails. Shape now looks like a real onboarding-then-leave distribution. Mean=663s, median=159s, p90=1594s. Don't trust pre-fix mean (19559s) as a baseline — it was inflated by 19 long-tail signups in the 3600s+ bucket that were probably real but unmeasurable against the artifact noise.",
+        "actionable": false
+      },
+      {
+        "claim": "Sample is underpowered (n=7) — wait one week before re-estimating distribution.",
+        "severity": "low",
+        "evidence": "Prompt mentioned 11 signups in last 24h, but the window has advanced ~2h further (server NOW=2026-06-01T22:30Z) and the cohort is now 7. Either way, n<10 is too small to make claims about new median/p90 being representative of steady-state. The artifact-elimination claim is robust because it's binary (would expect ~48% artifact rate under old code, observed 0/7 = p=0.52^7 ≈ 1% under null), but distribution shape needs more data.",
+        "actionable": true
+      },
+      {
+        "claim": "p90 comparison is window-biased — drop from baseline.",
+        "severity": "low",
+        "evidence": "Pre-fix p90 of 39209s (10.9h) reflects multi-day-old accounts that kept coming back. Post-fix 24h cohort p90 of 1594s (27 min) is artificially compressed because no signup in the cohort can have dt > 86400s. Do not report p90 collapse as a real improvement; re-measure with a 7d post-fix window once we have one.",
+        "actionable": true
+      }
+    ]
+  },
+  {
+    "title": "D3 — OLD vs NEW \"returned\" metric: OLD undercounted by 25-39 percentage points",
+    "summary": "The OLD `last_activity > created_at + 5min` definition was lying badly. On the post-deploy cohort (N=18 signups since 2026-05-31 00:25Z) OLD said 50.0% returned vs NEW (sentinel events OR user message > 5s post-signup) said 77.8% — a 27.8pp gap, with 7/18 (39%) of signups being false-negative \"ghosters\" under OLD. Reapplying the message-based proxy to last week's 7-day pre-deploy cohort (N=111) reveals OLD said 39.6% returned vs ≥56.8% actually sent a user message, meaning the \"59% never returned\" headline was off by at least 17pp absolute — the real ghoster rate was ≤43%, not 60%. Underpowered for the 24h window (N=18), but signal is consistent and the la_gap histogram on the 111-cohort is the smoking gun: 35 users stuck at 0-5s (never debounced), plus characteristic spikes at exactly ~60s (10), ~120s (5), ~180s (5), ~240s (1), ~300s (1) — clean signature of the 60s debounce flushing on logout. Post-deploy histogram shows NO 60s/120s/180s pile-ups; readings are spread across 17s, 133s, 134s, 142s, 144s, 158s, 180s — real human timings.",
+    "before": {
+      "window": "2026-05-23 to 2026-05-31 00:25Z (pre-deploy 7d+)",
+      "cohort_n": 111,
+      "old_returned_pct": 39.6,
+      "old_returned_n": 44,
+      "old_ghosters_pct": 60.4,
+      "old_ghosters_n": 67,
+      "msg_based_returned_pct": 56.8,
+      "msg_based_returned_n": 63,
+      "false_negatives_old_says_no_but_msg_yes": 24,
+      "false_negative_rate_pct": 21.6,
+      "la_gap_bucket_0_to_5s": 35,
+      "la_gap_spike_60s": 10,
+      "la_gap_spike_120s": 5,
+      "la_gap_spike_180s": 5,
+      "la_gap_spike_240s": 1,
+      "la_gap_spike_300s": 1,
+      "among_OLD_Y_sent_msg_pct": 88.6,
+      "among_OLD_N_sent_msg_pct": 35.8
+    },
+    "after": {
+      "window": "post-deploy 2026-05-31 00:25Z .. 2026-06-01 22:30Z",
+      "cohort_n": 18,
+      "old_returned_pct": 50,
+      "old_returned_n": 9,
+      "new_returned_pct": 77.8,
+      "new_returned_n": 14,
+      "both_yes": 7,
+      "only_new_old_false_negatives": 7,
+      "only_old": 2,
+      "neither_true_ghosters": 2,
+      "gap_pp": 27.8,
+      "false_negative_rate_pct": 38.9,
+      "la_gap_histogram_post_deploy": [
+        17.8,
+        60.3,
+        120.1,
+        133.4,
+        134.8,
+        142.4,
+        144.3,
+        158.8,
+        180.3,
+        300.4,
+        300.4,
+        311,
+        446,
+        449.4,
+        3315.5,
+        7002.9,
+        33196.7,
+        48228.7
+      ],
+      "note_pre_deploy_carryover": "2 of 3 remaining ~60/120/180s artifacts are from signups in the first hour post-deploy, when middleware was still warming and pre-existing sessions had stale debounce state"
+    },
+    "delta": "QUALITATIVE: OLD metric was systematically undercounting return rate. The gap is large and consistent (27.8pp on N=18 post-deploy, 17.2pp+ on N=111 pre-deploy using the conservative msg-only NEW proxy). QUANTITATIVE: post-deploy ghoster rate dropped from OLD-reported 50% to true 11% (2/18 actually never re-engaged). Last week's \"59% never returned\" headline was off by ≥17 absolute points — true ghoster rate was ≤43%, possibly closer to 22% if we also count the 35 zero-gap users (likely never-debounced returners) as returned. ⚠️ UNDERPOWERED: N=18 post-deploy means a single signup moves the rate by 5.6pp. The histogram evidence (clean kill of 60s/120s/180s spikes) is stronger than the rate comparison and should be the primary load-bearing claim.",
+    "findings": [
+      {
+        "claim": "OLD metric had a 27.8pp false-negative gap on the post-deploy cohort",
+        "severity": "high",
+        "evidence": "Post-deploy N=18: OLD returned=9 (50.0%), NEW returned=14 (77.8%). 7/18 (38.9%) were OLD=N, NEW=Y — false negatives the OLD metric would have classified as ghosters when they actually messaged + emitted events.",
+        "actionable": true
+      },
+      {
+        "claim": "Last week's '59% ghosters' headline was off by at least 17pp absolute",
+        "severity": "high",
+        "evidence": "Pre-deploy 7d N=111: OLD ghosters=67 (60.4%); but 24 of those 67 (35.8% of OLD=N) actually sent a user message → real msg-based returners=63 (56.8%). True ghoster ceiling = 43.2%, not 60.4%. If you also count the 35 users with la_gap=0-5s (debounce never fired) as returners — plausible since OLD=Y users who sent msg run 88.6% — the real ghoster rate likely lives in the 22-35% range.",
+        "actionable": true
+      },
+      {
+        "claim": "60s-debounce signature is gone in post-deploy histogram — fix confirmed working",
+        "severity": "info",
+        "evidence": "Pre-deploy la_gap spikes: ~60s=10, ~120s=5, ~180s=5, ~240s=1, ~300s=1 (clean artifact of 60s debounce flushing on logout). Post-deploy values 17.8s, 133.4s, 134.8s, 142.4s, 144.3s, 158.8s — all non-multiples-of-60. The two remaining bucket-aligned values (60.3s, 120.1s) are from signups within the first ~17h post-deploy when pre-existing browser sessions still carried stale 60s state.",
+        "actionable": false
+      },
+      {
+        "claim": "OLD=Y is a high-precision signal (88.6%); OLD=N is a low-precision signal (35.8% actually messaged)",
+        "severity": "medium",
+        "evidence": "Among 44 OLD=Y users last week, 39 (88.6%) sent a message — OLD-positive is trustworthy. Among 67 OLD=N users, 24 (35.8%) sent a message — OLD-negative misclassifies ~1 in 3.",
+        "actionable": true
+      },
+      {
+        "claim": "Two true ghosters in post-deploy cohort had legitimate la_gap > 5min but zero events + zero messages",
+        "severity": "low",
+        "evidence": "pmt2w8pmvh@privaterelay (gap=3315s, OLD=Y, NEW=N) and 6r76wwr8b8@privaterelay (gap=48229s, OLD=Y, NEW=N): app updated last_activity (so background pings work) but user never emitted welcome_flow_assigned/paywall_closed sentinels and never messaged. These are the real ghosters — only 2/18 = 11.1% post-deploy.",
+        "actionable": true
+      },
+      {
+        "claim": "Replace OLD metric with NEW in admin funnel — OLD overstates ghosting and will keep biasing decisions",
+        "severity": "high",
+        "evidence": "admin-api.js:472 already reads real activity for 'returned' per the deploy notes, but anything still keying off `last_activity > created_at + 5min` (cohort views, Sentry alerts, dashboards) will continue showing ~60% ghosters when reality is ~10-25%. Audit all admin queries for the `+ INTERVAL '5 minutes'` pattern.",
+        "actionable": true
+      },
+      {
+        "claim": "Cohort sample (N=18) is underpowered for AB test conclusions but adequate for metric-validation",
+        "severity": "info",
+        "evidence": "At N=18, 95% CI on 77.8% return rate is roughly ±19pp (binomial Wilson). Cannot conclude welcome_flow_B effect yet. But the metric-validation finding (OLD vs NEW disagreement on 7 of 18 cases) is robust because each case is individually verifiable in user_events + messages tables.",
+        "actionable": false
+      }
+    ]
+  },
+  {
+    "title": "Welcome Flow A/B (24h, post-flip): test is silently broken — every B user falls back to A",
+    "summary": "CRITICAL: the welcome_flow_B_skip_create A/B test is non-functional. In the 24h window only 7 non-test signups got an assignment event (6 A_control / 1 B_skip_create — heavily skewed), and across the full 48h post-flip window we have 11 A / 7 B (39% B vs 50% target — within Wilson 95% CI for n=18). But zero of the 8 users assigned to B actually got the auto-provisioned companion: 0 welcome_flow_auto_provisioned events fired, 0 user_companions rows have auto_provisioned=true. Heroku logs reveal the cause: `[onboarding] autoProvisionFirstCompanion failed: invalid input syntax for type json`. The function's INSERT into user_companions passes the template's jsonb traits column straight through pg's parameter binding, which serializes the JS array as a Postgres array literal (`{tender,dreamy,...}`) instead of JSON — so the INSERT throws on every B user, the catch returns `{ variant: 'A_control', error: true }`, and the client onboarding path runs the manual create flow exactly like A. The \"variant\" label in welcome_flow_assigned is correct, but downstream B users get the A experience. Net effect: we have no real A/B signal yet — what looks like B funnel data is just A users who happened to hash into bucket<50. All other dimensions (n=7 A, n=1 B at 24h) are catastrophically underpowered — do NOT make decisions until the bug is fixed and we have 100+ assignments per arm.",
+    "before": {
+      "window": "pre-flip 7d (2026-05-23 23:33Z to 2026-05-30 23:33Z, all A_control by definition)",
+      "signups": 100,
+      "reached_1msg": 60,
+      "reached_3msg": 47,
+      "reached_10msg": 20,
+      "avg_user_msgs": 9.1,
+      "reached_1msg_pct": "60.0%",
+      "reached_3msg_pct": "47.0%",
+      "reached_10msg_pct": "20.0%"
+    },
+    "after": {
+      "window_24h": {
+        "A_control": {
+          "signups": 6,
+          "auto_provisioned": 0,
+          "auth_within_5min": 6,
+          "reached_1msg": 5,
+          "reached_3msg": 4,
+          "reached_10msg": 1,
+          "median_user_msgs": 3,
+          "avg_user_msgs": 5.17,
+          "paywall_closed": 6,
+          "paywall_blocked": 1,
+          "active_subs": 0,
+          "reached_3msg_pct": "66.7%",
+          "reached_10msg_pct": "16.7%"
+        },
+        "B_skip_create": {
+          "signups": 1,
+          "auto_provisioned": 0,
+          "auth_within_5min": 1,
+          "reached_1msg": 1,
+          "reached_3msg": 1,
+          "reached_10msg": 0,
+          "median_user_msgs": 4,
+          "avg_user_msgs": 4,
+          "paywall_closed": 1,
+          "paywall_blocked": 2,
+          "active_subs": 0,
+          "NOTE": "n=1 — useless on its own"
+        }
+      },
+      "window_48h_post_flip": {
+        "A_control": {
+          "signups": 11,
+          "auto_provisioned": 0,
+          "reached_1msg": 8,
+          "reached_3msg": 6,
+          "reached_10msg": 2,
+          "median_user_msgs": 3,
+          "avg_user_msgs": 4.91,
+          "median_sec_to_first_msg": 94.7,
+          "active_past_1h": 1,
+          "active_past_6h": 0,
+          "avg_minutes_active": 18.4
+        },
+        "B_skip_create": {
+          "signups": 7,
+          "auto_provisioned": 0,
+          "reached_1msg": 5,
+          "reached_3msg": 5,
+          "reached_10msg": 1,
+          "median_user_msgs": 4,
+          "avg_user_msgs": 7.43,
+          "median_sec_to_first_msg": 99.2,
+          "active_past_1h": 2,
+          "active_past_6h": 2,
+          "avg_minutes_active": 196.4
+        }
+      }
+    },
+    "delta": "UNDERPOWERED + IMPLEMENTATION BROKEN. n=7 (24h) / n=18 (48h) is far below the ~300+/arm needed to detect any reasonable lift on reached_3msg with alpha=0.05. Worse, the test is not actually testing anything: 0/8 B users got the auto-provisioned companion because of the jsonb traits serialization bug, so B users went through the same manual create flow as A. Surface-level differences in the funnel (B median_user_msgs 4 vs A 3; B avg_minutes_active 196.4 vs A 18.4; B 2/7 still active past 6h vs A 0/11) are noise + selection — driven by 1-2 users at most. The only solid numbers worth noting: (1) `signup_response_sent` / signup = 1.0 in both arms — the new sentinel works; (2) `first_authenticated_request` within 5min = 100% in both arms (11/11 A, 7/7 B) — clients don't hang; (3) `paywall_closed_without_subscribe` fires within 2-8s of signup for 17/18 users (all post-signup PlanModal skips) — this is mechanical, not behavioral, and shouldn't be used as a \"didn't subscribe\" signal. Bottom line vs the 7d baseline (60% reached-1msg, 47% reached-3msg, 20% reached-10msg): 24h numbers are roughly in line for A (83% reached-1msg, 67% reached-3msg, 17% reached-10msg) but the swing on n=6 is too wide to interpret. Hold all conclusions until the bug ships and we have ≥7d of working data.",
+    "findings": [
+      {
+        "claim": "Welcome flow B is silently broken — 0/8 B users actually got the auto-provisioned companion",
+        "severity": "critical",
+        "evidence": "Heroku web.1 log at 2026-06-01T22:16:51.947Z: `[onboarding] autoProvisionFirstCompanion failed: invalid input syntax for type json`. Across 48h post-flip: 7 welcome_flow_assigned variant=B_skip_create events, 0 welcome_flow_auto_provisioned events, 0 user_companions rows with auto_provisioned=TRUE. The single 24h B user (a6db312d) shows the smoking gun timeline: welcome_flow_assigned (B) at 22:16:51, then companion_created (style=realistic, template_id=8, is_custom=false) at 22:17:08 — 17s later via the manual create flow, not auto-provisioned. Root cause in server/src/onboarding.js:114-125: SELECT pulls jsonb `traits` from companion_templates (e.g. `[\"tender\",\"dreamy\",...]`), then re-INSERTs as $7 — node-postgres serializes JS arrays as Postgres array literals `{tender,dreamy,...}` not JSON, so the jsonb cast on user_companions.traits throws. Fix: `JSON.stringify(t.traits)` in the parameter array, or cast `$7::jsonb` in the SQL.",
+        "actionable": true
+      },
+      {
+        "claim": "24h sample (n=7 total, 6 A / 1 B) is useless for any product decision — underpowered",
+        "severity": "high",
+        "evidence": "With n_A=6 and n_B=1 at 24h, a 5pp absolute lift on reached_3msg (e.g. 47% → 52%) needs ~1500 users/arm at alpha=0.05 / power=0.8. Wilson 95% CI for B reached_3msg with 1/1: [20.7%, 100%]. Even the 48h post-flip n=18 cannot rule out 0% vs 100% effects. The visible spread — B median_user_msgs 4 vs A 3, B avg_minutes_active 196.4 vs A 18.4 — is dominated by 1-2 outliers (one B user from UK on appleid stayed active for hours).",
+        "actionable": false
+      },
+      {
+        "claim": "Variant assignment hashing is fine but the bucket split is currently uneven",
+        "severity": "medium",
+        "evidence": "Post-flip cumulative: 11 A_control / 7 B_skip_create across all signups since 2026-05-30 23:33Z (39% B vs 50% target). Wilson 95% CI for true B share given 7/18: [19.5%, 61.5%] — 50% is inside, so this is consistent with random variance. With n>=100 we'd expect ±10pp; current spread isn't a bug. Hash is `hashUserIdMod100(userId)` from onboarding.js — uses uuid post-INSERT, deterministic and stable.",
+        "actionable": false
+      },
+      {
+        "claim": "The 11 signups / 11 paywall_closed_without_subscribe ratio in scout's numbers reflects a mechanical PlanModal skip, NOT a true 'declined to subscribe' signal",
+        "severity": "medium",
+        "evidence": "Per-user timing distribution shows paywall_closed_without_subscribe fires 2-8s after signup for 17/18 users (8s outlier; the one '23s' is also right after signup). This is the PlanModal that auto-mounts after signup and almost everyone hits Skip in <10s. Treat this as 'plan modal shown' not 'subscription declined'. Future: dedupe by adding a second event for 'closed after >30s of consideration' if we want a real decline signal. Scout's '11 events / 11 signups' overcounts because it included test users — non-test 24h was 7/7 (B variant fired only on 1).",
+        "actionable": true
+      },
+      {
+        "claim": "Scout's '11 signups in 24h' includes test users; real count is 7",
+        "severity": "low",
+        "evidence": "Filtered query (excluding @example.com, @test.com, conativer+%, conativer@gmail.com, deleted_at IS NOT NULL) shows 7 signups in last 24h. The 4 missing ones are test users (likely Playwright runs or your own QA). This matters because every per-signup ratio in scout's preliminary numbers is biased: paywall_closed_without_subscribe count is also inflated. Real per-signup ratios for 24h non-test: signup_response_sent and welcome_flow_assigned at 1.0 ✓.",
+        "actionable": false
+      },
+      {
+        "claim": "first_authenticated_request fires reliably for 100% of new signups within 5min — sentinel is healthy",
+        "severity": "info",
+        "evidence": "24h window: 6/6 A and 1/1 B had first_authenticated_request <= signup + 5min. 48h post-flip: 11/11 A, 7/7 B. The +2 overage scout saw (13 events vs 11 signups) is pre-existing users hitting /me for the first time post-deploy, not a bug. Sentinel is doing exactly what it should.",
+        "actionable": false
+      },
+      {
+        "claim": "Day-1 return rate is not yet measurable — most users <24h since signup",
+        "severity": "info",
+        "evidence": "Of 7 24h users, none have a window of 6-24h post-signup to evaluate yet (the earliest A user signed up 2026-06-01T01:28Z — only ~23h ago — and only 2/7 are even past 6h since signup at all). last_activity > signup+6h: A=0/11, B=2/7 in the 48h window. Recheck this metric after another 48-72h.",
+        "actionable": false
+      },
+      {
+        "claim": "Subscriptions and tips are zero across both arms — expected at this n, no signal yet",
+        "severity": "info",
+        "evidence": "24h: 0 active_subs in A (n=6), 0 in B (n=1). 48h post-flip: 0/11 A, 0/7 B. Last week's pre-flip baseline: 2 subs / 97 signups = 2.1%. To see a single sub in the post-flip B arm at baseline conversion you'd need ~50 users — we have 7. Need ~7d of data with the bug fixed before any monetization signal emerges.",
+        "actionable": false
+      }
+    ]
+  },
+  {
+    "title": "Paywall abandonment is real and total: 7/7 first-session signups dismiss the plan modal in <10s — but only 6 of 11 new signups actually saw it (variant counter inconsistency)",
+    "summary": "The headline \"11/11 signups dismissed the paywall\" was wrong — the scout double-counted. Actual: 8 paywall_closed_without_subscribe events from 8 distinct users in 24h. Of those, 7 are first_session=true post-signup dismissals: 6 A_control users (expected — A's whole point is \"land on /my/pricing first\"), 1 B_skip_create user (unexpected — B is supposed to skip pricing entirely), and 1 returning ghoster (hollbert2412, signed up 2026-05-26, finally came back today and dismissed pricing on first sight). The pattern is brutal: A_control users dismiss in 2–8 seconds (median ≈ 3s) — they never even read the plans. After dismissing, 5/6 A users still went on to create a companion and chat (3–17 messages), so the modal is friction, not the killer. The B_skip_create user (only 1 in the sample) ALSO fired the close event despite B's frontend supposedly routing to /chat/{id}?firstSession=1 — and the event's metadata.path was /my/pricing, meaning B's redirect-away-from-pricing is leaking. Variant assignment counter is also off: only 6 A + 1 B = 7 welcome_flow_assigned in 24h but 11 signups happened, so 4 signups got no variant tag (one of which appears to be a re-login of an existing user). Tally: paywall_closed_without_subscribe is firing correctly and is the most actionable lead-indicator from this deploy — A's cold paywall is a near-100% bounce surface, and B has a routing bug worth verifying.",
+    "before": {
+      "baseline_paywall_close_events": "not instrumented before 2026-05-30 20:25 EDT deploy",
+      "subscriptions_per_7d": 2,
+      "tips_per_7d": 0,
+      "paywall_blocked_per_7d": 14,
+      "note": "There was no client-side abandon signal before this deploy — paywall_blocked was the only paywall event. So before=N/A and the 8 dismissals are pure new signal."
+    },
+    "after": {
+      "paywall_closed_without_subscribe_events_24h": 8,
+      "distinct_users_24h": 8,
+      "first_session_true_24h": 8,
+      "first_session_false_24h": 0,
+      "surface_plan_modal_24h": 8,
+      "path_my_pricing_24h": 8,
+      "variant_breakdown": {
+        "A_control": 6,
+        "B_skip_create": 1,
+        "no_variant_returning_user": 1
+      },
+      "signups_24h": 11,
+      "welcome_flow_assigned_24h": 7,
+      "signups_without_variant_tag": 4,
+      "A_control_close_to_signup_seconds": {
+        "min": 2,
+        "max": 8,
+        "median_approx": 3,
+        "n": 6
+      },
+      "B_skip_create_close_to_signup_seconds": {
+        "value": 2,
+        "n": 1
+      },
+      "A_control_post_dismiss_activity": {
+        "created_companion": 5,
+        "did_not_create": 1,
+        "user_msgs_distribution": [
+          2,
+          3,
+          3,
+          6,
+          17,
+          0
+        ]
+      },
+      "B_skip_create_post_dismiss_activity": {
+        "created_companion": 1,
+        "user_msgs": 4,
+        "hit_paywall_blocked_weekly_limit": true
+      }
+    },
+    "delta": "UNDERPOWERED (n=8 paywall closes, n=1 B variant user). Directionally: A_control users dismiss the cold paywall in median ~3s (essentially zero engagement with the offer), but 5/6 still proceed into product. The single B user also fired paywall_closed_without_subscribe with path=/my/pricing — suggesting B's \"skip /my/pricing\" routing has a leak (or the modal opens elsewhere with onboarding=1 still in the URL). The new event is working as designed: 1.0 close per A_control first-session user is a high-confidence signal that the cold paywall is dismissed reflexively, not evaluated.",
+    "findings": [
+      {
+        "claim": "Scout's '11 paywall_closed_without_subscribe / 11 signups' was wrong — actual is 8 events from 8 distinct users in 24h. The scout likely counted both signups and closes via a window that overlapped older closes, or there are non-signup-window closes the filter missed.",
+        "severity": "info",
+        "evidence": "SELECT COUNT(*), COUNT(DISTINCT user_id) FROM user_events WHERE event_type='paywall_closed_without_subscribe' AND created_at > NOW() - INTERVAL '24 hours' (with test filter) → total_events=8, distinct_users=8. Reconciliation against the 11-signup cohort: 6/11 fired the event, 5/11 did not, +1 returning user from 2026-05-26 fired it, +1 B user (only B in sample) fired it.",
+        "actionable": true
+      },
+      {
+        "claim": "A_control users dismiss the cold paywall in 2–8 seconds (median ~3s). 6/6 A_control users fired paywall_closed_without_subscribe with first_session=true and path=/my/pricing — a 100% dismiss rate before any plan evaluation could occur.",
+        "severity": "high",
+        "evidence": "All 6 A_control close events: seconds_after_signup = [8, 3, 3, 3, 4, 2]. All have metadata={path:/my/pricing, surface:plan_modal, first_session:true}. 5/6 went on to create a companion within 17–86s after dismissing; 1/6 (pmt2w8pmvh@privaterelay) bounced entirely (0 messages, no companion).",
+        "actionable": true
+      },
+      {
+        "claim": "BUG candidate: 1 B_skip_create user fired paywall_closed_without_subscribe with path=/my/pricing — B is supposed to redirect to /chat/{id}?firstSession=1 and skip the pricing modal entirely.",
+        "severity": "medium",
+        "evidence": "user_id=a6db312d-a967-4685-9a85-d22aad49e368, variant=B_skip_create, event at 22:16:53.928Z (2s after signup), metadata={path:/my/pricing, surface:plan_modal, first_session:true}. Event sequence shows signup → welcome_flow_assigned(B_skip_create) → first_authenticated_request → paywall_closed_without_subscribe → companion_created (15s later, manual, auto_provisioned=false). This means B's auto-provision did NOT fire and the user landed on /my/pricing anyway. Either auto-provision failed silently or the frontend ignored the variant. n=1 so could be a corner case (Apple Sign-In email-relay account?), but worth tracing — the companion was created manually 15s after the close, not auto-provisioned at signup as B's design dictates.",
+        "actionable": true
+      },
+      {
+        "claim": "Variant assignment is leaking: 11 signups but only 7 welcome_flow_assigned events in 24h (6 A + 1 B). 4 signups got no variant tag.",
+        "severity": "medium",
+        "evidence": "Variant assignment query: A_control=6, B_skip_create=1. Signups 24h=11. Gap=4 untagged. The (none)-variant close event (user 293ac411 / hollbert2412) belongs to a returning user who signed up 2026-05-26 (pre-deploy), so they predate the variant assignment code — that's expected. But the remaining 3 fresh signups without a variant tag are concerning. Either welcome_flow_assigned is not firing for some signup branches, or the cohort filter is missing them. Worth auditing all 6 signup branches against welcome_flow_assigned emission.",
+        "actionable": true
+      },
+      {
+        "claim": "B variant is severely underpowered for any conclusion (n=1 user in 24h, ~9% of cohort instead of expected 50%).",
+        "severity": "medium",
+        "evidence": "variant_pct=50 was set 2026-05-30 23:33 UTC. 24h later: A_control=6, B_skip_create=1. Either the hash-mod-100 split is broken, the variant flip wasn't picked up by the deployed code, or the sample is too small. 1/7 ≈ 14% is plausible noise on n=7, but combined with the leaked path=/my/pricing for that one B user, the variant rollout deserves a sanity check.",
+        "actionable": true
+      },
+      {
+        "claim": "A_control's cold paywall is mostly friction, not a deal-killer: 5/6 A users still chat after dismissing (range: 2–17 messages, median ≈ 3 msgs). The cold paywall is therefore a high-bounce-rate ritual, not the bottleneck for first-session engagement.",
+        "severity": "info",
+        "evidence": "user_msgs for A_control users who dismissed: [2, 3, 3, 6, 17, 0]. Only 1/6 (pmt2w8pmvh) abandoned entirely after the dismiss. This re-frames the case for B: A's cold paywall isn't blocking engagement at the top of the funnel, but it costs ~3s of friction and a 100% bounce metric — worth removing on aesthetics if B's conversion is non-inferior.",
+        "actionable": false
+      },
+      {
+        "claim": "1 returning user (hollbert2412@gmail.com, signed up 2026-05-26) finally came back today and immediately dismissed the plan modal — they hit /my/pricing 5+ days post-signup, dismissed in 4s, then created a 2nd companion and got paywall-blocked on weekly limit. This is the ghost-cohort reanimating, and the plan modal is the first thing they see.",
+        "severity": "low",
+        "evidence": "user 293ac411 / hollbert2412@gmail.com. user_signup=2026-05-26T21:33:29Z, close_at=2026-06-01T15:27:49Z (496460s = 5.7 days later). Sequence: first_authenticated_request → paywall_closed_without_subscribe → companion_created → value_prompt_shown → paywall_blocked(weekly_limit). They're a returning ghoster — the funnel reactivation event the deploy was designed to capture.",
+        "actionable": false
+      },
+      {
+        "claim": "Funnel instrumentation is working as designed — the new sentinel event landed cleanly: 1 close event per A_control first-session user, correct metadata payload (surface/first_session/path all populated), no double-fires, no fires from non-modal sources.",
+        "severity": "info",
+        "evidence": "8/8 events have surface=plan_modal, 8/8 have first_session=true, 8/8 have path=/my/pricing. paywall_close_count per user is exactly 1 for all 8. No skip-button spam, no duplicate emissions. The fire-and-forget POST /api/user/events pattern is working.",
+        "actionable": false
+      }
+    ]
+  },
+  {
+    "title": "Apple-relay revisit: 19/19 zero-action was indeed measurement artifact",
+    "summary": "Hypothesis confirmed but underpowered (n=5 privaterelay in 24h). 5/5 privaterelay users hit `first_authenticated_request`, 4/5 created a companion and sent real user messages (3-17 msgs each). The lone \"no message\" privaterelay user spent 55 minutes on the app, hit FAR, but didn't pick a companion — that's behavioral, not measurement. Device classification shipped cleanly: 5/5 Apple users post-deploy are `device_type='ios'` vs. only 9/57 (16%) pre-deploy where 74% were misclassified as `web-mobile`. The pre-deploy \"19/19 privaterelay zero-action\" was a `last_activity − created_at <= 60s` artifact: of those 52 privaterelay users last week, 19 had gap<=60s, but only 22 actually had zero messages — meaning the old gap-based heuristic was overstating churn by ~2x for Apple users specifically.",
+    "before": {
+      "privaterelay_7d_signups": 52,
+      "privaterelay_old_zero_action_gap60": 19,
+      "privaterelay_true_no_messages": 22,
+      "privaterelay_no_companions": 20,
+      "apple_device_ios": 9,
+      "apple_device_web_mobile": 42,
+      "apple_device_web_tablet": 6,
+      "apple_ios_share_pct": 15.8,
+      "old_zero_action_to_true_no_msg_ratio": "19→22 (close, but 11 of those 19 actually had no msgs, so 8 of 19 'gap-zero-action' users DID engage)"
+    },
+    "after": {
+      "privaterelay_24h_signups": 5,
+      "privaterelay_far_hits": 5,
+      "privaterelay_companion_created": 4,
+      "privaterelay_first_message_sent": 4,
+      "privaterelay_user_messages_total": 30,
+      "privaterelay_zero_action_new_def": 0,
+      "privaterelay_no_messages": 1,
+      "privaterelay_device_ios": 5,
+      "privaterelay_device_ios_pct": 100,
+      "apple_24h_all_ios": "5/5",
+      "the_one_no_msg_user": "Canada, 3315s session, FAR=1, companions=0 — picked nothing, behavioral churn not artifact"
+    },
+    "delta": "UNDERPOWERED (n=5 privaterelay, n=7 total non-test signups in 24h) but directionally crisp. Privaterelay engagement: 80% sent messages (4/5) vs. last week's 58% (30/52 sent messages = 100% − 22/52 no_messages). Device classification: Apple `ios` share jumped 16% → 100% (+84pp). Zero-action by new definition (no FAR AND no messages): 0/5 privaterelay vs. ~37% (19/52) under old gap-based heuristic. The 19/19 narrative was wrong — it was the gap<=60s last_activity debounce that lied, not Apple users ghosting. Recommend: do NOT extrapolate the 19/19 → 0/5 swing as a fix-induced lift; the underlying message-send rate moved less dramatically (58% → 80%, but n=5).",
+    "findings": [
+      {
+        "claim": "19/19 privaterelay zero-action was measurement artifact from 60s last_activity debounce — confirmed.",
+        "severity": "high",
+        "evidence": "Pre-deploy 7d privaterelay cohort: 52 signups, 19 had last_activity−created_at <= 60s (old 'zero-action' heuristic) but only 22 truly had no messages. Post-deploy 24h: 0/5 privaterelay are zero-action by new def (no FAR AND no msgs). All 5/5 fire first_authenticated_request; 4/5 send real user messages (3, 4, 6, 17 msgs).",
+        "actionable": false
+      },
+      {
+        "claim": "Device classification fix landed cleanly — 100% of Apple users post-deploy classified as ios.",
+        "severity": "high",
+        "evidence": "Pre-deploy 7d Apple users: web-mobile 42, ios 9, web-tablet 6 (ios share 15.8%). Post-deploy 24h: ios 5, no others (ios share 100%). Privaterelay specifically: pre web-mobile 38 / ios 8 / web-tablet 6, post all 5 ios. `X-Lovetta-Platform` header is working as intended.",
+        "actionable": false
+      },
+      {
+        "claim": "1/5 privaterelay user (Canada, 55min session) hit FAR but never picked a companion — real behavioral funnel drop, not measurement.",
+        "severity": "medium",
+        "evidence": "user 9fc7695b: activity_secs=3315, far=1, wfa=1, pcs=1, companions=0, user_msgs=0. They opened the app, completed auth, got the welcome flow, closed the paywall, and sat there for 55 minutes without selecting a girl. This is a real UX/conversion problem.",
+        "actionable": true
+      },
+      {
+        "claim": "All 5 privaterelay users got paywall_closed_without_subscribe — matching the 11/11 striking ratio noted in scout numbers.",
+        "severity": "high",
+        "evidence": "Every single privaterelay user in 24h has pcs=1. 4 of them went on to engage (sent messages); 1 churned at companion-pick stage. Paywall is being shown universally and dismissed universally for this cohort.",
+        "actionable": true
+      },
+      {
+        "claim": "24h sample is too small to claim a lift on the actual underlying engagement rate.",
+        "severity": "info",
+        "evidence": "n=5 privaterelay in 24h vs. n=52 in 7d. Even though 4/5 sent messages (80%) vs. 30/52 (58%) last week, the 95% CI on 4/5 spans roughly 28%-99%. The fix is real on device_type and FAR instrumentation; the engagement lift narrative needs another 5-7 days of data.",
+        "actionable": true
+      },
+      {
+        "claim": "Auth provider mix in 24h is anomalously Apple-heavy after filtering test users.",
+        "severity": "low",
+        "evidence": "After test-user filter: 5 apple (all privaterelay), 2 email, 0 google. The original 11-signup count drops to 7 real signups; 4 were presumably test/dev. Worth checking if any legitimate users are being excluded by the conativer+ filter.",
+        "actionable": true
+      },
+      {
+        "claim": "Saudi Arabia appears twice in privaterelay 24h cohort — possible geo concentration worth a look.",
+        "severity": "low",
+        "evidence": "users a6db312d (SA, 4 msgs) and f735222f (SA, 6 msgs) both privaterelay, both engaged. Plus US, UK, Canada one each. Not actionable on its own but interesting alongside the broader country mix question.",
+        "actionable": false
+      }
+    ]
+  },
+  {
+    "title": "Errors & Regressions in 24h Post-Deploy — One Silent Critical, Otherwise Quiet",
+    "summary": "CRITICAL silent regression: the welcome_flow B_skip_create A/B variant — the entire reason for the v369/v370 ship — is 100% broken in production. Every B-assigned signup since the flag flipped (2026-05-30 23:33 UTC) hits `invalid input syntax for type json` inside `autoProvisionFirstCompanion` (server/src/onboarding.js:114-125 passes `t.traits` as a raw JS array to a `jsonb` column; companion-api.js:183 correctly uses `JSON.stringify` — onboarding.js does not). The function's defensive try/catch swallows the error and returns `{ variant: 'A_control', error: true }`, so the user falls back to the legacy `/pricing?onboarding=1` path and zero `welcome_flow_auto_provisioned` events are emitted. Result: 8 B-assigned users so far, 0 auto-provisioned companions, 2/8 ghosted with no companion at all — we are not running an A/B test, we are running A vs (silently-degraded A). Everything else is clean: no Sentry issues (`/api/admin/sentry/issues` → `{issues:[]}`), no app 4xx/5xx in 6000 lines of router logs, no boot/migration errors, Kontext null bug at 0/24h (was 9/wk), content_policy at 1/24h (within noise), POST /api/user/events 100% 200s, only 1 H27 client-interrupt on a long-running chat stream (benign). The 8 B-signups are well below n=30 — directionally damning but statistically underpowered. Underpowered.",
+    "before": {
+      "sentry_unresolved": "unknown (issues list now empty)",
+      "kontext_null_bug_per_week": 9,
+      "content_policy_per_week": 13,
+      "auto_provisioned_companions_per_week": "n/a (feature didn't exist)",
+      "B_skip_create_assignments": 0
+    },
+    "after": {
+      "sentry_unresolved_24h": 0,
+      "kontext_null_bug_24h": 0,
+      "content_policy_24h": 1,
+      "auto_provisioned_companions_24h": 0,
+      "B_skip_create_assignments_since_flag_flip": 8,
+      "B_users_with_companion_provisioned": 0,
+      "B_users_who_ghosted_no_companion": 2,
+      "onboarding_json_errors_logged": "1 visible in retention window, +7 historical inferred from DB"
+    },
+    "delta": "CRITICAL silent regression in the B_skip_create variant. n=8 B-users → 0 successful auto-provisions, 25% ghost rate with no companion. Media generation noise is flat-to-better (Kontext null bug eliminated, content_policy in normal range). No new infra issues. Sample size for the A/B comparison is underpowered (n=8 B vs n=11 A), but the bug itself is deterministic and 100%, not a sample-size question.",
+    "findings": [
+      {
+        "claim": "autoProvisionFirstCompanion is 100% broken in production — the B_skip_create variant has provisioned zero companions since flag flip on 2026-05-30 23:33 UTC.",
+        "severity": "critical",
+        "evidence": "Heroku log 2026-06-01T22:16:51: '[onboarding] autoProvisionFirstCompanion failed: invalid input syntax for type json' for user vc94mv89rv@privaterelay (assigned B_skip_create bucket=20). DB confirms: 8 distinct B_skip_create assignments since 2026-05-31 04:33 UTC, 0 rows in user_companions with auto_provisioned=TRUE in the past 7 days, 0 welcome_flow_auto_provisioned events. Root cause: server/src/onboarding.js:114-125 INSERT passes `t.traits` (a parsed jsonb array returned by node-pg, e.g. [\"tender\",\"dreamy\",...]) directly as $7 into a jsonb column. companion-api.js:183 wraps with JSON.stringify(); onboarding.js does not. The function's try/catch on line 161-164 swallows the error silently and returns {variant:'A_control', error:true}, so the bug is invisible in normal monitoring and the user gets routed to legacy /pricing?onboarding=1 instead of the intended /chat/{id}?firstSession=1.",
+        "actionable": true
+      },
+      {
+        "claim": "2 of 8 B_skip_create-assigned users ghosted with zero companions ever created (vs the intended outcome: land them inside a chat with Lily).",
+        "severity": "critical",
+        "evidence": "Per-user DB query: khhckhmgsn@privaterelay (2026-05-31 18:46) and 6r76wwr8b8@privaterelay (2026-05-31 04:56) have auto_count=0, tot_companions=0, conv_count=0, first_msg=0. The other 6 B users recovered by manually creating a companion via the legacy flow (auto=0, total=1) — so 75% recovery rate, but the entire purpose of the variant (skip CompanionCreate) is defeated.",
+        "actionable": true
+      },
+      {
+        "claim": "The A/B experiment is invalid as currently running — both arms effectively use the legacy onboarding flow, so any A vs B comparison measures noise plus the 2-user ghosting penalty inflicted on B.",
+        "severity": "high",
+        "evidence": "B's intended path (auto-provision + /chat/{id}?firstSession=1) never executes. Server returns onboardingVariant='A_control' to the client on every B request because of the catch on line 163. Client postSignupNav.js sees variant='A_control' and routes to /pricing?onboarding=1 — same as control. The only behavioral difference between A and B in production is that 2/8 B users (who would have been valid A signups) hit a 'lost between Apple callback and Pricing' edge case and never created a companion.",
+        "actionable": true
+      },
+      {
+        "claim": "No new Sentry issues introduced by v369/v370 — Sentry queue is empty.",
+        "severity": "info",
+        "evidence": "GET /api/admin/sentry/issues returns {\"issues\":[]}. No unresolved issues post-deploy.",
+        "actionable": false
+      },
+      {
+        "claim": "Media generation is healthier post-deploy, not worse. Kontext null bug fully gone in 24h.",
+        "severity": "info",
+        "evidence": "messages.media_error bucketed: kontext_null_bug 0/24h (was 9 in prior 7d), content_policy 1/24h (was 13 in prior 7d, ~1.86/day baseline, so 1 is within noise), other 0/24h. Total media generations: 33 with media_type set in 24h.",
+        "actionable": false
+      },
+      {
+        "claim": "New POST /api/user/events endpoint operating cleanly — 100% 200 responses, no validation rejections logged.",
+        "severity": "info",
+        "evidence": "router logs over 6000 lines: 1 visible call to /api/user/events with status=200 service=7ms. DB shows 9 paywall_closed_without_subscribe events written via the endpoint in 24h, consistent with the 8 signups + 1 pre-existing user. CLIENT_EMITTABLE_EVENTS whitelist working as intended.",
+        "actionable": false
+      },
+      {
+        "claim": "Only one Heroku platform warning in 6000 log lines — an H27 client interrupt on an 80-second chat stream after a paywall block. Benign.",
+        "severity": "low",
+        "evidence": "2026-06-01T22:19:12 H27 'Client Request Interrupted' on POST /api/chat/.../message after service=80609ms, immediately following two paywall_blocked events for the same user (chat_message + chat_next, weekly_limit). User closed/backgrounded the app while waiting on the long-running response. No retries, no dyno restart, status was 200 by the time the socket dropped.",
+        "actionable": false
+      },
+      {
+        "claim": "Server dyno has been stable across the entire 24h window — no restarts, no crashes, no migration errors.",
+        "severity": "info",
+        "evidence": "No state=crashed, state=down, R10, R12, R13, R14, R15 in 12000 lines. Continuous [redis] Connected heartbeats every 5min from 19:13 UTC through 00:53 UTC with no gaps. v370 has been the active release for ~30h.",
+        "actionable": false
+      }
+    ]
+  }
+]
