@@ -34,3 +34,6 @@ web/ios/App/App.xcworkspace/
 web/ios/App/App/Base.lproj/
 .gstack/
 .mystack/
+
+# Heroku Postgres backup dumps
+*.dump
