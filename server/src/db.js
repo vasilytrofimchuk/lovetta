@@ -24,7 +24,7 @@ function getPool() {
   pool = new Pool({
     connectionString: url,
     ssl,
-    max: 110,
+    max: parseInt(process.env.PG_POOL_MAX || '18', 10),
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   });
