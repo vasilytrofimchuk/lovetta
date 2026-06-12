@@ -378,11 +378,13 @@ if (SENTRY_ENABLED) {
 // Start
 // Retry-on-transient-error wrapper for migrate(). Heroku Postgres essential
 // plans occasionally drop the first connection; that should never be fatal.
+// (Earlier rev had `await migrateWithRetry()` recursing into itself instead
+// of calling migrate() — fixed.)
 async function migrateWithRetry(maxAttempts = 5) {
   let lastErr;
   for (let i = 1; i <= maxAttempts; i++) {
     try {
-      await migrateWithRetry();
+      await migrate();
       return;
     } catch (err) {
       lastErr = err;
@@ -399,7 +401,7 @@ async function migrateWithRetry(maxAttempts = 5) {
 }
 
 async function start() {
-  await migrate();
+  await migrateWithRetry();
 
   app.listen(PORT, () => {
     console.log(`[lovetta] Server running on port ${PORT}`);
