@@ -17,6 +17,7 @@ const {
   isSubscriptionActive,
   TIP_AMOUNTS,
 } = require('./billing');
+const { isHardPaywalled } = require('./consumption');
 
 const router = Router();
 
@@ -25,9 +26,16 @@ router.get('/status', authenticate, async (req, res) => {
   try {
     const sub = await getUserSubscription(req.userId);
     const active = isSubscriptionActive(sub);
+    // Whether this user has any free access at all — independent of whether
+    // they are subscribed, so it stays meaningful (and testable) on its own.
+    // False + !hasSubscription is what makes the client show a non-dismissable
+    // paywall. True for grandfathered users (created before the cutover) and
+    // whenever the hard paywall is switched off in admin.
+    const freeTierAvailable = !(await isHardPaywalled(req.userId));
 
     res.json({
       hasSubscription: active,
+      freeTierAvailable,
       plan: sub?.plan || null,
       status: sub?.status || null,
       paymentProvider: getPaymentProvider(sub),

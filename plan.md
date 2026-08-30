@@ -1237,3 +1237,37 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
 - Files: server/src/daily-digest.js, server/src/migrate.js, public/admin.html.
 - Verification: `npm run test:e2e:api` — 28/28 passed, migration v59 applied cleanly.
 - Manual `POST /api/admin/digest/send` keeps bypassing the gate (it calls `sendDailyDigest()` directly), which is correct for explicit admin actions.
+
+## Hard Paywall — Remove Trial (Apple-first), Then Stripe — CODE DONE, APPLE STEPS PENDING
+- Goal: subscription required to use the app at all. Non-dismissable paywall right after signup,
+  no companion creation or chat until paid, first charge immediate (no 3-day trial).
+  Existing users grandfathered — anyone created before the cutover keeps today's free cost caps.
+- Two "trial" mechanisms removed:
+  1. Free tier cost caps ($0.10/wk, $0.30/day, $5 lifetime) — kept for grandfathered users only.
+  2. 3-day free trial: web = `trial_period_days: 3` in billing.js; iOS = App Store Connect
+     introductory offer (NOT in this repo — must be deleted in App Store Connect).
+- Design: one server helper `checkAccess(userId, sub)` in consumption.js replaces the duplicated
+  gate blocks. Two app_settings keys make it reversible from admin without a deploy:
+  `hard_paywall_enabled` (kill switch, seeded false) and `hard_paywall_cutover_at` (grandfather line).
+- Client: single `<PaywallGate>` wrapper intercepts authed routes and renders full-screen
+  non-dismissable PlanModal. Allowlist /pricing, /profile, /support, /add-email + sign-out
+  (App Store review requires support/account-deletion/logout reachable behind a paywall).
+- Apple (outside repo): delete introductory offers on lovetta_monthly/lovetta_yearly; update
+  store description + screenshots (Guideline 2.3.1 — remote-flipping a reviewed freemium app to
+  a hard paywall is a known rejection); submit new build; supply a SUBSCRIBED demo account in
+  App Review Information or the reviewer cannot get past signup.
+- Rollout: ship code with flag false → delete Apple intro offers → submit new version →
+  flip `hard_paywall_enabled` true at submission time.
+- Implementation notes:
+  - `isHardPaywalled()` fails OPEN on any error — a billing lookup blowing up must never lock a user out.
+  - `freeTierAvailable` on /api/billing/status is computed independently of `hasSubscription` so it stays
+    meaningful (and testable) on its own; the client blocks on `!hasSubscription && freeTierAvailable === false`.
+  - `isSubscriptionActive()` short-circuits to true whenever NODE_ENV is development/test, which made the
+    paywall invisible locally and untestable. Added `PAYWALL_ENFORCE=1` to force real evaluation.
+  - PaywallGate deliberately does NOT wrap /pricing, /profile, /support, /add-email — App Store review
+    rejects paywalls that trap the user away from support, restore, sign-out and account deletion.
+  - Fixed two pre-existing bugs found on the way: `trial_exhausted` was emitted by the server but matched
+    by no client code (strongest block showed a generic error instead of the paywall), and FreeLimitPopup
+    claimed "free messages reset every week" for the daily and lifetime caps too.
+- Verified: 35/35 api tests, 48/48 ui tests, plus a manual PAYWALL_ENFORCE=1 run proving the 403 on
+  companion create, the SSE `subscription_required` on chat send, and the grandfather pass-through.

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import api, { authFetch, getResponseErrorMessage } from '../lib/api';
+import { isPaywallError } from '../lib/paywall';
 
 const TIP_PROMO_MESSAGES = [
   "*smiles warmly* Hey... I love spending time with you. A little support would mean everything to me 💕",
@@ -259,7 +260,7 @@ export default function useChat(companionId) {
                 created_at: new Date().toISOString(),
               });
             } else if (event.type === 'error') {
-              if (event.code === 'subscription_required' || event.code === 'free_limit_reached') {
+              if (isPaywallError(event.code)) {
                 setError(event.code);
               } else {
                 setError("She's a bit overwhelmed right now. Try again in a moment.");

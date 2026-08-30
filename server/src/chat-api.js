@@ -16,7 +16,7 @@ let reviewerTranscriptTimer = null;
 const { buildMemoryContext, buildUserContext, processMemory } = require('./memory');
 const { getEffectiveTextLevel } = require('./content-levels');
 const { parseMediaTags, generateOrReuseMedia, getMediaFailureLine } = require('./media-chat');
-const { checkMediaBlocked, checkFreeLimit, acquireTipRequestSlot } = require('./consumption');
+const { checkMediaBlocked, checkAccess, acquireTipRequestSlot } = require('./consumption');
 const { getRedis } = require('./redis');
 const { sendPushNotification } = require('./push');
 const { logEvent, hasEvent, EVENT_TYPES } = require('./events');
@@ -468,17 +468,16 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
   res.on('close', () => { aborted = true; });
 
   try {
-    // Check subscription
+    // Check subscription — hard paywall for post-cutover users, legacy free
+    // cost caps for grandfathered ones. See checkAccess in consumption.js.
     const sub = await getUserSubscription(req.userId);
-    if (!isSubscriptionActive(sub)) {
-      const { blocked, reason } = await checkFreeLimit(req.userId);
+    {
+      const { blocked, reason, code } = await checkAccess(req.userId, isSubscriptionActive(sub));
       if (blocked) {
         logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'chat_message', companion_id: req.params.companionId, reason });
-        const code = (reason === 'daily_cap' || reason === 'lifetime_cap') ? 'trial_exhausted' : 'free_limit_reached';
         res.write(`data: ${JSON.stringify({ type: 'error', code, reason })}\n\n`);
         return res.end();
       }
-      // Under free limit — fall through and allow the message
     }
 
     const companion = await verifyCompanionOwnership(pool, req.params.companionId, req.userId);
@@ -810,15 +809,13 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
 
   try {
     const sub = await getUserSubscription(req.userId);
-    if (!isSubscriptionActive(sub)) {
-      const { blocked, reason } = await checkFreeLimit(req.userId);
+    {
+      const { blocked, reason, code } = await checkAccess(req.userId, isSubscriptionActive(sub));
       if (blocked) {
         logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'chat_next', companion_id: req.params.companionId, reason });
-        const code = (reason === 'daily_cap' || reason === 'lifetime_cap') ? 'trial_exhausted' : 'free_limit_reached';
         res.write(`data: ${JSON.stringify({ type: 'error', code, reason })}\n\n`);
         return res.end();
       }
-      // Under free limit — fall through and allow the message
     }
 
     const companion = await verifyCompanionOwnership(pool, req.params.companionId, req.userId);

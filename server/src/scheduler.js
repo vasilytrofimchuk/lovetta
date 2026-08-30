@@ -171,7 +171,12 @@ async function runWelcomeEmailSeries() {
     }
 
     // Day 3: users created 71-73h ago, still on trial, no welcome_day3
-    // Join most recently active companion for personal email
+    // Join most recently active companion for personal email.
+    // NOTE: the status='trialing' join makes this self-limiting now that the
+    // 3-day trial is gone (billing.js no longer sets trial_period_days, and
+    // the Apple introductory offers were removed) — it keeps serving the
+    // legacy in-flight trials and then goes inert on its own. Do not "fix"
+    // this by widening the join; the copy is trial-specific.
     const { rows: day3 } = await pool.query(`
       SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name,
              comp.name AS companion_name, comp.id AS companion_id

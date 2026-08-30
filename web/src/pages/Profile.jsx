@@ -446,7 +446,7 @@ export default function Profile() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-brand-muted font-medium">No active plan</p>
-                <p className="text-xs text-brand-text-secondary mt-0.5">3-day free trial included</p>
+                <p className="text-xs text-brand-text-secondary mt-0.5">Unlimited messages, photos & voice</p>
               </div>
               <button
                 onClick={() => navigate('/pricing')}

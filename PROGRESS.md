@@ -1568,3 +1568,31 @@ Based on analysis of 35 real prod users (891 messages):
 - [x] Update `plan.md` and `PROGRESS.md` with final status
 - Local server check: no node process on 3900 — production (Heroku) was the source.
 - After deploy, the next 9:00 UTC tick logs `[digest] disabled via app_settings.digest_enabled, skipping` instead of sending. Toggle in Settings tab can re-enable.
+
+## Hard Paywall — Remove Trial (Apple-first), Then Stripe
+- [x] Update `plan.md` and `PROGRESS.md` before code changes
+- [x] Migration `v68_hard_paywall` — seed `hard_paywall_enabled=false`, `hard_paywall_cutover_at=NOW()`
+- [x] `checkAccess(userId, subscriptionActive)` + `isHardPaywalled(userId)` in `server/src/consumption.js` (grandfather by users.created_at, fails open)
+- [x] Apply gate: chat send + trigger-next (`chat-api.js`), companion create (`companion-api.js`)
+- [x] Remove Stripe `trial_period_days: 3` (`server/src/billing.js`)
+- [x] `PAYWALL_ENFORCE=1` escape hatch so the paywall is testable in dev/test (isSubscriptionActive short-circuits otherwise)
+- [x] Day-3 trial email left in place — its `status='trialing'` join self-limits to legacy in-flight trials (comment added)
+- [x] Add `freeTierAvailable` to `GET /api/billing/status` (`billing-api.js`)
+- [x] Admin Settings: `hard_paywall_enabled` toggle + `hard_paywall_cutover_at` readonly display (`public/admin.html`)
+- [x] `PaywallGate` component + `PaidRoute` wrapper in `web/src/App.jsx` (/, /create, /chat/:id gated; /pricing, /profile, /support, /add-email allowlisted)
+- [x] `PlanModal.jsx`: dropped trial timeline/copy/CTA, added `dismissible` + `footer` props, KEPT price disclosure + Privacy/Terms links + Restore Purchases
+- [x] `web/src/lib/paywall.js` + `useChat.js` + `ChatPage.jsx`: handle `trial_exhausted` (live bug — it fell through to a generic toast)
+- [x] `FreeLimitPopup.jsx`: per-reason copy (old copy claimed "resets every week" for the daily/lifetime caps too)
+- [x] Copy cleanup: Pricing.jsx, Profile.jsx, CompanionList.jsx, index.html (dropped the Free plan card), support.html FAQ
+- [x] New `e2e/paywall.test.js` (5 tests) covering the kill switch + grandfather line; added to the `api` bucket
+- [x] Updated `e2e/landing.test.js` for the new landing copy (2 pricing cards, no FREE TRIAL)
+- [x] Run `npm run test:e2e:api` — 35/35 passed · `npm run test:e2e:ui` — 48/48 passed
+- [x] Manual end-to-end with `PAYWALL_ENFORCE=1`: post-cutover user → `freeTierAvailable:false`, companion create 403 `subscription_required`, chat SSE `{"code":"subscription_required","reason":"hard_paywall"}`; pre-cutover user → passes through
+- [x] Update `plan.md` and `PROGRESS.md` with final status
+
+### Still to do — Apple (manual, outside the repo)
+- [ ] Delete the introductory offers on `lovetta_monthly` / `lovetta_yearly` in App Store Connect (new subscribers only; in-flight trials keep their terms; no build needed)
+- [ ] Update App Store promotional text now (no review), then description + screenshots with the next version submission
+- [ ] `npm run build:ios` → archive + upload a new build showing the hard paywall (Guideline 2.3.1: this app renders remotely from lovetta.ai/my/, so flipping it silently diverges from the reviewed listing)
+- [ ] App Review Information: a demo account with an ACTIVE subscription, or the reviewer cannot get past signup
+- [ ] Flip `hard_paywall_enabled` to true in admin at submission time (kill switch stays available)

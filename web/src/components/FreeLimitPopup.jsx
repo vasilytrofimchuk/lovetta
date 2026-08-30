@@ -1,19 +1,40 @@
 /**
- * Custom popup shown when a free user hits their weekly usage limit.
+ * Popup shown when a message is refused for billing reasons.
  * Displayed before the PlanModal (subscription screen).
+ *
+ * `reason` is the wire code from the chat stream (see lib/paywall.js). Copy
+ * differs per code — the old single message claimed "free messages reset
+ * every week", which is false for the daily and lifetime caps.
  */
-export default function FreeLimitPopup({ isOpen, onUpgrade, onClose }) {
+const COPY = {
+  subscription_required: {
+    title: 'Subscribe to keep chatting',
+    body: 'Lovetta is subscription-only. Subscribe for unlimited conversations with your girlfriend.',
+  },
+  trial_exhausted: {
+    title: "You've used up your free messages",
+    body: 'Your free access has run out. Subscribe for unlimited conversations with your girlfriend.',
+  },
+  free_limit_reached: {
+    title: "You've used your free messages for this week",
+    body: 'Free messages reset every week. Upgrade to Premium for unlimited conversations with your girlfriend.',
+  },
+}
+
+export default function FreeLimitPopup({ isOpen, reason, onUpgrade, onClose }) {
   if (!isOpen) return null
+
+  const { title, body } = COPY[reason] || COPY.free_limit_reached
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
       <div className="w-full max-w-sm rounded-2xl bg-brand-surface border border-brand-border p-6 text-center shadow-xl">
         <div className="text-4xl mb-3">✨</div>
         <h2 className="text-lg font-bold text-brand-text">
-          You've used your free messages
+          {title}
         </h2>
         <p className="text-brand-text-secondary text-sm mt-2 leading-relaxed">
-          Free messages reset every week. Upgrade to Premium for unlimited conversations with your girlfriend.
+          {body}
         </p>
 
         <button

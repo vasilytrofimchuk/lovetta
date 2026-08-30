@@ -207,6 +207,74 @@ async function checkFreeLimit(userId) {
 }
 
 /**
+ * Whether the hard paywall applies to this user.
+ *
+ * Returns true when the app is in hard-paywall mode AND the user signed up
+ * after the cutover. Users created before `hard_paywall_cutover_at` are
+ * grandfathered onto the legacy free tier (the cost caps in checkFreeLimit).
+ *
+ * Fails OPEN (returns false) on any error or missing config — a billing
+ * lookup blowing up must never lock a paying-capable user out of the app.
+ */
+async function isHardPaywalled(userId) {
+  const pool = getPool();
+  if (!pool) return false;
+
+  try {
+    const { rows: settings } = await pool.query(
+      `SELECT key, value FROM app_settings
+       WHERE key IN ('hard_paywall_enabled', 'hard_paywall_cutover_at')`
+    );
+    const map = {};
+    for (const s of settings) map[s.key] = s.value;
+
+    // Settings values are JSON-encoded; the enabled flag is a raw boolean.
+    if (map['hard_paywall_enabled'] !== true && map['hard_paywall_enabled'] !== 'true') return false;
+
+    const cutoverRaw = map['hard_paywall_cutover_at'];
+    // No cutover stamped — paywall everyone rather than silently no-op'ing.
+    if (!cutoverRaw) return true;
+
+    const { rows } = await pool.query(
+      'SELECT created_at < $2::timestamptz AS grandfathered FROM users WHERE id = $1',
+      [userId, String(cutoverRaw)]
+    );
+    if (!rows.length) return true;
+    return !rows[0].grandfathered;
+  } catch (err) {
+    console.warn('[consumption] isHardPaywalled failed, failing open:', err.message);
+    return false;
+  }
+}
+
+/**
+ * The single access decision for "can this user use the app".
+ *
+ * `subscriptionActive` is the caller's isSubscriptionActive(sub) result —
+ * passed in rather than imported because billing.js already requires this
+ * module (importing it back would be a cycle).
+ *
+ * Returns { blocked, reason, code } where code is the wire code the client
+ * maps to a paywall:
+ *   - 'subscription_required' — hard paywall, no free tier at all
+ *   - 'trial_exhausted'       — grandfathered user past their daily/lifetime cap
+ *   - 'free_limit_reached'    — grandfathered user past the weekly threshold
+ */
+async function checkAccess(userId, subscriptionActive) {
+  if (subscriptionActive) return { blocked: false, reason: null, code: null };
+
+  if (await isHardPaywalled(userId)) {
+    return { blocked: true, reason: 'hard_paywall', code: 'subscription_required' };
+  }
+
+  const { blocked, reason } = await checkFreeLimit(userId);
+  if (!blocked) return { blocked: false, reason: null, code: null };
+
+  const code = (reason === 'daily_cap' || reason === 'lifetime_cap') ? 'trial_exhausted' : 'free_limit_reached';
+  return { blocked: true, reason, code };
+}
+
+/**
  * Invalidate threshold cache for a user (call after tip payment).
  */
 async function invalidateThresholdCache(userId) {
@@ -393,6 +461,8 @@ module.exports = {
   resetTipCounter,
   checkMediaBlocked,
   checkFreeLimit,
+  checkAccess,
+  isHardPaywalled,
   invalidateThresholdCache,
   getConsumptionSummary,
   getFishAudioUsage,

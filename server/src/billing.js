@@ -56,8 +56,10 @@ async function createSubscriptionCheckout(userId, plan, email) {
     mode: 'subscription',
     customer_email: email,
     line_items: [{ price: planConf.price, quantity: 1 }],
+    // No trial_period_days — the app is subscription-required, first charge is
+    // immediate. In-flight trials created before this change still run out
+    // normally via the webhook's trial_ends_at handling.
     subscription_data: {
-      trial_period_days: 3,
       metadata: { userId: String(userId), plan },
     },
     success_url: `${SITE_URL}/my/?checkout=success`,
@@ -792,8 +794,11 @@ async function getUserSubscription(userId) {
 }
 
 function isSubscriptionActive(sub) {
-  // In development/test, always allow access for testing
-  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') return true;
+  // In development/test, always allow access for testing.
+  // Set PAYWALL_ENFORCE=1 to evaluate subscriptions for real locally — needed
+  // to exercise the hard paywall, which is otherwise invisible in dev.
+  if (!process.env.PAYWALL_ENFORCE
+    && (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test')) return true;
   if (!sub) return false;
   if (sub.status !== 'active' && sub.status !== 'canceling' && sub.status !== 'trialing') return false;
   if (sub.current_period_end && new Date(sub.current_period_end) <= new Date()) return false;

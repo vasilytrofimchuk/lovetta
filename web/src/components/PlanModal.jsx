@@ -39,8 +39,14 @@ function openLink(url) {
  *   onClose     — called when user clicks "Skip for now" (if null, no skip button shown)
  *   onSuccess   — called after successful iOS purchase (web redirects via Stripe)
  *   fullScreen  — when true, renders without overlay wrapper (used by Pricing.jsx as a full page)
+ *   dismissible — when false, the "Skip for now" button is hidden even if onClose
+ *                 is passed. Used by PaywallGate for the hard paywall, where
+ *                 there is nothing to skip to.
+ *   footer      — optional node rendered under the actions (PaywallGate uses it
+ *                 for the support / sign-out escape hatches App Store review
+ *                 requires to stay reachable behind a paywall)
  */
-export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = false }) {
+export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = false, dismissible = true, footer = null }) {
   const pageHeight = getAppPageHeight()
   const { user } = useAuth()
   const toast = useToast()
@@ -223,27 +229,6 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
         </button>
       </div>
 
-      {/* Trial timeline */}
-      <div className="flex items-start justify-center mb-3 px-4">
-        <div className="flex flex-col items-center flex-1">
-          <div className="w-2 h-2 rounded-full bg-brand-accent border-2 border-brand-accent shadow-[0_0_8px_rgba(214,51,108,0.3)] mb-1.5" />
-          <div className="text-[0.68rem] font-bold text-brand-text leading-none">Today</div>
-          <div className="text-[0.6rem] text-brand-muted mt-0.5 whitespace-nowrap">Full access, free</div>
-        </div>
-        <div className="h-px flex-1 min-w-4 bg-brand-border mt-1" />
-        <div className="flex flex-col items-center flex-1">
-          <div className="w-2 h-2 rounded-full bg-brand-card border-2 border-brand-muted mb-1.5" />
-          <div className="text-[0.68rem] font-bold text-brand-text leading-none">Day 3</div>
-          <div className="text-[0.6rem] text-brand-muted mt-0.5">Trial ends</div>
-        </div>
-        <div className="h-px flex-1 min-w-4 bg-brand-border mt-1" />
-        <div className="flex flex-col items-center flex-1">
-          <div className="w-2 h-2 rounded-full bg-brand-card border-2 border-brand-text-secondary mb-1.5" />
-          <div className="text-[0.68rem] font-bold text-brand-text leading-none">Day 4</div>
-          <div className="text-[0.6rem] text-brand-muted mt-0.5">First charge</div>
-        </div>
-      </div>
-
       {/* Features */}
       <ul className="list-none p-0 mb-3 space-y-1.5">
         {['Unlimited messages with your girlfriend', 'Unique personality & memory', 'Voice messages & photos'].map(f => (
@@ -255,9 +240,14 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
       </ul>
 
       <div className="pt-3">
-        {/* Trial note + links */}
+        {/* Subscription disclosure + legal links.
+            App Store review requires the price, the billing period and links to
+            Terms/EULA + Privacy to be visible on the paywall — do not remove. */}
         <p className="text-[0.72rem] text-brand-muted text-center leading-snug mb-5">
-          3-day free trial, then auto-renews. Cancel anytime — no charge during trial.{' '}
+          {selectedPlan === 'yearly'
+            ? `${sub('yearly')?.priceString || '$99.99'} per year, billed today.`
+            : `${sub('monthly')?.priceString || '$19.99'} per month, billed today.`}
+          {' '}Auto-renews until cancelled. Cancel anytime.{' '}
           <button type="button" onClick={() => openLink('https://lovetta.ai/privacy.html')} className="text-brand-accent underline">Privacy Policy</button>
           {' · '}
           <button type="button" onClick={() => openLink('https://lovetta.ai/terms.html')} className="text-brand-accent underline">Terms of Service</button>
@@ -269,7 +259,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
             disabled={!!loading}
             className="w-full py-3.5 bg-brand-accent text-white rounded-xl font-semibold text-base hover:bg-brand-accent-hover transition-colors disabled:opacity-60"
           >
-            {loading ? (loadingMessage || 'Processing...') : `3 Days Free · Then ${sub(selectedPlan)?.priceString || (selectedPlan === 'yearly' ? '$99.99' : '$19.99')}/${selectedPlan === 'yearly' ? 'yr' : 'mo'}`}
+            {loading ? (loadingMessage || 'Processing...') : `Subscribe · ${sub(selectedPlan)?.priceString || (selectedPlan === 'yearly' ? '$99.99' : '$19.99')}/${selectedPlan === 'yearly' ? 'yr' : 'mo'}`}
           </button>
 
           {isAppStore() && (
@@ -288,7 +278,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
             </div>
           )}
 
-          {onClose && (
+          {onClose && dismissible && (
             <button
               onClick={() => {
                 // Instrument paywall abandonment so we can split "client never
@@ -308,6 +298,8 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
               Skip for now
             </button>
           )}
+
+          {footer}
         </div>
       </div>
     </div>

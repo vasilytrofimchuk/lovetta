@@ -9,6 +9,7 @@ import ReportModal from '../components/chat/ReportModal';
 import PlanModal from '../components/PlanModal';
 import FreeLimitPopup from '../components/FreeLimitPopup';
 import { isCapacitor } from '../lib/platform';
+import { isPaywallError } from '../lib/paywall';
 import { getAppPageHeight } from '../lib/layout';
 import api from '../lib/api';
 import { playAudio as globalPlayAudio, stopAudio as globalStopAudio, setOnStopCallback } from '../lib/audioManager';
@@ -256,7 +257,7 @@ export default function ChatPage() {
       />
 
       {/* Error banner */}
-      {error && error !== 'subscription_required' && error !== 'free_limit_reached' && (
+      {error && !isPaywallError(error) && (
         <div className="app-page-gutter py-2 bg-brand-error/10 border-t border-brand-error/20 text-center">
           <span className="text-sm text-brand-error">{error}</span>
         </div>
@@ -288,7 +289,8 @@ export default function ChatPage() {
       )}
 
       <FreeLimitPopup
-        isOpen={(error === 'free_limit_reached' || error === 'subscription_required') && !showPlanFromLimit}
+        isOpen={isPaywallError(error) && !showPlanFromLimit}
+        reason={error}
         onUpgrade={() => setShowPlanFromLimit(true)}
         onClose={() => { setShowPlanFromLimit(false); clearError(); }}
       />
