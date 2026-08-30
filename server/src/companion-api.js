@@ -8,6 +8,8 @@ const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
 const { chatCompletion, plainChatCompletion } = require('./ai');
 const { logEvent, EVENT_TYPES } = require('./events');
+const { isHardPaywalled } = require('./consumption');
+const { getUserSubscription, isSubscriptionActive } = require('./billing');
 
 function truncateNatural(text, maxWords) {
   const words = text.split(/\s+/);
@@ -114,6 +116,14 @@ router.post('/', authenticate, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'No database' });
 
   try {
+    // Hard paywall: post-cutover users must subscribe before creating anyone.
+    // Grandfathered users skip this and stay on the free tier.
+    const sub = await getUserSubscription(req.userId);
+    if (!isSubscriptionActive(sub) && await isHardPaywalled(req.userId)) {
+      logEvent(req.userId, EVENT_TYPES.PAYWALL_BLOCKED, { source: 'companion_create', reason: 'hard_paywall' });
+      return res.status(403).json({ error: 'subscription_required' });
+    }
+
     // Check max_companions limit
     const { rows: settings } = await pool.query(
       `SELECT value FROM app_settings WHERE key = 'max_companions'`

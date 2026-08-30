@@ -1395,6 +1395,34 @@ const MIGRATIONS = [
       ON CONFLICT (key) DO NOTHING;
     `,
   },
+  {
+    name: 'v68_hard_paywall',
+    sql: `
+      -- Hard paywall: a subscription is required to use the app at all.
+      -- New signups hit a non-dismissable paywall right after signup — no
+      -- companion creation, no chat until they pay.
+      --
+      -- Existing users are GRANDFATHERED: anyone whose users.created_at is
+      -- before hard_paywall_cutover_at keeps the legacy free-tier cost caps
+      -- (free_daily_cost_cap_usd / free_lifetime_cost_cap_usd /
+      -- tip_request_threshold_free_usd), which is why those settings stay.
+      --
+      -- Seeded OFF. The flag is flipped in admin Settings at the moment the
+      -- new iOS build is submitted for review, so the reviewer's session
+      -- matches the updated App Store listing (Guideline 2.3.1: remotely
+      -- flipping a reviewed freemium app to a hard paywall is a rejection
+      -- pattern, and this app loads its UI from lovetta.ai/my/).
+      INSERT INTO app_settings (key, value) VALUES
+        ('hard_paywall_enabled', 'false')
+      ON CONFLICT (key) DO NOTHING;
+
+      -- Grandfather line, stamped at migration time so every user who exists
+      -- when this deploys keeps the free tier.
+      INSERT INTO app_settings (key, value)
+      SELECT 'hard_paywall_cutover_at', to_jsonb(NOW()::text)
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

@@ -187,12 +187,13 @@ test.describe('Landing page', () => {
 
     await expect(page.locator('[data-testid="landing-rotator"]')).toBeVisible();
     await expect(page.locator('[data-testid="landing-continue"]')).toBeVisible();
-    await expect(page.locator('[data-testid="landing-trial-badge"]')).toContainText('FREE TRIAL');
+    await expect(page.locator('[data-testid="landing-plan-badge"]')).toContainText('UNLIMITED');
+    // No free plan card — the app is subscription-only.
+    await expect(page.locator('body')).not.toContainText('FREE TRIAL');
     const pricingCards = page.locator('[data-testid="landing-pricing-card"]');
-    await expect(pricingCards).toHaveCount(3);
-    await expect(pricingCards.nth(0)).toContainText('Free');
-    await expect(pricingCards.nth(1)).toContainText('Premium Monthly');
-    await expect(pricingCards.nth(2)).toContainText('Premium Yearly');
+    await expect(pricingCards).toHaveCount(2);
+    await expect(pricingCards.nth(0)).toContainText('Premium Monthly');
+    await expect(pricingCards.nth(1)).toContainText('Premium Yearly');
     await expect(page.locator('#signup-form')).toHaveCount(0);
     await expect(page.locator('#agree-terms')).toHaveCount(0);
   });

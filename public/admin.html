@@ -1223,6 +1223,10 @@
         // Onboarding & Welcome Flow (A/B) — feature flags for the direct-to-chat experiment.
         // app_settings.value is JSONB, so values arrive already-parsed (bool / number / string).
         var WELCOME_FLOW_DEFS = [
+          { key: 'hard_paywall_enabled', type: 'toggle', label: 'Hard paywall — subscription required',
+            desc: 'When ON, users who signed up AFTER the cutover below get a non-dismissable paywall: no companion creation, no chat until they subscribe. Users created before the cutover keep the legacy free-tier cost caps. Turning this OFF puts everyone back on the free tier.' },
+          { key: 'hard_paywall_cutover_at', type: 'readonly', label: 'Hard paywall cutover (grandfather line)',
+            desc: 'Stamped when the migration ran. Everyone created before this timestamp keeps free access forever.' },
           { key: 'welcome_flow_B_skip_create', type: 'toggle', label: 'Welcome Flow B — master switch',
             desc: 'When ON, a share of NEW signups skip the create &rarr; pricing screens and land directly in a chat with an auto-provisioned companion.' },
           { key: 'welcome_flow_B_variant_pct', type: 'number', min: 0, max: 100, dflt: 50, label: 'Variant B traffic %',
@@ -1261,6 +1265,9 @@
             control = '<input type="text" value="' + esc(t) + '" ' +
               'style="width:160px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;font-family:monospace;" ' +
               'onchange="saveEconSetting(\'' + def.key + '\', this.value.trim(), \'text\', this)">';
+          } else if (def.type === 'readonly') {
+            control = '<span style="font-family:monospace;font-size:0.85rem;color:var(--muted);">' +
+              esc(stripQuotes(raw) || '(not set)') + '</span>';
           } else if (def.type === 'select') {
             var sv = stripQuotes(raw) || def.dflt;
             var optionsHtml = def.options.map(function(o) {

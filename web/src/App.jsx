@@ -21,6 +21,7 @@ import SupportPage from './pages/SupportPage'
 import AddEmailPage from './pages/AddEmailPage'
 import WelcomeScreen from './pages/WelcomeScreen'
 import DesktopShell from './components/DesktopShell'
+import PaywallGate from './components/PaywallGate'
 
 function Loading() {
   const pageHeight = getAppPageHeight(isCapacitor())
@@ -44,6 +45,21 @@ function ProtectedRoute({ children }) {
   if (loading) return <Loading />
   if (!user) return <Navigate to={isCapacitor() ? '/welcome' : '/login'} replace />
   return children
+}
+
+/**
+ * Authenticated AND subscribed (or grandfathered onto the free tier).
+ * Used for the routes that consume AI: home, companion create, chat.
+ * /pricing, /profile, /support and /add-email stay on plain ProtectedRoute so
+ * an unpaid user can always reach billing, support, sign-out and account
+ * deletion — App Store review requires it.
+ */
+function PaidRoute({ children }) {
+  return (
+    <ProtectedRoute>
+      <PaywallGate>{children}</PaywallGate>
+    </ProtectedRoute>
+  )
 }
 
 function PwaInstallBanner() {
@@ -257,9 +273,9 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/" element={<ProtectedRoute><CompanionList /></ProtectedRoute>} />
-      <Route path="/create" element={<ProtectedRoute><CompanionCreate /></ProtectedRoute>} />
-      <Route path="/chat/:companionId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+      <Route path="/" element={<PaidRoute><CompanionList /></PaidRoute>} />
+      <Route path="/create" element={<PaidRoute><CompanionCreate /></PaidRoute>} />
+      <Route path="/chat/:companionId" element={<PaidRoute><ChatPage /></PaidRoute>} />
       <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
