@@ -25,6 +25,7 @@
     "test:e2e:demo": "npx playwright test --project=demo",
     "test:load": "node e2e/load-test.js",
     "build:ios": "cd web && CAPACITOR_BUILD=1 npx vite build && npx cap sync ios",
+    "ios:archive": "bash scripts/ios-archive.sh",
     "open:ios": "cd web && npx cap open ios"
   },
   "dependencies": {
