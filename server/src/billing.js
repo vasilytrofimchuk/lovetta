@@ -809,6 +809,107 @@ function isSubscriptionActive(sub) {
 
 const REVENUECAT_WEBHOOK_SECRET = (process.env.REVENUECAT_SECRET_KEY || '').trim();
 
+/**
+ * Ask RevenueCat directly whether this user owns an active subscription, and
+ * write the result to our subscriptions table.
+ *
+ * Why this exists: unlocking used to depend entirely on the RevenueCat webhook
+ * arriving before the client's 45s poll gave up. In the App Store sandbox that
+ * race is routinely lost, which is what got 1.1 rejected under 2.1(b) — the
+ * reviewer purchased successfully and the app stayed locked. Pulling the
+ * entitlement over the REST API makes unlocking synchronous and independent of
+ * webhook delivery; the webhook still handles renewals and cancellations.
+ *
+ * Returns the subscription row when active, or null. Never throws — callers
+ * fall back to whatever the webhook has already recorded.
+ */
+const REVENUECAT_API = 'https://api.revenuecat.com/v2';
+let rcProjectIdCache = process.env.REVENUECAT_PROJECT_ID || null;
+let rcProductMapCache = null; // RevenueCat product id -> store identifier
+
+async function rcGet(path, key) {
+  const res = await fetch(REVENUECAT_API + path, {
+    headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    console.warn(`[revenuecat] GET ${path} -> ${res.status}`);
+    return null;
+  }
+  return res.json();
+}
+
+async function getRcProjectId(key) {
+  if (rcProjectIdCache) return rcProjectIdCache;
+  const list = await rcGet('/projects', key);
+  rcProjectIdCache = list?.items?.[0]?.id || null;
+  return rcProjectIdCache;
+}
+
+// RevenueCat's subscription objects reference products by RC id (prod…), not by
+// the App Store identifier, so we need this map to tell monthly from yearly.
+async function getRcProductMap(projectId, key) {
+  if (rcProductMapCache) return rcProductMapCache;
+  const list = await rcGet(`/projects/${projectId}/products`, key);
+  if (!list?.items) return {};
+  rcProductMapCache = {};
+  for (const p of list.items) rcProductMapCache[p.id] = p.store_identifier || '';
+  return rcProductMapCache;
+}
+
+async function syncRevenueCatSubscription(userId) {
+  const pool = getPool();
+  if (!pool || !userId) return null;
+  const key = REVENUECAT_WEBHOOK_SECRET;
+  if (!key.startsWith('sk_')) {
+    console.warn('[revenuecat] REVENUECAT_SECRET_KEY is not a REST key — skipping direct sync');
+    return null;
+  }
+
+  try {
+    const projectId = await getRcProjectId(key);
+    if (!projectId) return null;
+
+    const subs = await rcGet(
+      `/projects/${projectId}/customers/${encodeURIComponent(userId)}/subscriptions`, key
+    );
+    if (!subs?.items?.length) return null;
+
+    // `gives_access` is RevenueCat's own verdict on whether this subscription
+    // currently entitles the customer — true for sandbox purchases too, and it
+    // covers trials and grace periods without us re-deriving the rules.
+    // Entitlements are not configured on this project, so don't use them.
+    const now = Date.now();
+    let best = null;
+    for (const s of subs.items) {
+      const ends = Number(s.current_period_ends_at) || 0;
+      const grants = s.gives_access === true || (ends > now && s.status !== 'expired');
+      if (!grants) continue;
+      if (!best || ends > Number(best.current_period_ends_at || 0)) best = s;
+    }
+    if (!best) return null;
+
+    const products = await getRcProductMap(projectId, key);
+    const storeId = products[best.product_id] || best.product_id || '';
+    const plan = /yearly|annual/i.test(storeId) ? 'yearly' : 'monthly';
+    const status = best.auto_renewal_status === 'will_not_renew' ? 'canceling' : 'active';
+    const expiresAt = Number(best.current_period_ends_at)
+      ? new Date(Number(best.current_period_ends_at)) : null;
+
+    const row = await upsertRevenueCatSubscription(pool, {
+      userId, plan, status,
+      subscriberId: best.original_customer_id || userId,
+      expiresAt,
+    });
+    console.log(`[revenuecat] direct sync: user=${userId} plan=${plan} status=${status}`
+      + `${best.environment === 'sandbox' ? ' [SANDBOX]' : ''}`);
+    try { await markRecentValuePromptsConverted(pool, userId); } catch {}
+    return row;
+  } catch (err) {
+    console.warn('[revenuecat] direct sync error:', err.message);
+    return null;
+  }
+}
+
 async function handleRevenueCatWebhook(body, authHeader) {
   // Verify webhook authorization
   if (REVENUECAT_WEBHOOK_SECRET) {
@@ -1011,6 +1112,7 @@ module.exports = {
   isIosTipThankYouReady,
   handleWebhook,
   handleRevenueCatWebhook,
+  syncRevenueCatSubscription,
   getUserSubscription,
   getPaymentProvider,
   isSubscriptionActive,
