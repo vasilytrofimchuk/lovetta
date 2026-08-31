@@ -15,6 +15,7 @@ const {
   getPaymentProvider,
   getUserSubscription,
   isSubscriptionActive,
+  syncRevenueCatSubscription,
   TIP_AMOUNTS,
 } = require('./billing');
 const { isHardPaywalled } = require('./consumption');
@@ -46,6 +47,30 @@ router.get('/status', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[billing] status error:', err.message);
     res.status(500).json({ error: 'Failed to load billing status' });
+  }
+});
+
+// -- POST /api/billing/ios/sync ---------------------------
+// Ask RevenueCat directly whether this user owns an active subscription and
+// record it, instead of waiting for the webhook. The client calls this right
+// after a purchase or restore so unlocking never depends on webhook delivery —
+// the race that App Review lost in the sandbox (2.1(b), 1.1 build 8).
+router.post('/ios/sync', authenticate, async (req, res) => {
+  try {
+    await syncRevenueCatSubscription(req.userId);
+    const sub = await getUserSubscription(req.userId);
+    const active = isSubscriptionActive(sub);
+    res.json({
+      hasSubscription: active,
+      freeTierAvailable: !(await isHardPaywalled(req.userId)),
+      plan: sub?.plan || null,
+      status: sub?.status || null,
+      paymentProvider: getPaymentProvider(sub),
+      currentPeriodEnd: sub?.current_period_end || null,
+    });
+  } catch (err) {
+    console.error('[billing] ios sync error:', err.message);
+    res.status(500).json({ error: 'Failed to sync subscription' });
   }
 });
 

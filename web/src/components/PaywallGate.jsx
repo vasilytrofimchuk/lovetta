@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
 import { getAppPageHeight } from '../lib/layout'
-import { isCapacitor } from '../lib/platform'
+import { isCapacitor, isAppStore } from '../lib/platform'
+import { syncIosSubscription } from '../lib/revenuecat'
 import PlanModal from './PlanModal'
 
 /**
@@ -39,7 +40,32 @@ export default function PaywallGate({ children }) {
     .catch(() => setStatus(null))
     .finally(() => setLoading(false))
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await api.get('/api/billing/status')
+        if (cancelled) return
+        // Self-heal: if we're about to lock out an App Store user, first ask
+        // RevenueCat directly whether they already own a subscription. A
+        // webhook that was delayed, dropped, or never sent (routine in the
+        // sandbox) must not strand a paying user on the paywall — that is
+        // exactly the 2.1(b) rejection of 1.1 build 8.
+        if (!data?.hasSubscription && data?.freeTierAvailable === false && isAppStore()) {
+          const synced = await syncIosSubscription()
+          if (cancelled) return
+          setStatus(synced?.hasSubscription ? synced : data)
+        } else {
+          setStatus(data)
+        }
+      } catch {
+        if (!cancelled) setStatus(null)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   if (loading) {
     return (

@@ -132,18 +132,45 @@ export function isRevenueCatCancelError(error) {
   )
 }
 
+/**
+ * Ask the server to pull this user's entitlement straight from RevenueCat.
+ * Returns the fresh billing status, or null if the call failed.
+ *
+ * This is the primary unlock path — the webhook is only a backstop. Waiting on
+ * webhook delivery is what left App Review locked out after a successful
+ * sandbox purchase (2.1(b) rejection of 1.1 build 8).
+ */
+export async function syncIosSubscription() {
+  try {
+    const { data } = await api.post('/api/billing/ios/sync')
+    return data
+  } catch {
+    return null
+  }
+}
+
+function isUnlocked(data) {
+  return data?.hasSubscription
+    && data?.paymentProvider === 'revenuecat'
+    && ['active', 'canceling', 'trialing'].includes(data?.status)
+}
+
 export async function waitForSubscriptionSync({ timeoutMs = SYNC_TIMEOUT_MS, intervalMs = SYNC_INTERVAL_MS } = {}) {
   const deadline = Date.now() + timeoutMs
 
+  // Direct entitlement check first — resolves immediately in both sandbox and
+  // production, so the poll below is only a fallback for transient failures.
+  const synced = await syncIosSubscription()
+  if (isUnlocked(synced)) return synced
+
   while (Date.now() < deadline) {
+    // Retry the direct check each round too — a sandbox purchase can take a
+    // moment to become visible on RevenueCat's side.
+    const again = await syncIosSubscription()
+    if (isUnlocked(again)) return again
+
     const { data } = await api.get('/api/billing/status')
-    if (
-      data?.paymentProvider === 'revenuecat'
-      && ['active', 'canceling', 'trialing'].includes(data?.status)
-      && data?.hasSubscription
-    ) {
-      return data
-    }
+    if (isUnlocked(data)) return data
     await sleep(intervalMs)
   }
 
