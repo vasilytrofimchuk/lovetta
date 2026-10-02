@@ -145,11 +145,14 @@ function unsubscribeFooter(userId) {
 
 // -- Companion email system -----------------------------------
 
-const COMPANION_EMAIL_DOMAIN = process.env.COMPANION_EMAIL_DOMAIN || 'lovetta.email';
+const COMPANION_EMAIL_DOMAIN = process.env.COMPANION_EMAIL_DOMAIN || 'lovetta.ai';
+// Companion mail used to come from a separate domain. Replies to those older
+// threads must still reach the chat for as long as that domain is alive.
+const COMPANION_EMAIL_DOMAINS = [...new Set([COMPANION_EMAIL_DOMAIN, 'lovetta.email'])];
 
 /**
  * Generate a deterministic email address for a companion.
- * e.g. luna.a3b2c1@lovetta.email
+ * e.g. luna.a3b2c1@lovetta.ai
  */
 function companionEmailAddress(name, companionId) {
   const slug = (name || 'girl').toLowerCase().replace(/[^a-z]/g, '') || 'girl';
@@ -158,7 +161,7 @@ function companionEmailAddress(name, companionId) {
 }
 
 /**
- * Parse companion identifier from an email address like luna.a3b2c1@lovetta.email.
+ * Parse companion identifier from an email address like luna.a3b2c1@lovetta.ai.
  * Returns the 6-char hex short ID.
  */
 function parseCompanionEmailId(address) {
@@ -590,5 +593,5 @@ module.exports = {
   generateUnsubscribeToken, unsubscribeLink,
   sendAppleReviewerLoginAlert, sendAppleReviewerTranscriptAlert,
   sendLowBalanceAlert,
-  ADMIN_EMAIL, ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN,
+  ADMIN_EMAIL, ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN, COMPANION_EMAIL_DOMAINS,
 };

@@ -1271,3 +1271,10 @@ Users can contact support from the Profile page. Admins view, reply, and resolve
     claimed "free messages reset every week" for the daily and lifetime caps too.
 - Verified: 35/35 api tests, 48/48 ui tests, plus a manual PAYWALL_ENFORCE=1 run proving the 403 on
   companion create, the SSE `subscription_required` on chat send, and the grandfather pass-through.
+
+## Companion mail moves to the main domain (2026-10-02)
+
+Owner's decision: stop using the separate `lovetta.email` domain (it will not be renewed; expires
+March 2027) and send companion mail from `lovetta.ai`. New mail and the address shown in the app use
+`lovetta.ai`; replies to older `@lovetta.email` threads are still accepted while that domain is alive.
+`COMPANION_EMAIL_DOMAIN` still overrides the sending domain.

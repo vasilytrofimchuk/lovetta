@@ -10,7 +10,7 @@ import useVoicePreview from '../../hooks/useVoicePreview';
 function companionEmail(name, id) {
   const slug = (name || 'girl').toLowerCase().replace(/[^a-z]/g, '') || 'girl';
   const short = (id || '').replace(/-/g, '').slice(0, 6);
-  return `${slug}.${short}@lovetta.email`;
+  return `${slug}.${short}@lovetta.ai`;
 }
 
 const GRADIENT_COLORS = [
