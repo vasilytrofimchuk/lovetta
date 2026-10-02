@@ -827,13 +827,80 @@ const FISH_AUDIO_DEFAULT_VOICE = 'b089032e45db460fb1934ece75a8c51d';
 // OpenAI STT pricing (gpt-4o-mini-transcribe)
 const STT_COST_PER_MINUTE = 0.003;
 
+// -- Speech: ElevenLabs Turbo v2.5 through fal ----------------
+//
+// Speech moved from Fish.audio to fal on 2026-10-02: the Fish account is prepaid with no way to
+// top it up automatically, it ran dry in August and every voice request has failed since. fal
+// is already what draws the pictures — one key, one bill, pay as you go.
+//
+// Voices are still stored as Fish.audio ids — on companions, on templates, in the voice picker
+// and in the preview file names — so nothing in the database or the app changes. Each id maps to
+// the ElevenLabs voice the same label had before the move to Fish (migrations v11 → v55 → v56).
+const TTS_PROVIDER = (process.env.TTS_PROVIDER || 'fal').trim().toLowerCase(); // 'fish' switches back
+const FAL_TTS_MODEL = 'fal-ai/elevenlabs/tts/turbo-v2.5';
+const FAL_TTS_COST_PER_CHAR = 0.00005; // $0.05 per 1,000 characters
+const ELEVEN_DEFAULT_VOICE = 'KF337ZXYjoHdNuYUrufC'; // Ember
+const ELEVEN_VOICE_BY_FISH_ID = {
+  b089032e45db460fb1934ece75a8c51d: 'KF337ZXYjoHdNuYUrufC', // Ember
+  '933563129e564b19a115bedd57b7406a': 'rBUHN6YO9PJUwGXk13Jt', // Aurora
+  c2623f0c075b4492ac367989aee1576f: 'XrExE9yKIg1WjnnlVkGX', // Flame (had no ElevenLabs original; the confident one)
+  '8126dcf7ccd949a2b4d83c328efb91a5': 'iCrDUkL56s3C8sCRl7wb', // Velour
+  b545c585f631496c914815291da4e893: 'FGY2WhTYpPnrIDTdsKH5', // Spark
+  e3cd384158934cc9a01029cd7d278634: 'Xb7hH8MSUJpSbSDYk0k2', // Crystal
+  b347db033a6549378b48d00acb0d06cd: 'pFZP5JQG7iQjIQuC4Bku', // Silk
+  b1e436a2375f4cdfbefc432381e385f4: 'hpp4J3VqNfWAUOO0d1Us', // Pearl
+  '59e9dc1cb20c452584788a2690c80970': 'xctasy8XvGp2cVO9HL9k', // Fizz
+  '13ea42e651954876a59109ba40c8cdb2': 'AyCt0WmAXUcPJR11zeeP', // Breeze
+  '42e70f5bc7b34a9e84abbbd6ec5572d0': 'i4CzbCVWoqvD0P1QJCUL', // Dazzle
+  '8ef4a238714b45718ce04243307c57a7': 'jpICOesdLlRSc39O1UB5', // Honey
+  '37ab9e84be5b42a18681adb35ab988d1': '6tHWtWy43FFxMeA73K4c', // Moon
+  d60c136243984ec78a3be125b2f38faf: 'wNvqdMNs9MLd1PG6uWuY', // Mist
+  df5c6c19dca944918dcbd6f1368fd02f: 'z12gfZvqqjJ9oHFbB5i6', // Fairy
+  '584afa907518428fac9b04c92ec8a563': 'ytfkKJNB1AXxIr8dKm5H', // Willow
+  '08b50a4cac844cea91a4b396bd1d10c3': 'OHY6EjdeHKeQymoihwfz', // Blossom
+  '22550e2d849b44e18c7df57f61e666f9': 'nPpkc230TdYdntJKFNby', // Echo
+};
+
+function elevenVoiceFor(voiceId) {
+  const id = String(voiceId || '');
+  if (ELEVEN_VOICE_BY_FISH_ID[id]) return ELEVEN_VOICE_BY_FISH_ID[id];
+  // A few old companions still carry an ElevenLabs id from before the Fish migration; it is
+  // already what fal wants. Anything else gets the default voice.
+  return /^[A-Za-z0-9]{20}$/.test(id) ? id : ELEVEN_DEFAULT_VOICE;
+}
+
+async function generateSpeechFal(text, voiceId) {
+  if (!FAL_KEY) throw new Error('FAL_KEY not configured');
+  // Fish reads [laughing]-style tags as sounds; this model would say the word aloud.
+  const spoken = text.replace(/\[[a-z ]+\]\s*/gi, '').replace(/\s+/g, ' ').trim();
+  if (!spoken) throw new Error('Empty text for TTS');
+  const response = await fetch(`${FAL_BASE}/${FAL_TTS_MODEL}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: spoken, voice: elevenVoiceFor(voiceId), stability: 0.5, similarity_boost: 0.75 }),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    checkAndAlertBalance('fal.ai', response.status, errText);
+    throw new Error(`fal TTS ${response.status}: ${errText.slice(0, 300)}`);
+  }
+  const url = (await response.json())?.audio?.url;
+  if (!url) throw new Error('fal TTS: no audio in the response');
+  const audio = await fetch(url, { signal: AbortSignal.timeout(60000) });
+  if (!audio.ok) throw new Error(`fal TTS: audio download ${audio.status}`);
+  const buffer = Buffer.from(await audio.arrayBuffer());
+  return { buffer, costUsd: spoken.length * FAL_TTS_COST_PER_CHAR, credits: spoken.length, provider: 'fal', model: 'elevenlabs_turbo_v2.5' };
+}
+
 /**
- * Generate speech audio from text via Fish.audio TTS API.
+ * Generate speech audio from text.
  * @param {string} text - Text to convert to speech
- * @param {string} voiceId - Fish.audio voice model ID
- * @returns {{ buffer: Buffer, costUsd: number, credits: number }}
+ * @param {string} voiceId - voice id as stored on the companion (a Fish.audio id)
+ * @returns {{ buffer: Buffer, costUsd: number, credits: number, provider: string, model: string }}
  */
 async function generateSpeech(text, voiceId = FISH_AUDIO_DEFAULT_VOICE) {
+  if (TTS_PROVIDER !== 'fish') return generateSpeechFal(text, voiceId);
   if (!FISH_AUDIO_API_KEY) throw new Error('FISH_AUDIO_API_KEY not configured');
   if (!text || !text.trim()) throw new Error('Empty text for TTS');
 
@@ -877,7 +944,7 @@ async function generateSpeech(text, voiceId = FISH_AUDIO_DEFAULT_VOICE) {
   const bytes = Buffer.byteLength(text, 'utf8');
   const costUsd = bytes * FISH_AUDIO_COST_PER_BYTE;
 
-  return { buffer, costUsd, credits: bytes };
+  return { buffer, costUsd, credits: bytes, provider: 'fish_audio', model: 'fish_s2_pro' };
 }
 
 /**

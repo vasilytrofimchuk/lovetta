@@ -1602,3 +1602,9 @@ Based on analysis of 35 real prod users (891 messages):
 - [x] `server/index.js`: inbound routing accepts both domains
 - [x] `web/src/components/chat/CompanionSheet.jsx`: shows the `@lovetta.ai` address (iOS loads the web app remotely — no native rebuild)
 - [x] Deployed to the shared server and checked there
+
+## Speech through fal instead of Fish.audio (2026-10-02)
+- [x] `server/src/ai.js`: `generateSpeech` goes to `fal-ai/elevenlabs/tts/turbo-v2.5`; the 18 voice ids map to their original ElevenLabs voices (all 17 originals verified to work through fal; Flame, which had none, gets the confident one); 32 old companions still carrying an ElevenLabs id use it directly; Fish stays behind `TTS_PROVIDER=fish`
+- [x] Fish `[laughing]`-style tags are dropped for this model (it would read them aloud)
+- [x] `server/src/tts-api.js`: consumption is recorded with the real provider and model
+- [x] Deployed, speech generated on the server for several voices, voice previews regenerated
