@@ -1278,3 +1278,12 @@ Owner's decision: stop using the separate `lovetta.email` domain (it will not be
 March 2027) and send companion mail from `lovetta.ai`. New mail and the address shown in the app use
 `lovetta.ai`; replies to older `@lovetta.email` threads are still accepted while that domain is alive.
 `COMPANION_EMAIL_DOMAIN` still overrides the sending domain.
+
+## Speech moves from Fish.audio to fal (2026-10-02)
+
+Owner's decision. The Fish.audio account is prepaid, ran dry in mid-August and every voice
+request has failed since (last paid one 2026-08-14). Speech now comes from ElevenLabs Turbo v2.5
+through fal — the provider that already draws the pictures: one key, one pay-as-you-go bill.
+Voice ids stay as they are everywhere (companions, templates, the picker, preview file names);
+`server/src/ai.js` maps each to the ElevenLabs voice the same label had before the Fish move.
+`TTS_PROVIDER=fish` switches back.

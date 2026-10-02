@@ -1,6 +1,8 @@
 /**
- * TTS + STT API — Fish.audio text-to-speech + OpenAI speech-to-text.
- * TTS: on-demand generation with R2 caching, emotion tags for Fish.audio S2.
+ * TTS + STT API — text-to-speech (ElevenLabs Turbo v2.5 through fal; Fish.audio kept as a
+ * switchable fallback, see ai.js) + OpenAI speech-to-text.
+ * TTS: on-demand generation with R2 caching; emotion tags are for Fish.audio S2 and are
+ * dropped for the fal voice.
  * STT: voice input transcription via OpenAI gpt-4o-mini-transcribe.
  */
 
@@ -120,7 +122,7 @@ router.post('/tts', authenticate, async (req, res) => {
       const ttsText = actionsToAudioTags(msg.content);
       if (!ttsText) throw new Error('No speakable text');
 
-      const { buffer, costUsd, credits } = await generateSpeech(ttsText, voiceId);
+      const { buffer, costUsd, credits, provider, model } = await generateSpeech(ttsText, voiceId);
 
       const { url: audioUrl } = await uploadBuffer(buffer, 'audio', {
         filename: messageId,
@@ -131,8 +133,8 @@ router.post('/tts', authenticate, async (req, res) => {
       await consumption.trackConsumption({
         userId: req.userId,
         companionId: msg.companion_id,
-        provider: 'fish_audio',
-        model: 'fish_s2_pro',
+        provider: provider || 'fish_audio',
+        model: model || 'fish_s2_pro',
         callType: 'tts',
         costUsd,
         metadata: { messageId, bytes: Buffer.byteLength(ttsText, 'utf8'), credits, voice: voiceId },
