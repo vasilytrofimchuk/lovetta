@@ -275,13 +275,13 @@ app.post('/api/inbound', async (req, res) => {
     }
 
     // Route to admin inbox or companion reply
-    const { ADMIN_EMAILS, COMPANION_EMAIL_DOMAIN, processAdminInbound, processCompanionReply } = require('./src/email');
+    const { ADMIN_EMAILS, COMPANION_EMAIL_DOMAINS, processAdminInbound, processCompanionReply } = require('./src/email');
     const recipientAddr = (Array.isArray(to) ? to[0] : to) || '';
     const recipientStr = typeof recipientAddr === 'object' ? (recipientAddr.address || recipientAddr.email || String(recipientAddr)) : String(recipientAddr);
 
     if (ADMIN_EMAILS.includes(recipientStr.toLowerCase())) {
       await processAdminInbound({ from, to: recipientStr, cc, subject, text, html, headers });
-    } else if (recipientStr.toLowerCase().endsWith(`@${COMPANION_EMAIL_DOMAIN}`)) {
+    } else if (COMPANION_EMAIL_DOMAINS.some((d) => recipientStr.toLowerCase().endsWith(`@${d}`))) {
       // Reply to a companion email — route to chat
       await processCompanionReply({ from, to: recipientStr, cc, subject, text, html, headers });
     }

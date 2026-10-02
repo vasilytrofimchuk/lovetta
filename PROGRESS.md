@@ -1596,3 +1596,9 @@ Based on analysis of 35 real prod users (891 messages):
 - [ ] `npm run build:ios` → archive + upload a new build showing the hard paywall (Guideline 2.3.1: this app renders remotely from lovetta.ai/my/, so flipping it silently diverges from the reviewed listing)
 - [ ] App Review Information: a demo account with an ACTIVE subscription, or the reviewer cannot get past signup
 - [ ] Flip `hard_paywall_enabled` to true in admin at submission time (kill switch stays available)
+
+## Companion mail on the main domain (2026-10-02)
+- [x] `server/src/email.js`: companion addresses are `{name}.{shortid}@lovetta.ai`; `COMPANION_EMAIL_DOMAINS` keeps `lovetta.email` accepted for replies to old threads
+- [x] `server/index.js`: inbound routing accepts both domains
+- [x] `web/src/components/chat/CompanionSheet.jsx`: shows the `@lovetta.ai` address (iOS loads the web app remotely — no native rebuild)
+- [x] Deployed to the shared server and checked there
