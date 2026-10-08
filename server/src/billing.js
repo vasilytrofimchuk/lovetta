@@ -787,10 +787,60 @@ async function getUserSubscription(userId) {
   if (!pool) return null;
 
   const { rows } = await pool.query(
-    `SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY updated_at DESC, created_at DESC LIMIT 1`,
+    // A row that still gives access wins over a newer one that does not. A user can hold two:
+    // a subscription granted by support (grantSubscription) beside a store one — and a store
+    // webhook touching the expired row must not lock them out of the gift.
+    `SELECT * FROM subscriptions WHERE user_id = $1
+      ORDER BY (status IN ('active', 'canceling', 'trialing')
+                AND (current_period_end IS NULL OR current_period_end > NOW())) DESC,
+               updated_at DESC, created_at DESC
+      LIMIT 1`,
     [userId]
   );
   return rows[0] || null;
+}
+
+/**
+ * Give a user access for a number of months, on us — compensation decided by the owner in support.
+ *
+ * Its own row (payment_provider 'gift'), never an edit of a paid one: the store and Stripe
+ * webhooks keep rewriting theirs, and a gift written into one would be undone by the next renewal
+ * or cancellation event. A second grant extends the first from wherever it currently ends.
+ */
+async function grantSubscription(userId, { months, reason, grantedBy }) {
+  const pool = getPool();
+  if (!pool) throw new Error('No database');
+  const n = parseInt(months, 10);
+  if (!Number.isInteger(n) || n < 1 || n > 36) throw new Error('months must be 1..36');
+  const why = String(reason || '').trim().slice(0, 500);
+  if (!why) throw new Error('reason required');
+  const { rows: users } = await pool.query('SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL', [userId]);
+  if (!users.length) throw new Error('user not found');
+
+  const { rows: existing } = await pool.query(
+    `SELECT id FROM subscriptions WHERE user_id = $1 AND payment_provider = 'gift' ORDER BY id DESC LIMIT 1`, [userId]
+  );
+  let sub;
+  if (existing.length) {
+    ({ rows: [sub] } = await pool.query(
+      `UPDATE subscriptions
+          SET status = 'active', updated_at = NOW(),
+              current_period_end = GREATEST(COALESCE(current_period_end, NOW()), NOW()) + make_interval(months => $2)
+        WHERE id = $1 RETURNING *`,
+      [existing[0].id, n]
+    ));
+  } else {
+    ({ rows: [sub] } = await pool.query(
+      `INSERT INTO subscriptions (user_id, plan, status, payment_provider, current_period_end, updated_at)
+       VALUES ($1, 'yearly', 'active', 'gift', NOW() + make_interval(months => $2), NOW()) RETURNING *`,
+      [userId, n]
+    ));
+  }
+  await pool.query(
+    `INSERT INTO subscription_grants (user_id, subscription_id, months, reason, granted_by) VALUES ($1, $2, $3, $4, $5)`,
+    [userId, sub.id, n, why, String(grantedBy || 'admin').slice(0, 80)]
+  );
+  return sub;
 }
 
 function isSubscriptionActive(sub) {
@@ -1114,6 +1164,7 @@ module.exports = {
   handleRevenueCatWebhook,
   syncRevenueCatSubscription,
   getUserSubscription,
+  grantSubscription,
   getPaymentProvider,
   isSubscriptionActive,
   insertTipThankYou,

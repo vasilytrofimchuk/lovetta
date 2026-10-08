@@ -736,6 +736,21 @@ router.get('/users', async (req, res) => {
   }
 });
 
+// -- POST /api/admin/users/:id/grant-subscription ----------
+// Compensation from support: access for N months on us. Body: { months, reason, grantedBy? }.
+router.post('/users/:id/grant-subscription', async (req, res) => {
+  try {
+    const { grantSubscription } = require('./billing');
+    const { months, reason, grantedBy } = req.body || {};
+    const sub = await grantSubscription(req.params.id, { months, reason, grantedBy });
+    res.json({ ok: true, subscription: { id: sub.id, plan: sub.plan, status: sub.status, paymentProvider: sub.payment_provider, currentPeriodEnd: sub.current_period_end } });
+  } catch (err) {
+    const known = /months must be|reason required|user not found/.test(err.message);
+    if (!known) console.error('[admin] grant-subscription error:', err.message);
+    res.status(known ? 400 : 500).json({ error: known ? err.message : 'Failed to grant subscription' });
+  }
+});
+
 // -- DELETE /api/admin/users/:id (soft delete) ------------
 router.delete('/users/:id', async (req, res) => {
   const pool = getPool();
@@ -876,7 +891,7 @@ router.get('/payments', async (req, res) => {
           'subscription' AS type,
           s.id,
           u.email AS user_email,
-          CASE WHEN s.plan = 'yearly' THEN 99.99 ELSE 19.99 END AS amount_usd,
+          CASE WHEN s.payment_provider = 'gift' THEN 0 WHEN s.plan = 'yearly' THEN 99.99 ELSE 19.99 END AS amount_usd,
           COALESCE(s.payment_provider, 'stripe') AS provider,
           NULL AS companion_name,
           s.status,

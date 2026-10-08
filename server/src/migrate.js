@@ -1423,6 +1423,22 @@ const MIGRATIONS = [
       ON CONFLICT (key) DO NOTHING;
     `,
   },
+  {
+    // Subscriptions granted by support as compensation (billing.js grantSubscription): who, how
+    // long and why. The access itself is a subscriptions row with payment_provider 'gift'.
+    name: 'v69_subscription_grants',
+    sql: `
+      CREATE TABLE IF NOT EXISTS subscription_grants (
+        id              SERIAL PRIMARY KEY,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subscription_id INTEGER,
+        months          INTEGER NOT NULL,
+        reason          TEXT NOT NULL,
+        granted_by      TEXT,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+    `,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

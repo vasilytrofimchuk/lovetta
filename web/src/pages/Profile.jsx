@@ -426,10 +426,10 @@ export default function Profile() {
               )}
               {subscription.currentPeriodEnd && (
                 <p className="text-sm text-brand-muted mb-3">
-                  {subscription.status === 'canceling' ? 'Ends' : 'Renews'}: {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                  {subscription.paymentProvider === 'gift' ? 'A gift from us, active until' : subscription.status === 'canceling' ? 'Ends' : 'Renews'}: {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
                 </p>
               )}
-              <button
+              {subscription.paymentProvider !== 'gift' && <button
                 onClick={() => {
                   if (subscription?.paymentProvider === 'revenuecat') {
                     window.location.href = 'https://apps.apple.com/account/subscriptions';
@@ -440,7 +440,7 @@ export default function Profile() {
                 className="w-full py-2.5 rounded-lg border border-brand-border text-brand-text-secondary text-sm hover:bg-brand-surface transition-colors"
               >
                 Manage Subscription
-              </button>
+              </button>}
             </>
           ) : (
             <div className="flex items-center justify-between">
