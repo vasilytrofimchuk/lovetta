@@ -1608,3 +1608,9 @@ Based on analysis of 35 real prod users (891 messages):
 - [x] Fish `[laughing]`-style tags are dropped for this model (it would read them aloud)
 - [x] `server/src/tts-api.js`: consumption is recorded with the real provider and model
 - [x] Deployed, speech generated on the server for several voices, voice previews regenerated
+
+## Subscription granted by support (2026-10-08, `gift-subscription`)
+- [x] `POST /api/admin/users/:id/grant-subscription { months, reason, grantedBy }` — its own `subscriptions` row with `payment_provider = 'gift'`; a second grant extends the first; who/why in `subscription_grants` (migration v69)
+- [x] `getUserSubscription` prefers a row that still gives access, so a store webhook on an expired row cannot lock a gifted user out
+- [x] Profile shows «A gift from us, active until …» without the Manage button; admin payments list counts a gift as 0
+- [x] Tests: `e2e/admin.test.js` (grant, extend, validation, auth)
