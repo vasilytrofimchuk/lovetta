@@ -72,6 +72,11 @@ module.exports = async function globalSetup() {
       JWT_REFRESH_SECRET: 'test-refresh-secret-000',
       SITE_URL: `http://localhost:${port}`,
       REVENUECAT_SECRET_KEY: process.env.REVENUECAT_SECRET_KEY || 'test-revenuecat-secret',
+      // Same fallbacks as e2e/ios-billing.test.js signs its events with. Without them a checkout
+      // with no .env (a fresh worktree, CI) answered «Stripe not configured» and the tip-webhook
+      // test failed there while passing on any machine that had a .env.
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || 'test-stripe-secret',
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || 'test-stripe-webhook-secret',
       RESEND_API_KEY: '',
       RESEND_INBOUND_SECRET: '',
     },
