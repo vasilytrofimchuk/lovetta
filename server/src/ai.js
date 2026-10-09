@@ -684,7 +684,14 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
     falData = await response.json();
   }
 
-  const falUrl = falData.images?.[0]?.url || null;
+  // The fallback model's safety filter does not refuse — it answers 200 with a BLACK image and
+  // flags it in has_nsfw_concepts. That frame used to be sent to the user and saved to the
+  // companion's catalog, where it could be reused for others (support #151, 2026-07-26: «a picture
+  // is just showing as a black screen»). A flagged frame is no image: the caller's existing
+  // «no URL» path handles it like any other failed generation.
+  const flagged = Array.isArray(falData.has_nsfw_concepts) && falData.has_nsfw_concepts.some(Boolean);
+  if (flagged) console.warn(`[ai] ${usedModel} returned a safety-filtered (black) frame — discarding it`);
+  const falUrl = flagged ? null : (falData.images?.[0]?.url || null);
   const costUsd = FAL_PRICING[usedModel] || 0.04;
 
   let imageUrl = falUrl;
