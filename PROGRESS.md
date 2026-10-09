@@ -1614,3 +1614,9 @@ Based on analysis of 35 real prod users (891 messages):
 - [x] `getUserSubscription` prefers a row that still gives access, so a store webhook on an expired row cannot lock a gifted user out
 - [x] Profile shows «A gift from us, active until …» without the Manage button; admin payments list counts a gift as 0
 - [x] Tests: `e2e/admin.test.js` (grant, extend, validation, auth)
+
+## Black pictures in chat (2026-10-08, `black-image`)
+Support #151 (26.07.2026): «a picture is just showing as a black screen».
+- [x] `server/src/ai.js` `generateCharacterImage`: the fallback model's safety filter answers 200 with a black frame flagged in `has_nsfw_concepts`; a flagged frame is now discarded (no URL) instead of being sent and saved to the catalog
+- [x] `server/src/media-chat.js`: the video path stops on a missing source image instead of cataloguing a NULL and asking for a video of nothing
+- [ ] Not done: black frames already saved in `companion_media` before this are still there and can be reused; they cannot be told apart without looking at the pictures

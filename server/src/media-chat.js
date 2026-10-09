@@ -235,6 +235,7 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
         companionId: companion.id,
         platform: opts.platform,
       });
+      if (!imgResult.url) throw new Error('Image generation returned no URL');
       sourceImageUrl = imgResult.url;
 
       // Catalog the image too
