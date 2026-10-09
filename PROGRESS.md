@@ -1623,3 +1623,6 @@ Support #151 (26.07.2026): «a picture is just showing as a black screen».
 
 ## Profile button says what it does (2026-10-08, `try-free-label`)
 - [x] `Profile.jsx`: «Try Free» → «Subscribe». The 3-day trial was removed with the hard paywall (#1); the button promised something that no longer exists (noticed in support #240)
+
+## Billing tests pass without a .env (2026-10-08, `test-stripe-fallback`)
+- [x] `e2e/global-setup.js`: the test server gets the same fallback Stripe secrets the test signs with; the tip-webhook test used to fail in any checkout without a `.env` («Stripe not configured»). 37/37 in the api bucket
