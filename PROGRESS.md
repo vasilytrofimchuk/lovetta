@@ -1620,3 +1620,6 @@ Support #151 (26.07.2026): «a picture is just showing as a black screen».
 - [x] `server/src/ai.js` `generateCharacterImage`: the fallback model's safety filter answers 200 with a black frame flagged in `has_nsfw_concepts`; a flagged frame is now discarded (no URL) instead of being sent and saved to the catalog
 - [x] `server/src/media-chat.js`: the video path stops on a missing source image instead of cataloguing a NULL and asking for a video of nothing
 - [ ] Not done: black frames already saved in `companion_media` before this are still there and can be reused; they cannot be told apart without looking at the pictures
+
+## Profile button says what it does (2026-10-08, `try-free-label`)
+- [x] `Profile.jsx`: «Try Free» → «Subscribe». The 3-day trial was removed with the hard paywall (#1); the button promised something that no longer exists (noticed in support #240)
