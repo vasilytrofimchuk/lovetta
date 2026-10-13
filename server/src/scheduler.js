@@ -69,6 +69,7 @@ async function runAbandonedPaymentReminders() {
         AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
         AND (u.email_disabled IS NULL OR u.email_disabled = false)
+        AND u.email_verified = TRUE
     `);
 
     for (const user of rows) {
@@ -113,6 +114,7 @@ async function runWelcomeEmailSeries() {
         AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
         AND (u.email_disabled IS NULL OR u.email_disabled = false)
+        AND u.email_verified = TRUE
     `);
 
     for (const user of day0) {
@@ -154,6 +156,7 @@ async function runWelcomeEmailSeries() {
         AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
         AND (u.email_disabled IS NULL OR u.email_disabled = false)
+        AND u.email_verified = TRUE
     `);
 
     for (const user of day1) {
@@ -198,6 +201,7 @@ async function runWelcomeEmailSeries() {
         AND u.email NOT LIKE '%@test.com'
         AND (u.marketing_unsubscribed IS NULL OR u.marketing_unsubscribed = false)
         AND (u.email_disabled IS NULL OR u.email_disabled = false)
+        AND u.email_verified = TRUE
     `);
 
     for (const user of day3) {
@@ -238,6 +242,7 @@ async function runRenewalReminders() {
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
         AND (u.email_disabled IS NULL OR u.email_disabled = false)
+        AND u.email_verified = TRUE
     `);
 
     for (const user of rows) {

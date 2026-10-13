@@ -15,6 +15,7 @@ const {
 } = require('./jwt');
 const { authenticate } = require('./auth-middleware');
 const { sendVerificationEmail, sendResetEmail, sendNewRegistrationNotification, sendAppleReviewerLoginAlert } = require('./email');
+const { emailDomainExists, EMAIL_DOMAIN_ERROR } = require('./email-domain');
 const { fireSignupPostback } = require('./trafficstars');
 const { classifyDevice } = require('./device');
 const { logEvent, EVENT_TYPES } = require('./events');
@@ -122,6 +123,10 @@ router.post('/signup', authLimiter, async (req, res) => {
     }
     if (!aiConsentAccepted) {
       return res.status(400).json({ error: 'You must consent to AI data processing' });
+    }
+
+    if (!(await emailDomainExists(email))) {
+      return res.status(400).json({ error: EMAIL_DOMAIN_ERROR });
     }
 
     // Check duplicate
