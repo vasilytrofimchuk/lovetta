@@ -1290,3 +1290,6 @@ Voice ids stay as they are everywhere (companions, templates, the picker, previe
 
 ## Email domain check at signup (2026-10-13, `email-domain-check`)
 Scope: stop mail to addresses that can only bounce. `server/src/email-domain.js` — DNS check (MX → A/AAAA, 3 s, a DNS failure lets the address through) on every route where a user types a new address; scheduled emails only to confirmed addresses where the app has confirmation; users on dead domains flagged in production. Status: shipped, see PROGRESS.md.
+
+## Renewal reminder audience (2026-10-13, `renewal-audience`)
+Follow-up to the email domain check: the renewal reminder is taken out from under the «confirmed address» condition; everything else scheduled keeps it. Status: shipped, see PROGRESS.md.

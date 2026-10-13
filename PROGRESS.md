@@ -1635,3 +1635,9 @@ Support #151 (26.07.2026): «a picture is just showing as a black screen».
 - [x] Tests: `e2e/email-domain.test.js` (fake DNS + a refused signup), api bucket 45/45
 - [x] Production data: 13 users on 12 dead domains (`gmail.con`, `gmail.vom`, `gmal.com`, `outlook.con`, …) set to `email_disabled = true`, reason `invalid_domain`; accounts kept. At the time 47 of 587 password signups had confirmed their address; 2 of 15 subscribers had not
 - [x] Deployed to the box 2026-10-13 and checked live: dead-domain signup → 400 and no account; `conativer+…@gmail.com` → 200, test account deleted; `/api/health` 200
+
+## Renewal reminder goes to every paying subscriber again (2026-10-13, `renewal-audience`)
+The «confirmed address only» rule added earlier today (`email-domain-check`) also caught the renewal reminder — a side effect, not a decision. A paying subscriber is reminded whether or not the address was confirmed.
+- [x] `scheduler.js`: the renewal reminder query (`RENEWAL_REMINDER_SQL`) no longer requires `email_verified`; `email_disabled` (incl. `invalid_domain`) still excludes. Welcome and come-back emails unchanged — confirmed addresses only
+- [x] Tests: `e2e/renewal-reminder.test.js` (unconfirmed subscriber is in the audience, a switched-off address is not), api bucket 49/49
+- [x] Deployed to the box 2026-10-13; the audience query was run on the production database with and without the condition
