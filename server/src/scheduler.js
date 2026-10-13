@@ -224,13 +224,11 @@ async function runWelcomeEmailSeries() {
 
 // -- Subscription renewal reminders --------------------------------
 
-async function runRenewalReminders() {
-  const pool = getPool();
-  if (!pool) return;
-
-  try {
-    // Active subscriptions renewing in ~3 days (71-73h window)
-    const { rows } = await pool.query(`
+// Who gets the renewal reminder: every paying subscriber whose period ends in
+// ~3 days. It does NOT require a confirmed address — a subscriber's card works,
+// and the notice about an upcoming charge is owed to them either way. Addresses
+// switched off (`email_disabled`, e.g. `invalid_domain`) are still skipped.
+const RENEWAL_REMINDER_SQL = `
       SELECT u.id, COALESCE(u.real_email, u.email) AS email, u.display_name, s.current_period_end
       FROM users u
       JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
@@ -242,8 +240,15 @@ async function runRenewalReminders() {
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
         AND (u.email_disabled IS NULL OR u.email_disabled = false)
-        AND u.email_verified = TRUE
-    `);
+`;
+
+async function runRenewalReminders() {
+  const pool = getPool();
+  if (!pool) return;
+
+  try {
+    // Active subscriptions renewing in ~3 days (71-73h window)
+    const { rows } = await pool.query(RENEWAL_REMINDER_SQL);
 
     for (const user of rows) {
       try {
@@ -323,4 +328,4 @@ function startScheduler() {
   startDigestWorker();
 }
 
-module.exports = { startScheduler };
+module.exports = { startScheduler, RENEWAL_REMINDER_SQL };
