@@ -1626,3 +1626,12 @@ Support #151 (26.07.2026): «a picture is just showing as a black screen».
 
 ## Billing tests pass without a .env (2026-10-08, `test-stripe-fallback`)
 - [x] `e2e/global-setup.js`: the test server gets the same fallback Stripe secrets the test signs with; the tip-webhook test used to fail in any checkout without a `.env` («Stripe not configured»). 37/37 in the api bucket
+
+## Signup refuses an email domain that does not exist (2026-10-13, `email-domain-check`)
+13.10.2026 a signup in Verbally as `…@icloud.comhevinilhan` (a name glued to the address) passed the format check; the verification and welcome emails bounced with «550 Invalid domain». Same code here, same fix.
+- [x] `server/src/email-domain.js`: asks DNS for a mail server (MX, then A/AAAA), 3 s limit; only a definite «no such domain» refuses; no live DNS under `NODE_ENV=test`
+- [x] `POST /api/auth/signup` and `PUT /api/user/real-email` answer 400 «This email domain doesn't exist — check for a typo»
+- [x] `scheduler.js`: the five scheduled emails (abandoned payment, welcome day 0/1/3, renewal reminder) also require `email_verified` — nothing scheduled goes to an unconfirmed address (Apple/Google/Telegram sign-ins are confirmed from the start). Companion/coach emails to people already chatting are unchanged
+- [x] Tests: `e2e/email-domain.test.js` (fake DNS + a refused signup), api bucket 45/45
+- [x] Production data: 13 users on 12 dead domains (`gmail.con`, `gmail.vom`, `gmal.com`, `outlook.con`, …) set to `email_disabled = true`, reason `invalid_domain`; accounts kept. At the time 47 of 587 password signups had confirmed their address; 2 of 15 subscribers had not
+- [x] Deployed to the box 2026-10-13 and checked live: dead-domain signup → 400 and no account; `conativer+…@gmail.com` → 200, test account deleted; `/api/health` 200

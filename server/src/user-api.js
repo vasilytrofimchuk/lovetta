@@ -8,6 +8,7 @@ const { authenticate } = require('./auth-middleware');
 // content-levels import removed — explicit default is now false for all platforms
 const { getVapidPublicKey } = require('./push');
 const { sendEmail, ADMIN_EMAIL } = require('./email');
+const { emailDomainExists, EMAIL_DOMAIN_ERROR } = require('./email-domain');
 const { logEvent, EVENT_TYPES } = require('./events');
 
 const router = Router();
@@ -206,6 +207,9 @@ router.put('/real-email', authenticate, async (req, res) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    if (!(await emailDomainExists(normalizedEmail))) {
+      return res.status(400).json({ error: EMAIL_DOMAIN_ERROR });
+    }
     const pool = getPool();
 
     // Check if email is already taken by another user
