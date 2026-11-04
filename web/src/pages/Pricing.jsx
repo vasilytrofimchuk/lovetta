@@ -1,3 +1,4 @@
+import { APP_STORE_URL, APP_STORE_SUBSCRIPTIONS_URL } from '../lib/appStore'
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -39,8 +40,8 @@ export default function Pricing() {
   const handleSubscribe = async (plan) => {
     setLoading(plan)
     try {
-      const { data } = await api.post('/api/billing/subscribe', { plan })
-      window.location.href = data.url
+      // Card checkout is off (2026-11-04): subscriptions are sold only in the iOS app.
+      window.location.href = APP_STORE_URL
     } catch (err) {
       toast(getErrorMessage(err))
     } finally {
@@ -54,8 +55,8 @@ export default function Pricing() {
       return
     }
     try {
-      const { data } = await api.post('/api/billing/portal')
-      window.location.href = data.url
+      // Subscriptions are managed in the App Store (card billing is off since 2026-11-04).
+      window.location.href = APP_STORE_SUBSCRIPTIONS_URL
     } catch (err) {
       toast(getErrorMessage(err))
     }

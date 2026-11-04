@@ -1641,3 +1641,11 @@ The «confirmed address only» rule added earlier today (`email-domain-check`) a
 - [x] `scheduler.js`: the renewal reminder query (`RENEWAL_REMINDER_SQL`) no longer requires `email_verified`; `email_disabled` (incl. `invalid_domain`) still excludes. Welcome and come-back emails unchanged — confirmed addresses only
 - [x] Tests: `e2e/renewal-reminder.test.js` (unconfirmed subscriber is in the audience, a switched-off address is not), api bucket 49/49
 - [x] Deployed to the box 2026-10-13; the audience query was run on the production database with and without the condition
+
+## 2026-11-04 — Card payments off; the web app is for the iOS app only (agent stripe-off-apps)
+Owner decision: card payments are off in every project except selectic.ai; Lovetta takes money only through App Store purchases. The web app at /my/ is the iOS app's web view, so it stays served, but browsers no longer get it.
+- [x] Card checkout endpoints /subscribe, /tip, /portal answer 410; the card-payment webhook answers 410; card code and the stripe package removed.
+- [x] Browser visits to /my/* go to /get-app (name, one line, App Store button) or, on iPhone/iPad, straight to the App Store (server/src/app-only.js); the bundle itself sends any non-native visitor there too (web/src/main.jsx). Kept: landing, privacy, terms, support, admin, API, store webhooks, health, and the email links /my/reset-password and /my/verify-email.
+- [x] Landing: log-in/sign-up buttons now open the App Store; "Subscriptions are available in the iOS app" line. Terms no longer promise card checkout or a billing portal.
+- [x] STRIPE_* removed from the production env (backup kept beside secrets/*.env).
+- Web/Telegram content level capped at the App Store level (text_level_web/image_level_web 2 -> 1) in production app_settings: nothing outside the iOS app gets more than the app. The iOS app was and stays at level 1.n- Card subscription of 1 user (asked to cancel 2026-09-29, still active at the provider) cancelled at the provider 2026-11-04; paid period ended 2026-10-29.

@@ -94,11 +94,6 @@ export async function startTipCheckout(amount, companionId, userId) {
     return { status: 'completed', intentId: data.intentId, tipId: synced.tipId || null, amount }
   }
 
-  // Stripe checkout for web
-  const { data } = await api.post('/api/billing/tip', {
-    amount: Math.round(amount * 100),
-    companionId,
-  })
-  window.location.href = data.url
-  return { status: 'redirected' }
+  // Card checkout is off (2026-11-04): this is sold only in the iOS app.
+  throw new Error('Available in the iOS app.')
 }
