@@ -1648,4 +1648,13 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
 - [x] Browser visits to /my/* go to /get-app (name, one line, App Store button) or, on iPhone/iPad, straight to the App Store (server/src/app-only.js); the bundle itself sends any non-native visitor there too (web/src/main.jsx). Kept: landing, privacy, terms, support, admin, API, store webhooks, health, and the email links /my/reset-password and /my/verify-email.
 - [x] Landing: log-in/sign-up buttons now open the App Store; "Subscriptions are available in the iOS app" line. Terms no longer promise card checkout or a billing portal.
 - [x] STRIPE_* removed from the production env (backup kept beside secrets/*.env).
-- Web/Telegram content level capped at the App Store level (text_level_web/image_level_web 2 -> 1) in production app_settings: nothing outside the iOS app gets more than the app. The iOS app was and stays at level 1.n- Card subscription of 1 user (asked to cancel 2026-09-29, still active at the provider) cancelled at the provider 2026-11-04; paid period ended 2026-10-29.
+- Web/Telegram content level capped at the App Store level (text_level_web/image_level_web 2 -> 1) in production app_settings: nothing outside the iOS app gets more than the app. The iOS app was and stays at level 1.
+- Card subscription of 1 user (asked to cancel 2026-09-29, still active at the provider) cancelled at the provider 2026-11-04; paid period ended 2026-10-29.
+
+## Remove TrafficJunky pixel; content levels audit (2026-11-04, `lovetta-pixel-levels`)
+- [x] Remove the TrafficJunky idsync pixel (`fl-cdn2.contentabc.com`, account 37322) from `public/index.html`, `web/index.html`; delete `web/src/lib/pixels.js` and its signup/pay calls. No env var or CSP entry existed. TrafficStars, TikTok, GA, selectic pixel untouched.
+- [x] Fix: literal `.n-` in the PR #16 PROGRESS line split into two lines.
+- [x] Deployment section of CLAUDE.md/AGENTS.md: production runs on the shared box, not Heroku.
+- [x] Content levels read from production (read-only, nothing changed): appstore text 1 / image 1 (unchanged since March 2026), telegram 1/1 (unchanged since March), web 1/1 (was 2/2, changed 2026-11-04 03:01 UTC by PR #16).
+- [x] Fix: landing test still expected web sign-up after PR #16 made Continue open the App Store.
+- [x] Deploy to the shared box; live landing in headless Playwright without console errors.

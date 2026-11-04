@@ -1293,3 +1293,6 @@ Scope: stop mail to addresses that can only bounce. `server/src/email-domain.js`
 
 ## Renewal reminder audience (2026-10-13, `renewal-audience`)
 Follow-up to the email domain check: the renewal reminder is taken out from under the «confirmed address» condition; everything else scheduled keeps it. Status: shipped, see PROGRESS.md.
+
+## Remove TrafficJunky pixel (2026-11-04, `lovetta-pixel-levels`)
+Scope: the owner does not use TrafficJunky; its idsync pixel threw a CORS console error on the landing. Removed from both HTML shells and the SPA (signup/pay events). Also a read-only audit of per-platform content levels after PR #16. Status: shipped, see PROGRESS.md.

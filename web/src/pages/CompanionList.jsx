@@ -8,7 +8,6 @@ import PlanModal from '../components/PlanModal';
 import { isCapacitor } from '../lib/platform';
 import { getAppPageHeight } from '../lib/layout';
 import RateAppBanner from '../components/RateAppBanner';
-import { trackPay } from '../lib/pixels';
 
 export default function CompanionList() {
   const { user } = useAuth();
@@ -80,7 +79,6 @@ export default function CompanionList() {
     const checkout = searchParams.get('checkout');
     const tip = searchParams.get('tip');
     if (checkout === 'success') {
-      trackPay();
       toast('Subscription activated!', { type: 'success' });
       window.history.replaceState({}, '', window.location.pathname);
       setShowPlanModal(false);

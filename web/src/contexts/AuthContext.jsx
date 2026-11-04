@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api from '../lib/api'
 import { clearOnboardingData, getPostAuthPath, readOnboardingData } from '../lib/onboarding'
-import { trackSignup } from '../lib/pixels'
 
 const AuthContext = createContext(null)
 
@@ -85,7 +84,6 @@ export function AuthProvider({ children }) {
           localStorage.removeItem('lovetta-utm-source')
           localStorage.removeItem('lovetta-utm-medium')
           localStorage.removeItem('lovetta-utm-campaign')
-          trackSignup()
           setUser(data.user)
           tgWebApp.ready?.()
           tgWebApp.expand?.()

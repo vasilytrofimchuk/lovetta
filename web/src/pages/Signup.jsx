@@ -10,7 +10,6 @@ import AppleSignIn from '../components/AppleSignIn'
 import { hasCompleteConsent, readOnboardingData, writeOnboardingData } from '../lib/onboarding'
 import { resolvePostSignupPath } from '../lib/postSignupNav'
 import { isCapacitor } from '../lib/platform'
-import { trackSignup } from '../lib/pixels'
 import { getAppPageHeight } from '../lib/layout'
 import logoSrc from '../../../public/assets/brand/logo_text.png'
 
@@ -173,7 +172,6 @@ export default function Signup() {
         aiConsentAccepted: consentData.aiConsentAccepted,
         referralCode,
       })
-      trackSignup()
       // Welcome flow B: if server auto-provisioned a companion, route straight to chat.
       const dest = resolvePostSignupPath(signupResponse) || postSignupPath
       if (nativeApp) {
@@ -189,7 +187,6 @@ export default function Signup() {
   }
 
   const handleSocialSuccess = (data) => {
-    trackSignup()
     // Welcome flow B: server may have auto-provisioned a companion — go straight to chat.
     navigate(resolvePostSignupPath(data) || postSignupPath)
   }
