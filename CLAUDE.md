@@ -241,9 +241,9 @@ Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
 
 ### Deployment
 
-- **Heroku app**: `lovetta-ai`
-- Auto-deploys from GitHub on push to main
-- Procfile: `web: node server/index.js`
+- **Production**: `ssh tracker-box`, `/opt/selectic-heroku-exit`, compose project `selectic-heroku-exit`, service `lovetta` (Heroku is retired; merging to GitHub ships nothing)
+- Deploy: back up `apps/lovetta` to `apps/lovetta.bak-<ts>.tgz`, `git archive origin/main | tar x` into `apps/lovetta`, then `docker compose --profile apps up -d --build lovetta`
+- Settings live in `secrets/lovetta.env`; public `VITE_*` build settings in `build-secrets/`
 - Migrations run automatically on server start (`migrate()` in `server/index.js`)
 
 ### DB Sync: Dev ↔ Prod

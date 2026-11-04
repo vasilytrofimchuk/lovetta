@@ -198,14 +198,11 @@ test.describe('Landing page', () => {
     await expect(page.locator('#agree-terms')).toHaveCount(0);
   });
 
-  test('Continue opens signup consent step', async ({ page }) => {
+  test('Continue leads to the App Store (web sign-up is off since PR #16)', async ({ page }) => {
     await page.goto(BASE);
 
-    await page.locator('[data-testid="landing-continue"]').click();
-    await page.waitForURL('**/my/signup?from=landing**');
-    await expect(page.getByRole('heading', { name: 'Verify your age' })).toBeVisible();
-    await expect(page.locator('button:has-text("Month")')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+    await expect(page.locator('[data-testid="landing-continue"]'))
+      .toHaveAttribute('href', /apps\.apple\.com\/app\/id6760726614/);
   });
 
   test('footer links work', async ({ page }) => {
