@@ -559,47 +559,29 @@ test.describe('Admin Settings — AI economics', () => {
   });
 });
 
-// ============================================================
-// Billing — tip with companionId
-// ============================================================
-
-test.describe('Billing — tip with companionId', () => {
-  test('POST /api/billing/tip accepts companionId', async ({ request }) => {
+// Card payments are off (2026-11-04): the card-checkout endpoints and webhook refuse.
+test.describe('Billing — card payments off', () => {
+  test('POST /api/billing/portal answers 410', async ({ request }) => {
     const user = await createTestUser(request);
-
-    // This will fail because Stripe is not configured in test, but we verify
-    // the endpoint accepts the companionId parameter without a 400 error
-    const res = await request.post(`${BASE}/api/billing/tip`, {
-      headers: user.authHeaders,
-      data: { amount: 999, companionId: '00000000-0000-4000-8000-000000000001' },
-    });
-
-    // 500 expected (Stripe not configured), NOT 400 (bad request)
-    const status = res.status();
-    expect(status).not.toBe(400);
+    const res = await request.post(`${BASE}/api/billing/portal`, { headers: user.authHeaders, data: {} });
+    expect(res.status()).toBe(410);
   });
 
-  test('POST /api/billing/tip still works without companionId', async ({ request }) => {
+  test('POST /api/billing/subscribe answers 410', async ({ request }) => {
     const user = await createTestUser(request);
-
-    const res = await request.post(`${BASE}/api/billing/tip`, {
-      headers: user.authHeaders,
-      data: { amount: 1999 },
-    });
-
-    // 500 expected (Stripe not configured), NOT 400
-    expect(res.status()).not.toBe(400);
+    const res = await request.post(`${BASE}/api/billing/subscribe`, { headers: user.authHeaders, data: {} });
+    expect(res.status()).toBe(410);
   });
 
-  test('POST /api/billing/tip rejects invalid amount', async ({ request }) => {
+  test('POST /api/billing/tip answers 410', async ({ request }) => {
     const user = await createTestUser(request);
+    const res = await request.post(`${BASE}/api/billing/tip`, { headers: user.authHeaders, data: {} });
+    expect(res.status()).toBe(410);
+  });
 
-    const res = await request.post(`${BASE}/api/billing/tip`, {
-      headers: user.authHeaders,
-      data: { amount: 1234, companionId: '00000000-0000-4000-8000-000000000001' },
-    });
-
-    expect(res.status()).toBe(400);
+  test('POST /api/webhooks/stripe answers 410', async ({ request }) => {
+    const res = await request.post(`${BASE}/api/webhooks/stripe`, { data: {} });
+    expect(res.status()).toBe(410);
   });
 });
 

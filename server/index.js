@@ -64,21 +64,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Stripe webhook MUST come before express.json() — raw body needed for signature
-app.post('/api/webhooks/stripe',
-  express.raw({ type: 'application/json' }),
-  async (req, res) => {
-    try {
-      const { handleWebhook } = require('./src/billing');
-      const sig = req.headers['stripe-signature'];
-      const result = await handleWebhook(req.body, sig);
-      res.json({ received: true, ...result });
-    } catch (err) {
-      console.error('[stripe-webhook]', err.message);
-      res.status(400).json({ error: err.message });
-    }
-  }
-);
+// Card payments are off (2026-11-04): the old card-payment webhook only answers that it is gone.
+app.post('/api/webhooks/stripe', (_req, res) => res.status(410).json({ error: 'Card payments are not available' }));
 
 // Telegram webhook (also needs raw/json body but after stripe raw handler)
 app.post('/api/webhooks/telegram', express.json(), async (req, res) => {
@@ -134,6 +121,8 @@ app.post('/api/chat/stt',
 
 app.use(express.json());
 app.use(cookieParser());
+// The web app is for the iOS app only (2026-11-04): browsers get the App Store page instead.
+app.use(require('./src/app-only')({ appStoreUrl: 'https://apps.apple.com/app/id6760726614' }));
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
 
 // API routes

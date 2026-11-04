@@ -41,7 +41,6 @@
     "jsonwebtoken": "^9.0.2",
     "patch-package": "^8.0.1",
     "pg": "^8.13.0",
-    "stripe": "^20.4.1",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

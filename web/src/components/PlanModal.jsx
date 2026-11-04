@@ -1,3 +1,4 @@
+import { APP_STORE_URL } from '../lib/appStore'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
@@ -37,7 +38,7 @@ function openLink(url) {
  * Props:
  *   isOpen      — show/hide
  *   onClose     — called when user clicks "Skip for now" (if null, no skip button shown)
- *   onSuccess   — called after successful iOS purchase (web redirects via Stripe)
+ *   onSuccess   — called after successful iOS purchase (outside the app: App Store page)
  *   fullScreen  — when true, renders without overlay wrapper (used by Pricing.jsx as a full page)
  *   dismissible — when false, the "Skip for now" button is hidden even if onClose
  *                 is passed. Used by PaywallGate for the hard paywall, where
@@ -121,8 +122,8 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
         const synced = await waitForSubscriptionSync()
         onSuccess?.(synced)
       } else {
-        const { data } = await api.post('/api/billing/subscribe', { plan })
-        window.location.href = data.url
+        // Card checkout is off (2026-11-04): subscriptions are sold only in the iOS app.
+        window.location.href = APP_STORE_URL
       }
     } catch (err) {
       if (isAppStore()) {

@@ -6,10 +6,7 @@ const { Router } = require('express');
 const { getPool } = require('./db');
 const { authenticate } = require('./auth-middleware');
 const {
-  createSubscriptionCheckout,
-  createTipCheckout,
   createIosTipIntent,
-  createPortalSession,
   getIosTipIntent,
   isIosTipThankYouReady,
   getPaymentProvider,
@@ -71,62 +68,6 @@ router.post('/ios/sync', authenticate, async (req, res) => {
   } catch (err) {
     console.error('[billing] ios sync error:', err.message);
     res.status(500).json({ error: 'Failed to sync subscription' });
-  }
-});
-
-// -- POST /api/billing/subscribe --------------------------
-router.post('/subscribe', authenticate, async (req, res) => {
-  try {
-    const { plan } = req.body || {};
-    if (!['monthly', 'yearly'].includes(plan)) {
-      return res.status(400).json({ error: 'Invalid plan. Use: monthly, yearly' });
-    }
-
-    const pool = getPool();
-    const { rows } = await pool.query('SELECT email FROM users WHERE id = $1', [req.userId]);
-    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
-
-    const session = await createSubscriptionCheckout(req.userId, plan, rows[0].email);
-    res.json({ url: session.url });
-  } catch (err) {
-    console.error('[billing] subscribe error:', err.message);
-    res.status(500).json({ error: 'Failed to create checkout session' });
-  }
-});
-
-// -- POST /api/billing/tip --------------------------------
-router.post('/tip', authenticate, async (req, res) => {
-  try {
-    const { amount, companionId } = req.body || {};
-    const amountCents = parseInt(amount, 10);
-    if (!TIP_AMOUNTS.includes(amountCents)) {
-      return res.status(400).json({ error: `Invalid amount. Use: ${TIP_AMOUNTS.join(', ')} (in cents)` });
-    }
-
-    const pool = getPool();
-    const { rows } = await pool.query('SELECT email FROM users WHERE id = $1', [req.userId]);
-    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
-
-    const session = await createTipCheckout(req.userId, amountCents, rows[0].email, companionId || null);
-
-    // Observability: write a pending tip row at checkout creation so we can see
-    // every initiation, not just succeeded ones. The webhook upgrades this row
-    // to 'succeeded' or 'failed' once Stripe confirms the outcome.
-    try {
-      await pool.query(
-        `INSERT INTO tips (user_id, amount, currency, stripe_session_id, companion_id, status)
-         VALUES ($1, $2, 'usd', $3, $4, 'pending')
-         ON CONFLICT (stripe_session_id) DO NOTHING`,
-        [req.userId, amountCents, session.id, companionId || null]
-      );
-    } catch (e) {
-      console.warn('[billing] pending tip insert failed:', e.message);
-    }
-
-    res.json({ url: session.url });
-  } catch (err) {
-    console.error('[billing] tip error:', err.message);
-    res.status(500).json({ error: 'Failed to create tip session' });
   }
 });
 
@@ -199,20 +140,12 @@ router.get('/ios/tip-intents/:id', authenticate, async (req, res) => {
   }
 });
 
-// -- POST /api/billing/portal -----------------------------
-router.post('/portal', authenticate, async (req, res) => {
-  try {
-    const sub = await getUserSubscription(req.userId);
-    if (!sub?.stripe_customer_id) {
-      return res.status(400).json({ error: 'No active subscription found' });
-    }
-
-    const session = await createPortalSession(sub.stripe_customer_id);
-    res.json({ url: session.url });
-  } catch (err) {
-    console.error('[billing] portal error:', err.message);
-    res.status(500).json({ error: 'Failed to create portal session' });
-  }
+// -- Card payments are off (owner decision 2026-11-04) --
+// Subscriptions and in-app extras are sold only through App Store purchases in the iOS app.
+// These were the card-checkout endpoints; they now refuse instead of creating a session.
+const APP_STORE_URL = 'https://apps.apple.com/app/id6760726614';
+router.post(['/portal', '/subscribe', '/tip'], (_req, res) => {
+  res.status(410).json({ error: 'Card payments are not available. Subscriptions are available in the iOS app.', appStoreUrl: APP_STORE_URL });
 });
 
 module.exports = router;
