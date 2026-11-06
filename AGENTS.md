@@ -4,6 +4,14 @@ AI girlfriend app — entertaining and intimate chat with AI-generated women. Do
 
 Express.js server + PostgreSQL + monorepo (flat structure for Phase 1).
 
+## Work board — every task is a card (since 06.11.2026)
+All work on this project goes through its board in the tracker: https://selectic.games/board.html, project `lovetta`.
+Tool: `/Users/vasily/projects/tracker/scripts/board.sh` (on mac3: `~/projects/apps-support/scripts/board.sh`).
+1. Before any work: find or file the card and take it — `board.sh list lovetta`, `board.sh add lovetta <bug|idea|admin|text> "title" "details"`, `board.sh take N`. An owner's request in chat becomes a card in the same step.
+2. Plan first: `board.sh plan N <file>`; code only after the owner's «ок» (he answers in Telegram or on the page). His remarks: `board.sh show N`.
+3. Close only when shipped and checked live: `board.sh done N "PR #…, deployed, checked …"`; no code → `board.sh reject N "why"`; check later → `board.sh defer N 'YYYY-MM-DD'`.
+4. PROGRESS.md and plan.md are the story, not the queue: no new `- [ ]` lists; a finished card gets a short section with its number.
+
 ### Brand & Style Guide
 
 **Accent color: `#d6336c` (hot pink).** Use this for ALL buttons, links, highlights, and interactive elements.
@@ -100,31 +108,9 @@ Run E2E tests **only when changes could break functionality**. **Text/copy-only 
 - **Do NOT hardcode `localhost:3900`** in test files — always use `BASE` from `e2e/helpers.js`
 - Port 3900 is reserved for `npm run dev` only
 
-### Plan + Progress Tracking — MANDATORY
+### Plan + Progress Tracking
 
-Shared tracking files exist in the project root:
-- `plan.md`
-- `PROGRESS.md`
-
-#### BEFORE writing ANY code:
-1. **Read `plan.md` and `PROGRESS.md`** — check what's done, avoid duplicating work
-2. **Update `plan.md`** with the current task scope and planned execution steps
-3. **Add a new section header** for your task in `PROGRESS.md`
-4. **List ALL planned tasks** as unchecked `- [ ]` items in `PROGRESS.md` BEFORE executing
-
-#### DURING execution:
-- Keep `plan.md` current if scope or execution order changes
-- Mark each task in `PROGRESS.md` as `[x]` immediately after completing it
-- Add new sub-tasks as discovered to both files
-
-#### AFTER execution:
-1. **Update `plan.md`** with final status and implementation notes
-2. **Update `PROGRESS.md`** by marking completed items and noting remaining follow-ups
-3. Do NOT mark the task complete until both files are updated
-
-#### Rules:
-- Do NOT remove existing items. Only append and update statuses.
-- ALL work gets logged in both files — no exceptions.
+Replaced by the work board — see «Work board — every task is a card» at the top. `plan.md` and `PROGRESS.md` stay as the project's story (append-only), not a to-do list.
 
 ### Tech Stack
 

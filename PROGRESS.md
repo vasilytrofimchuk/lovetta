@@ -1658,3 +1658,10 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
 - [x] Content levels read from production (read-only, nothing changed): appstore text 1 / image 1 (unchanged since March 2026), telegram 1/1 (unchanged since March), web 1/1 (was 2/2, changed 2026-11-04 03:01 UTC by PR #16).
 - [x] Fix: landing test still expected web sign-up after PR #16 made Continue open the App Store.
 - [x] Deploy to the shared box; live landing in headless Playwright without console errors.
+
+## Открытые пункты перенесены на доску (06.11.2026)
+Живые пункты стали карточками на доске трекера (проект `lovetta`, https://selectic.games/board.html):
+- #17 Чёрные картинки, сохранённые до 8 октября, всё ещё могут приходить в чат
+- #18 Жёсткая подписка в App Store: проверить, всё ли доведено
+- #19 Вкладка «Разбор чатов» в админке
+- 49 пунктов признаны неактуальными: прогоны тестов и коммиты давно законченной работы, ручные шаги первого выпуска в App Store (приложение давно в магазине), работа над пробным периодом на сайте (пробный период убран), правка сдвига при клавиатуре (перекрыта общим исправлением экрана iOS), уже сделанная правка кнопки Apple.
