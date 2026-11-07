@@ -1702,3 +1702,13 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
 ## Minor safety hard line (2026-11-07, card #212)
 - [x] Chat review found the companion carrying on sexual role-play about a 13-year-old and about the player's children (28.10, iOS app). Causes: the player-message scan only logged, the reply scan missed "thirteenth bday", refusal recovery pushed the model past refusals and onto the uncensored fallback.
 - [x] `server/src/minor-safety.js`: player message + last 6 messages checked before any model call (age-guard regexes, childhood/incest-with-minor phrasing, OpenAI omni-moderation `sexual/minors`), every reply after; a hit gets a fixed refusal and a `minor_safety_block` event. Birthday-age patterns added to age-guard. Tests: ai 159/159.
+- [x] Card #212, chat-review fixes (owner «ок» 07.11):
+  - Text level 0–1 (store apps): every reply moderated; an explicit one is rewritten once under `LEVEL_ENFORCE_PROMPT`, then the companion backstop. The uncensored fallback model only at level ≥2. Backstop uses the main model and no longer says "not so fast / take it slow".
+  - No lecturing: `NO_LECTURE_RULES` in every content prompt (one warm line + what IS allowed; never "earn it / not yet / not for sale"); image rules and "never claim a photo without the SEND tag" in the chat prompt.
+  - Photos: image level in the PuLID prompt (it was missing), provider safety checker on at image level 0–1, "solo, no other people", "adult woman in her mid-twenties" instead of "18+"; blank frames (<60 KB) discarded like flagged ones. Videos: within the level; a provider-refused video sends its source photo instead.
+  - Media failure lines rewritten (no brackets, no "earn it / greedy / be patient"); bracketed fake photos become real photo requests; her own media marker reads "[I sent him a photo of myself]".
+  - Upsell not after a ≥12 h gap, not with a refusal, not on top of media being sent.
+  - Reactivation notes: max 3 per chat since the user last wrote, three varied texts (was one text every 3 days for months).
+  - Repetition: recent actions and openers are listed in the prompt as "use something different"; action/scene in the reply's language; scene line built from the recent chat, no dim/moonlit default.
+  - Replies are saved even when the player leaves mid-reply (iOS app switch) — 4 chats had unanswered messages.
+  - Tests: ai 163, api 52, ui 48.

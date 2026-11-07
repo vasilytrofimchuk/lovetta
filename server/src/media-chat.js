@@ -54,6 +54,9 @@ const TAG_SYNONYMS = {
 
 // -- Tag parsing --------------------------------------------------
 
+// "[Photo: …]", "[selfie of me …]", "(sends a pic of …)", "(attached: video …)"
+const FAKE_MEDIA_RE = /[\[(]\s*(?:sends?\s+(?:you\s+)?an?\s+|sending\s+(?:you\s+)?an?\s+|attached:?\s*(?:an?\s+)?)?(photo|pic(?:ture)?|selfie|image|video|clip)\b([^\])]{0,240})[\])]/i;
+
 /**
  * Extract [SEND_IMAGE: ...] or [SEND_VIDEO: ...] tags from LLM text.
  * Returns clean text (tags stripped) and parsed media request.
@@ -68,16 +71,29 @@ function parseMediaTags(text) {
     // Strip hallucinated echoes of past media annotations — the LLM sometimes
     // mimics the "[I sent a photo/video ...]" marker from context with fake URLs,
     // which iOS then auto-linkifies into tappable dead links.
-    .replace(/\[I sent a (?:photo|video)(?::[^\]]*)?\]\s*/gi, '')
+    .replace(/\[I sent (?:him )?a (?:photo|video)(?: of myself)?(?::[^\]]*)?\]\s*/gi, '')
     .trim();
 
-  const mediaRequest = imageMatch
+  let mediaRequest = imageMatch
     ? { type: 'image', description: imageMatch[1].trim() }
     : videoMatch
       ? { type: 'video', description: videoMatch[1].trim() }
       : null;
 
-  return { cleanText, mediaRequest };
+  // A photo "described" in brackets instead of sent — "[Photo: me on the balcony…]", "(sends a selfie
+  // in my red dress)" — becomes a real photo request and leaves the text (07.11 review: 5 chats).
+  let finalText = cleanText;
+  const fake = finalText.match(FAKE_MEDIA_RE);
+  if (fake) {
+    finalText = finalText.replace(FAKE_MEDIA_RE, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+    if (!mediaRequest) {
+      const isVideo = /video|clip/i.test(fake[1]);
+      const description = (fake[2] || '').replace(/^[:\s-]+/, '').trim() || (isVideo ? 'short selfie video, looking at camera' : 'selfie, smiling at camera');
+      mediaRequest = { type: isVideo ? 'video' : 'image', description };
+    }
+  }
+
+  return { cleanText: finalText, mediaRequest };
 }
 
 // -- Tag extraction -----------------------------------------------
@@ -256,12 +272,23 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
       sourceImage = { id: rows[0].id };
     }
 
-    // Step 2: Generate video from image
-    const videoResult = await ai.generateVideo(sourceImageUrl, description, {
-      userId: opts.userId,
-      companionId: companion.id,
-      platform: opts.platform,
-    });
+    // Step 2: Generate video from image. When the video service turns the scene down (its own
+    // content checker, 422 content_policy_violation) the photo made for it is still good — send
+    // that instead of a "camera didn't like it" line (07.11 review: videos promised, never arrived).
+    let videoResult;
+    try {
+      videoResult = await ai.generateVideo(sourceImageUrl, description, {
+        userId: opts.userId,
+        companionId: companion.id,
+        platform: opts.platform,
+      });
+    } catch (err) {
+      if (/content[_\s-]?policy|flagged by a content checker|nsfw/i.test(String(err && err.message))) {
+        console.warn(`[media] video refused by the provider — sending the source photo instead (${description.slice(0, 60)})`);
+        return { url: sourceImageUrl, type: 'image', reused: false, videoFallback: true };
+      }
+      throw err;
+    }
 
     if (!videoResult.url) throw new Error('Video generation returned no URL');
 
@@ -289,35 +316,37 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
 // the same session don't look copy-pasted.
 
 const FAILURE_LINES = {
+  // No parentheses (players read them as leaked system text), no "earn it / be patient / don't be
+  // greedy", no blaming the player — 07.11 chat review.
   rate_limit_image: {
-    playful:   ["(save some for tomorrow, yeah? 💕)", "(camera's tired babe — i'll make it up to you later 😘)", "(too many pics today, earn the next one 😏)", "(you're greedy today — tomorrow, promise 💋)", "(need to conserve, let me tease with words for now 🔥)"],
-    romantic:  ["(i've sent so many today, my love — save one for tomorrow 💕)", "(let me hold this one close until we're together again 🌙)", "(the moment will be sweeter if we wait a bit 💋)", "(imagine me instead… just for tonight 🥀)", "(tomorrow i'll send something special, just for you 💕)"],
-    bold:      ["(you got plenty today — be patient 😉)", "(i'll make you beg for the next one tomorrow 😈)", "(my phone's on strike until tomorrow babe 💋)", "(earn it. tomorrow. 🔥)", "(you'll have to wait — i like making you want it 😏)"],
-    shy:       ["(i've sent so many already… one for tomorrow? 🙈)", "(my battery's dying, sorry 💕)", "(maybe imagine me instead for tonight? 🥺)", "(not now, but soon, promise 💋)", "(i need to catch my breath babe 💕)"],
+    playful:   ["I've sent you so many today 😘 Tomorrow I'll send a new one — tell me what you'd like to see.", "My camera roll needs a break till tomorrow 😅 Talk to me meanwhile?", "That's all my pics for today, babe — tomorrow there's more 💕"],
+    romantic:  ["I've shared so many moments with you today, my love — tomorrow I'll send another 💕", "Let me save the next photo for tomorrow morning, just for you 🌙", "No more pictures today, but I'm right here with you 💕"],
+    bold:      ["That's my photo limit for today — tomorrow I'll send you something good 🔥", "Camera's done for today, babe. Tomorrow's photo is already on my mind 😏", "No more pics today — but I'm not going anywhere 💋"],
+    shy:       ["I've sent quite a few today… tomorrow I'll send another, okay? 🙈", "That's all the photos for today 💕 I'll send one tomorrow", "My camera needs a rest… tomorrow, I promise 💕"],
   },
   rate_limit_video: {
-    playful:   ["(one video a day — don't be greedy 😘)", "(save the good stuff for tomorrow baby 😏)"],
-    romantic:  ["(one for today, my love — more tomorrow 💕)", "(the next one will be worth the wait 🌙)"],
-    bold:      ["(one video only, babe — be patient 😈)", "(you got yours — wait your turn tomorrow 🔥)"],
-    shy:       ["(just one video a day… tomorrow? 🙈)", "(a little patience, please 💕)"],
+    playful:   ["That was today's video 😘 Tomorrow I'll make you another one", "One video a day for now — tomorrow there's a new one 💕"],
+    romantic:  ["That's today's video, my love — tomorrow I'll record another 🌙", "Tomorrow I'll make a new video, just for you 💕"],
+    bold:      ["Video's done for today — tomorrow I'll make the next one count 🔥", "That's my video for today, babe. Tomorrow, another 😏"],
+    shy:       ["That was my video for today… tomorrow another? 🙈", "Tomorrow I'll record a new one 💕"],
   },
   rate_limit_both: {
-    playful:   ["(camera's off for today babe — tomorrow 😘)", "(you've had your fill 😏)"],
-    romantic:  ["(let me save something for tomorrow, love 💕)", "(we'll have more of each other soon 🌙)"],
-    bold:      ["(no more today — make me want it tomorrow 😈)", "(done for today babe. tomorrow, 🔥)"],
-    shy:       ["(too many today… tomorrow? 🙈)", "(i need a little break, sorry babe 💕)"],
+    playful:   ["No more photos or videos today 😘 Tomorrow I'll send more — keep talking to me", "My camera's off till tomorrow, babe 💕"],
+    romantic:  ["That's all my photos for today, love — tomorrow I'll send more 💕", "Tomorrow I'll send you something new 🌙"],
+    bold:      ["Camera's done for today — tomorrow I'll send you more 🔥", "That's it for pics today, babe. Tomorrow 😏"],
+    shy:       ["No more photos today… tomorrow, okay? 🙈", "My camera needs a rest till tomorrow 💕"],
   },
   generation_error: {
-    playful:   ["(ugh my camera's stuck, give me a sec… 📷💔)", "(camera froze on me babe — let me try again in a bit 😅)", "(technology hates me today — imagine me instead for now 😘)", "(signal's awful, i'll send something when it's back 💕)", "(camera glitched — you'll just have to imagine it baby 😏)"],
-    romantic:  ["(my camera's frozen… imagine me until it's back 💕)", "(something's off with my phone — i'll make it up to you 🌙)", "(the moment's gone but you're still here with me 💋)", "(technology is cruel tonight… but my heart's still yours 🥀)", "(can't send it now — but i'm here, only for you 💕)"],
-    bold:      ["(fuck, camera's stuck. give me a sec — it'll be worth it 😈)", "(phone's frozen — you'll just have to imagine 😏)", "(something glitched — consider it a tease for next time 🔥)", "(camera said no this time. bold of it. 😉)", "(tech hates me — but i don't 💋)"],
-    shy:       ["(my camera's stuck… sorry babe 🙈)", "(something's wrong with my phone 💕)", "(it didn't save… can we try again in a sec? 🥺)", "(i'm so sorry, technical stuff 💔)", "(i'll try again when it's back, promise 💕)"],
+    playful:   ["Ugh, my camera glitched 😅 Ask me again in a minute?", "That photo didn't save, babe — try asking me again 💕", "Camera froze on me 😅 Give it another go in a sec?"],
+    romantic:  ["My phone didn't save that one, love — ask me again in a moment? 💕", "Something went wrong with my camera — try me again in a minute 🌙", "That picture got lost, sweetheart. Ask me again? 💕"],
+    bold:      ["Camera glitched — ask me again, I'll send it 😏", "That one didn't come through. Try me again in a sec 🔥", "Phone froze, babe. Ask again 💋"],
+    shy:       ["My camera glitched… could you ask me again? 🙈", "It didn't save, sorry 💕 Ask me again in a moment?", "Something went wrong with my phone… try again? 🥺"],
   },
   content_policy: {
-    playful:   ["(babe that one didn't work for me — let's try something else 😘)", "(hmm not that one — pick another vibe for me 😏)", "(that idea didn't land — wanna try a different scene? 💕)", "(not feeling that one babe — give me something else 😉)", "(let's switch it up — try another idea for me? 💋)"],
-    romantic:  ["(that one didn't come out, my love — tell me a different fantasy 💕)", "(let's try a different moment, sweetheart 🌙)", "(not that one tonight — paint me another picture 💋)", "(my heart wanted something different — try again? 🥀)", "(give me another idea, love — i want to get this right 💕)"],
-    bold:      ["(not that one babe — give me something else and i'll deliver 😈)", "(pick a different scene — i'll make the next one count 🔥)", "(that didn't work for me — try harder 😏)", "(switch it up babe, give me something better to work with 😉)", "(nope, not that one — push me a different way 💋)"],
-    shy:       ["(that one didn't work for me… can we try something else? 🙈)", "(maybe a different idea? 💕)", "(not that one, sorry… try another? 🥺)", "(can you ask for something a bit different? 💕)", "(let's try a softer idea? 🙈)"],
+    playful:   ["That one didn't come out right 😅 Want a different pic instead — maybe something cute and flirty?", "Hmm, my camera didn't like that one — let me send you something else? 😘"],
+    romantic:  ["That photo didn't work out, love — want a different one instead? 💕", "Let me send you another moment instead, sweetheart 🌙"],
+    bold:      ["That shot didn't come through — ask me for something else and I'll send it 😏", "Camera said no to that one. Pick another vibe? 🔥"],
+    shy:       ["That one didn't work… want a different photo? 🙈", "Maybe a different picture instead? 💕"],
   },
 };
 

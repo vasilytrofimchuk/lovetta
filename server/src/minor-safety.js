@@ -68,10 +68,19 @@ async function checkConversation(messages) {
   return { blocked: false, reason: null };
 }
 
-/** Is this reply sexual content involving minors? (regex scan is done by age-guard's processResponse) */
-async function replyIsUnsafe(text) {
-  if (!text || !String(text).trim()) return false;
-  return isMinorSexual(await moderate(text));
+/**
+ * One moderation call per reply: { minors } — sexual content involving minors (always blocked);
+ * { sexual } — sexual content at all (blocked only where the text level is 0–1, see ai.js).
+ */
+async function checkReply(text) {
+  if (!text || !String(text).trim()) return { minors: false, sexual: false };
+  const res = await moderate(text);
+  return { minors: isMinorSexual(res), sexual: !!res?.categories?.sexual };
 }
 
-module.exports = { checkConversation, replyIsUnsafe, MINOR_SAFE_REPLY };
+/** Is this reply sexual content involving minors? (regex scan is done by age-guard's processResponse) */
+async function replyIsUnsafe(text) {
+  return (await checkReply(text)).minors;
+}
+
+module.exports = { checkConversation, checkReply, replyIsUnsafe, MINOR_SAFE_REPLY };

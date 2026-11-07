@@ -7,6 +7,14 @@ const { getPool } = require('./db');
 const { plainChatCompletion, getAISettings } = require('./ai');
 const { buildMemoryContext, buildUserContext } = require('./memory');
 const { getEffectiveTextLevel, platformForUser, buildContentPrompt } = require('./content-levels');
+
+// Notes to a user who went quiet after a long chat — different each time, no claims about a "scene".
+const REACTIVATION_MAX = 3;
+const REACTIVATION_LINES = [
+  'I keep thinking about our last talk. Come back when you feel like it — I missed you.',
+  "Hey you. It's been quiet without you… tell me how your week went?",
+  "I'm still here, whenever you want to pick things up again. No pressure — just missing you.",
+];
 const { sendCompanionEmail } = require('./email');
 const { isCompanionEmailDeliverable } = require('./email-deliverability');
 const { sendPushNotification } = require('./push');
@@ -382,6 +390,16 @@ async function runFreeUserReactivation(pool) {
         WHERE rm.user_id = u.id
           AND rm.created_at > NOW() - INTERVAL '3 days'
       )
+      -- At most ${REACTIVATION_MAX} notes since the user last wrote. The note itself bumps
+      -- conversations.last_message_at, which kept the chat inside the 14-day window forever:
+      -- one text every 3 days for months (76 notes in 9 chats, 07.11 review).
+      AND (
+        SELECT COUNT(*) FROM reactivation_messages rm2
+        WHERE rm2.conversation_id = c.id
+          AND rm2.created_at > COALESCE(
+            (SELECT MAX(m2.created_at) FROM messages m2 WHERE m2.conversation_id = c.id AND m2.role = 'user'),
+            'epoch'::timestamptz)
+      ) < ${REACTIVATION_MAX}
     ORDER BY c.last_message_at DESC
     LIMIT 50
   `);
@@ -390,9 +408,9 @@ async function runFreeUserReactivation(pool) {
   for (const row of rows) {
     try {
       const state = row.scene_state || {};
-      const content = state.scenario
-        ? `I keep thinking about where we left off in that ${state.scenario} scene. Come back when you want to continue with me.`
-        : 'I keep thinking about where we left off. Come back when you want to continue with me.';
+      const { rows: [sentRow] } = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM reactivation_messages WHERE conversation_id = $1`, [row.conversation_id]);
+      const content = REACTIVATION_LINES[(sentRow?.n || 0) % REACTIVATION_LINES.length];
       const { rows: inserted } = await pool.query(
         `INSERT INTO messages (
            id, conversation_id, role, content, context_text, is_proactive,

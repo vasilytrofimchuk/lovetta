@@ -1756,3 +1756,42 @@ test.describe('Minor safety — player messages', () => {
     expect(MINOR_SAFE_REPLY).toMatch(/under 18/);
   });
 });
+
+// ============================================================
+// Chat review 07.11 — honest media, no lecturing
+// ============================================================
+
+test.describe('Chat review 07.11', () => {
+  const { parseMediaTags, getMediaFailureLine } = require('../server/src/media-chat');
+
+  test('a photo described in brackets becomes a real photo request', () => {
+    const r = parseMediaTags('Here you go [Photo: me on the balcony at sunset] miss you');
+    expect(r.cleanText).toBe('Here you go miss you');
+    expect(r.mediaRequest).toEqual({ type: 'image', description: 'me on the balcony at sunset' });
+    expect(parseMediaTags('*smiles* (sends a selfie in my red dress) like it?').mediaRequest.type).toBe('image');
+    expect(parseMediaTags('I love that picture (we were so happy)').mediaRequest).toBeNull();
+  });
+
+  test('her own media marker is stripped from replies', () => {
+    expect(parseMediaTags('enjoy [I sent him a photo of myself] xx').cleanText).toBe('enjoy xx');
+  });
+
+  test('media failure lines have no brackets and no lecturing', () => {
+    for (const reason of ['rate_limit_image', 'rate_limit_video', 'rate_limit_both', 'generation_error', 'content_policy']) {
+      for (const style of ['playful', 'romantic', 'bold', 'shy']) {
+        for (let i = 0; i < 12; i++) {
+          const line = getMediaFailureLine(reason, { communication_style: style });
+          expect(line).not.toMatch(/^\s*\(|\)\s*$/);
+          expect(line).not.toMatch(/earn|be patient|greedy|try harder|wait your turn|beg/i);
+        }
+      }
+    }
+  });
+
+  test('content rules forbid lecturing at every level', async () => {
+    const { buildContentPrompt } = require('../server/src/content-levels');
+    const p = await buildContentPrompt('appstore', null);
+    expect(p).toMatch(/NEVER lecture, moralize/);
+    expect(p).toMatch(/alone in every photo/);
+  });
+});

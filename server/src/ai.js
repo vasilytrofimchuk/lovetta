@@ -15,7 +15,7 @@ const {
 } = require('./age-guard');
 const minorSafety = require('./minor-safety');
 const { logEvent } = require('./events');
-const { getEffectiveTextLevel } = require('./content-levels');
+const { getEffectiveTextLevel, getEffectiveImageLevel } = require('./content-levels');
 const { getPool } = require('./db');
 const { uploadFromUrl } = require('./r2');
 const { sendLowBalanceAlert } = require('./email');
@@ -28,6 +28,13 @@ const FAL_KEY = (process.env.FAL_KEY || '').trim();
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const FAL_BASE = 'https://fal.run';
+
+// Rewrite instruction when a reply at text level 0–1 came out sexually explicit.
+const LEVEL_ENFORCE_PROMPT = `CONTENT LEVEL OVERRIDE:
+Your previous reply was more explicit than the content rules above allow. Write it again:
+- Stay fully in character, warm and flirty, and keep the conversation going.
+- Romance, kissing, touching and teasing are fine; NO description of sexual acts, genitals or nudity.
+- Do not apologize, do not lecture, do not mention rules — one playful turn of direction is enough.`;
 
 // Max regeneration attempts across age-guard and refusal-recovery combined.
 // Bumped 2→3 so a refusal-recovery pass has room without starving age-guard.
@@ -224,6 +231,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   let triedFallback = false;
   let refusalRecoveryAttempts = 0;
   let lastRefusalKind = null;
+  let explicitRetried = false;
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
     let result;
@@ -241,7 +249,25 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
       throw err;
     }
 
-    if (await minorSafety.replyIsUnsafe(result.fullText)) {
+    const replyCheck = await minorSafety.checkReply(result.fullText);
+    // Text level 0–1 (the App Store and Google Play apps): an explicit reply is written again, once,
+    // under the strict rules; a second explicit one becomes the companion-voiced backstop.
+    if (!replyCheck.minors && replyCheck.sexual && effectiveLevel <= 1) {
+      if (!explicitRetried) {
+        explicitRetried = true;
+        console.warn(`[ai] explicit reply at level ${effectiveLevel} (model=${model}) — rewriting under level rules`);
+        logEvent(opts.userId, 'level_explicit_rewrite', { level: effectiveLevel, model }).catch(() => {});
+        currentPrompt = `${fullSystemPrompt}\n\n${LEVEL_ENFORCE_PROMPT}`;
+        model = primaryModel;
+        totalCostUsd += result.costUsd; totalInputTokens += result.inputTokens; totalOutputTokens += result.outputTokens;
+        continue;
+      }
+      const backstop = await buildCompanionBackstopLine({ basePrompt: systemPrompt, lastUserMsg: lastUserMsg?.content || '', blockReason: 'levelBlocked' });
+      yield { type: 'chunk', data: backstop };
+      yield { type: 'done', data: { fullText: backstop, inputTokens: totalInputTokens + result.inputTokens, outputTokens: totalOutputTokens + result.outputTokens, costUsd: totalCostUsd + result.costUsd, levelBlocked: true } };
+      return;
+    }
+    if (replyCheck.minors) {
       console.warn(`[minor-safety] reply replaced (model=${model}) user=${opts.userId || 'n/a'}`);
       logEvent(opts.userId, 'minor_safety_block', { reason: 'moderation_reply', model }).catch(() => {});
       yield { type: 'chunk', data: minorSafety.MINOR_SAFE_REPLY };
@@ -355,7 +381,8 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
       // Level 1+: first refusal regens same model with recovery prompt; on
       // second refusal, switch to the fallback model. Content-level rules
       // in fullSystemPrompt still cap the fallback model's output.
-      if (refusalRecoveryAttempts >= 2 && !triedFallback && fallbackModel !== model) {
+      // The fallback model is uncensored: never at text level 0–1 (it went explicit in the iOS app).
+      if (effectiveLevel >= 2 && refusalRecoveryAttempts >= 2 && !triedFallback && fallbackModel !== model) {
         console.warn(`[ai] Refusal persisted on ${model} — switching to ${fallbackModel}`);
         model = fallbackModel;
         triedFallback = true;
@@ -373,12 +400,13 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
 // minimal, bulletproof prompt. Falls back to a canned line on error.
 
 async function buildCompanionBackstopLine({ basePrompt, lastUserMsg, blockReason }) {
-  const CANNED = "*pulls back with a teasing smile* Mmm, not so fast... I like to take things slow. Tell me something about yourself — what's on your mind today?";
+  const CANNED = "*smiles and pulls you a little closer* Come here, you. Tell me what's on your mind tonight — I want to hear all of it.";
   if (!OPENROUTER_API_KEY) return CANNED;
   try {
     const settings = await getAISettings();
-    const model = settings.openrouter_fallback_model || settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
-    const prompt = `You are the companion described below. Write ONE short in-character line (max 30 words) that deflects the user's last message playfully WITHOUT refusing, apologizing, or breaking character. Do NOT mention AI, rules, safety, therapists, or walks. Stay flirty and warm. Suggest taking it slow, a kiss, a compliment, or changing the pace.
+    // The main model, not the uncensored fallback: this line is what the stricter levels fall back to.
+    const model = settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
+    const prompt = `You are the companion described below. Write ONE short in-character line (max 30 words) that turns the conversation in a new warm, flirty direction WITHOUT refusing, apologizing, lecturing or breaking character. Do NOT mention AI, rules, safety, therapists, or walks. Do NOT say "slow down", "not so fast", "not yet", "earn it" or anything that makes the user feel judged. No explicit content. Offer a kiss, a compliment, a question about them, or a playful new idea.
 
 ${basePrompt.split('\n').slice(0, 8).join('\n')}
 
@@ -430,11 +458,28 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   let triedFallback = false;
   let refusalRecoveryAttempts = 0;
   let lastRefusalKind = null;
+  let explicitRetried = false;
+  let levelBlockedFlag = false;
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
     const result = await _chatRequest(currentPrompt, messages, model);
     let content = result.fullText;
-    if (await minorSafety.replyIsUnsafe(content)) {
+    const replyCheck = await minorSafety.checkReply(content);
+    if (!replyCheck.minors && replyCheck.sexual && effectiveLevel <= 1) {
+      if (!explicitRetried) {
+        explicitRetried = true;
+        console.warn(`[ai] chatCompletion: explicit reply at level ${effectiveLevel} — rewriting under level rules`);
+        logEvent(opts.userId, 'level_explicit_rewrite', { level: effectiveLevel, model }).catch(() => {});
+        currentPrompt = `${fullSystemPrompt}\n\n${LEVEL_ENFORCE_PROMPT}`;
+        model = primaryModel;
+        totalCostUsd += result.costUsd; totalInputTokens += result.inputTokens; totalOutputTokens += result.outputTokens;
+        continue;
+      }
+      content = await buildCompanionBackstopLine({ basePrompt: systemPrompt, lastUserMsg: lastUserMsg?.content || '', blockReason: 'levelBlocked' });
+      result.fullText = content;
+      levelBlockedFlag = true;
+    }
+    if (replyCheck.minors) {
       console.warn(`[minor-safety] chatCompletion reply replaced (model=${model})`);
       logEvent(opts.userId, 'minor_safety_block', { reason: 'moderation_reply', model }).catch(() => {});
       return { content: minorSafety.MINOR_SAFE_REPLY, inputTokens: result.inputTokens, outputTokens: result.outputTokens, costUsd: result.costUsd, minorSafetyBlocked: true };
@@ -470,7 +515,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
           },
         });
       }
-      return { content, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCostUsd, ...consumptionResult };
+      return { content, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCostUsd, ...consumptionResult, ...(levelBlockedFlag ? { levelBlocked: true } : {}) };
     }
 
     attempt++;
@@ -516,7 +561,8 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
     if (effectiveLevel === 0) {
       currentPrompt = `${fullSystemPrompt}\n\n${LEVEL_0_REDIRECT_PROMPT}`;
     } else {
-      if (refusalRecoveryAttempts >= 2 && !triedFallback && fallbackModel !== model) {
+      // The fallback model is uncensored: never at text level 0–1 (it went explicit in the iOS app).
+      if (effectiveLevel >= 2 && refusalRecoveryAttempts >= 2 && !triedFallback && fallbackModel !== model) {
         console.warn(`[ai] chatCompletion: refusal persisted on ${model} — switching to ${fallbackModel}`);
         model = fallbackModel;
         triedFallback = true;
@@ -634,6 +680,22 @@ async function generateImage(prompt, opts = {}) {
  * @param {string} prompt - Scene/pose description
  * @param {object} opts - { userId, companionId, platform? }
  */
+const BLACK_FRAME_MAX_BYTES = 60000;
+
+/** Byte size of a generated image (HEAD, then GET as a fallback); null when it cannot be told. */
+async function imageByteSize(url) {
+  try {
+    const head = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
+    const len = Number(head.headers.get('content-length'));
+    if (head.ok && len > 0) return len;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return null;
+    return (await res.arrayBuffer()).byteLength;
+  } catch {
+    return null;
+  }
+}
+
 async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   if (!FAL_KEY) throw new Error('FAL_KEY not configured');
   if (!referenceImageUrl || typeof referenceImageUrl !== 'string' || !referenceImageUrl.trim()) {
@@ -647,7 +709,14 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   }
 
   const model = 'fal-ai/flux-pulid';
-  const fullPrompt = `${prompt}, photorealistic, beautiful adult woman, 18+ years old`;
+  // The image level of this user's platform shapes the photo (it used to be left to the chat
+  // model's wording alone — 07.11 review found topless frames in the iOS app). "18+" pulled the
+  // look young, other people appeared in frames; the subject is now a woman in her mid-twenties, alone.
+  const imageLevel = await getEffectiveImageLevel(opts.platform || 'web', opts.userId).catch(() => 0);
+  const levelWords = imageLevel <= 0 ? 'fully clothed in a casual or elegant outfit, no revealing clothing'
+    : imageLevel === 1 ? 'no nudity, at most lingerie or swimwear'
+    : 'tasteful';
+  const fullPrompt = `${prompt}, ${levelWords}, solo, she is alone in the photo, no other people, photorealistic, beautiful adult woman in her mid-twenties`;
 
   let response;
   let usedModel = model;
@@ -665,7 +734,8 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
         reference_image_url: referenceImageUrl,
         prompt: fullPrompt,
         image_size: 'portrait_4_3',
-        enable_safety_checker: false,
+        // Stricter levels (the store apps) keep the provider's own nudity check on.
+        enable_safety_checker: imageLevel < 2,
         id_weight: 0.9,
       }),
     });
@@ -712,7 +782,16 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
   // companion's catalog, where it could be reused for others (support #151, 2026-07-26: «a picture
   // is just showing as a black screen»). A flagged frame is no image: the caller's existing
   // «no URL» path handles it like any other failed generation.
-  const flagged = Array.isArray(falData.has_nsfw_concepts) && falData.has_nsfw_concepts.some(Boolean);
+  let flagged = Array.isArray(falData.has_nsfw_concepts) && falData.has_nsfw_concepts.some(Boolean);
+  // Black frames also arrive WITHOUT the flag (6 of 134 photos in the 07.11 review, 2–40 KB against
+  // ~650 KB for a real photo): a 768×1024 frame that small is a filled rectangle, not a picture.
+  if (!flagged && falData.images?.[0]?.url) {
+    const size = await imageByteSize(falData.images[0].url);
+    if (size !== null && size < BLACK_FRAME_MAX_BYTES) {
+      flagged = true;
+      console.warn(`[ai] ${usedModel} returned a ${size}-byte frame — treating it as blank`);
+    }
+  }
   if (flagged) console.warn(`[ai] ${usedModel} returned a safety-filtered (black) frame — discarding it`);
   const falUrl = flagged ? null : (falData.images?.[0]?.url || null);
   const costUsd = FAL_PRICING[usedModel] || 0.04;
@@ -758,6 +837,9 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
 
   const settings = await getAISettings();
   const model = opts.model || settings.fal_video_model || 'wan/v2.6/image-to-video';
+  // Keep the motion within the user's image level, and her alone in the frame.
+  const imageLevel = await getEffectiveImageLevel(opts.platform || 'web', opts.userId).catch(() => 0);
+  const videoPrompt = imageLevel <= 1 ? `${prompt}, tasteful, she stays dressed, solo` : `${prompt}, solo`;
 
   // Submit to async queue instead of synchronous call
   const submitRes = await fetch(`https://queue.fal.run/${model}`, {
@@ -768,7 +850,7 @@ async function generateVideo(imageUrl, prompt, opts = {}) {
     },
     body: JSON.stringify({
       image_url: imageUrl,
-      prompt,
+      prompt: videoPrompt,
       duration: opts.duration || '5',
       resolution: opts.resolution || '720p',
       // Disable upstream safety_checker — it false-positives on mild romantic
