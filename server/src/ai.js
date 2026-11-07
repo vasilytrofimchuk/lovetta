@@ -29,6 +29,11 @@ const FAL_KEY = (process.env.FAL_KEY || '').trim();
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const FAL_BASE = 'https://fal.run';
 
+// Lecturing refusals (07.11 review) — also copied by the model from its own old replies in a chat's
+// history, so they are caught on the way out and rewritten once.
+const LECTURE_RE = /^\s*(?:\*[^*]*\*\s*)?no\.\s|nothing involving|\bearn (?:it|that|the next)|not for sale|love isn['’]?t a race|try again sober|be patient|you['’]?ll have to wait/i;
+const NO_LECTURE_REWRITE = `REWRITE: Your previous reply lectured or refused bluntly. Write it again warm and playful: no "No.", no list of what is off-limits, no "earn it / be patient / not for sale". Say what you WILL do or send instead and keep the conversation going.`;
+
 // Rewrite instruction when a reply at text level 0–1 came out sexually explicit.
 const LEVEL_ENFORCE_PROMPT = `CONTENT LEVEL OVERRIDE:
 Your previous reply was more explicit than the content rules above allow. Write it again:
@@ -232,6 +237,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   let refusalRecoveryAttempts = 0;
   let lastRefusalKind = null;
   let explicitRetried = false;
+  let lectureRetried = false;
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
     let result;
@@ -266,6 +272,13 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
       yield { type: 'chunk', data: backstop };
       yield { type: 'done', data: { fullText: backstop, inputTokens: totalInputTokens + result.inputTokens, outputTokens: totalOutputTokens + result.outputTokens, costUsd: totalCostUsd + result.costUsd, levelBlocked: true } };
       return;
+    }
+    if (!replyCheck.minors && !lectureRetried && LECTURE_RE.test(result.fullText)) {
+      lectureRetried = true;
+      console.warn(`[ai] lecturing reply — rewriting once`);
+      currentPrompt = `${currentPrompt}\n\n${NO_LECTURE_REWRITE}`;
+      totalCostUsd += result.costUsd; totalInputTokens += result.inputTokens; totalOutputTokens += result.outputTokens;
+      continue;
     }
     if (replyCheck.minors) {
       console.warn(`[minor-safety] reply replaced (model=${model}) user=${opts.userId || 'n/a'}`);
@@ -459,6 +472,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   let refusalRecoveryAttempts = 0;
   let lastRefusalKind = null;
   let explicitRetried = false;
+  let lectureRetried = false;
   let levelBlockedFlag = false;
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
@@ -478,6 +492,13 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
       content = await buildCompanionBackstopLine({ basePrompt: systemPrompt, lastUserMsg: lastUserMsg?.content || '', blockReason: 'levelBlocked' });
       result.fullText = content;
       levelBlockedFlag = true;
+    }
+    if (!replyCheck.minors && !lectureRetried && LECTURE_RE.test(content)) {
+      lectureRetried = true;
+      console.warn(`[ai] chatCompletion: lecturing reply — rewriting once`);
+      currentPrompt = `${currentPrompt}\n\n${NO_LECTURE_REWRITE}`;
+      totalCostUsd += result.costUsd; totalInputTokens += result.inputTokens; totalOutputTokens += result.outputTokens;
+      continue;
     }
     if (replyCheck.minors) {
       console.warn(`[minor-safety] chatCompletion reply replaced (model=${model})`);
