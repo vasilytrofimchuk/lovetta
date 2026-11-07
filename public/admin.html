@@ -490,6 +490,15 @@
         <h3>Free reactivation</h3>
         <div id="chat-insights-reactivation"></div>
       </div>
+      <div class="section" style="margin-top:24px;">
+        <h3>Where people drop the conversation</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:8px;">Conversations that went silent in this period and stayed silent for a week since, by how many messages the user had written in them, and who wrote last.</p>
+        <div id="chat-insights-dropoff"></div>
+      </div>
+      <div class="breakdown-grid" style="margin-top:24px;">
+        <div class="section"><h3>Most active users</h3><div id="chat-insights-top"></div></div>
+        <div class="section"><h3>Girls' own messages (reminders)</h3><div id="chat-insights-reminders"></div></div>
+      </div>
     </div>
 
     <!-- Girls Tab -->
@@ -1926,7 +1935,7 @@
       }
 
       document.getElementById('chat-insights-cards').innerHTML = '<p style="color:var(--muted);padding:16px;">Loading...</p>';
-      ['topics','languages','value','media','reactivation'].forEach(function(id) {
+      ['topics','languages','value','media','reactivation','dropoff','top','reminders'].forEach(function(id) {
         document.getElementById('chat-insights-' + id).innerHTML = '';
       });
 
@@ -1970,6 +1979,37 @@
           { key: 'reason', label: 'Reason' },
           { key: 'count', label: 'Messages' }
         ], 'No media failures');
+        document.getElementById('chat-insights-dropoff').innerHTML = simpleTable(data.dropOff || [], [
+          { key: 'bucket', label: 'User messages' },
+          { key: 'conversations', label: 'Dropped' },
+          { key: 'last_user', label: 'Last: user' },
+          { key: 'last_girl', label: 'Last: girl' },
+          { key: 'last_reminder', label: 'Last: reminder' }
+        ], 'No conversation went silent in this period');
+        var top = data.topUsers || [];
+        document.getElementById('chat-insights-top').innerHTML = !top.length
+          ? '<p style="color:var(--muted);padding:16px;">No messages in this period</p>'
+          : '<table style="font-size:0.85rem;"><tr><th>User</th><th>Messages</th><th>Chats</th><th>Girls</th><th>Subscribed</th></tr>' +
+            top.map(function(u) {
+              return '<tr><td><a href="#" class="insights-open-chat" data-cid="' + esc(u.last_conversation_id || '') + '">' + esc(u.email) + '</a></td>' +
+                '<td>' + formatNumber(u.messages) + '</td><td>' + u.conversations + '</td><td>' + u.companions + '</td>' +
+                '<td>' + (u.subscribed ? 'yes' : 'no') + '</td></tr>';
+            }).join('') + '</table>';
+        document.querySelectorAll('#chat-insights-top .insights-open-chat').forEach(function(a) {
+          a.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (!a.dataset.cid) return;
+            // The Chats tab opens the conversation it holds as active (loadChats).
+            if (chatsView === 'flagged') chatsView = 'all';
+            chatsActiveCId = a.dataset.cid;
+            switchTab('chats');
+          });
+        });
+        var rm = data.reminders || {};
+        var rmRate = rm.sent ? ((100 * (rm.answered_24h || 0) / rm.sent).toFixed(1) + '%') : '—';
+        document.getElementById('chat-insights-reminders').innerHTML =
+          '<table style="font-size:0.85rem;"><tr><th>Sent</th><th>To users</th><th>Answered within 24 h</th><th>Rate</th></tr>' +
+          '<tr><td>' + formatNumber(rm.sent || 0) + '</td><td>' + formatNumber(rm.users || 0) + '</td><td>' + formatNumber(rm.answered_24h || 0) + '</td><td>' + rmRate + '</td></tr></table>';
         var rate = re.sent ? ((100 * (re.returned || 0) / re.sent).toFixed(1) + '%') : '—';
         document.getElementById('chat-insights-reactivation').innerHTML =
           '<table style="font-size:0.85rem;"><tr><th>Sent</th><th>Returned</th><th>Return rate</th></tr>' +

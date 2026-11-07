@@ -280,8 +280,88 @@ router.get('/chat-insights', async (req, res) => {
       WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL
     `, params);
 
+    // -- Card #19: where people drop the conversation, the most active, and whether a girl's own
+    // message (a reminder) brings them back. Conversations, not raw text.
+    //
+    // «Dropped» = went silent during the period: its last message falls in [now − days − 7d, now − 7d],
+    // so every one of them has had a full week of silence since.
+    const { rows: dropOff } = await pool.query(`
+      WITH conv AS (
+        SELECT c.id,
+          COUNT(*) FILTER (WHERE m.role = 'user') AS user_msgs,
+          (ARRAY_AGG(CASE WHEN m.role = 'user' THEN 'user' WHEN m.is_proactive THEN 'reminder' ELSE 'girl' END
+                     ORDER BY m.created_at DESC))[1] AS last_by,
+          MAX(m.created_at) AS last_at
+        FROM conversations c
+        JOIN users u ON u.id = c.user_id
+        JOIN messages m ON m.conversation_id = c.id
+        WHERE c.last_message_at < NOW() - INTERVAL '7 days'
+          AND c.last_message_at >= NOW() - INTERVAL '7 days' - ($1 || ' days')::INTERVAL
+          ${testUserFilter}
+        GROUP BY c.id
+      )
+      SELECT bucket, ord,
+        COUNT(*)::int AS conversations,
+        COUNT(*) FILTER (WHERE last_by = 'user')::int AS last_user,
+        COUNT(*) FILTER (WHERE last_by = 'girl')::int AS last_girl,
+        COUNT(*) FILTER (WHERE last_by = 'reminder')::int AS last_reminder
+      FROM (
+        SELECT last_by, CASE
+          WHEN user_msgs = 0 THEN '0' WHEN user_msgs <= 2 THEN '1–2' WHEN user_msgs <= 5 THEN '3–5'
+          WHEN user_msgs <= 10 THEN '6–10' WHEN user_msgs <= 20 THEN '11–20' WHEN user_msgs <= 50 THEN '21–50'
+          ELSE '50+' END AS bucket,
+          CASE WHEN user_msgs = 0 THEN 0 WHEN user_msgs <= 2 THEN 1 WHEN user_msgs <= 5 THEN 2
+          WHEN user_msgs <= 10 THEN 3 WHEN user_msgs <= 20 THEN 4 WHEN user_msgs <= 50 THEN 5 ELSE 6 END AS ord
+        FROM conv
+      ) b
+      GROUP BY bucket, ord
+      ORDER BY ord
+    `, params);
+
+    const { rows: topUsers } = await pool.query(`
+      SELECT u.id AS user_id, u.email,
+        COUNT(*)::int AS messages,
+        COUNT(DISTINCT c.id)::int AS conversations,
+        COUNT(DISTINCT c.companion_id)::int AS companions,
+        EXISTS (
+          SELECT 1 FROM subscriptions s WHERE s.user_id = u.id
+            AND s.status IN ('active', 'canceling', 'trialing')
+            AND (s.current_period_end IS NULL OR s.current_period_end > NOW())
+        ) AS subscribed,
+        (ARRAY_AGG(c.id ORDER BY m.created_at DESC))[1] AS last_conversation_id
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      JOIN users u ON u.id = c.user_id
+      WHERE m.role = 'user'
+        AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+      GROUP BY u.id, u.email
+      ORDER BY messages DESC
+      LIMIT 10
+    `, params);
+
+    const { rows: [reminders] } = await pool.query(`
+      SELECT
+        COUNT(*)::int AS sent,
+        COUNT(DISTINCT c.user_id)::int AS users,
+        COUNT(*) FILTER (WHERE EXISTS (
+          SELECT 1 FROM messages r
+          WHERE r.conversation_id = m.conversation_id AND r.role = 'user'
+            AND r.created_at > m.created_at AND r.created_at <= m.created_at + INTERVAL '24 hours'
+        ))::int AS answered_24h
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      JOIN users u ON u.id = c.user_id
+      WHERE m.is_proactive = true
+        AND m.created_at >= NOW() - ($1 || ' days')::INTERVAL
+        ${testUserFilter}
+    `, params);
+
     res.json({
       days,
+      dropOff,
+      topUsers,
+      reminders: reminders || { sent: 0, users: 0, answered_24h: 0 },
       summary: {
         user_messages: summary.user_messages || 0,
         assistant_messages: summary.assistant_messages || 0,
