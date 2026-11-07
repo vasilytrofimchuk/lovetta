@@ -9,6 +9,12 @@ const { authenticate } = require('./auth-middleware');
 const { chatCompletion, plainChatCompletion } = require('./ai');
 const { logEvent, EVENT_TYPES } = require('./events');
 const { isHardPaywalled } = require('./consumption');
+const { detectPlatform, platformForUser } = require('./content-levels');
+
+/** 'playstore' for the Android app or an Android sign-up, otherwise 'web' (as before). */
+async function companionPlatform(req) {
+  return detectPlatform(req) === 'playstore' ? 'playstore' : platformForUser(req.userId, 'web');
+}
 const { getUserSubscription, isSubscriptionActive } = require('./billing');
 
 function truncateNatural(text, maxWords) {
@@ -230,7 +236,7 @@ router.post('/', authenticate, async (req, res) => {
         chatCompletion(
           openerSystemPrompt,
           [{ role: 'user', content: 'I just brought you to life.' }],
-          { userId: req.userId, companionId: companion.id, platform: 'web' }
+          { userId: req.userId, companionId: companion.id, platform: await companionPlatform(req) }
         ),
         firstMessageTimeoutMs,
         'first companion message'
@@ -466,7 +472,7 @@ Return ONLY the personality text, nothing else.`;
 
     const result = await chatCompletion(systemPrompt, [{ role: 'user', content: userMsg }], {
       userId: req.userId,
-      platform: 'web',
+      platform: await companionPlatform(req),
     });
     res.json({ personality: result.fullText.trim().replace(/^["']|["']$/g, '') });
   } catch (err) {

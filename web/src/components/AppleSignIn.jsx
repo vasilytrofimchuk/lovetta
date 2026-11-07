@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api, { getErrorMessage } from '../lib/api'
-import { isCapacitor } from '../lib/platform'
+import { hasAppleSignIn } from '../lib/platform'
 import { clearOnboardingData, readOnboardingData } from '../lib/onboarding'
 
 function isAppleUserCancel(err) {
@@ -20,7 +20,8 @@ export default function AppleSignIn({ onError, ageData, onSuccess }) {
   const { refreshUser } = useAuth()
   const [loading, setLoading] = useState(false)
 
-  if (!isCapacitor()) return null
+  // iOS app only: not in browsers, not in the Android app.
+  if (!hasAppleSignIn()) return null
 
   async function handleAppleSignIn() {
     setLoading(true)

@@ -317,4 +317,42 @@ test.describe('iOS Billing — RevenueCat', () => {
     expect(tipRows[0].stripe_payment_id).toBe(`rc_${webhookEventId}`);
   });
 
+  test('Google Play subscription (subscription:basePlan id) unlocks the yearly plan', async ({ request }) => {
+    const user = await createTestUser(request);
+    const eventId = `rc_play_sub_${Date.now()}`;
+    const res = await postRevenueCatEvent(request, {
+      id: eventId,
+      type: 'INITIAL_PURCHASE',
+      store: 'PLAY_STORE',
+      app_user_id: user.userId,
+      subscriber_id: `sub_${eventId}`,
+      product_id: 'lovetta_yearly:yearly',
+      expiration_at_ms: String(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    });
+    expect(res.ok()).toBeTruthy();
+    const status = await (await request.get(`${BASE}/api/billing/status`, { headers: user.authHeaders })).json();
+    expect(status.plan).toBe('yearly');
+    expect(status.status).toBe('active');
+  });
+
+  test('Google Play tip counts its USD tier, not the price in the buyer currency', async ({ request }) => {
+    const user = await createTestUser(request);
+    const eventId = `rc_play_tip_${Date.now()}`;
+    const res = await postRevenueCatEvent(request, {
+      id: eventId,
+      type: 'NON_RENEWING_PURCHASE',
+      store: 'PLAY_STORE',
+      app_user_id: user.userId,
+      subscriber_id: `sub_${eventId}`,
+      product_id: 'lovetta_tip_999',
+      currency: 'INR',
+      price: 9.99,
+      price_in_purchased_currency: 850,
+    });
+    expect(res.ok()).toBeTruthy();
+    const { rows } = await pool.query('SELECT amount FROM tips WHERE user_id = $1', [user.userId]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].amount).toBe(999);
+  });
+
 });

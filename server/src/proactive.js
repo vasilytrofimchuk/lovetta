@@ -6,7 +6,7 @@
 const { getPool } = require('./db');
 const { plainChatCompletion, getAISettings } = require('./ai');
 const { buildMemoryContext, buildUserContext } = require('./memory');
-const { getEffectiveTextLevel } = require('./content-levels');
+const { getEffectiveTextLevel, platformForUser, buildContentPrompt } = require('./content-levels');
 const { sendCompanionEmail } = require('./email');
 const { isCompanionEmailDeliverable } = require('./email-deliverability');
 const { sendPushNotification } = require('./push');
@@ -200,13 +200,17 @@ async function runProactiveMessages() {
         // Generate proactive message. Proactive has no explicit platform — use
         // the user's effective web-level as a safe default (least restrictive
         // that's still capped by their preference). Level 0 still skips kinks.
+        // Users who signed up in the Android app keep the Google Play level.
         const actionsEnabled = row.show_actions ?? true;
-        const proLevel = await getEffectiveTextLevel('web', row.user_id);
+        const proPlatform = await platformForUser(row.user_id, 'web');
+        const proLevel = await getEffectiveTextLevel(proPlatform, row.user_id);
         const [memoryContext, userContext] = await Promise.all([
           buildMemoryContext(row.conversation_id, { level: proLevel }),
           buildUserContext(row.user_id, { level: proLevel }),
         ]);
-        const prompt = buildProactivePrompt(row, (userContext || '') + memoryContext, slot, { actionsEnabled });
+        let prompt = buildProactivePrompt(row, (userContext || '') + memoryContext, slot, { actionsEnabled });
+        // The plain completion adds no content rules; the Android app's users get them spelled out.
+        if (proPlatform === 'playstore') prompt += '\n\n' + await buildContentPrompt('playstore', row.user_id);
         const proSettings = await getAISettings();
         const proModel = proSettings.proactive_model || 'qwen/qwen3-235b-a22b-2507';
         const result = await plainChatCompletion(prompt, [], { model: proModel });

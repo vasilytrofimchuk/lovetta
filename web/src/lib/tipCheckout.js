@@ -1,6 +1,7 @@
 import api from './api'
 import { isAppStore } from './platform'
 import {
+  isProduct,
   getTipOfferings,
   IOS_TIP_PRODUCTS,
   IOS_TIP_PRODUCT_IDS,
@@ -27,7 +28,7 @@ export async function getTipAmountsWithPrices() {
   const tipOfferings = await getTipOfferings()
   if (!tipOfferings?.length) return TIP_AMOUNTS
   return TIP_AMOUNTS.map(tip => {
-    const offering = tipOfferings.find(t => t.productId === tip.rcProductId)
+    const offering = tipOfferings.find(t => isProduct(t.productId, tip.rcProductId))
     return offering
       ? { ...tip, priceString: offering.priceString }
       : tip
@@ -51,7 +52,7 @@ export async function startTipCheckout(amount, companionId, userId) {
 
     // Try offerings-based purchase first (enables experiments)
     const tipOfferings = await getTipOfferings()
-    const offeringPkg = tipOfferings?.find(t => t.productId === tip.rcProductId)?.package
+    const offeringPkg = tipOfferings?.find(t => isProduct(t.productId, tip.rcProductId))?.package
 
     if (offeringPkg) {
       console.log('[billing] tip purchasePackage', { productId: tip.rcProductId })
@@ -65,7 +66,7 @@ export async function startTipCheckout(amount, companionId, userId) {
           type: PRODUCT_CATEGORY.NON_SUBSCRIPTION,
         }),
         PRODUCT_TIMEOUT_MS,
-        'Timed out loading iOS tip products. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account and App Store Connect setup.'
+        'Timed out loading tip products. Please try again in a moment.'
       )
 
       let products = primaryResult?.products || []
@@ -74,18 +75,18 @@ export async function startTipCheckout(amount, companionId, userId) {
         const fallbackResult = await withTimeout(
           Purchases.getProducts({ productIdentifiers: IOS_TIP_PRODUCT_IDS }),
           PRODUCT_TIMEOUT_MS,
-          'Timed out loading iOS tip products. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account and App Store Connect setup.'
+          'Timed out loading tip products. Please try again in a moment.'
         )
         products = fallbackResult?.products || []
       }
 
       if (!products.length) {
-        throw new Error('No iOS tip products were returned. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account and product status in App Store Connect.')
+        throw new Error('The store returned no tip products. Please try again later.')
       }
 
-      const product = products.find((entry) => entry.identifier === tip.rcProductId)
+      const product = products.find((entry) => isProduct(entry.identifier, tip.rcProductId))
       if (!product) {
-        throw new Error(`StoreKit did not return the expected tip product: ${tip.rcProductId}`)
+        throw new Error(`The store did not return the expected tip product: ${tip.rcProductId}`)
       }
 
       await Purchases.purchaseStoreProduct({ product })
@@ -94,6 +95,6 @@ export async function startTipCheckout(amount, companionId, userId) {
     return { status: 'completed', intentId: data.intentId, tipId: synced.tipId || null, amount }
   }
 
-  // Card checkout is off (2026-11-04): this is sold only in the iOS app.
-  throw new Error('Available in the iOS app.')
+  // Card checkout is off (2026-11-04): this is sold only in the iOS and Android apps.
+  throw new Error('Available in the Lovetta app.')
 }

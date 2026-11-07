@@ -1439,6 +1439,24 @@ const MIGRATIONS = [
       );
     `,
   },
+  {
+    // Android app (Google Play): its own content levels. Google Play does not allow sexual
+    // content, so both start at 0 (light flirt, fully clothed); admin Settings can change them.
+    name: 'v70_playstore_content_levels',
+    sql: `
+      INSERT INTO app_settings (key, value) VALUES
+        ('text_level_playstore', '0'),
+        ('image_level_playstore', '0')
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
+  {
+    // The image content level a catalogued photo/video was made at. Reuse across users only hands
+    // out media at or below the viewer's level (media-chat.js findReusableMedia). Older rows are
+    // NULL and count as level 2 (the web level they were mostly made at).
+    name: 'v71_companion_media_content_level',
+    sql: `ALTER TABLE companion_media ADD COLUMN IF NOT EXISTS content_level SMALLINT;`,
+  },
 ];
 
 const LEGACY_MIGRATIONS = [

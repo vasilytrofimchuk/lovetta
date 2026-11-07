@@ -1,5 +1,5 @@
 /**
- * Billing — App Store subscriptions and purchases (RevenueCat). Card payments are off since 2026-11-04.
+ * Billing — App Store and Google Play subscriptions and purchases (RevenueCat). Card payments are off since 2026-11-04.
  * Plans: monthly ($19.99), yearly ($99.99), 3-day free trial.
  * Tips: $9.99, $19.99, $49.99, $99.99 (one-time payments).
  */
@@ -13,6 +13,35 @@ const SITE_URL = (process.env.SITE_URL || 'http://localhost:3900').trim();
 
 const TIP_AMOUNTS = [999, 1999, 4999, 9999]; // cents
 const IOS_TIP_INTENT_LIFETIME_MINUTES = 30;
+
+/*
+ * Store products (same ids in the App Store and Google Play; see web/src/lib/revenuecat.js).
+ * Google Play subscriptions arrive from RevenueCat as "<subscriptionId>:<basePlanId>"
+ * (e.g. "lovetta_yearly:yearly"); storeProductId() reduces both forms to the base id.
+ */
+const SUBSCRIPTION_PRODUCTS = { lovetta_monthly: 'monthly', lovetta_yearly: 'yearly' };
+const TIP_PRODUCT_CENTS = {
+  lovetta_tip_999: 999,
+  lovetta_tip_1999: 1999,
+  lovetta_tip_4999: 4999,
+  lovetta_tip_9999: 9999,
+};
+
+function storeProductId(productId) {
+  return String(productId || '').trim().split(':')[0];
+}
+
+function planForProduct(productId) {
+  const id = storeProductId(productId);
+  if (SUBSCRIPTION_PRODUCTS[id]) return SUBSCRIPTION_PRODUCTS[id];
+  const full = String(productId || '');
+  return (full.includes('yearly') || full.includes('annual')) ? 'yearly' : 'monthly';
+}
+
+/** RevenueCat event.store → our tracker source label. */
+function storeSource(store) {
+  return store === 'PLAY_STORE' ? 'android' : 'ios';
+}
 
 async function markRecentValuePromptsConverted(pool, userId) {
   if (!pool || !userId) return;
@@ -196,28 +225,29 @@ async function upsertRevenueCatSubscription(pool, { userId, plan, status = 'acti
 }
 
 // -- Tip reward image prompts (varied scenes for reward images) ---
+// racy: true — revealing scenes; never used at image level 0 (the store apps).
 
 const REWARD_PROMPTS = [
-  { prompt: 'woman in elegant lingerie posing on a luxurious bed, soft warm lighting, intimate atmosphere', tags: ['bedroom', 'lingerie', 'bed', 'seductive'] },
-  { prompt: 'woman in a stylish bikini by a sparkling pool, golden hour sunlight, relaxed pose', tags: ['pool', 'bikini', 'outdoor'] },
+  { prompt: 'woman in elegant lingerie posing on a luxurious bed, soft warm lighting, intimate atmosphere', tags: ['bedroom', 'lingerie', 'bed', 'seductive'], racy: true },
+  { prompt: 'woman in a stylish bikini by a sparkling pool, golden hour sunlight, relaxed pose', tags: ['pool', 'bikini', 'outdoor'], racy: true },
   { prompt: 'woman taking a flirty mirror selfie in a fitted dress, playful expression', tags: ['mirror', 'selfie', 'dress', 'flirty'] },
   { prompt: 'woman in silk pajamas on a cozy couch, morning light, holding coffee mug, smiling', tags: ['couch', 'pajamas', 'morning', 'smile'] },
   { prompt: 'woman in a sleek evening dress at a rooftop bar, city lights behind, confident look', tags: ['bar', 'dress', 'evening', 'elegant'] },
   { prompt: 'woman in workout clothes at the gym, sporty and toned, energetic smile', tags: ['gym', 'sporty', 'smile'] },
-  { prompt: 'woman in a towel after a bath, steamy bathroom, shy glance at camera', tags: ['bath', 'towel', 'shy'] },
-  { prompt: 'woman lying on beach sand in a bikini, waves in background, sun-kissed skin', tags: ['beach', 'bikini', 'outdoor'] },
+  { prompt: 'woman in a towel after a bath, steamy bathroom, shy glance at camera', tags: ['bath', 'towel', 'shy'], racy: true },
+  { prompt: 'woman lying on beach sand in a bikini, waves in background, sun-kissed skin', tags: ['beach', 'bikini', 'outdoor'], racy: true },
   { prompt: 'woman in oversized shirt in the kitchen, morning sunlight, cooking breakfast', tags: ['kitchen', 'shirt', 'morning', 'casual'] },
-  { prompt: 'woman in lace nightgown sitting by a window, moonlight, dreamy atmosphere', tags: ['nightgown', 'window', 'evening', 'seductive'] },
+  { prompt: 'woman in lace nightgown sitting by a window, moonlight, dreamy atmosphere', tags: ['nightgown', 'window', 'evening', 'seductive'], racy: true },
   { prompt: 'woman in sundress walking through a garden, flowers around, natural beauty', tags: ['garden', 'dress', 'outdoor', 'elegant'] },
-  { prompt: 'woman in lingerie lying on bed, looking at camera, close-up, seductive smile', tags: ['bed', 'lingerie', 'closeup', 'seductive'] },
+  { prompt: 'woman in lingerie lying on bed, looking at camera, close-up, seductive smile', tags: ['bed', 'lingerie', 'closeup', 'seductive'], racy: true },
   { prompt: 'woman in casual outfit taking selfie in car, sunglasses, playful wink', tags: ['car', 'selfie', 'casual', 'playful'] },
-  { prompt: 'woman in elegant swimsuit by infinity pool, sunset behind, glamorous', tags: ['pool', 'bikini', 'sunset', 'elegant'] },
+  { prompt: 'woman in elegant swimsuit by infinity pool, sunset behind, glamorous', tags: ['pool', 'bikini', 'sunset', 'elegant'], racy: true },
   { prompt: 'woman stretching in bed wearing just a shirt, lazy morning, messy hair, cute', tags: ['bed', 'shirt', 'morning', 'lazy'] },
   { prompt: 'woman in cocktail dress at a restaurant, candlelight, romantic setting', tags: ['restaurant', 'dress', 'evening', 'elegant'] },
-  { prompt: 'woman in sporty bikini at the beach, surfboard nearby, confident stance', tags: ['beach', 'bikini', 'sporty', 'confident'] },
-  { prompt: 'woman in silk robe on bedroom balcony, city view, holding wine glass', tags: ['bedroom', 'elegant', 'evening'] },
+  { prompt: 'woman in sporty bikini at the beach, surfboard nearby, confident stance', tags: ['beach', 'bikini', 'sporty', 'confident'], racy: true },
+  { prompt: 'woman in silk robe on bedroom balcony, city view, holding wine glass', tags: ['bedroom', 'elegant', 'evening'], racy: true },
   { prompt: 'woman in crop top and shorts, mirror selfie, flirty pose, bright room', tags: ['mirror', 'selfie', 'casual', 'flirty'] },
-  { prompt: 'woman in bubble bath, candles around, relaxed and playful expression', tags: ['bath', 'playful', 'seductive'] },
+  { prompt: 'woman in bubble bath, candles around, relaxed and playful expression', tags: ['bath', 'playful', 'seductive'], racy: true },
 ];
 
 const REWARD_CAPTIONS = [
@@ -324,6 +354,10 @@ Response format: Always start with a brief action or emotional context in *aster
 
 async function generateTipRewardImages(pool, userId, companionId, count, conversationId, companion) {
   const { generateCharacterImage } = require('./ai');
+  const { platformForUser, getEffectiveImageLevel } = require('./content-levels');
+  // Android sign-ups get the Google Play level; everyone else keeps the web level (as before).
+  const platform = await platformForUser(userId, 'web');
+  const level = await getEffectiveImageLevel(platform, userId);
 
   // Get all media_urls this user has already seen across ALL conversations
   const { rows: seenRows } = await pool.query(
@@ -340,8 +374,9 @@ async function generateTipRewardImages(pool, userId, companionId, count, convers
      JOIN user_companions uc_media ON uc_media.id = cm.companion_id
      JOIN user_companions uc_self  ON uc_self.avatar_url = uc_media.avatar_url
      WHERE uc_self.id = $1 AND cm.media_type = 'image'
+       AND COALESCE(cm.content_level, 2) <= $2
      ORDER BY RANDOM()`,
-    [companionId]
+    [companionId, level]
   );
   const reusableUrls = unseenCatalog
     .map(r => r.media_url)
@@ -352,7 +387,7 @@ async function generateTipRewardImages(pool, userId, companionId, count, convers
   const generateCount = count - reusedCount;
 
   // Pick random prompts for new images to generate
-  const shuffledPrompts = [...REWARD_PROMPTS].sort(() => Math.random() - 0.5);
+  const shuffledPrompts = REWARD_PROMPTS.filter(p => level > 0 || !p.racy).sort(() => Math.random() - 0.5);
   const promptsToUse = shuffledPrompts.slice(0, generateCount);
 
   // Insert reused image messages
@@ -381,7 +416,7 @@ async function generateTipRewardImages(pool, userId, companionId, count, convers
     generateCharacterImage(companion.avatar_url, rewardPrompt.prompt, {
       userId,
       companionId: companion.id,
-      platform: 'web',
+      platform,
     })
       .then(async (result) => {
         if (result.url) {
@@ -391,9 +426,9 @@ async function generateTipRewardImages(pool, userId, companionId, count, convers
           );
           // Catalog the image for future reuse
           await pool.query(
-            `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd)
-             VALUES ($1, $2, 'image', $3, $4, $5)`,
-            [companion.id, result.url, rewardPrompt.prompt, rewardPrompt.tags, result.cost || 0]
+            `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd, content_level)
+             VALUES ($1, $2, 'image', $3, $4, $5, $6)`,
+            [companion.id, result.url, rewardPrompt.prompt, rewardPrompt.tags, result.cost || 0, level]
           );
           console.log(`[billing] tip reward image ready for message ${messageId}: ${result.url}`);
         } else {
@@ -663,8 +698,9 @@ async function handleRevenueCatWebhook(body, authHeader) {
   const userId = appUserId; // We set app_user_id to our user ID
 
   // Determine plan from product ID
-  let plan = 'monthly';
-  if (productId?.includes('yearly') || productId?.includes('annual')) plan = 'yearly';
+  // App Store id or Google Play "subscription:basePlan"
+  const plan = planForProduct(productId);
+  const source = storeSource(event.store);
 
   // Determine period end from event
   const expiresAt = event.expiration_at_ms
@@ -690,7 +726,7 @@ async function handleRevenueCatWebhook(body, authHeader) {
       if (rcType === 'INITIAL_PURCHASE' && !isSandbox) {
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
           if (rows[0]) {
-            fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'ios', trial: true } }) }).catch(() => {});
+            fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source, trial: true } }) }).catch(() => {});
             sendTtEvent({
               eventName: 'CompletePayment',
               eventId: `rc:${event.id || `${userId}_${rcType}`}`,
@@ -709,7 +745,7 @@ async function handleRevenueCatWebhook(body, authHeader) {
       if (rcType === 'RENEWAL' && !isSandbox) {
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
           if (rows[0]) {
-            fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source: 'ios' } }) }).catch(() => {});
+            fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source } }) }).catch(() => {});
             sendTtEvent({
               eventName: 'CompletePayment',
               eventId: `rc:${event.id || `${userId}_${rcType}_${Date.now()}`}`,
@@ -764,16 +800,18 @@ async function handleRevenueCatWebhook(body, authHeader) {
     }
 
     case 'NON_RENEWING_PURCHASE': {
-      // Tip / consumable purchase via RevenueCat
-      const amount = event.price_in_purchased_currency
-        ? Math.round(event.price_in_purchased_currency * 100)
-        : 0;
+      // Tip / consumable purchase via RevenueCat (App Store or Google Play).
+      // The tier comes from the product, not the price paid: price_in_purchased_currency is in the
+      // buyer's own currency (e.g. 850 rupees), which made a $9.99 tip count as an 85000-cent one.
+      const amount = TIP_PRODUCT_CENTS[storeProductId(productId)]
+        || (event.price ? Math.round(event.price * 100) : 0)
+        || (event.price_in_purchased_currency ? Math.round(event.price_in_purchased_currency * 100) : 0);
       if (amount > 0) {
         const client = await pool.connect();
         try {
           await client.query('BEGIN');
 
-          const intent = await findPendingIosTipIntent(client, userId, productId);
+          const intent = await findPendingIosTipIntent(client, userId, storeProductId(productId));
           const companionId = intent?.companion_id || null;
           const paymentId = `rc_${event.id || `${subscriberId}_${Date.now()}`}`;
           const { rows } = await client.query(
@@ -808,7 +846,7 @@ async function handleRevenueCatWebhook(body, authHeader) {
         console.log(`[revenuecat] Tip: user=${userId} amount=${amount}${isSandbox ? ' [SANDBOX]' : ''}`);
         if (!isSandbox) {
           pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
-            if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan: 'tip', amount: amount / 100, source: 'ios' } }) }).catch(() => {});
+            if (rows[0]) fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan: 'tip', amount: amount / 100, source } }) }).catch(() => {});
           }).catch(() => {});
         }
         try { await creditReferralCommission(pool, userId, 'tip', `rc_tip_${event.id || Date.now()}`, amount); } catch (e) { console.warn('[revenuecat] referral error:', e.message); }
@@ -824,6 +862,8 @@ async function handleRevenueCatWebhook(body, authHeader) {
 }
 
 module.exports = {
+  storeProductId,
+  planForProduct,
   createIosTipIntent,
   getIosTipIntent,
   isIosTipThankYouReady,

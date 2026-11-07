@@ -5,7 +5,7 @@ import { useToast } from '../components/Toast';
 import api from '../lib/api';
 import CompanionCard from '../components/CompanionCard';
 import PlanModal from '../components/PlanModal';
-import { isCapacitor } from '../lib/platform';
+import { isCapacitor, hasNativePush } from '../lib/platform';
 import { getAppPageHeight } from '../lib/layout';
 import RateAppBanner from '../components/RateAppBanner';
 
@@ -55,7 +55,7 @@ export default function CompanionList() {
     }).catch(() => {}).finally(() => setLoading(false));
 
     // Check if push banner should show (Capacitor only, not dismissed, not yet granted)
-    if (isCapacitor() && !localStorage.getItem('push_prompt_dismissed')) {
+    if (hasNativePush() && !localStorage.getItem('push_prompt_dismissed')) {
       import('@capacitor/push-notifications').then(({ PushNotifications }) => {
         PushNotifications.checkPermissions().then(({ receive }) => {
           if (receive !== 'granted' && receive !== 'denied') {

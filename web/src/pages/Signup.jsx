@@ -9,7 +9,7 @@ import TelegramSignIn from '../components/TelegramSignIn'
 import AppleSignIn from '../components/AppleSignIn'
 import { hasCompleteConsent, readOnboardingData, writeOnboardingData } from '../lib/onboarding'
 import { resolvePostSignupPath } from '../lib/postSignupNav'
-import { isCapacitor } from '../lib/platform'
+import { isCapacitor, hasAppleSignIn, hasGoogleSignIn } from '../lib/platform'
 import { getAppPageHeight } from '../lib/layout'
 import logoSrc from '../../../public/assets/brand/logo_text.png'
 
@@ -359,6 +359,8 @@ export default function Signup() {
             </button>
           </form>
 
+          {/* Android app: email only until its Google client exists — no lonely "or". */}
+          {(!nativeApp || hasAppleSignIn() || hasGoogleSignIn()) && (
           <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-brand-border" />
@@ -367,6 +369,7 @@ export default function Signup() {
               <span className="bg-brand-bg px-3 text-brand-muted">or</span>
             </div>
           </div>
+          )}
 
           <div className="mt-3">
             <AppleSignIn onError={setError} ageData={consentData} onSuccess={handleSocialSuccess} />

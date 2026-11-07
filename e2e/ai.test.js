@@ -235,6 +235,40 @@ test.describe('Content Levels — platform detection', () => {
     const req = { get: () => null, body: {} };
     expect(detectPlatform(req)).toBe('web');
   });
+
+  // The Android web view names "Mobile Safari/" — without the app's own signals it looked like a
+  // browser and got the web (explicit) level, which Google Play forbids.
+  const ANDROID_WEBVIEW_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/UQ1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/129.0 Mobile Safari/537.36';
+
+  test('detects the Android app from its platform header', () => {
+    const headers = { 'user-agent': ANDROID_WEBVIEW_UA, 'x-lovetta-platform': 'android-native' };
+    const req = { get: (h) => headers[h.toLowerCase()], body: {} };
+    expect(detectPlatform(req)).toBe('playstore');
+  });
+
+  test('detects the Android app from its user-agent token', () => {
+    const headers = { 'user-agent': `${ANDROID_WEBVIEW_UA} Capacitor lovetta-android` };
+    const req = { get: (h) => headers[h.toLowerCase()], body: {} };
+    expect(detectPlatform(req)).toBe('playstore');
+  });
+
+  test('an Android browser without the app signals stays web', () => {
+    const headers = { 'user-agent': ANDROID_WEBVIEW_UA.replace('; wv', '') };
+    const req = { get: (h) => headers[h.toLowerCase()], body: {} };
+    expect(detectPlatform(req)).toBe('web');
+  });
+});
+
+test.describe('Billing — Google Play product ids', () => {
+  const { storeProductId, planForProduct } = require('../server/src/billing');
+
+  test('Play subscription ids reduce to the App Store ids', () => {
+    expect(storeProductId('lovetta_yearly:yearly')).toBe('lovetta_yearly');
+    expect(storeProductId('lovetta_tip_999')).toBe('lovetta_tip_999');
+    expect(planForProduct('lovetta_yearly:yearly')).toBe('yearly');
+    expect(planForProduct('lovetta_monthly:monthly')).toBe('monthly');
+    expect(planForProduct('lovetta_monthly')).toBe('monthly');
+  });
 });
 
 // ============================================================
@@ -1173,40 +1207,40 @@ test.describe('Media Reuse — findReusableMedia', () => {
   });
 
   test('reuses image with 2+ tag overlap', async () => {
-    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'bedroom']);
+    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'bedroom'], undefined, 2);
     expect(result).not.toBeNull();
     expect(result.media_url).toBe('https://cdn.test/img1.jpg');
   });
 
   test('reuses image with 3 tag overlap (picks highest)', async () => {
-    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'bedroom', 'smile', 'garden']);
+    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'bedroom', 'smile', 'garden'], undefined, 2);
     expect(result).not.toBeNull();
     expect(result.media_url).toBe('https://cdn.test/img1.jpg');
   });
 
   test('does NOT reuse with only 1 tag overlap', async () => {
-    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'pool']);
+    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'pool'], undefined, 2);
     expect(result).toBeNull();
   });
 
   test('does NOT reuse with 0 tag overlap', async () => {
-    const result = await findReusableMedia(pool, companionAId, 'image', ['garden', 'rain']);
+    const result = await findReusableMedia(pool, companionAId, 'image', ['garden', 'rain'], undefined, 2);
     expect(result).toBeNull();
   });
 
   test('REUSES across companions with same avatar (same girl)', async () => {
-    const result = await findReusableMedia(pool, companionBId, 'image', ['selfie', 'bedroom']);
+    const result = await findReusableMedia(pool, companionBId, 'image', ['selfie', 'bedroom'], undefined, 2);
     expect(result).not.toBeNull();
     expect(result.media_url).toBe('https://cdn.test/img1.jpg');
   });
 
   test('does NOT reuse across companions with different avatar', async () => {
-    const result = await findReusableMedia(pool, companionCId, 'image', ['selfie', 'bedroom']);
+    const result = await findReusableMedia(pool, companionCId, 'image', ['selfie', 'bedroom'], undefined, 2);
     expect(result).toBeNull();
   });
 
   test('type isolation — image request does not match video', async () => {
-    const result = await findReusableMedia(pool, companionAId, 'image', ['bedroom', 'playful', 'lingerie']);
+    const result = await findReusableMedia(pool, companionAId, 'image', ['bedroom', 'playful', 'lingerie'], undefined, 2);
     // Should NOT return the video (vid1.mp4), only images
     if (result) {
       expect(result.media_type).toBe('image');
@@ -1214,15 +1248,32 @@ test.describe('Media Reuse — findReusableMedia', () => {
   });
 
   test('reuses video with 2+ tag overlap', async () => {
-    const result = await findReusableMedia(pool, companionAId, 'video', ['bedroom', 'playful']);
+    const result = await findReusableMedia(pool, companionAId, 'video', ['bedroom', 'playful'], undefined, 2);
     expect(result).not.toBeNull();
     expect(result.media_url).toBe('https://cdn.test/vid1.mp4');
     expect(result.media_type).toBe('video');
   });
 
   test('returns null for empty tags', async () => {
-    const result = await findReusableMedia(pool, companionAId, 'image', []);
+    const result = await findReusableMedia(pool, companionAId, 'image', [], undefined, 2);
     expect(result).toBeNull();
+  });
+
+  // Media made before content levels were recorded counts as web level 2: the store apps (level 0)
+  // must never be handed it, only media made at their own level.
+  test('does NOT reuse web-level media at image level 0 (store apps)', async () => {
+    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'bedroom'], undefined, 0);
+    expect(result).toBeNull();
+  });
+
+  test('reuses level-0 media at image level 0', async () => {
+    await pool.query(
+      `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd, content_level)
+       VALUES ($1, 'https://cdn.test/img-safe.jpg', 'image', 'selfie in a cafe', '{selfie,cafe,smile}', 0.025, 0)`,
+      [companionAId]
+    );
+    const result = await findReusableMedia(pool, companionAId, 'image', ['selfie', 'cafe'], undefined, 0);
+    expect(result?.media_url).toBe('https://cdn.test/img-safe.jpg');
   });
 });
 

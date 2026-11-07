@@ -120,7 +120,7 @@ function buildAdaptivePrompt({ analysis, recentMessages = [] } = {}) {
 
 function buildTabooPolicyPrompt({ analysis, platform = 'web', level = 2 } = {}) {
   if (!analysis?.taboo) return { action: 'none', prompt: '' };
-  const restricted = platform === 'appstore' || Number(level) <= 1;
+  const restricted = platform === 'appstore' || platform === 'playstore' || Number(level) <= 1;
   if (restricted) {
     return {
       action: 'redirect',

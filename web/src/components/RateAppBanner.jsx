@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { isCapacitor } from '../lib/platform';
 import api from '../lib/api';
 
-const APP_STORE_URL = 'https://apps.apple.com/app/id6760726614?action=write-review';
+import { storeReviewUrl } from '../lib/appStore';
 const LS_KEY = 'lovetta-rate-dismissed';
 const THRESHOLDS = [10, 100, 200];
 
@@ -52,15 +52,15 @@ export default function RateAppBanner({ companions, totalUserMessages }) {
   const handleStar = async (stars) => {
     setRating(stars);
     if (native && stars >= 4) {
-      // iOS high rating: open App Store review directly
+      // App high rating: open the store review page directly (App Store or Google Play)
       localStorage.setItem(LS_KEY, String(threshold));
       setPhase('thankyou');
       api.post('/api/user/app-feedback', { rating: stars }).catch(() => {});
       try {
         const { Browser } = await import('@capacitor/browser');
-        await Browser.open({ url: APP_STORE_URL, presentationStyle: 'popover' });
+        await Browser.open({ url: storeReviewUrl(), presentationStyle: 'popover' });
       } catch {
-        window.open(APP_STORE_URL, '_blank');
+        window.open(storeReviewUrl(), '_blank');
       }
       setTimeout(() => setPhase('hidden'), 2000);
     } else {

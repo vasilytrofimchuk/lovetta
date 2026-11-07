@@ -302,10 +302,11 @@ Stay in character at all times. Be engaging, expressive, and emotionally present
 This conversation is happening via email. Keep responses natural but don't mention email explicitly.`;
 
   // Load memory context + recent messages. Email replies have no platform
-  // context — use the user's effective web-level.
+  // context — use the user's effective web-level (Google Play level for Android sign-ups).
   const { buildMemoryContext, buildUserContext, processMemory } = require('./memory');
-  const { getEffectiveTextLevel } = require('./content-levels');
-  const emailLevel = await getEffectiveTextLevel('web', userId);
+  const { getEffectiveTextLevel, platformForUser } = require('./content-levels');
+  const emailPlatform = await platformForUser(userId, 'web');
+  const emailLevel = await getEffectiveTextLevel(emailPlatform, userId);
   const [memoryContext, userContext] = await Promise.all([
     buildMemoryContext(conversation.id, { level: emailLevel }),
     buildUserContext(userId, { level: emailLevel }),
@@ -325,7 +326,7 @@ This conversation is happening via email. Keep responses natural but don't menti
     aiResult = await chatCompletion(fullSystemPrompt, aiMessages, {
       userId,
       companionId: companion.id,
-      platform: 'web',
+      platform: emailPlatform,
     });
   } catch (err) {
     console.error('[email] AI response error:', err.message);

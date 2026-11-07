@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ToastProvider } from './components/Toast'
 import usePwaInstall from './hooks/usePwaInstall'
 import { initIosKeyboard } from './lib/keyboard'
-import { isCapacitor, isIOS } from './lib/platform'
+import { isCapacitor, isIOS, isAndroid, hasNativePush } from './lib/platform'
 import { getAppPageHeight } from './lib/layout'
 import { apiUrl } from './lib/api'
 import Login from './pages/Login'
@@ -105,9 +105,13 @@ function RevenueCatInitializer() {
     let cancelled = false
 
     const initRevenueCat = async () => {
-      const rcKey = import.meta.env.VITE_REVENUECAT_IOS_KEY
+      // One public RevenueCat SDK key per store: appl_… (iOS), goog_… (Android).
+      const keyName = isAndroid() ? 'VITE_REVENUECAT_ANDROID_KEY' : 'VITE_REVENUECAT_IOS_KEY'
+      const rcKey = isAndroid()
+        ? import.meta.env.VITE_REVENUECAT_ANDROID_KEY
+        : import.meta.env.VITE_REVENUECAT_IOS_KEY
       if (!rcKey) {
-        console.error('VITE_REVENUECAT_IOS_KEY not configured — skipping RevenueCat init')
+        console.error(`${keyName} not configured — skipping RevenueCat init`)
         return
       }
 
@@ -166,7 +170,8 @@ function PushInitializer() {
     initedRef.current = true
 
     // Set up tap-to-navigate listeners and auto-register push if already granted
-    if (isCapacitor()) {
+    // (iOS only: the Android app has no push yet — see hasNativePush)
+    if (hasNativePush()) {
       import('./lib/push-native').then(({ registerNativePush, setupPushListeners }) => {
         setupPushListeners((url) => navigate(url))
         // Auto-register token if permission already granted (no prompt shown)

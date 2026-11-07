@@ -274,6 +274,16 @@ Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
 
 **CRITICAL:** After ANY native file change, **run `npm run build:ios` immediately** before telling the user to test. Never skip this step.
 
+### Android (Google Play)
+
+- `web/android/` — Capacitor shell, package `ai.lovetta.app`, loads https://lovetta.ai/my/ like iOS. UA ends with `Capacitor lovetta-android`; the client also sends `X-Lovetta-Platform: android-native`.
+- **Content level `playstore`** (`text_level_playstore` / `image_level_playstore`, both 0): Google Play forbids sexual content. Users who signed up on Android keep it in proactive messages, email replies and tip photos (`platformForUser` in `content-levels.js`).
+- Build: `scripts/android-build.sh` (release AAB) / `--debug` / `--all`. JDK 21 from Android Studio. Bump `versionCode` in `web/android/app/build.gradle` before every Play upload. Upload key: `~/.android-keys/lovetta-upload.jks` + `.properties` — never commit.
+- Play without the browser: `node scripts/play-release.js --show | --track internal|production`, `scripts/play-products.js`, `scripts/play-listing.js --config web/android/play/listing.json` (owner's OAuth, same login as Mystery Lab).
+- Purchases: RevenueCat, `VITE_REVENUECAT_ANDROID_KEY` (goog_…) in `build-secrets/lovetta.build_env` on the box. Play subscriptions `lovetta_monthly:monthly`, `lovetta_yearly:yearly`; tips `lovetta_tip_*` — server strips `:basePlan`.
+- Not on Android yet: push (no Firebase), Sign in with Apple, Google sign-in (until `VITE_GOOGLE_ANDROID_SIGNIN=1` after the Android OAuth client exists).
+- Production deploy: `scripts/deploy-box.sh` (shared box, not Heroku).
+
 ### Ports
 
 - **3900** — Dev server

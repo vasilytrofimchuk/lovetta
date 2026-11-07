@@ -5,6 +5,10 @@
 
 const { getPool } = require('./db');
 const ai = require('./ai');
+const { getEffectiveImageLevel } = require('./content-levels');
+
+// Catalog rows made before content_level was recorded (v71) were mostly made at the web level.
+const UNKNOWN_MEDIA_LEVEL = 2;
 
 // -- Tag vocabulary for reuse matching ----------------------------
 
@@ -103,21 +107,22 @@ function extractTags(description) {
  * Find existing media that matches the requested context.
  * Looks across ALL companions that share the same avatar_url (same girl),
  * not just the current companion. Requires at least 2 overlapping tags.
- * Excludes images the user has already seen in their chat messages.
+ * Excludes images the user has already seen in their chat messages, and anything made at a
+ * higher image content level than the viewer's (a web photo must not reach the store apps).
  */
-async function findReusableMedia(pool, companionId, type, tags, userId) {
+async function findReusableMedia(pool, companionId, type, tags, userId, maxLevel = 0) {
   if (!tags.length) return null;
 
   // Find all companions that share the same avatar (same base image = same girl)
   // Exclude images already in this user's conversation messages
-  const params = [companionId, type, tags];
+  const params = [companionId, type, tags, maxLevel];
   let userExclude = '';
   if (userId) {
     params.push(userId);
     userExclude = `AND cm.media_url NOT IN (
       SELECT m.media_url FROM messages m
       JOIN conversations c ON c.id = m.conversation_id
-      WHERE c.user_id = $4 AND m.media_url IS NOT NULL
+      WHERE c.user_id = $5 AND m.media_url IS NOT NULL
     )`;
   }
 
@@ -128,6 +133,7 @@ async function findReusableMedia(pool, companionId, type, tags, userId) {
      JOIN user_companions uc_media ON uc_media.id = cm.companion_id
      JOIN user_companions uc_self  ON uc_self.avatar_url = uc_media.avatar_url
      WHERE uc_self.id = $1 AND cm.media_type = $2 AND cm.tags && $3
+       AND COALESCE(cm.content_level, ${UNKNOWN_MEDIA_LEVEL}) <= $4
      ${userExclude}
      ORDER BY overlap DESC, cm.created_at DESC
      LIMIT 1`,
@@ -193,8 +199,11 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
     }
   }
 
+  // Image level this user may see on this platform (store apps are stricter than the web)
+  const level = await getEffectiveImageLevel(opts.platform || 'web', opts.userId);
+
   // Try reuse (exclude images user already has in chat)
-  const existing = await findReusableMedia(pool, companion.id, type, tags, opts.userId);
+  const existing = await findReusableMedia(pool, companion.id, type, tags, opts.userId, level);
   if (existing) {
     console.log(`[media] reusing existing ${type}: ${existing.media_url} (tags: ${existing.tags})`);
     return { url: existing.media_url, type: existing.media_type, reused: true };
@@ -212,9 +221,9 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
 
     // Save to catalog
     await pool.query(
-      `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd)
-       VALUES ($1, $2, 'image', $3, $4, $5)`,
-      [companion.id, result.url, description, tags, result.cost]
+      `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd, content_level)
+       VALUES ($1, $2, 'image', $3, $4, $5, $6)`,
+      [companion.id, result.url, description, tags, result.cost, level]
     );
 
     console.log(`[media] generated new image: ${result.url} (tags: ${tags})`);
@@ -223,7 +232,7 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
 
   if (type === 'video') {
     // Step 1: Find or generate a source image (source images can be reused even if user saw them)
-    let sourceImage = await findReusableMedia(pool, companion.id, 'image', tags);
+    let sourceImage = await findReusableMedia(pool, companion.id, 'image', tags, null, level);
     let sourceImageUrl;
 
     if (sourceImage) {
@@ -240,9 +249,9 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
 
       // Catalog the image too
       const { rows } = await pool.query(
-        `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd)
-         VALUES ($1, $2, 'image', $3, $4, $5) RETURNING id`,
-        [companion.id, imgResult.url, description, tags, imgResult.cost]
+        `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, cost_usd, content_level)
+         VALUES ($1, $2, 'image', $3, $4, $5, $6) RETURNING id`,
+        [companion.id, imgResult.url, description, tags, imgResult.cost, level]
       );
       sourceImage = { id: rows[0].id };
     }
@@ -257,9 +266,9 @@ async function generateOrReuseMedia(companion, mediaRequest, opts = {}) {
     if (!videoResult.url) throw new Error('Video generation returned no URL');
 
     await pool.query(
-      `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, source_image_id, cost_usd)
-       VALUES ($1, $2, 'video', $3, $4, $5, $6)`,
-      [companion.id, videoResult.url, description, tags, sourceImage?.id || null, videoResult.cost]
+      `INSERT INTO companion_media (companion_id, media_url, media_type, prompt, tags, source_image_id, cost_usd, content_level)
+       VALUES ($1, $2, 'video', $3, $4, $5, $6, $7)`,
+      [companion.id, videoResult.url, description, tags, sourceImage?.id || null, videoResult.cost, level]
     );
 
     console.log(`[media] generated new video: ${videoResult.url} (tags: ${tags})`);

@@ -10,10 +10,18 @@ const { getPool } = require('./db');
 
 /**
  * Detect platform from request headers/body.
- * @returns {'web'|'appstore'|'telegram'}
+ * @returns {'web'|'appstore'|'playstore'|'telegram'}
  */
 function detectPlatform(req) {
   const ua = (req.get('user-agent') || '').toLowerCase();
+
+  // Android app (Google Play): its web view says "Mobile Safari/", so without this it would be
+  // taken for a browser and get the web level. The app sends X-Lovetta-Platform on every request
+  // (web/src/lib/api.js) and "lovetta-android" in its user agent (capacitor.config.json).
+  const platformHeader = String(req.get('x-lovetta-platform') || '').toLowerCase();
+  if (platformHeader === 'android-native' || ua.includes('lovetta-android')) {
+    return 'playstore';
+  }
 
   // Telegram Mini App: initData in body or Telegram bot user-agent
   if (req.body?.initData || ua.includes('telegrambot') || ua.includes('tg_web_app')) {
@@ -79,7 +87,7 @@ async function getContentLevels() {
   }
   const pool = getPool();
   if (!pool) {
-    return { text_level_web: 0, text_level_appstore: 0, text_level_telegram: 0, image_level_web: 0, image_level_appstore: 0, image_level_telegram: 0 };
+    return { text_level_web: 0, text_level_appstore: 0, text_level_playstore: 0, text_level_telegram: 0, image_level_web: 0, image_level_appstore: 0, image_level_playstore: 0, image_level_telegram: 0 };
   }
 
   const { rows } = await pool.query(
@@ -92,6 +100,32 @@ async function getContentLevels() {
   levelsCache = levels;
   levelsCacheTime = Date.now();
   return levels;
+}
+
+// -- Platform for work done outside a request -------------------
+
+/**
+ * Platform whose levels apply when there is no request to look at (proactive messages, email
+ * replies) or when the request is not the app's own chat. A user who signed up in the Android app
+ * keeps the Google Play level everywhere; everyone else gets `fallback`.
+ */
+async function platformForUser(userId, fallback = 'web') {
+  if (!userId) return fallback;
+  const pool = getPool();
+  if (!pool) return fallback;
+  try {
+    const { rows } = await pool.query('SELECT device_type FROM users WHERE id = $1', [userId]);
+    return rows[0]?.device_type === 'android' ? 'playstore' : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** detectPlatform for a request, but never looser than the user's own Android sign-up. */
+async function requestPlatform(req, userId) {
+  const platform = detectPlatform(req);
+  if (platform === 'playstore') return platform;
+  return platformForUser(userId, platform);
 }
 
 // -- User explicit content preference -------------------------
@@ -117,7 +151,7 @@ async function getUserExplicitPref(userId) {
 
 /**
  * Get the text content level for a platform.
- * @param {'web'|'appstore'|'telegram'} platform
+ * @param {'web'|'appstore'|'playstore'|'telegram'} platform
  * @returns {number} 0-3
  */
 async function getTextLevel(platform) {
@@ -127,7 +161,7 @@ async function getTextLevel(platform) {
 
 /**
  * Get the image content level for a platform.
- * @param {'web'|'appstore'|'telegram'} platform
+ * @param {'web'|'appstore'|'playstore'|'telegram'} platform
  * @returns {number} 0-3
  */
 async function getImageLevel(platform) {
@@ -254,6 +288,8 @@ async function getAvatarFilterSettings() {
 
 module.exports = {
   detectPlatform,
+  platformForUser,
+  requestPlatform,
   getTextLevel,
   getImageLevel,
   getEffectiveTextLevel,

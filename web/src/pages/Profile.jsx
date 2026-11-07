@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import api from '../lib/api';
 import { APP_ICON_OPTIONS, getCurrentAppIcon, getSavedAppIcon, saveAppIcon, setCurrentAppIcon } from '../lib/app-icon';
-import { isAppStore, isCapacitor, isIOS } from '../lib/platform';
+import { isAppStore, isCapacitor, isIOS, hasNativePush } from '../lib/platform';
+import { storeSubscriptionsUrl } from '../lib/appStore';
 import { getAppPageHeight } from '../lib/layout';
 import RealEmailPrompt from '../components/RealEmailPrompt';
 
@@ -99,7 +100,7 @@ export default function Profile() {
 
     // Check existing push subscription and show prompt if needed
     const dismissed = localStorage.getItem('push_prompt_dismissed');
-    if (isCapacitor()) {
+    if (hasNativePush()) {
       import('@capacitor/push-notifications').then(({ PushNotifications }) => {
         return PushNotifications.checkPermissions().then(status => {
           const granted = status.receive === 'granted';
@@ -118,7 +119,7 @@ export default function Profile() {
           setPushPromptVisible(true);
         }
       });
-    } else if ('serviceWorker' in navigator && 'PushManager' in window) {
+    } else if (!isCapacitor() && 'serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready.then(reg => {
         return reg.pushManager.getSubscription().then(sub => {
           const hasSub = !!sub;
@@ -360,7 +361,7 @@ export default function Profile() {
     }
   };
 
-  const showPushToggle = isCapacitor() || ('PushManager' in window);
+  const showPushToggle = hasNativePush() || (!isCapacitor() && 'PushManager' in window);
 
   return (
     <div
@@ -432,7 +433,7 @@ export default function Profile() {
               {subscription.paymentProvider !== 'gift' && <button
                 onClick={() => {
                   if (subscription?.paymentProvider === 'revenuecat') {
-                    window.location.href = 'https://apps.apple.com/account/subscriptions';
+                    window.location.href = storeSubscriptionsUrl();
                   } else {
                     navigate('/pricing');
                   }
