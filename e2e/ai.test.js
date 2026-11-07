@@ -1812,3 +1812,12 @@ test('a blunt "No. Nothing involving …" opener is dropped', () => {
   expect(stripLectureOpener('No. Nothing involving nudity — I like a little mystery 😉 Want a cute pic?')).toBe('I like a little mystery 😉 Want a cute pic?');
   expect(stripLectureOpener('No matter what, I adore you')).toBe('No matter what, I adore you');
 });
+
+test('app-appended media failure lines are hidden from the model', () => {
+  const { formatMessagesForAI } = require('../server/src/chat-api');
+  const out = formatMessagesForAI([
+    { role: 'assistant', content: 'Here is me in the garden 💕\n\nUgh, my camera glitched 😅 Ask me again in a minute?' },
+    { role: 'assistant', content: 'I love mornings' },
+  ]);
+  expect(out.map(m => m.content)).toEqual(['Here is me in the garden 💕', 'I love mornings']);
+});
