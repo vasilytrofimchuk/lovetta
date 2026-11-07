@@ -16,6 +16,7 @@ let reviewerTranscriptTimer = null;
 const { buildMemoryContext, buildUserContext, processMemory } = require('./memory');
 const { getEffectiveTextLevel } = require('./content-levels');
 const { parseMediaTags, generateOrReuseMedia, getMediaFailureLine } = require('./media-chat');
+const { truncateNatural } = require('./text-trim');
 const { checkMediaBlocked, checkAccess, acquireTipRequestSlot } = require('./consumption');
 const { getRedis } = require('./redis');
 const { sendPushNotification } = require('./push');
@@ -332,22 +333,6 @@ You can send photos of yourself.
   return prompt;
 }
 
-/**
- * Truncate text to maxWords, cutting at a natural break (comma, dash, period)
- * if possible. Falls back to hard cut at maxWords.
- */
-function truncateNatural(text, maxWords) {
-  const words = text.split(/\s+/);
-  if (words.length <= maxWords) return text;
-
-  // Look for a natural break (,  —  –  -  ;  .) within the first maxWords
-  for (let i = maxWords - 1; i >= Math.floor(maxWords / 2); i--) {
-    if (/[,;.\-–—]$/.test(words[i])) {
-      return words.slice(0, i + 1).join(' ').replace(/[,;.\-–—]+$/, '');
-    }
-  }
-  return words.slice(0, maxWords).join(' ');
-}
 
 function parseContextText(text) {
   let sceneText = null;
