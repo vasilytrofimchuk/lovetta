@@ -44,7 +44,13 @@ const RATE_LIMIT_WINDOW = 60;    // seconds
 
 /** Enrich raw message rows with image annotations for AI context */
 function formatMessagesForAI(rows) {
-  return rows.map(m => {
+  // A turn refused by minor-safety (the player's message and the fixed refusal) is left out of what
+  // the model sees: the model copied that blunt "No. Nothing involving …" into later replies.
+  // (Stored without its *action*, so it is recognised by a phrase of the reply, not the whole text.)
+  const { MINOR_SAFE_MARK } = require('./minor-safety');
+  const isRefusal = (m) => m?.role === 'assistant' && String(m.content || '').includes(MINOR_SAFE_MARK);
+  const kept = rows.filter((m, i) => !isRefusal(m) && !(m.role === 'user' && isRefusal(rows[i + 1])));
+  return kept.map(m => {
     let content = m.content || '';
     if (m.media_url && m.role === 'assistant') {
       const label = m.media_type === 'video' ? 'video' : 'photo';
@@ -1377,3 +1383,4 @@ router.post('/:companionId/report', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.formatMessagesForAI = formatMessagesForAI;

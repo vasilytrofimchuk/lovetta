@@ -1795,3 +1795,14 @@ test.describe('Chat review 07.11', () => {
     expect(p).toMatch(/alone in every photo/);
   });
 });
+
+test('a minor-safety refusal and the message before it are hidden from the model', () => {
+  const { formatMessagesForAI } = require('../server/src/chat-api');
+  const out = formatMessagesForAI([
+    { role: 'user', content: 'bad request' },
+    { role: 'assistant', content: "No. Nothing involving kids or anyone under 18 — not as a game, not as a memory, not ever." },
+    { role: 'user', content: 'hi' },
+    { role: 'assistant', content: 'hey you' },
+  ]);
+  expect(out.map(m => m.content)).toEqual(['hi', 'hey you']);
+});
