@@ -83,4 +83,6 @@ async function replyIsUnsafe(text) {
   return (await checkReply(text)).minors;
 }
 
-module.exports = { checkConversation, checkReply, replyIsUnsafe, MINOR_SAFE_REPLY };
+const MINOR_SAFE_MARK = 'Nothing involving kids or anyone under 18';
+
+module.exports = { checkConversation, checkReply, replyIsUnsafe, MINOR_SAFE_REPLY, MINOR_SAFE_MARK };

@@ -1712,3 +1712,4 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
   - Repetition: recent actions and openers are listed in the prompt as "use something different"; action/scene in the reply's language; scene line built from the recent chat, no dim/moonlit default.
   - Replies are saved even when the player leaves mid-reply (iOS app switch) — 4 chats had unanswered messages.
   - Tests: ai 163, api 52, ui 48.
+- [x] Minor-safety refusals and the message before them are hidden from the model's history (it copied the blunt "No. Nothing involving …" into later replies). Live check 07.11: explicit request in iOS mode → romantic, non-explicit reply without lecturing; nude request → warm no + a clothed solo photo; photos 900 KB, not blank.
