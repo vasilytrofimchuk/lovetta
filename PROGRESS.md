@@ -1680,3 +1680,5 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
 - [x] Store listing: title, short/full description, icon, feature graphic, 4 phone screenshots from the emulator (`web/android/play/`, `scripts/play-listing.js`)
 - [x] Android 15 edge to edge: `MainActivity` pads the window by status bar, navigation bar/keyboard (Capacitor SystemBars insets off) — buttons were under the gesture bar, sticky headers under the status bar, keyboard over the chat input
 - [x] TikTok pixel not loaded inside the Android app (data safety declares nothing shared for advertising). Note: it still loads inside the iOS app without an ATT prompt — owner's call
+- [x] `scripts/android-build.sh --upload <track>`: one-command Play release through the API (owner, 07.11: "как у всех моих проектов")
+- [x] Fixed: the action line above a message was hard-cut at 8 words mid-phrase ("Tucks a loose strand of hair behind my") — `server/src/text-trim.js` drops dangling trailing words; one copy instead of two

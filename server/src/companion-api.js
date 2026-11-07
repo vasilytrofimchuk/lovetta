@@ -17,16 +17,8 @@ async function companionPlatform(req) {
 }
 const { getUserSubscription, isSubscriptionActive } = require('./billing');
 
-function truncateNatural(text, maxWords) {
-  const words = text.split(/\s+/);
-  if (words.length <= maxWords) return text;
-  for (let i = maxWords - 1; i >= Math.floor(maxWords / 2); i--) {
-    if (/[,;.\-–—]$/.test(words[i])) {
-      return words.slice(0, i + 1).join(' ').replace(/[,;.\-–—]+$/, '');
-    }
-  }
-  return words.slice(0, maxWords).join(' ');
-}
+
+const { truncateNatural } = require('./text-trim');
 
 const router = Router();
 
