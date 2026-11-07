@@ -26,3 +26,19 @@ function truncateNatural(text, maxWords) {
 }
 
 module.exports = { truncateNatural };
+
+/**
+ * Drop a blunt refusal opener: "No. Nothing involving nudity — I like mystery…" → "I like mystery…".
+ * Used on replies after a rewrite failed, and on old replies before they go back to the model, so it
+ * stops copying the shape from its own history.
+ */
+function stripLectureOpener(text) {
+  const s = String(text || '');
+  const m = s.match(/^(\s*(?:\*[^*]*\*\s*)?)no\.\s+(?:nothing involving[^—–.!?]*[—–.!?]\s*)?/i);
+  if (!m) return s;
+  const rest = s.slice(m[0].length).trim();
+  if (rest.length < 10) return s;
+  return m[1] + rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+module.exports.stripLectureOpener = stripLectureOpener;

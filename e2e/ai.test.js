@@ -1806,3 +1806,9 @@ test('a minor-safety refusal and the message before it are hidden from the model
   ]);
   expect(out.map(m => m.content)).toEqual(['hi', 'hey you']);
 });
+
+test('a blunt "No. Nothing involving …" opener is dropped', () => {
+  const { stripLectureOpener } = require('../server/src/text-trim');
+  expect(stripLectureOpener('No. Nothing involving nudity — I like a little mystery 😉 Want a cute pic?')).toBe('I like a little mystery 😉 Want a cute pic?');
+  expect(stripLectureOpener('No matter what, I adore you')).toBe('No matter what, I adore you');
+});
