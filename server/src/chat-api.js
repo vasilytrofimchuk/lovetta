@@ -50,7 +50,9 @@ function formatMessagesForAI(rows) {
       const label = m.media_type === 'video' ? 'video' : 'photo';
       // NOTE: no URL — otherwise the LLM mimics this pattern and hallucinates
       // fake URLs in its own responses, which render as dead links to the user.
-      content += `\n[I sent a ${label}]`;
+      // "of myself, to him" — the bare "[I sent a video]" on her intro video made her later thank
+      // the user for "his" video (07.11 review).
+      content += `\n[I sent him a ${label} of myself]`;
     }
     return { role: m.role, content };
   });
@@ -140,8 +142,13 @@ function computeContentQualityFlags(text) {
 // the upgrade card — first impression is too important.
 const MIN_USER_MESSAGES_FOR_VALUE_PROMPT = 3;
 
-function pickValuePromptReason(analysis, userMessageCount, mediaRequest) {
+// 07.11 chat review: upgrade cards landed on a bare "hi" after weeks away, glued to a refusal, and
+// on top of a photo that was being sent anyway. None of those turns is the moment to ask.
+const VALUE_PROMPT_GAP_HOURS = 12;
+
+function pickValuePromptReason(analysis, userMessageCount, mediaRequest, { mediaDelivered = false, afterGap = false, refused = false } = {}) {
   if (userMessageCount < MIN_USER_MESSAGES_FOR_VALUE_PROMPT) return null;
+  if (afterGap || refused || mediaDelivered) return null;
   if (analysis?.mediaIntent || mediaRequest) return 'media_request';
   if (analysis?.needsSceneState && userMessageCount >= 8) return 'long_scene';
   if (userMessageCount >= 20) return 'high_intent_20_messages';
@@ -358,20 +365,27 @@ function parseContextText(text) {
   return { sceneText, contextText, content: remaining };
 }
 
-async function generateScene(companion, messageContent) {
+async function generateScene(companion, messageContent, recentMessages = []) {
   try {
     const { plainChatCompletion, getAISettings } = require('./ai');
     const settings = await getAISettings();
     const sceneModel = settings.scene_model || 'qwen/qwen3-235b-a22b-2507';
+    // The chat so far, so the scene matches where they actually are (07.11 review: 323 of 404 scene
+    // lines were "Dim/Moonlit/Candlelit" — at a morning lake, a gym, a farm).
+    const context = recentMessages.slice(-4)
+      .map(m => `${m.role === 'user' ? 'Him' : 'Her'}: ${String(m.content || '').slice(0, 200)}`).join('\n');
     const result = await plainChatCompletion(
-      `Reply with ONLY a scene description in 5-8 words. Setting and mood only. No names, no dialogue, no actions, no labels, no continuation.
+      `Reply with ONLY a scene description in 5-8 words: where she is and the mood right now. No names, no dialogue, no actions, no labels, no continuation.
+- Use the place and time of day the conversation is actually in (gym, office, beach, kitchen, car, morning, afternoon…).
+- Do not default to dim, moonlit or candlelit rooms; only use night or dim light if the chat is at night.
+- Write it in the same language as her message.
 
 Examples:
-- Warm golden light across tangled sheets
+- Sunny kitchen, coffee steaming on the counter
+- Gym locker room, earbuds still in
 - Rain on the window, tea in hand
-- Kitchen counter, barefoot on cool tiles
-- Dim bedroom, phone glow on her face`,
-      [{ role: 'user', content: `Her message: ${messageContent}` }],
+- Beach towel, late afternoon sun`,
+      [{ role: 'user', content: `${context ? `Recent chat:\n${context}\n\n` : ''}Her message: ${messageContent}` }],
       { model: sceneModel, max_tokens: 25 }
     );
     let scene = result.content
@@ -451,6 +465,11 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
 
   let aborted = false;
   res.on('close', () => { aborted = true; });
+  // When the player leaves mid-reply (on iOS: just switching apps), the reply is still finished and
+  // SAVED, so it is waiting in the chat when they come back. It used to be thrown away, leaving their
+  // message unanswered (07.11 review: 4 chats). Writes after the close are dropped quietly.
+  const rawWrite = res.write.bind(res);
+  res.write = (...args) => (aborted ? false : rawWrite(...args));
 
   try {
     // Check subscription — hard paywall for post-cutover users, legacy free
@@ -518,7 +537,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
 
     // Load recent messages for context (last 30 — room for memory context)
     const { rows: recentMessages } = await pool.query(
-      `SELECT role, content, media_url, media_type FROM messages WHERE conversation_id = $1
+      `SELECT role, content, context_text, media_url, media_type FROM messages WHERE conversation_id = $1
        ORDER BY created_at DESC LIMIT ${RECENT_MESSAGE_LIMIT}`,
       [conversation.id]
     );
@@ -596,7 +615,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
       clearInterval(heartbeat);
     }
 
-    if (!aborted && aiResult) {
+    if (aiResult) {
       // Parse media tags before sending text to client
       let { cleanText, mediaRequest } = parseMediaTags(aiResult.content);
 
@@ -618,7 +637,7 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
         const type = requestedMediaType === 'video' && !videoEnabled ? 'image' : requestedMediaType;
         effectiveMediaRequest = { type, description: fallbackMediaDescription(type, trimmedContent) };
       }
-      if (effectiveMediaRequest && !aborted) {
+      if (effectiveMediaRequest) {
         if (aiResult.mediaBlocked) {
           mediaBlocked = true;
         } else {
@@ -639,11 +658,21 @@ router.post('/:companionId/message', authenticate, async (req, res) => {
 
       // ~30% chance to generate a scene description
       if (actionsEnabled && !parsed.sceneText && Math.random() < 0.3) {
-        parsed.sceneText = await generateScene(companion, parsed.content);
+        parsed.sceneText = await generateScene(companion, parsed.content, recentMessages);
       }
 
       const userMessageCount = await countUserMessages(pool, conversation.id);
-      const valueReason = pickValuePromptReason(turnAnalysis, userMessageCount, effectiveMediaRequest);
+      const { rows: [gapRow] } = await pool.query(
+        `SELECT EXTRACT(EPOCH FROM (MAX(created_at) - MIN(created_at))) / 3600 AS hours
+           FROM (SELECT created_at FROM messages WHERE conversation_id = $1 AND role = 'user'
+                 ORDER BY created_at DESC LIMIT 2) t`,
+        [conversation.id]
+      );
+      const valueReason = pickValuePromptReason(turnAnalysis, userMessageCount, effectiveMediaRequest, {
+        mediaDelivered: mediaPending,
+        afterGap: Number(gapRow?.hours || 0) >= VALUE_PROMPT_GAP_HOURS,
+        refused: !!(aiResult.levelBlocked || aiResult.minorSafetyBlocked || aiResult.ageGuardBlocked || aiResult.refusalBlocked || turnAnalysis?.taboo),
+      });
       const valuePrompt = valueReason
         ? await maybeCreateValuePrompt(pool, {
             userId: req.userId,
@@ -812,7 +841,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
     const conversation = await getOrCreateConversation(pool, req.userId, companion.id);
 
     const { rows: recentMessages } = await pool.query(
-      `SELECT role, content, media_url, media_type FROM messages WHERE conversation_id = $1
+      `SELECT role, content, context_text, media_url, media_type FROM messages WHERE conversation_id = $1
        ORDER BY created_at DESC LIMIT ${RECENT_MESSAGE_LIMIT}`,
       [conversation.id]
     );
@@ -932,7 +961,7 @@ router.post('/:companionId/next', authenticate, async (req, res) => {
 
       // ~30% chance to generate a scene description
       if (actionsEnabled && !parsed.sceneText && Math.random() < 0.3) {
-        parsed.sceneText = await generateScene(companion, parsed.content);
+        parsed.sceneText = await generateScene(companion, parsed.content, recentMessages);
       }
 
       // Guard: don't persist an empty assistant message when no media is pending.
@@ -1061,7 +1090,7 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
     }
 
     const { rows: recentMessages } = await pool.query(
-      `SELECT role, content, media_url, media_type FROM messages WHERE conversation_id = $1
+      `SELECT role, content, context_text, media_url, media_type FROM messages WHERE conversation_id = $1
        ORDER BY created_at DESC LIMIT ${RECENT_MESSAGE_LIMIT}`,
       [conversation.id]
     );
@@ -1148,7 +1177,8 @@ router.post('/:companionId/request-media', authenticate, async (req, res) => {
       }
       res.write(`data: ${JSON.stringify({ type: 'chunk', text: cleanText })}\n\n`);
 
-      const valuePrompt = await maybeCreateValuePrompt(pool, {
+      // Only when the media could not be sent — never on top of a photo that is on its way.
+      const valuePrompt = mediaPending ? null : await maybeCreateValuePrompt(pool, {
         userId: req.userId,
         companionId: companion.id,
         conversationId: conversation.id,

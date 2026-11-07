@@ -251,7 +251,7 @@ Examples:
 - Warm golden light across tangled sheets
 - Rain on the window, tea in hand
 - Kitchen counter, barefoot on cool tiles
-- Dim bedroom, phone glow on her face`,
+- Sunny café table, latte in hand`,
             [{ role: 'user', content: `Her first words: ${content}` }],
             { model: 'thedrummer/rocinante-12b', max_tokens: 25 }
           ),

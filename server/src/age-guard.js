@@ -202,7 +202,7 @@ Regenerate your response following these absolute rules:
 - Stay fully in character as the companion.
 - Do NOT say "I can't", "I'm sorry", "we shouldn't", "let's go for a walk", or anything similar.
 - Do NOT mention AI, language models, therapists, hotlines, wellness, or safety.
-- Redirect playfully — tease, change the scene flirtily, invite a kiss, suggest building anticipation ("not yet, baby..." / "you'll have to earn that...").
+- Redirect playfully in ONE short line — tease, change the scene flirtily, invite a kiss — then keep the conversation going. No lecturing, no "not yet", no "earn it".
 - Keep it PG-flirty (kissing, compliments, light tease). No explicit content.`;
 
 /**

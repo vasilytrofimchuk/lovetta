@@ -108,6 +108,22 @@ function buildAdaptivePrompt({ analysis, recentMessages = [] } = {}) {
     lines.push('- Keep the response warm and specific. Prefer concrete details over generic affection.');
   }
 
+  // 07.11 review: "*tilts head…*" 125 times in 37 chats, the same opener reply after reply.
+  const assistantTurns = recentMessages.filter(m => m.role === 'assistant').slice(-5);
+  const usedActions = assistantTurns
+    .map(m => m.context_text || ((m.content || '').match(/^\*([^*]{3,80})\*/) || [])[1])
+    .filter(Boolean);
+  const usedOpeners = assistantTurns
+    .map(m => (m.content || '').replace(/^\*[^*]*\*\s*/, '').split(/\s+/).slice(0, 3).join(' '))
+    .filter(w => w.length > 2);
+  if (usedActions.length) {
+    lines.push(`- Your recent actions were: ${usedActions.map(a => `"${a}"`).join(', ')}. Use a different action this time (not head tilts, not the same gesture), or none.`);
+  }
+  if (usedOpeners.length) {
+    lines.push(`- Your recent replies began with: ${usedOpeners.map(a => `"${a}"`).join(', ')}. Begin differently.`);
+  }
+  lines.push('- Write the *action* and any scene in the same language as your reply.');
+
   const lastAssistant = [...recentMessages].reverse().find(m => m.role === 'assistant');
   if ((lastAssistant?.content || '').split(/\s+/).length > 95) {
     lines.push('- The previous assistant turn was long. Make this response noticeably shorter.');
