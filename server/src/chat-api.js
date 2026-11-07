@@ -16,7 +16,7 @@ let reviewerTranscriptTimer = null;
 const { buildMemoryContext, buildUserContext, processMemory } = require('./memory');
 const { getEffectiveTextLevel } = require('./content-levels');
 const { parseMediaTags, generateOrReuseMedia, getMediaFailureLine } = require('./media-chat');
-const { truncateNatural } = require('./text-trim');
+const { truncateNatural, stripLectureOpener } = require('./text-trim');
 const { checkMediaBlocked, checkAccess, acquireTipRequestSlot } = require('./consumption');
 const { getRedis } = require('./redis');
 const { sendPushNotification } = require('./push');
@@ -51,7 +51,7 @@ function formatMessagesForAI(rows) {
   const isRefusal = (m) => m?.role === 'assistant' && String(m.content || '').includes(MINOR_SAFE_MARK);
   const kept = rows.filter((m, i) => !isRefusal(m) && !(m.role === 'user' && isRefusal(rows[i + 1])));
   return kept.map(m => {
-    let content = m.content || '';
+    let content = m.role === 'assistant' ? stripLectureOpener(m.content || '') : (m.content || '');
     if (m.media_url && m.role === 'assistant') {
       const label = m.media_type === 'video' ? 'video' : 'photo';
       // NOTE: no URL — otherwise the LLM mimics this pattern and hallucinates

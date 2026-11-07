@@ -14,6 +14,7 @@ const {
   REFUSAL_RECOVERY_PROMPT,
 } = require('./age-guard');
 const minorSafety = require('./minor-safety');
+const { stripLectureOpener } = require('./text-trim');
 const { logEvent } = require('./events');
 const { getEffectiveTextLevel, getEffectiveImageLevel } = require('./content-levels');
 const { getPool } = require('./db');
@@ -273,6 +274,9 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
       yield { type: 'done', data: { fullText: backstop, inputTokens: totalInputTokens + result.inputTokens, outputTokens: totalOutputTokens + result.outputTokens, costUsd: totalCostUsd + result.costUsd, levelBlocked: true } };
       return;
     }
+    if (!replyCheck.minors && lectureRetried && LECTURE_RE.test(result.fullText)) {
+      result.fullText = stripLectureOpener(result.fullText);
+    }
     if (!replyCheck.minors && !lectureRetried && LECTURE_RE.test(result.fullText)) {
       lectureRetried = true;
       console.warn(`[ai] lecturing reply — rewriting once`);
@@ -492,6 +496,10 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
       content = await buildCompanionBackstopLine({ basePrompt: systemPrompt, lastUserMsg: lastUserMsg?.content || '', blockReason: 'levelBlocked' });
       result.fullText = content;
       levelBlockedFlag = true;
+    }
+    if (!replyCheck.minors && lectureRetried && LECTURE_RE.test(content)) {
+      content = stripLectureOpener(content);
+      result.fullText = content;
     }
     if (!replyCheck.minors && !lectureRetried && LECTURE_RE.test(content)) {
       lectureRetried = true;
