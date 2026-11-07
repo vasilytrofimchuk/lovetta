@@ -1,0 +1,12 @@
+{
+  "package": "ai.lovetta.app",
+  "language": "en-US",
+  "title": "Lovetta: AI Girlfriend Chat",
+  "shortDescription": "Create your AI girlfriend: her look, voice and personality. She remembers you.",
+  "fullDescriptionFile": "full-description.txt",
+  "icon": "icon-512.png",
+  "featureGraphic": "feature-graphic-1024x500.png",
+  "phoneScreenshots": ["screenshots/play1.png", "screenshots/play2.png", "screenshots/play3.png", "screenshots/play4.png"],
+  "contactEmail": "hello@lovetta.ai",
+  "contactWebsite": "https://lovetta.ai"
+}

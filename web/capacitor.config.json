@@ -47,7 +47,8 @@
       "androidClientId": "1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com"
     },
     "SystemBars": {
-      "style": "DARK"
+      "style": "DARK",
+      "insetsHandling": "disable"
     }
   },
   "packageClassList": [
