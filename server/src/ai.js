@@ -822,6 +822,11 @@ async function generateCharacterImage(referenceImageUrl, prompt, opts = {}) {
     }
   }
   if (flagged) console.warn(`[ai] ${usedModel} returned a safety-filtered (black) frame — discarding it`);
+  // One more try with a modest version of the scene, so the player gets a photo, not an excuse.
+  if (flagged && !opts._modestRetry) {
+    console.warn('[ai] retrying the photo once as a modest, fully clothed selfie');
+    return generateCharacterImage(referenceImageUrl, 'cute flirty selfie, fully clothed in a pretty outfit, warm smile, looking at camera', { ...opts, _modestRetry: true });
+  }
   const falUrl = flagged ? null : (falData.images?.[0]?.url || null);
   const costUsd = FAL_PRICING[usedModel] || 0.04;
 
