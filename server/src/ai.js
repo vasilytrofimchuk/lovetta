@@ -13,6 +13,8 @@ const {
   LEVEL_0_REDIRECT_PROMPT,
   REFUSAL_RECOVERY_PROMPT,
 } = require('./age-guard');
+const minorSafety = require('./minor-safety');
+const { logEvent } = require('./events');
 const { getEffectiveTextLevel } = require('./content-levels');
 const { getPool } = require('./db');
 const { uploadFromUrl } = require('./r2');
@@ -203,13 +205,15 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
   // repeat refusal since the content-level rules still cap output via prompt.
   const effectiveLevel = await getEffectiveTextLevel(platform, opts.userId);
 
-  // Pre-screen user's last message for underage solicitation
+  // Hard line: anything sexual involving minors is refused before a model sees it (minor-safety.js).
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-  if (lastUserMsg) {
-    const userScan = scanUserMessage(lastUserMsg.content);
-    if (userScan.flagged) {
-      console.warn(`[age-guard] User message flagged: ${userScan.reason}`);
-    }
+  const minorCheck = await minorSafety.checkConversation(messages);
+  if (minorCheck.blocked) {
+    console.warn(`[minor-safety] turn refused: ${minorCheck.reason} user=${opts.userId || 'n/a'}`);
+    logEvent(opts.userId, 'minor_safety_block', { reason: minorCheck.reason, companionId: opts.companionId || null }).catch(() => {});
+    yield { type: 'chunk', data: minorSafety.MINOR_SAFE_REPLY };
+    yield { type: 'done', data: { fullText: minorSafety.MINOR_SAFE_REPLY, inputTokens: 0, outputTokens: 0, costUsd: 0, minorSafetyBlocked: true } };
+    return;
   }
 
   let attempt = 0;
@@ -235,6 +239,14 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
         continue;
       }
       throw err;
+    }
+
+    if (await minorSafety.replyIsUnsafe(result.fullText)) {
+      console.warn(`[minor-safety] reply replaced (model=${model}) user=${opts.userId || 'n/a'}`);
+      logEvent(opts.userId, 'minor_safety_block', { reason: 'moderation_reply', model }).catch(() => {});
+      yield { type: 'chunk', data: minorSafety.MINOR_SAFE_REPLY };
+      yield { type: 'done', data: { fullText: minorSafety.MINOR_SAFE_REPLY, inputTokens: result.inputTokens, outputTokens: result.outputTokens, costUsd: result.costUsd, minorSafetyBlocked: true } };
+      return;
     }
 
     // Yield response as a single chunk (non-streaming for reliability)
@@ -403,6 +415,12 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
   const effectiveLevel = await getEffectiveTextLevel(platform, opts.userId);
 
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  const minorCheck = await minorSafety.checkConversation(messages);
+  if (minorCheck.blocked) {
+    console.warn(`[minor-safety] chatCompletion refused: ${minorCheck.reason} user=${opts.userId || 'n/a'}`);
+    logEvent(opts.userId, 'minor_safety_block', { reason: minorCheck.reason, companionId: opts.companionId || null }).catch(() => {});
+    return { content: minorSafety.MINOR_SAFE_REPLY, inputTokens: 0, outputTokens: 0, costUsd: 0, minorSafetyBlocked: true };
+  }
 
   let attempt = 0;
   let currentPrompt = fullSystemPrompt;
@@ -415,7 +433,12 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
 
   while (attempt <= MAX_REGENERATE_ATTEMPTS) {
     const result = await _chatRequest(currentPrompt, messages, model);
-    const content = result.fullText;
+    let content = result.fullText;
+    if (await minorSafety.replyIsUnsafe(content)) {
+      console.warn(`[minor-safety] chatCompletion reply replaced (model=${model})`);
+      logEvent(opts.userId, 'minor_safety_block', { reason: 'moderation_reply', model }).catch(() => {});
+      return { content: minorSafety.MINOR_SAFE_REPLY, inputTokens: result.inputTokens, outputTokens: result.outputTokens, costUsd: result.costUsd, minorSafetyBlocked: true };
+    }
     totalCostUsd += result.costUsd;
     totalInputTokens += result.inputTokens;
     totalOutputTokens += result.outputTokens;

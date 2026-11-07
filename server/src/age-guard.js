@@ -22,6 +22,9 @@ const UNDERAGE_KEYWORDS = [
   /\b(?:little (?:girl|boy)|young (?:girl|boy))\b/i,
   /\b(?:child|children|kid|kiddo|kiddie)\b/i,
   /\bpuberty\b/i,
+  // "on your thirteenth bday", "my 14th birthday" — an age under 18 told as a birthday
+  /\b(?:fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth)\s+(?:bday|b-day|birthday)\b/i,
+  /\b(?:[5-9]|1[0-7])(?:st|nd|rd|th)\s+(?:bday|b-day|birthday)\b/i,
 ];
 
 // School-age context combined with sexual/romantic content
