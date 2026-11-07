@@ -66,7 +66,9 @@
     .tabs {
       display: flex; flex-wrap: nowrap; gap: 0; margin-bottom: 24px;
       border-bottom: 1px solid var(--border); padding-bottom: 0;
+      overflow-x: auto; scrollbar-width: none; /* a phone swipes the tabs, the page stays put */
     }
+    .tabs::-webkit-scrollbar { display: none; }
     .tab {
       padding: 6px 6px; background: none; border: none; border-bottom: 2px solid transparent;
       color: var(--muted); cursor: pointer; font-size: 0.75rem; font-weight: 500; white-space: nowrap;
@@ -178,8 +180,9 @@
       font-size: 0.6rem; color: var(--muted);
     }
 
-    .breakdown-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-    @media (max-width: 768px) { .breakdown-grid { grid-template-columns: 1fr; } }
+    .breakdown-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .breakdown-grid > * { min-width: 0; }
+    @media (max-width: 768px) { .breakdown-grid { grid-template-columns: minmax(0, 1fr); } }
 
     /* Mono & truncate */
     .mono { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace; font-size: 0.8rem; }
@@ -1941,14 +1944,14 @@
 
       function simpleTable(rows, cols, empty) {
         if (!rows || !rows.length) return '<p style="color:var(--muted);padding:16px;">' + empty + '</p>';
-        var html = '<table style="font-size:0.85rem;"><tr>' + cols.map(function(c) { return '<th>' + esc(c.label) + '</th>'; }).join('') + '</tr>';
+        var html = '<div style="overflow-x:auto"><table style="font-size:0.85rem;"><tr>' + cols.map(function(c) { return '<th>' + esc(c.label) + '</th>'; }).join('') + '</tr>';
         rows.forEach(function(r) {
           html += '<tr>' + cols.map(function(c) {
             var v = typeof c.value === 'function' ? c.value(r) : r[c.key];
             return '<td>' + esc(v == null ? '—' : String(v)) + '</td>';
           }).join('') + '</tr>';
         });
-        return html + '</table>';
+        return html + '</table></div>';
       }
 
       apiFetch('/api/admin/chat-insights?days=' + chatInsightsDays).then(function(data) {
@@ -1979,14 +1982,15 @@
           { key: 'reason', label: 'Reason' },
           { key: 'count', label: 'Messages' }
         ], 'No media failures');
-        // Wide tables scroll inside their own box on a phone instead of pushing the page (checker, 07.11).
-        document.getElementById('chat-insights-dropoff').innerHTML = '<div style="overflow-x:auto">' + simpleTable(data.dropOff || [], [
+        // Wide tables scroll inside their own box on a phone instead of pushing the page (checker, 07.11):
+        // simpleTable wraps itself, and .breakdown-grid columns may shrink below a table's width.
+        document.getElementById('chat-insights-dropoff').innerHTML = simpleTable(data.dropOff || [], [
           { key: 'bucket', label: 'User messages' },
           { key: 'conversations', label: 'Dropped' },
           { key: 'last_user', label: 'Last: user' },
           { key: 'last_girl', label: 'Last: girl' },
           { key: 'last_reminder', label: 'Last: reminder' }
-        ], 'No conversation went silent in this period') + '</div>';
+        ], 'No conversation went silent in this period');
         var top = data.topUsers || [];
         document.getElementById('chat-insights-top').innerHTML = !top.length
           ? '<p style="color:var(--muted);padding:16px;">No messages in this period</p>'
