@@ -1685,3 +1685,9 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
 
 ## TikTok removed (2026-11-07, card #200)
 - [x] Pixel removed from `web/index.html` (in-app) and `public/index.html`; server-side Events API (`server/src/tt-events.js` and both calls in `billing.js`) removed; TT_* keys removed from the box secrets (backup beside the file). The pixel ran inside the iOS app without an ATT prompt.
+
+## Карточка #17 — старые чёрные картинки убраны из каталога (07.11.2026, apps-worker)
+- `server/tools/black-media.js`: проверяет каждую картинку каталога (companion_media) по яркости; чёрные
+  (среднее каждого канала < 8/255) и видео из них убирает из каталога с копией строк в файл.
+- Прогон 07.11: из 3533 картинок 332 совершенно чёрные (все до 08.10, после починки — ни одной), из них
+  сделано 41 видео. Файлы и сообщения в чатах не тронуты — убраны только из повторной выдачи.
