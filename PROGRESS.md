@@ -1698,3 +1698,7 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
   последним (он, девушка, её напоминание); «Most active users» — 10 по сообщениям, с подпиской, клик открывает
   переписку во вкладке Chats; «Girls' own messages» — напоминания, скольким людям, ответ в течение суток.
 - `/api/admin/chat-insights` отдаёт `dropOff`, `topUsers`, `reminders`; тест `e2e/chat-insights.test.js` (api 52/52).
+
+## Minor safety hard line (2026-11-07, card #212)
+- [x] Chat review found the companion carrying on sexual role-play about a 13-year-old and about the player's children (28.10, iOS app). Causes: the player-message scan only logged, the reply scan missed "thirteenth bday", refusal recovery pushed the model past refusals and onto the uncensored fallback.
+- [x] `server/src/minor-safety.js`: player message + last 6 messages checked before any model call (age-guard regexes, childhood/incest-with-minor phrasing, OpenAI omni-moderation `sexual/minors`), every reply after; a hit gets a fixed refusal and a `minor_safety_block` event. Birthday-age patterns added to age-guard. Tests: ai 159/159.
