@@ -79,6 +79,11 @@ test.describe('Chat Insights: drop-off, most active, reminders', () => {
     for (const id of ['#chat-insights-dropoff', '#chat-insights-top', '#chat-insights-reminders']) {
       expect(await page.locator(id + ' > div').first().evaluate((d) => getComputedStyle(d).overflowX)).toBe('auto');
     }
+    // On a phone no block sticks out past the screen: the two-column grids shrink (checker, 07.11).
+    await page.setViewportSize({ width: 390, height: 844 });
+    const rights = await page.locator('#tab-chat-insights .section').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
+    expect(Math.max(...rights)).toBeLessThanOrEqual(390);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     await link.click();
     await expect(page.locator('#tab-chats')).toHaveClass(/active/);
     expect(errors).toEqual([]);
