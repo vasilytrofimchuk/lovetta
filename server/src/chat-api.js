@@ -43,6 +43,10 @@ const RATE_LIMIT_MAX = 20;       // max requests
 const RATE_LIMIT_WINDOW = 60;    // seconds
 
 /** Enrich raw message rows with image annotations for AI context */
+// Lines the app appends when a photo fails (media-chat.js FAILURE_LINES) — left out of what the
+// model sees, or it starts inventing "my phone keeps freezing" while a photo is on its way.
+const MEDIA_FAILURE_LINE_RE = /\n\n[^\n]*(?:camera|phone|photo|pic|video)[^\n]*(?:glitch|froze|frozen|didn['’]t save|got lost|didn['’]t come|limit|tomorrow|rest|needs a break)[^\n]*$/i;
+
 function formatMessagesForAI(rows) {
   // A turn refused by minor-safety (the player's message and the fixed refusal) is left out of what
   // the model sees: the model copied that blunt "No. Nothing involving …" into later replies.
@@ -51,7 +55,9 @@ function formatMessagesForAI(rows) {
   const isRefusal = (m) => m?.role === 'assistant' && String(m.content || '').includes(MINOR_SAFE_MARK);
   const kept = rows.filter((m, i) => !isRefusal(m) && !(m.role === 'user' && isRefusal(rows[i + 1])));
   return kept.map(m => {
-    let content = m.role === 'assistant' ? stripLectureOpener(m.content || '') : (m.content || '');
+    let content = m.role === 'assistant'
+      ? stripLectureOpener(m.content || '').replace(MEDIA_FAILURE_LINE_RE, '')
+      : (m.content || '');
     if (m.media_url && m.role === 'assistant') {
       const label = m.media_type === 'video' ? 'video' : 'photo';
       // NOTE: no URL — otherwise the LLM mimics this pattern and hallucinates
