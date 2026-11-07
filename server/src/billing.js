@@ -7,7 +7,6 @@
 const { getPool } = require('./db');
 const { resetTipCounter, invalidateThresholdCache } = require('./consumption');
 const { firePayPostback } = require('./trafficstars');
-const { sendTtEvent } = require('./tt-events');
 
 const SITE_URL = (process.env.SITE_URL || 'http://localhost:3900').trim();
 
@@ -727,16 +726,6 @@ async function handleRevenueCatWebhook(body, authHeader) {
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
           if (rows[0]) {
             fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'subscription', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source, trial: true } }) }).catch(() => {});
-            sendTtEvent({
-              eventName: 'CompletePayment',
-              eventId: `rc:${event.id || `${userId}_${rcType}`}`,
-              email: rows[0].email,
-              value: plan === 'yearly' ? 99.99 : 19.99,
-              currency: 'USD',
-              actionSource: 'web',
-              contentId: `lovetta_${plan}_ios`,
-              contentName: `Lovetta ${plan} subscription (iOS)`,
-            });
           }
         }).catch(() => {});
       }
@@ -746,16 +735,6 @@ async function handleRevenueCatWebhook(body, authHeader) {
         pool.query('SELECT email FROM users WHERE id = $1', [userId]).then(({ rows }) => {
           if (rows[0]) {
             fetch('https://selectic.games/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': process.env.TRACKER_TOKEN || '' }, body: JSON.stringify({ projectId: 'lovetta', eventType: 'payment', userEmail: rows[0].email, meta: { plan, amount: plan === 'yearly' ? 99.99 : 19.99, source } }) }).catch(() => {});
-            sendTtEvent({
-              eventName: 'CompletePayment',
-              eventId: `rc:${event.id || `${userId}_${rcType}_${Date.now()}`}`,
-              email: rows[0].email,
-              value: plan === 'yearly' ? 99.99 : 19.99,
-              currency: 'USD',
-              actionSource: 'web',
-              contentId: `lovetta_${plan}_ios_renewal`,
-              contentName: `Lovetta ${plan} renewal (iOS)`,
-            });
           }
         }).catch(() => {});
       }

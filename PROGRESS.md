@@ -1682,3 +1682,6 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
 - [x] TikTok pixel not loaded inside the Android app (data safety declares nothing shared for advertising). Note: it still loads inside the iOS app without an ATT prompt — owner's call
 - [x] `scripts/android-build.sh --upload <track>`: one-command Play release through the API (owner, 07.11: "как у всех моих проектов")
 - [x] Fixed: the action line above a message was hard-cut at 8 words mid-phrase ("Tucks a loose strand of hair behind my") — `server/src/text-trim.js` drops dangling trailing words; one copy instead of two
+
+## TikTok removed (2026-11-07, card #200)
+- [x] Pixel removed from `web/index.html` (in-app) and `public/index.html`; server-side Events API (`server/src/tt-events.js` and both calls in `billing.js`) removed; TT_* keys removed from the box secrets (backup beside the file). The pixel ran inside the iOS app without an ATT prompt.
