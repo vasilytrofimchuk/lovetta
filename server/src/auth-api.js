@@ -451,6 +451,14 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 
 // -- Google OAuth (server-side redirect flow) -------------
 const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim();
+// Native sign-in (iOS app, Android app) sends Google ID tokens; these are the clients they may be
+// issued to. Android asks for a token for the web client (serverClientId), so its aud is the web id.
+const GOOGLE_TOKEN_AUDIENCES = [
+  GOOGLE_CLIENT_ID,
+  (process.env.GOOGLE_IOS_CLIENT_ID || '').trim(),
+  '1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com', // web
+  '1007256282722-jhi7vl1mj4jv12638fv5vh8ao9ribr3a.apps.googleusercontent.com', // iOS
+].filter(Boolean);
 const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
 const SITE_URL = (process.env.SITE_URL || 'http://localhost:3900').trim();
 
@@ -660,6 +668,12 @@ router.post('/google/token', async (req, res) => {
 
     const tokenInfo = await tokenInfoRes.json();
     if (tokenInfo.error) return res.status(401).json({ error: 'Invalid Google token' });
+    // The token must have been issued to one of our own Google clients — a token from any other
+    // app would otherwise sign its holder in as that Google user.
+    if (!GOOGLE_TOKEN_AUDIENCES.includes(tokenInfo.aud)) {
+      console.warn('[auth] google/token: foreign audience', tokenInfo.aud);
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
 
     const googleId = tokenInfo.sub;
     const email = tokenInfo.email;

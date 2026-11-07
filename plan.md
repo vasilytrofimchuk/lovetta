@@ -1296,3 +1296,6 @@ Follow-up to the email domain check: the renewal reminder is taken out from unde
 
 ## Remove TrafficJunky pixel (2026-11-04, `lovetta-pixel-levels`)
 Scope: the owner does not use TrafficJunky; its idsync pixel threw a CORS console error on the landing. Removed from both HTML shells and the SPA (signup/pay events). Also a read-only audit of per-platform content levels after PR #16. Status: shipped, see PROGRESS.md.
+
+## Android app in Google Play (card #192, 2026-11-06)
+Same path as Mystery Lab (#181): Capacitor shell, strict `playstore` content level (Google Play forbids sexual content), Play purchases via RevenueCat (same product ids as iOS, no trial), Play Console in the owner's Chrome (Selectic account), listing + questionnaires, test on the emulator, production release sent to review.

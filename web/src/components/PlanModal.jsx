@@ -1,9 +1,9 @@
-import { APP_STORE_URL } from '../lib/appStore'
+import { APP_STORE_URL, storeName } from '../lib/appStore'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
 import api, { getErrorMessage } from '../lib/api'
-import { isAppStore } from '../lib/platform'
+import { isAppStore, isAndroid } from '../lib/platform'
 import { Browser } from '@capacitor/browser'
 import { isCapacitor } from '../lib/platform'
 import { getAppPageHeight } from '../lib/layout'
@@ -13,12 +13,15 @@ import {
   FALLBACK_SUBSCRIPTION_PRICES,
   IOS_SUBSCRIPTION_PRODUCT_IDS,
   IOS_SUBSCRIPTION_PRODUCTS,
+  isProduct,
   isRevenueCatCancelError,
   serializeRevenueCatError,
   waitForSubscriptionSync,
 } from '../lib/revenuecat'
 
 const IOS_PURCHASE_ERROR_MESSAGE = 'Unable to start the iOS subscription. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account, agreements, and product status in App Store Connect.'
+const ANDROID_PURCHASE_ERROR_MESSAGE = 'Unable to start the Google Play subscription. Check that you are signed in to Google Play and try again.'
+const purchaseErrorMessage = () => (isAndroid() ? ANDROID_PURCHASE_ERROR_MESSAGE : IOS_PURCHASE_ERROR_MESSAGE)
 const PRODUCT_TIMEOUT_MS = 15_000
 
 function withTimeout(promise, ms, message) {
@@ -91,7 +94,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
           useOffering: !!offeringPkg,
         })
 
-        setLoadingMessage('Opening App Store…')
+        setLoadingMessage(`Opening ${storeName()}…`)
 
         if (offeringPkg) {
           // Use offerings-based purchase (enables experiments/A/B tests)
@@ -104,15 +107,17 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
           const productsResult = await withTimeout(
             Purchases.getProducts({ productIdentifiers: IOS_SUBSCRIPTION_PRODUCT_IDS }),
             PRODUCT_TIMEOUT_MS,
-            IOS_PURCHASE_ERROR_MESSAGE
+            purchaseErrorMessage()
           )
           const products = productsResult?.products || []
           if (!products.length) {
-            throw new Error('No iOS subscription products were returned. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account and product status in App Store Connect.')
+            throw new Error(isAndroid()
+              ? 'Google Play returned no subscription products. Please try again later.'
+              : 'No iOS subscription products were returned. If using Xcode, select Lovetta.storekit in the App scheme. If using Apple sandbox, verify the sandbox Apple account and product status in App Store Connect.')
           }
-          const product = products.find((entry) => entry.identifier === productIdentifier)
+          const product = products.find((entry) => isProduct(entry.identifier, productIdentifier))
           if (!product) {
-            throw new Error(`StoreKit did not return the expected subscription product: ${productIdentifier}`)
+            throw new Error(`The store did not return the expected subscription product: ${productIdentifier}`)
           }
           await Purchases.purchaseStoreProduct({ product })
         }
@@ -128,7 +133,7 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
     } catch (err) {
       if (isAppStore()) {
         if (isRevenueCatCancelError(err)) return
-        const message = getRevenueCatErrorMessage(err, IOS_PURCHASE_ERROR_MESSAGE)
+        const message = getRevenueCatErrorMessage(err, purchaseErrorMessage())
         console.error('[billing] subscribe failed', serializeRevenueCatError(err))
         setError(message)
         return
@@ -164,7 +169,9 @@ export default function PlanModal({ isOpen, onClose, onSuccess, fullScreen = fal
       const message = isAppStore()
         ? getRevenueCatErrorMessage(
           err,
-          'Restore is taking too long. If using Xcode, confirm Lovetta.storekit is selected. If using Apple sandbox, verify the sandbox Apple account and product setup.'
+          isAndroid()
+            ? 'Restore is taking too long. Please try again in a moment.'
+            : 'Restore is taking too long. If using Xcode, confirm Lovetta.storekit is selected. If using Apple sandbox, verify the sandbox Apple account and product setup.'
         )
         : getErrorMessage(err)
       console.error('[billing] restore failed', isAppStore() ? serializeRevenueCatError(err) : err)

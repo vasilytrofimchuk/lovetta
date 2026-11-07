@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lovetta</string>
+    <string name="title_activity_main">Lovetta</string>
+    <string name="package_name">ai.lovetta.app</string>
+    <string name="custom_url_scheme">ai.lovetta.app</string>
+</resources>

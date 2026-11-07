@@ -1665,3 +1665,13 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
 - #18 Жёсткая подписка в App Store: проверить, всё ли доведено
 - #19 Вкладка «Разбор чатов» в админке
 - 49 пунктов признаны неактуальными: прогоны тестов и коммиты давно законченной работы, ручные шаги первого выпуска в App Store (приложение давно в магазине), работа над пробным периодом на сайте (пробный период убран), правка сдвига при клавиатуре (перекрыта общим исправлением экрана iOS), уже сделанная правка кнопки Apple.
+
+## Android app in Google Play (2026-11-06, card #192, `android-play`)
+- [x] `web/android`: Capacitor 8 shell `ai.lovetta.app` («Lovetta»), loads https://lovetta.ai/my/ like iOS; UA `Capacitor lovetta-android`; dark theme, pink L icon, wordmark splash (`node scripts/android-assets.js`); upload key in `~/.android-keys/lovetta-upload.*` (outside the repo); `scripts/android-build.sh`
+- [x] Content: new platform `playstore` (Android app header/UA, or a user who signed up on Android) with its own levels `text_level_playstore` / `image_level_playstore` = 0 (migration v70, admin Settings). Before this the Android web view counted as a browser → web level
+- [x] Media reuse: `companion_media.content_level` (v71); cross-user reuse only hands out media at or below the viewer's image level (old rows count as 2) — web photos could reach the App Store app too
+- [x] Tip reward photos: revealing scenes skipped at image level 0; level/platform recorded
+- [x] Client: Google Play purchases through RevenueCat (`VITE_REVENUECAT_ANDROID_KEY`), Play "id:basePlan" product ids; push and Apple sign-in hidden on Android; Google sign-in hidden until `VITE_GOOGLE_ANDROID_SIGNIN=1`; review/manage-subscription links go to Google Play
+- [x] Fixed on the way: native Google sign-in did not check the token's audience (any app's token signed its holder in); tip amount came from the price in the buyer's currency (85000 cents for a $9.99 tip in rupees) — now from the product id
+- [x] Scripts from Mystery Lab: `play-release.js`, `play-products.js`, `play-listing.js`, `deploy-box.sh` (production is the shared box, not Heroku)
+- [x] Tests: api 50/50, ai 156/156, ui 48/48

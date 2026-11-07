@@ -3,6 +3,24 @@ import api from './api'
 const SYNC_TIMEOUT_MS = 45_000
 const SYNC_INTERVAL_MS = 1_500
 
+/*
+ * Store product ids. The same ids exist in the App Store and in Google Play:
+ *   subscriptions — Play subscription "lovetta_monthly" (base plan "monthly") and "lovetta_yearly"
+ *                   (base plan "yearly"); RevenueCat names a Play subscription
+ *                   "<subscriptionId>:<basePlanId>", e.g. "lovetta_monthly:monthly";
+ *   tips          — one-time consumable products, same ids in both stores.
+ */
+
+/** "lovetta_monthly:monthly" (Google Play) → "lovetta_monthly"; App Store ids unchanged. */
+export function baseProductId(id) {
+  return String(id || '').split(':')[0]
+}
+
+/** True when a store product id (either store's form) is the given product. */
+export function isProduct(id, productId) {
+  return baseProductId(id) === baseProductId(productId)
+}
+
 export const IOS_SUBSCRIPTION_PRODUCTS = {
   monthly: 'lovetta_monthly',
   yearly: 'lovetta_yearly',
@@ -56,7 +74,7 @@ export async function getSubscriptionOfferings() {
       package: pkg,
       priceString: pkg.product?.priceString || pkg.product?.price_string,
       price: pkg.product?.price,
-      productId: pkg.product?.identifier,
+      productId: baseProductId(pkg.product?.identifier),
     } : null
 
     return {
@@ -80,7 +98,7 @@ export async function getTipOfferings() {
         package: pkg,
         priceString: pkg.product?.priceString || pkg.product?.price_string,
         price: pkg.product?.price,
-        productId: pkg.product?.identifier,
+        productId: baseProductId(pkg.product?.identifier),
         amount: pkg.product?.price,
       }))
       .sort((a, b) => (a.price || 0) - (b.price || 0))

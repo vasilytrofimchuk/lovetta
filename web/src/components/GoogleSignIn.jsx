@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 import { useAuth } from '../contexts/AuthContext'
 import api, { getErrorMessage } from '../lib/api'
-import { isCapacitor } from '../lib/platform'
+import { isCapacitor, isAndroid, hasGoogleSignIn } from '../lib/platform'
 import { clearOnboardingData, readOnboardingData } from '../lib/onboarding'
 
 const GOOGLE_WEB_CLIENT_ID = '1007256282722-1n6bdvdcta96jf51bpajod0gjheo31ur.apps.googleusercontent.com'
@@ -17,7 +17,9 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
     setError('')
     try {
       await GoogleAuth.initialize({
-        clientId: '1007256282722-jhi7vl1mj4jv12638fv5vh8ao9ribr3a.apps.googleusercontent.com',
+        // Android asks Google for an ID token issued to the WEB client (serverClientId); it also needs
+        // an Android OAuth client for ai.lovetta.app + the signing SHA-1 in the same Google project.
+        clientId: isAndroid() ? GOOGLE_WEB_CLIENT_ID : '1007256282722-jhi7vl1mj4jv12638fv5vh8ao9ribr3a.apps.googleusercontent.com',
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       })
@@ -91,6 +93,9 @@ export default function GoogleSignIn({ birthData, hideSeparator = false, onSucce
     if (stateData) url += '?state=' + encodeURIComponent(btoa(JSON.stringify(stateData)))
     window.location.href = url
   }
+
+  // Android without its OAuth client configured: no button (email sign-in still works).
+  if (!hasGoogleSignIn()) return null
 
   return (
     <div>
