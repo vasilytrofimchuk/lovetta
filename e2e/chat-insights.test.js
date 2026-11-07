@@ -74,6 +74,11 @@ test.describe('Chat Insights: drop-off, most active, reminders', () => {
     await expect(page.locator('#chat-insights-reminders table')).toBeVisible();
     const link = page.locator('#chat-insights-top .insights-open-chat').filter({ hasText: 'conativer.insights' }).first();
     await expect(link).toBeVisible();
+    // Readable on the dark admin (not the browser's default blue), and wide tables scroll in their own box.
+    expect(await link.evaluate((a) => getComputedStyle(a).color)).not.toBe('rgb(0, 0, 238)');
+    for (const id of ['#chat-insights-dropoff', '#chat-insights-top', '#chat-insights-reminders']) {
+      expect(await page.locator(id + ' > div').first().evaluate((d) => getComputedStyle(d).overflowX)).toBe('auto');
+    }
     await link.click();
     await expect(page.locator('#tab-chats')).toHaveClass(/active/);
     expect(errors).toEqual([]);

@@ -1979,22 +1979,23 @@
           { key: 'reason', label: 'Reason' },
           { key: 'count', label: 'Messages' }
         ], 'No media failures');
-        document.getElementById('chat-insights-dropoff').innerHTML = simpleTable(data.dropOff || [], [
+        // Wide tables scroll inside their own box on a phone instead of pushing the page (checker, 07.11).
+        document.getElementById('chat-insights-dropoff').innerHTML = '<div style="overflow-x:auto">' + simpleTable(data.dropOff || [], [
           { key: 'bucket', label: 'User messages' },
           { key: 'conversations', label: 'Dropped' },
           { key: 'last_user', label: 'Last: user' },
           { key: 'last_girl', label: 'Last: girl' },
           { key: 'last_reminder', label: 'Last: reminder' }
-        ], 'No conversation went silent in this period');
+        ], 'No conversation went silent in this period') + '</div>';
         var top = data.topUsers || [];
         document.getElementById('chat-insights-top').innerHTML = !top.length
           ? '<p style="color:var(--muted);padding:16px;">No messages in this period</p>'
-          : '<table style="font-size:0.85rem;"><tr><th>User</th><th>Messages</th><th>Chats</th><th>Girls</th><th>Subscribed</th></tr>' +
+          : '<div style="overflow-x:auto"><table style="font-size:0.85rem;"><tr><th>User</th><th>Messages</th><th>Chats</th><th>Girls</th><th>Subscribed</th></tr>' +
             top.map(function(u) {
-              return '<tr><td><a href="#" class="insights-open-chat" data-cid="' + esc(u.last_conversation_id || '') + '">' + esc(u.email) + '</a></td>' +
+              return '<tr><td><a href="#" class="insights-open-chat" style="color:var(--text);text-decoration:underline dotted;word-break:break-all" data-cid="' + esc(u.last_conversation_id || '') + '">' + esc(u.email) + '</a></td>' +
                 '<td>' + formatNumber(u.messages) + '</td><td>' + u.conversations + '</td><td>' + u.companions + '</td>' +
                 '<td>' + (u.subscribed ? 'yes' : 'no') + '</td></tr>';
-            }).join('') + '</table>';
+            }).join('') + '</table></div>';
         document.querySelectorAll('#chat-insights-top .insights-open-chat').forEach(function(a) {
           a.addEventListener('click', function(e) {
             e.preventDefault();
@@ -2008,8 +2009,8 @@
         var rm = data.reminders || {};
         var rmRate = rm.sent ? ((100 * (rm.answered_24h || 0) / rm.sent).toFixed(1) + '%') : '—';
         document.getElementById('chat-insights-reminders').innerHTML =
-          '<table style="font-size:0.85rem;"><tr><th>Sent</th><th>To users</th><th>Answered within 24 h</th><th>Rate</th></tr>' +
-          '<tr><td>' + formatNumber(rm.sent || 0) + '</td><td>' + formatNumber(rm.users || 0) + '</td><td>' + formatNumber(rm.answered_24h || 0) + '</td><td>' + rmRate + '</td></tr></table>';
+          '<div style="overflow-x:auto"><table style="font-size:0.85rem;"><tr><th>Sent</th><th>To users</th><th>Answered within 24 h</th><th>Rate</th></tr>' +
+          '<tr><td>' + formatNumber(rm.sent || 0) + '</td><td>' + formatNumber(rm.users || 0) + '</td><td>' + formatNumber(rm.answered_24h || 0) + '</td><td>' + rmRate + '</td></tr></table></div>';
         var rate = re.sent ? ((100 * (re.returned || 0) / re.sent).toFixed(1) + '%') : '—';
         document.getElementById('chat-insights-reactivation').innerHTML =
           '<table style="font-size:0.85rem;"><tr><th>Sent</th><th>Returned</th><th>Return rate</th></tr>' +
