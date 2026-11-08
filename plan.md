@@ -1302,3 +1302,6 @@ Same path as Mystery Lab (#181): Capacitor shell, strict `playstore` content lev
 
 ## Card #192 — Google Play badge (2026-11-07)
 - Google approved the Android app (production build 3). Added a Google Play badge next to the App Store one on the landing and /get-app; on Android the app buttons, /get-app and browser visits to /my/ go to Google Play. Copy says "the app for iPhone and Android".
+
+## Card #192 — landing: only store badges, no prices (2026-11-07)
+- Owner: removed the pink "Get the app" button (only the official App Store and Google Play badges stay) and the pricing block — plans are chosen inside the app only.

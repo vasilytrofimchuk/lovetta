@@ -182,26 +182,22 @@ test.describe('Landing page', () => {
     expect(twitterCard).toBe('summary_large_image');
   });
 
-  test('landing shows rotator, Continue CTA, and informational pricing cards', async ({ page }) => {
+  test('landing shows rotator and store badges, no prices', async ({ page }) => {
     await page.goto(BASE);
 
     await expect(page.locator('[data-testid="landing-rotator"]')).toBeVisible();
-    await expect(page.locator('[data-testid="landing-continue"]')).toBeVisible();
-    await expect(page.locator('[data-testid="landing-plan-badge"]')).toContainText('UNLIMITED');
-    // No free plan card — the app is subscription-only.
-    await expect(page.locator('body')).not.toContainText('FREE TRIAL');
-    const pricingCards = page.locator('[data-testid="landing-pricing-card"]');
-    await expect(pricingCards).toHaveCount(2);
-    await expect(pricingCards.nth(0)).toContainText('Premium Monthly');
-    await expect(pricingCards.nth(1)).toContainText('Premium Yearly');
+    await expect(page.locator('[data-testid="landing-store-badges"] a')).toHaveCount(2);
+    // Plans are chosen inside the app only — no prices and no extra CTA on the landing.
+    await expect(page.locator('[data-testid="landing-continue"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="landing-pricing-card"]')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('$');
     await expect(page.locator('#signup-form')).toHaveCount(0);
-    await expect(page.locator('#agree-terms')).toHaveCount(0);
   });
 
-  test('Continue leads to the App Store (web sign-up is off since PR #16)', async ({ page }) => {
+  test('App Store badge leads to the App Store', async ({ page }) => {
     await page.goto(BASE);
 
-    await expect(page.locator('[data-testid="landing-continue"]'))
+    await expect(page.locator('.appstore-badge[aria-label="Download on the App Store"]'))
       .toHaveAttribute('href', /apps\.apple\.com\/app\/id6760726614/);
   });
 
