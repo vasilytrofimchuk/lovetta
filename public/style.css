@@ -278,6 +278,18 @@ header {
   box-shadow: none;
 }
 
+.store-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.store-badges .appstore-badge {
+  margin-bottom: 0;
+}
+
 .appstore-badge {
   display: flex;
   justify-content: center;

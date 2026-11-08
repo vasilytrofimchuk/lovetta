@@ -1299,3 +1299,6 @@ Scope: the owner does not use TrafficJunky; its idsync pixel threw a CORS consol
 
 ## Android app in Google Play (card #192, 2026-11-06)
 Same path as Mystery Lab (#181): Capacitor shell, strict `playstore` content level (Google Play forbids sexual content), Play purchases via RevenueCat (same product ids as iOS, no trial), Play Console in the owner's Chrome (Selectic account), listing + questionnaires, test on the emulator, production release sent to review.
+
+## Card #192 — Google Play badge (2026-11-07)
+- Google approved the Android app (production build 3). Added a Google Play badge next to the App Store one on the landing and /get-app; on Android the app buttons, /get-app and browser visits to /my/ go to Google Play. Copy says "the app for iPhone and Android".

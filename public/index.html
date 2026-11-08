@@ -113,9 +113,10 @@
           class="btn-primary continue-button"
           data-testid="landing-continue"
         >
-          Get the iOS app
+          Get the app
         </a>
 
+        <div class="store-badges">
         <a href="https://apps.apple.com/app/id6760726614" class="appstore-badge" aria-label="Download on the App Store">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" height="44">
             <rect width="120" height="40" rx="6" fill="#000"/>
@@ -127,6 +128,21 @@
             </g>
           </svg>
         </a>
+        <a href="https://play.google.com/store/apps/details?id=ai.lovetta.app" class="appstore-badge" aria-label="Get it on Google Play" data-testid="play-badge">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 135 40" height="44">
+            <rect width="135" height="40" rx="6" fill="#000"/>
+            <rect x="0.5" y="0.5" width="134" height="39" rx="5.5" fill="none" stroke="#a6a6a6" stroke-width="1"/>
+            <g transform="translate(10,8)">
+              <path d="M1 0.6 L13.4 12 L1 23.4 Q0 23 0 21.8 V2.2 Q0 1 1 0.6Z" fill="#00d7fe"/>
+              <path d="M1 0.6 L17.3 9.9 L13.4 12Z" fill="#00f076"/>
+              <path d="M1 23.4 L17.3 14.1 L13.4 12Z" fill="#ff3a44"/>
+              <path d="M17.3 9.9 L21 12 L17.3 14.1 L13.4 12Z" fill="#ffd400"/>
+            </g>
+            <text x="40" y="14" fill="#fff" font-family="Roboto,-apple-system,BlinkMacSystemFont,sans-serif" font-size="6" letter-spacing="0.06em">GET IT ON</text>
+            <text x="40" y="29" fill="#fff" font-family="Roboto,-apple-system,BlinkMacSystemFont,sans-serif" font-size="14" font-weight="500" letter-spacing="-0.01em">Google Play</text>
+          </svg>
+        </a>
+      </div>
       </section>
 
       <section class="pricing-info" aria-labelledby="pricing-info-title">
@@ -137,13 +153,13 @@
           </div>
           <div class="trial-hero-copy">
             <p class="trial-hero-kicker">A subscription is required</p>
-            <p class="trial-hero-subtitle">Subscribe in the iOS app and start chatting straight away. Cancel anytime.</p>
+            <p class="trial-hero-subtitle">Subscribe in the app and start chatting straight away. Cancel anytime.</p>
           </div>
         </div>
 
         <div class="pricing-header">
           <p class="pricing-kicker">Pricing</p>
-          <h2 id="pricing-info-title">Choose a plan in the iOS app</h2>
+          <h2 id="pricing-info-title">Choose a plan in the app</h2>
         </div>
 
         <div class="pricing-grid">
@@ -177,7 +193,7 @@
           <span class="trial-note-emphasis">Cancel anytime.</span>
           Your plan renews automatically until you cancel.
         </p>
-        <p class="trial-note"><a href="https://apps.apple.com/app/id6760726614" style="color:inherit">Subscriptions are available in the iOS app</a></p>
+        <p class="trial-note"><a href="https://apps.apple.com/app/id6760726614" style="color:inherit">Subscriptions are available in the app for iPhone and Android</a></p>
       </section>
     </main>
 
@@ -330,5 +346,11 @@
     })();
   </script>
   <script src="/s/o.js?pid=lovetta" defer></script>
+  <script>
+    (function () {
+      if (!/Android/i.test(navigator.userAgent || '')) return;
+      document.querySelectorAll('a[href="https://apps.apple.com/app/id6760726614"]').forEach(function (a) { a.href = 'https://play.google.com/store/apps/details?id=ai.lovetta.app'; });
+    })();
+  </script>
 </body>
 </html>
