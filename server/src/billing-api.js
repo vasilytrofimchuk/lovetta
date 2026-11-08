@@ -144,8 +144,9 @@ router.get('/ios/tip-intents/:id', authenticate, async (req, res) => {
 // Subscriptions and in-app extras are sold only through App Store purchases in the iOS app.
 // These were the card-checkout endpoints; they now refuse instead of creating a session.
 const APP_STORE_URL = 'https://apps.apple.com/app/id6760726614';
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=ai.lovetta.app';
 router.post(['/portal', '/subscribe', '/tip'], (_req, res) => {
-  res.status(410).json({ error: 'Card payments are not available. Subscriptions are available in the iOS app.', appStoreUrl: APP_STORE_URL });
+  res.status(410).json({ error: 'Card payments are not available. Subscriptions are available in the app for iPhone and Android.', appStoreUrl: APP_STORE_URL, playStoreUrl: PLAY_STORE_URL });
 });
 
 module.exports = router;

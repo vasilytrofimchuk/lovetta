@@ -122,7 +122,7 @@ app.post('/api/chat/stt',
 app.use(express.json());
 app.use(cookieParser());
 // The web app is for the iOS app only (2026-11-04): browsers get the App Store page instead.
-app.use(require('./src/app-only')({ appStoreUrl: 'https://apps.apple.com/app/id6760726614' }));
+app.use(require('./src/app-only')({ appStoreUrl: 'https://apps.apple.com/app/id6760726614', playStoreUrl: 'https://play.google.com/store/apps/details?id=ai.lovetta.app' }));
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
 
 // API routes

@@ -3,7 +3,7 @@
  *
  * The iOS app is a web view that loads https://<site>/my/ from this server, so the pages cannot
  * simply be removed. A browser visit to them goes to /get-app (or, on an iPhone or iPad, straight
- * to the App Store) instead. The App Store builds send a plain web-view user agent: iPhone/iPad
+ * to the App Store; on Android, to Google Play) instead. The App Store builds send a plain web-view user agent: iPhone/iPad
  * WebKit with no "Safari/" token (checked against production users 2026-11-04), so anything that
  * names a browser engine or a desktop/Android system is a browser. Everything else reaches the
  * page, which checks for the native bridge itself (web/src/main.jsx) — that catches in-app
@@ -14,13 +14,14 @@
  */
 const BROWSER_UA = /Safari\/|Firefox\/|FxiOS|Android|Windows NT|X11|Linux|CrOS/i;
 const APPLE_MOBILE_UA = /iPhone|iPad|iPod/i;
+const ANDROID_UA = /Android/i;
 const EMAIL_LINK_PAGES = /^\/my\/(reset-password|verify-email)\/?$/;
 
 function isBrowser(ua) {
   return BROWSER_UA.test(ua) && !/Capacitor/i.test(ua);
 }
 
-module.exports = function appOnly({ appStoreUrl }) {
+module.exports = function appOnly({ appStoreUrl, playStoreUrl }) {
   return (req, res, next) => {
     if (process.env.NODE_ENV !== 'production') return next();
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
@@ -31,7 +32,9 @@ module.exports = function appOnly({ appStoreUrl }) {
     const ua = req.get('user-agent') || '';
     if (!isBrowser(ua)) return next();
     res.set('Cache-Control', 'no-store');
-    return res.redirect(302, APPLE_MOBILE_UA.test(ua) ? appStoreUrl : '/get-app');
+    if (APPLE_MOBILE_UA.test(ua)) return res.redirect(302, appStoreUrl);
+    if (playStoreUrl && ANDROID_UA.test(ua)) return res.redirect(302, playStoreUrl);
+    return res.redirect(302, '/get-app');
   };
 };
 

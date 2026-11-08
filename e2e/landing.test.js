@@ -205,6 +205,15 @@ test.describe('Landing page', () => {
       .toHaveAttribute('href', /apps\.apple\.com\/app\/id6760726614/);
   });
 
+  test('landing shows both store badges', async ({ page }) => {
+    await page.goto(BASE);
+    await expect(page.locator('.appstore-badge[aria-label="Download on the App Store"]')).toBeVisible();
+    await expect(page.locator('[data-testid="play-badge"]'))
+      .toHaveAttribute('href', 'https://play.google.com/store/apps/details?id=ai.lovetta.app');
+    await page.goto(BASE + '/get-app.html');
+    await expect(page.locator('[data-testid="play-download"]')).toBeVisible();
+  });
+
   test('footer links work', async ({ page }) => {
     await page.goto(BASE);
 

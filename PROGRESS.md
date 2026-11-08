@@ -1715,3 +1715,6 @@ Owner decision: card payments are off in every project except selectic.ai; Lovet
 - [x] Minor-safety refusals and the message before them are hidden from the model's history (it copied the blunt "No. Nothing involving …" into later replies). Live check 07.11: explicit request in iOS mode → romantic, non-explicit reply without lecturing; nude request → warm no + a clothed solo photo; photos 900 KB, not blank.
 - [x] A blank/flagged photo is retried once as a modest, fully clothed selfie instead of ending in "camera glitched".
 - [x] The model no longer invents "my phone keeps freezing": a rule in the content prompt, and the app's own failure lines are hidden from the history it sees.
+
+## Card #192 — Google Play badge (2026-11-07)
+- Google approved the Android app (production build 3). Added a Google Play badge next to the App Store one on the landing and /get-app; on Android the app buttons, /get-app and browser visits to /my/ go to Google Play. Copy says "the app for iPhone and Android".
