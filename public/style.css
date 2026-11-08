@@ -67,6 +67,7 @@ header {
 }
 
 .btn-login {
+  white-space: nowrap;
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 0.9rem;
@@ -230,8 +231,8 @@ header {
 
 .feature-copy {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .feature-title {
@@ -282,7 +283,7 @@ header {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 18px;
 }
 
@@ -299,7 +300,9 @@ header {
 }
 
 .appstore-badge svg {
-  height: 54px;
+  height: 48px;
+  width: auto;
+  display: block;
 }
 
 .appstore-badge:hover {
