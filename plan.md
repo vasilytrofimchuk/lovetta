@@ -1306,3 +1306,6 @@ Same path as Mystery Lab (#181): Capacitor shell, strict `playstore` content lev
 ## Card #192 — landing: only store badges, no prices (2026-11-07)
 - Owner: removed the pink "Get the app" button (only the official App Store and Google Play badges stay) and the pricing block — plans are chosen inside the app only.
 - Fix: on phones the two store badges now sit in one row, the "Always Connected" feature line stacks like the others, and the header "Get the app" button no longer wraps.
+
+## Fix — retired chat model (2026-11-08)
+- thedrummer/rocinante-12b was withdrawn from OpenRouter (scene generation 404). Replaced with thedrummer/unslopnemo-12b (code defaults + migration v72 for the fallback setting).

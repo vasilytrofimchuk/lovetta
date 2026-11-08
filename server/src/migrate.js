@@ -67,7 +67,7 @@ const MIGRATIONS = [
         ('image_level_telegram', '1'),
         ('max_companions', '3'),
         ('tip_request_threshold_usd', '"10.00"'),
-        ('openrouter_model', '"thedrummer/rocinante-12b"'),
+        ('openrouter_model', '"thedrummer/unslopnemo-12b"'),
         ('openrouter_fallback_model', '"sao10k/l3.1-euryale-70b"'),
         ('fal_image_model', '"fal-ai/flux/dev"'),
         ('fal_video_model', '"wan/v2.6/image-to-video"'),
@@ -1456,6 +1456,13 @@ const MIGRATIONS = [
     // NULL and count as level 2 (the web level they were mostly made at).
     name: 'v71_companion_media_content_level',
     sql: `ALTER TABLE companion_media ADD COLUMN IF NOT EXISTS content_level SMALLINT;`,
+  },
+  {
+    // thedrummer/rocinante-12b was withdrawn from OpenRouter (404 "no provider serves this model",
+    // seen 2026-11-08). Same author, same 12B size, still served.
+    name: 'v72_replace_rocinante',
+    sql: `UPDATE app_settings SET value = '"thedrummer/unslopnemo-12b"' WHERE key = 'openrouter_fallback_model' AND value = '"thedrummer/rocinante-12b"';
+          UPDATE app_settings SET value = '"thedrummer/unslopnemo-12b"' WHERE key = 'openrouter_model' AND value = '"thedrummer/rocinante-12b"';`,
   },
 ];
 
