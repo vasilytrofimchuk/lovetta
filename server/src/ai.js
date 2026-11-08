@@ -208,7 +208,7 @@ async function* streamChat(systemPrompt, messages, opts = {}) {
 
   const settings = await getAISettings();
   const primaryModel = opts.model || settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
-  const fallbackModel = settings.openrouter_fallback_model || 'thedrummer/rocinante-12b';
+  const fallbackModel = settings.openrouter_fallback_model || 'thedrummer/unslopnemo-12b';
   let model = primaryModel;
   const platform = opts.platform || 'web';
 
@@ -452,7 +452,7 @@ async function chatCompletion(systemPrompt, messages, opts = {}) {
 
   const settings = await getAISettings();
   const primaryModel = opts.model || settings.openrouter_model || 'qwen/qwen3-235b-a22b-2507';
-  const fallbackModel = settings.openrouter_fallback_model || 'thedrummer/rocinante-12b';
+  const fallbackModel = settings.openrouter_fallback_model || 'thedrummer/unslopnemo-12b';
   let model = primaryModel;
   const platform = opts.platform || 'web';
 

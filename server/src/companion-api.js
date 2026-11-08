@@ -253,7 +253,7 @@ Examples:
 - Kitchen counter, barefoot on cool tiles
 - Sunny café table, latte in hand`,
             [{ role: 'user', content: `Her first words: ${content}` }],
-            { model: 'thedrummer/rocinante-12b', max_tokens: 25 }
+            { model: 'thedrummer/unslopnemo-12b', max_tokens: 25 }
           ),
           sceneTimeoutMs,
           'first companion scene'
