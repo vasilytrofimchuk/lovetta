@@ -14,8 +14,7 @@ function isTestEmail(email) {
 }
 
 function isRelayEmail(email) {
-  return email.endsWith('@telegram.lovetta.ai') ||
-    email.endsWith('@apple.lovetta.ai');
+  return email.endsWith('@apple.lovetta.ai');
 }
 
 function isCompanionEmailDeliverable(row = {}) {

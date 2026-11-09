@@ -201,21 +201,6 @@ test.describe('Content Levels — platform detection', () => {
     expect(detectPlatform(req)).toBe('web');
   });
 
-  test('detects telegram from user-agent', () => {
-    const req = { get: () => 'TelegramBot/1.0', body: {} };
-    expect(detectPlatform(req)).toBe('telegram');
-  });
-
-  test('detects telegram from tg_web_app user-agent', () => {
-    const req = { get: () => 'Mozilla/5.0 tg_web_app', body: {} };
-    expect(detectPlatform(req)).toBe('telegram');
-  });
-
-  test('detects telegram from initData in body', () => {
-    const req = { get: () => 'Mozilla/5.0', body: { initData: 'query_id=xxx' } };
-    expect(detectPlatform(req)).toBe('telegram');
-  });
-
   test('detects iOS app from WKWebView user-agent (iPhone, no Safari)', () => {
     const req = { get: () => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148', body: {} };
     expect(detectPlatform(req)).toBe('appstore');
@@ -321,11 +306,6 @@ test.describe('Content Levels — buildContentPrompt', () => {
 
   test('includes age rule for appstore platform', async () => {
     const prompt = await buildContentPrompt('appstore');
-    expect(prompt).toContain('MANDATORY AGE RULE');
-  });
-
-  test('includes age rule for telegram platform', async () => {
-    const prompt = await buildContentPrompt('telegram');
     expect(prompt).toContain('MANDATORY AGE RULE');
   });
 
@@ -586,10 +566,10 @@ test.describe('Admin Settings — AI economics', () => {
 
     expect(settings).toHaveProperty('text_level_web');
     expect(settings).toHaveProperty('text_level_appstore');
-    expect(settings).toHaveProperty('text_level_telegram');
+    expect(settings).toHaveProperty('text_level_playstore');
     expect(settings).toHaveProperty('image_level_web');
     expect(settings).toHaveProperty('image_level_appstore');
-    expect(settings).toHaveProperty('image_level_telegram');
+    expect(settings).toHaveProperty('image_level_playstore');
   });
 });
 
@@ -651,7 +631,7 @@ test.describe('AI Module — buildSystemPrompt', () => {
   });
 
   test('includes age rule for all platforms', async () => {
-    for (const platform of ['web', 'appstore', 'telegram']) {
+    for (const platform of ['web', 'appstore']) {
       const prompt = await buildSystemPrompt('Test prompt', platform);
       expect(prompt).toContain('MANDATORY AGE RULE');
       expect(prompt).toContain('NEVER reference, imply, or roleplay being underage');
@@ -675,12 +655,6 @@ test.describe('Image Generation — prompt constraints', () => {
   test('web level returns appropriate constraints', async () => {
     // Default web level is 2 (Intimate)
     const rules = await buildImagePrompt('web');
-    expect(rules).toContain('IMAGE RULES');
-  });
-
-  test('telegram level returns suggestive constraints', async () => {
-    // Default telegram level is 1 (Suggestive)
-    const rules = await buildImagePrompt('telegram');
     expect(rules).toContain('IMAGE RULES');
   });
 });
@@ -1673,8 +1647,7 @@ test.describe('Email Deliverability — isCompanionEmailDeliverable', () => {
     expect(isCompanionEmailDeliverable({ email: 'foo@test.com' })).toBe(false);
   });
 
-  test('rejects relay emails (telegram, apple)', () => {
-    expect(isCompanionEmailDeliverable({ email: 'tg-12345@telegram.lovetta.ai' })).toBe(false);
+  test('rejects relay emails (apple)', () => {
     expect(isCompanionEmailDeliverable({ email: 'apple_xyz@apple.lovetta.ai' })).toBe(false);
   });
 

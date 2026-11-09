@@ -837,7 +837,7 @@ router.delete('/users/:id', async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'No database' });
   try {
     const { rowCount } = await pool.query(
-      `UPDATE users SET email = NULL, google_id = NULL, apple_id = NULL, telegram_id = NULL,
+      `UPDATE users SET email = NULL, google_id = NULL, apple_id = NULL,
        deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
       [req.params.id]
     );

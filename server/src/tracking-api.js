@@ -10,7 +10,7 @@ const { geoFromIp } = require('./geo');
 const router = Router();
 
 // -- Bot detection ----------------------------------------
-const BOT_RE = /bot|crawler|spider|crawling|headless|lighthouse|pingdom|uptimerobot|synthetics|monitoring|preview|fetch|curl|wget|python-|java\/|go-http|axios|node-fetch|facebookexternalhit|twitterbot|linkedinbot|slackbot|telegrambot|whatsapp|applebot|bingpreview|googlebot/i;
+const BOT_RE = /bot|crawler|spider|crawling|headless|lighthouse|pingdom|uptimerobot|synthetics|monitoring|preview|fetch|curl|wget|python-|java\/|go-http|axios|node-fetch|facebookexternalhit|twitterbot|linkedinbot|slackbot|whatsapp|applebot|bingpreview|googlebot/i;
 
 function isBot(ua) {
   return BOT_RE.test(ua || '');

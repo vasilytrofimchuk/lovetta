@@ -136,7 +136,7 @@ test.describe('OpenRouter — chatCompletion (real API)', () => {
     const ai = require('../server/src/ai');
     const user = await createTestUser(request);
 
-    for (const platform of ['web', 'appstore', 'telegram']) {
+    for (const platform of ['web', 'appstore']) {
       const result = await ai.chatCompletion(
         'You are a companion. Reply with one word only.',
         [{ role: 'user', content: 'Hi' }],

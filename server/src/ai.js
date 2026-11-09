@@ -113,7 +113,7 @@ async function getAISettings() {
 /**
  * Build a full system prompt with content level rules appended.
  * @param {string} basePrompt - Companion personality/context prompt
- * @param {string} platform - 'web', 'appstore', 'telegram'
+ * @param {string} platform - 'web', 'appstore', 'playstore'
  * @returns {string} Full system prompt with content rules
  */
 async function buildSystemPrompt(basePrompt, platform = 'web', userId = null) {
