@@ -32,13 +32,6 @@
       window.addEventListener('orientationchange', syncWideTabletShell);
     })();
   </script>
-  <script>
-    // Load the Telegram SDK only inside Telegram: telegram.org does not answer in Russia, and a
-    // blocking script from it kept the page black there (card #290).
-    if (/tgWebApp/.test(location.hash + location.search) || window.TelegramWebviewProxy || window.external && 'notify' in window.external) {
-      document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
-    }
-  </script>
 </head>
 <body>
   <div id="root"></div>

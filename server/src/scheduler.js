@@ -63,7 +63,6 @@ async function runAbandonedPaymentReminders() {
       WHERE u.created_at BETWEEN NOW() - INTERVAL '48 hours' AND NOW() - INTERVAL '24 hours'
         AND s.id IS NULL
         AND r.id IS NULL
-        AND u.email NOT LIKE '%@telegram.lovetta.ai'
         AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
@@ -108,7 +107,6 @@ async function runWelcomeEmailSeries() {
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'welcome_day0'
       WHERE u.created_at > NOW() - INTERVAL '1 hour'
         AND r.id IS NULL
-        AND u.email NOT LIKE '%@telegram.lovetta.ai'
         AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
@@ -150,7 +148,6 @@ async function runWelcomeEmailSeries() {
       WHERE u.created_at BETWEEN NOW() - INTERVAL '25 hours' AND NOW() - INTERVAL '23 hours'
         AND r.id IS NULL
         AND m.id IS NULL
-        AND u.email NOT LIKE '%@telegram.lovetta.ai'
         AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
@@ -195,7 +192,6 @@ async function runWelcomeEmailSeries() {
       ) comp ON true
       WHERE u.created_at BETWEEN NOW() - INTERVAL '73 hours' AND NOW() - INTERVAL '71 hours'
         AND r.id IS NULL
-        AND u.email NOT LIKE '%@telegram.lovetta.ai'
         AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'
@@ -235,7 +231,6 @@ const RENEWAL_REMINDER_SQL = `
       LEFT JOIN email_reminders r ON r.user_id = u.id AND r.reminder_type = 'renewal_reminder'
       WHERE s.current_period_end BETWEEN NOW() + INTERVAL '71 hours' AND NOW() + INTERVAL '73 hours'
         AND r.id IS NULL
-        AND u.email NOT LIKE '%@telegram.lovetta.ai'
         AND u.email NOT LIKE '%@apple.lovetta.ai'
         AND u.email NOT LIKE '%@example.com'
         AND u.email NOT LIKE '%@test.com'

@@ -67,21 +67,6 @@ app.use((req, res, next) => {
 // Card payments are off (2026-11-04): the old card-payment webhook only answers that it is gone.
 app.post('/api/webhooks/stripe', (_req, res) => res.status(410).json({ error: 'Card payments are not available' }));
 
-// Telegram webhook (also needs raw/json body but after stripe raw handler)
-app.post('/api/webhooks/telegram', express.json(), async (req, res) => {
-  try {
-    const { handleBotUpdate, verifyWebhookSecret } = require('./src/telegram');
-    if (!verifyWebhookSecret(req)) {
-      return res.status(403).json({ error: 'Invalid secret' });
-    }
-    await handleBotUpdate(req.body);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('[telegram-webhook]', err.message);
-    res.status(200).json({ ok: true }); // Always 200 to prevent Telegram retries
-  }
-});
-
 // RevenueCat webhook for iOS in-app purchases
 app.post('/api/webhooks/revenuecat', express.json(), async (req, res) => {
   try {
@@ -396,12 +381,6 @@ async function start() {
     console.log(`[lovetta] Server running on port ${PORT}`);
     require('./src/scheduler').startScheduler();
 
-    // Configure Telegram bot profile (non-blocking, non-fatal)
-    const { setupBotProfile, setBotCommands, BOT_TOKEN } = require('./src/telegram');
-    if (BOT_TOKEN) {
-      setupBotProfile().catch(err => console.error('[telegram] setup error:', err.message));
-      setBotCommands().catch(err => console.error('[telegram] commands error:', err.message));
-    }
   });
 }
 

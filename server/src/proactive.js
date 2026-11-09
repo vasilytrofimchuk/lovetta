@@ -18,7 +18,6 @@ const REACTIVATION_LINES = [
 const { sendCompanionEmail } = require('./email');
 const { isCompanionEmailDeliverable } = require('./email-deliverability');
 const { sendPushNotification } = require('./push');
-const { sendMessage: sendTelegramMessage } = require('./telegram');
 const { getUserSubscription } = require('./billing');
 const { trackConsumption, checkMediaBlocked } = require('./consumption');
 const { logEvent, EVENT_TYPES } = require('./events');
@@ -134,7 +133,6 @@ async function runProactiveMessages() {
         c.id AS conversation_id, c.companion_id, c.last_proactive_at,
         uc.name AS companion_name, uc.personality, uc.backstory,
         uc.traits, uc.communication_style, uc.age,
-        tu.telegram_id,
         up.proactive_frequency,
         up.show_actions
       FROM users u
@@ -144,7 +142,6 @@ async function runProactiveMessages() {
         AND (s.current_period_end IS NULL OR s.current_period_end > NOW())
       JOIN conversations c ON c.user_id = u.id
       JOIN user_companions uc ON uc.id = c.companion_id AND uc.is_active = true
-      LEFT JOIN telegram_users tu ON tu.user_id = u.id
       WHERE u.last_activity < NOW() - INTERVAL '${INACTIVITY_HOURS} hours'
         AND COALESCE(up.proactive_messages, true) = true
         AND c.last_message_at IS NOT NULL
@@ -301,20 +298,6 @@ async function runProactiveMessages() {
           }
         }
 
-        // Telegram — rich message with button to open chat
-        if (row.telegram_id) {
-          const SITE_URL = process.env.SITE_URL || 'http://localhost:3900';
-          sendTelegramMessage(row.telegram_id,
-            `💕 <b>${row.companion_name}</b>\n\n${messagePreview}`,
-            {
-              reply_markup: {
-                inline_keyboard: [[
-                  { text: '💬 Reply', web_app: { url: `${SITE_URL}/my/chat/${row.companion_id}` } }
-                ]],
-              },
-            }
-          ).catch(() => {});
-        }
 
         console.log(`[proactive] Sent ${slot} message from ${row.companion_name} to user ${row.user_id}`);
       } catch (err) {
@@ -348,7 +331,6 @@ async function runFreeUserReactivation(pool) {
       c.id AS conversation_id,
       c.companion_id,
       uc.name AS companion_name,
-      tu.telegram_id,
       COALESCE(up.notify_new_messages, TRUE) AS notify_new_messages,
       up.last_notification_at,
       css.language,
@@ -376,7 +358,6 @@ async function runFreeUserReactivation(pool) {
       LIMIT 1
     ) msg ON TRUE
     LEFT JOIN conversation_scene_state css ON css.conversation_id = c.id
-    LEFT JOIN telegram_users tu ON tu.user_id = u.id
     WHERE s.id IS NULL
       AND u.last_activity BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '24 hours'
       AND COALESCE(up.proactive_messages, TRUE) = TRUE
@@ -473,19 +454,6 @@ async function runFreeUserReactivation(pool) {
         }
       }
 
-      if (row.telegram_id) {
-        const SITE_URL = process.env.SITE_URL || 'http://localhost:3900';
-        sendTelegramMessage(row.telegram_id,
-          `<b>${row.companion_name}</b>\n\n${content}`,
-          {
-            reply_markup: {
-              inline_keyboard: [[
-                { text: 'Reply', web_app: { url: `${SITE_URL}/my/chat/${row.companion_id}` } }
-              ]],
-            },
-          }
-        ).catch(() => {});
-      }
 
       sent++;
     } catch (err) {

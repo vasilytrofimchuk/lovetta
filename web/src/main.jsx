@@ -19,7 +19,7 @@ if (browserVisit) {
 }
 
 
-// Register service worker for PWA (skip inside Telegram WebApp and Capacitor native)
-if (!browserVisit && 'serviceWorker' in navigator && !window.Telegram?.WebApp?.initData && !isCapacitor()) {
+// Register service worker for PWA (skip inside Capacitor native)
+if (!browserVisit && 'serviceWorker' in navigator && !isCapacitor()) {
   navigator.serviceWorker.register('/sw.js')
 }

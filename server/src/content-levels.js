@@ -10,7 +10,7 @@ const { getPool } = require('./db');
 
 /**
  * Detect platform from request headers/body.
- * @returns {'web'|'appstore'|'playstore'|'telegram'}
+ * @returns {'web'|'appstore'|'playstore'}
  */
 function detectPlatform(req) {
   const ua = (req.get('user-agent') || '').toLowerCase();
@@ -21,11 +21,6 @@ function detectPlatform(req) {
   const platformHeader = String(req.get('x-lovetta-platform') || '').toLowerCase();
   if (platformHeader === 'android-native' || ua.includes('lovetta-android')) {
     return 'playstore';
-  }
-
-  // Telegram Mini App: initData in body or Telegram bot user-agent
-  if (req.body?.initData || ua.includes('telegrambot') || ua.includes('tg_web_app')) {
-    return 'telegram';
   }
 
   // iOS native app (WKWebView: has iPhone/iPad but no Safari/ in UA)
@@ -87,7 +82,7 @@ async function getContentLevels() {
   }
   const pool = getPool();
   if (!pool) {
-    return { text_level_web: 0, text_level_appstore: 0, text_level_playstore: 0, text_level_telegram: 0, image_level_web: 0, image_level_appstore: 0, image_level_playstore: 0, image_level_telegram: 0 };
+    return { text_level_web: 0, text_level_appstore: 0, text_level_playstore: 0, image_level_web: 0, image_level_appstore: 0, image_level_playstore: 0 };
   }
 
   const { rows } = await pool.query(
@@ -151,7 +146,7 @@ async function getUserExplicitPref(userId) {
 
 /**
  * Get the text content level for a platform.
- * @param {'web'|'appstore'|'playstore'|'telegram'} platform
+ * @param {'web'|'appstore'|'playstore'} platform
  * @returns {number} 0-3
  */
 async function getTextLevel(platform) {
@@ -161,7 +156,7 @@ async function getTextLevel(platform) {
 
 /**
  * Get the image content level for a platform.
- * @param {'web'|'appstore'|'playstore'|'telegram'} platform
+ * @param {'web'|'appstore'|'playstore'} platform
  * @returns {number} 0-3
  */
 async function getImageLevel(platform) {

@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getErrorMessage } from '../lib/api'
 import GoogleSignIn from '../components/GoogleSignIn'
-import TelegramSignIn from '../components/TelegramSignIn'
 import AppleSignIn from '../components/AppleSignIn'
 import { isCapacitor, hasAppleSignIn, hasGoogleSignIn } from '../lib/platform'
 import { clearOnboardingData } from '../lib/onboarding'
@@ -34,13 +33,6 @@ export default function Login() {
       if (utmCampaign) localStorage.setItem('lovetta-utm-campaign', utmCampaign.trim())
     } catch {}
   }, [searchParams])
-
-  // Telegram Mini App: redirect to home for auto-auth
-  useEffect(() => {
-    if (window.Telegram?.WebApp?.initData) {
-      window.location.replace('/my/')
-    }
-  }, [])
 
   // Handle Google OAuth callback
   useEffect(() => {
@@ -170,12 +162,6 @@ export default function Login() {
             <AppleSignIn onError={setError} />
             <GoogleSignIn hideSeparator />
           </div>
-
-          {!nativeApp && (
-            <div className="mt-3">
-              <TelegramSignIn />
-            </div>
-          )}
 
           <div className="mt-4 text-center">
             <Link to="/forgot-password" className="text-sm text-brand-accent hover:underline">

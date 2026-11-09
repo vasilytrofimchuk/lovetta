@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api from '../lib/api'
-import { clearOnboardingData, getPostAuthPath, readOnboardingData } from '../lib/onboarding'
+import { clearOnboardingData } from '../lib/onboarding'
 
 const AuthContext = createContext(null)
 
@@ -8,15 +8,6 @@ export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be inside AuthProvider')
   return ctx
-}
-
-// Detect Telegram Mini App
-function getTelegramWebApp() {
-  try {
-    const tg = window.Telegram?.WebApp
-    if (tg?.initData) return tg
-  } catch {}
-  return null
 }
 
 export function AuthProvider({ children }) {
@@ -50,61 +41,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    const tgWebApp = getTelegramWebApp()
-
-    if (tgWebApp) {
-      // Telegram Mini App — auto-auth via initData
-      const payload = { initData: tgWebApp.initData }
-      const onboardingData = readOnboardingData()
-      const postAuthPath = getPostAuthPath(onboardingData)
-      if (onboardingData?.birthMonth) payload.birthMonth = onboardingData.birthMonth
-      if (onboardingData?.birthYear) payload.birthYear = onboardingData.birthYear
-      if (onboardingData?.termsAccepted) payload.termsAccepted = onboardingData.termsAccepted
-      if (onboardingData?.privacyAccepted) payload.privacyAccepted = onboardingData.privacyAccepted
-      if (onboardingData?.aiConsentAccepted) payload.aiConsentAccepted = onboardingData.aiConsentAccepted
-
-      // Include referral code + click_id + UTM if present
-      const ref = localStorage.getItem('lovetta-ref')
-      if (ref) payload.referralCode = ref
-      const tsClickId = localStorage.getItem('lovetta-ts-click-id')
-      if (tsClickId) payload.tsClickId = tsClickId
-      const utmSource = localStorage.getItem('lovetta-utm-source')
-      if (utmSource) payload.utmSource = utmSource
-      const utmMedium = localStorage.getItem('lovetta-utm-medium')
-      if (utmMedium) payload.utmMedium = utmMedium
-      const utmCampaign = localStorage.getItem('lovetta-utm-campaign')
-      if (utmCampaign) payload.utmCampaign = utmCampaign
-
-      api.post('/api/auth/telegram', payload)
-        .then(({ data }) => {
-          localStorage.setItem('lovetta-token', data.accessToken)
-          localStorage.setItem('lovetta-refresh-token', data.refreshToken)
-          clearOnboardingData()
-          localStorage.removeItem('lovetta-ref')
-          localStorage.removeItem('lovetta-utm-source')
-          localStorage.removeItem('lovetta-utm-medium')
-          localStorage.removeItem('lovetta-utm-campaign')
-          setUser(data.user)
-          tgWebApp.ready?.()
-          tgWebApp.expand?.()
-          if (postAuthPath) {
-            window.location.replace(`/my${postAuthPath}`)
-          }
-        })
-        .catch((err) => {
-          // If age/consent required, redirect to signup
-          const errMsg = err?.response?.data?.error
-          if (errMsg === 'age_consent_required') {
-            window.location.href = '/my/signup?from=telegram'
-            return
-          }
-          // Fallback to normal auth check
-          refreshUser()
-        })
-        .finally(() => setLoading(false))
-    } else {
-      refreshUser()
-    }
+    refreshUser()
   }, [refreshUser])
 
   // Heartbeat every 60s for logged-in users to keep last_activity fresh
@@ -151,10 +88,6 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('lovetta-token')
     localStorage.removeItem('lovetta-refresh-token')
     setUser(null)
-
-    // If in Telegram, close the mini app
-    const tg = getTelegramWebApp()
-    if (tg) tg.close?.()
   }
 
   const deleteAccount = async () => {

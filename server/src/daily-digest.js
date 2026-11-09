@@ -49,8 +49,7 @@ async function gatherStats() {
         COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS today,
         COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours' AND auth_provider = 'email') AS today_email,
         COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours' AND auth_provider = 'google') AS today_google,
-        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours' AND auth_provider = 'apple') AS today_apple,
-        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours' AND auth_provider = 'telegram') AS today_telegram
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours' AND auth_provider = 'apple') AS today_apple
       FROM users`),
     q(`SELECT
         COUNT(*) AS total,
@@ -183,7 +182,7 @@ function formatDigest(stats) {
     '',
     'USERS',
     `  New signups:  ${fmt(s.users.today)}  (total: ${fmt(s.users.total)})`,
-    `  Breakdown:    ${s.users.today_email || 0} email / ${s.users.today_google || 0} google / ${s.users.today_apple || 0} apple / ${s.users.today_telegram || 0} telegram`,
+    `  Breakdown:    ${s.users.today_email || 0} email / ${s.users.today_google || 0} google / ${s.users.today_apple || 0} apple`,
     '',
     'VISITORS',
     `  New (24h):    ${fmt(s.visitors.today)}  (total: ${fmt(s.visitors.total)})`,
@@ -256,7 +255,7 @@ function formatDigest(stats) {
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         ${section('Users')}
         ${row('New signups', `${fmt(s.users.today)} <span style="color:#b8a4d6;">(${fmt(s.users.total)} total)</span>`)}
-        ${row('Breakdown', `${s.users.today_email || 0} email / ${s.users.today_google || 0} google / ${s.users.today_apple || 0} apple / ${s.users.today_telegram || 0} tg`)}
+        ${row('Breakdown', `${s.users.today_email || 0} email / ${s.users.today_google || 0} google / ${s.users.today_apple || 0} apple`)}
 
         ${section('Visitors')}
         ${row('New (24h)', `${fmt(s.visitors.today)} <span style="color:#b8a4d6;">(${fmt(s.visitors.total)} total)</span>`)}
