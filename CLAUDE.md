@@ -8,7 +8,7 @@
 - **Своё дерево:** `~/projects/tracker/scripts/wt.sh <слаг>` (на Mac владельца — `/Users/vasily/projects/tracker/…`); после слияния `wt.sh --done <слаг>`
 - **Тесты:** `scripts/test.sh` (Playwright `--project=api`)
 - **Выкладка:** `scripts/ship.sh "<сообщение>" [--card N]` — PR, слияние, выкладка на коробку, проверка `https://lovetta.ai/api/health`
-- **Приложения:** iPhone `npm run ios:archive`
+- **Приложения:** `scripts/release.sh ios` — сборка на mac3 из origin/main и выгрузка в App Store Connect, «что едет», журнал (трекер #413)
 - **Тестовые учётки:** не описаны — заведи нужные и впиши сюда
 - **Доска:** проект `lovetta` — `board.sh list lovetta`
 <!-- passport:end -->
