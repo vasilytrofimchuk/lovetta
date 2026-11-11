@@ -295,3 +295,9 @@ Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
 Из своей ветки в своём рабочем дереве: `scripts/ship.sh "<сообщение>" [--card N]` — коммит, PR, проверки, слияние,
 `scripts/deploy-box.sh`, живая проверка, отметка в карточке. `--no-deploy` — смержить без выкладки (со следующим релизом),
 `--deploy` — выложить, даже если менялись только документы, `--hold` — PR без слияния. Своё у проекта — `scripts/ship.conf`.
+
+## Тесты — одна команда (трекер #412, 11.11.2026)
+`scripts/test.sh` — тесты проекта на любой машине агентов без подготовки: зависимости, браузер Playwright и своя тестовая
+база Postgres без root (общий tracker/scripts/test-project.sh). Что запускается — `SHIP_TEST` в `scripts/ship.conf`;
+другая команда в том же окружении — `scripts/test.sh npx playwright test --project=ui`. `scripts/ship.sh` гоняет их сам, если у
+репозитория нет CI.
