@@ -290,3 +290,8 @@ Single-page dashboard at `/admin.html`. Token-gated via `ADMIN_TOKEN`.
 - **3900** — Dev server
 - **3000** — NEVER use (occupied by another project)
 - **3800** — NEVER use (occupied by KeyID)
+
+## Выкладка — одна команда (трекер #399, 11.11.2026)
+Из своей ветки в своём рабочем дереве: `scripts/ship.sh "<сообщение>" [--card N]` — коммит, PR, проверки, слияние,
+`scripts/deploy-box.sh`, живая проверка, отметка в карточке. `--no-deploy` — смержить без выкладки (со следующим релизом),
+`--deploy` — выложить, даже если менялись только документы, `--hold` — PR без слияния. Своё у проекта — `scripts/ship.conf`.
