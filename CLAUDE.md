@@ -1,5 +1,18 @@
 # Claude Instructions for Lovetta.ai
 
+<!-- passport:start (трекер #412) — паспорт проекта: одинаковые строки во всех проектах; меняется вместе с проектом -->
+## Паспорт проекта
+- **Адрес:** https://lovetta.ai
+- **Где живёт:** общая коробка `ssh tracker-box`, `/opt/selectic-heroku-exit`, контейнер `lovetta`
+- **База:** общий Postgres на коробке, база `lovetta`
+- **Своё дерево:** `~/projects/tracker/scripts/wt.sh <слаг>` (на Mac владельца — `/Users/vasily/projects/tracker/…`); после слияния `wt.sh --done <слаг>`
+- **Тесты:** `scripts/test.sh` (Playwright `--project=api`)
+- **Выкладка:** `scripts/ship.sh "<сообщение>" [--card N]` — PR, слияние, выкладка на коробку, проверка `https://lovetta.ai/api/health`
+- **Приложения:** iPhone `npm run ios:archive`
+- **Тестовые учётки:** не описаны — заведи нужные и впиши сюда
+- **Доска:** проект `lovetta` — `board.sh list lovetta`
+<!-- passport:end -->
+
 AI girlfriend app — entertaining and intimate chat with AI-generated women. Domain: lovetta.ai
 
 Express.js server + PostgreSQL + monorepo (flat structure for Phase 1).
